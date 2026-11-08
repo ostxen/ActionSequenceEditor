@@ -21,7 +21,7 @@ namespace NBC.ActionEditor
             }
             catch (Exception e)
             {
-                return string.Empty;
+                throw new InvalidOperationException("ActionEditor JSON serialization failed; no data was saved.", e);
             }
         }
 
@@ -38,9 +38,6 @@ namespace NBC.ActionEditor
             }
             catch (Exception e)
             {
-#if UNITY_EDITOR
-                File.WriteAllText($"{Application.dataPath}/../error_json.json", serializedState);
-#endif
                 Debug.LogError(e);
                 return null;
             }

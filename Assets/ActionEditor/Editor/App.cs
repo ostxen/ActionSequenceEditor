@@ -26,19 +26,19 @@ namespace NBC.ActionEditor
             get => _textAsset;
             set
             {
-                _textAsset = value;
-
-                if (_textAsset == null)
+                if (value == null)
                 {
+                    _textAsset = null;
                     AssetData = null;
                 }
                 else
                 {
-                    var obj = Json.Deserialize(typeof(Asset), _textAsset.text);
+                    var obj = Json.Deserialize(typeof(Asset), value.text);
                     if (obj is Asset asset)
                     {
-                        AssetData = asset;
                         asset.Init();
+                        _textAsset = value;
+                        AssetData = asset;
                         OnOpenAsset?.Invoke(AssetData);
                         App.Refresh();
                     }
@@ -62,11 +62,7 @@ namespace NBC.ActionEditor
 
         public static void SaveAsset()
         {
-            if (AssetData == null) return;
-            AssetData.OnBeforeSerialize();
-            var path = AssetDatabase.GetAssetPath(TextAsset);
-            var json = Json.Serialize(AssetData);
-            System.IO.File.WriteAllText(path, json);
+            throw new InvalidOperationException("Legacy JSON editing is read-only during the ActionEditor migration. Use the native document workbench when available; original files are not overwritten.");
         }
 
         public static void OnGUIEnd()
@@ -101,17 +97,12 @@ namespace NBC.ActionEditor
         /// </summary>
         public static void TryAutoSave()
         {
-            var timespan = DateTime.Now - _lastSaveTime;
-            if (timespan.Seconds > Prefs.autoSaveSeconds)
-            {
-                AutoSave();
-            }
+            // Legacy JSON is reference-only. Native sessions own their save schedule.
         }
 
         public static void AutoSave()
         {
-            _lastSaveTime = DateTime.Now;
-            SaveAsset();
+            // Never autosave reference documents through the retired JSON path.
         }
 
         #endregion

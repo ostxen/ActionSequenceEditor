@@ -58,32 +58,7 @@ namespace NBC.ActionEditor
 
         void CreateConfirm()
         {
-            var path = $"{Prefs.savePath}/{_createName}.json";
-            if (string.IsNullOrEmpty(_createName))
-            {
-                EditorUtility.DisplayDialog(Lan.TipsTitle, Lan.CreateAssetTipsNameNull, Lan.TipsConfirm);
-            }
-            else if (AssetDatabase.LoadAssetAtPath<TextAsset>(path) != null)
-            {
-                EditorUtility.DisplayDialog(Lan.TipsTitle, Lan.CreateAssetTipsRepetitive, Lan.TipsConfirm);
-            }
-            else
-            {
-                var t = Prefs.AssetTypes[_selectType];
-                var inst = Activator.CreateInstance(t);
-                if (inst != null)
-                {
-                    var json = Json.Serialize(inst);
-                    System.IO.File.WriteAllText(path, json);
-                    AssetDatabase.Refresh();
-                    var textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
-                    if (textAsset != null)
-                    {
-                        App.OnObjectPickerConfig(textAsset);
-                    }
-                    editorWindow.Close();
-                }
-            }
+            throw new InvalidOperationException("Legacy JSON creation is disabled. The new ActionEditor uses native document assets; no original JSON file has been written.");
         }
     }
 }
