@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：`implementing`，已获准依序实施 ActionEditor A00–B06；Combat 专属实施与验收暂缓。
-- 当前执行任务：`A04`。
-- 下一任务：完成 `A04` 数据模型与程序集边界，再进入 `A05`。
+- 当前执行任务：`A05`。
+- 下一任务：完成 `A05` 正式文档会话与可靠存储，再进入 `B01`。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -80,7 +80,7 @@
 | [x] | A01 | 编辑数据与持久化方案验证、定案 | A00 |
 | [x] | A02 | 时间、身份、顺序和业务扩展契约定案 | A01 |
 | [x] | A03 | 保留路径的数据安全修复与回归 | A00、A01 |
-| [ ] | A04 | 数据基础和 Runtime/Editor 依赖整理 | A02、A03 |
+| [x] | A04 | 数据基础和 Runtime/Editor 依赖整理（Combat 专属项暂缓） | A02、A03 |
 | [ ] | A05 | 文档会话、工作区与可靠存储 | A04 |
 | [ ] | B01 | 编辑命令、事务和 Undo/Redo | A05 |
 | [ ] | B02 | 原生 UI Toolkit 工作台与文档切换 | B01 |
@@ -339,3 +339,12 @@
 - 最终报告 `.codex/runs/20261108T183813Z-128f81ac/`：42/42 EditMode passed，0 failed/skipped/inconclusive；实际生成方案覆盖 18 项目/605 源文件；dotnet build 0 错误、46 警告。
 - 未覆盖及限制：文件提交基础尚未接入正式原生文档，A05 必须通过真实文档会话和资源引用往返验收，不能将本任务称为正式存储完成。File.Replace 失败时不降级为覆盖写；磁盘文件并发在最终校验与 OS 替换之间仍存在极短竞争窗口，跨进程协作锁不在首版范围。未覆盖断电/进程被杀、网络盘、Editor 重启；未修改 Combat 或原始样本。
 - 下一任务：A04。
+
+### A04 执行记录
+
+- 状态 / 日期：`complete`（本轮 ActionEditor 范围），2026-11-09。
+- 实现：单根 ActionDocument、DocumentGroup/DocumentTrack、SerializeReference TimelineEvent，内置点/区间示例、稳定 ID、版本、分类、锁定、重叠策略；纯 Runtime 校验器诊断无效时间/ID/版本、重复 ID、未知空事件及非法重叠，检查不修改输入。工作区和播放状态不进入模型。
+- 依赖：`NBC.ActionEditor.Editor` includePlatforms 明确为 Editor；Runtime 唯一 UnityEditor using 加 UNITY_EDITOR 条件，AssetDatabase 调用原已有条件保护。源码搜索无 Combat 类型依赖。验证程序集独立且 Editor-only，正式 Runtime 不反向依赖它。Combat Runtime 反向依赖按用户授权暂缓，未修改其文件。
+- 验证：`.codex/runs/20261108T184204Z-94c6b760/`，46/46 EditMode passed，0 failed/skipped/inconclusive；新增模型合法性、非变异诊断、邻接/重叠、Unity 克隆不共享集合且保留多态类型测试。实际生成方案覆盖 18 项目/608 源文件，dotnet build 0 错误、43 警告。
+- 未覆盖：未授权 Player Build，Editor 编译和源码依赖检查不能替代 E02 的实际 Player 边界验证。尚未保存正式模型资产，真实引用与会话往返由 A05 验收；没有把 A01 探针当作正式模型已验收。
+- 下一任务：A05。
