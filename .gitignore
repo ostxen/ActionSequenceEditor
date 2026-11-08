@@ -1,0 +1,56 @@
+# Unity generated files and local editor state.
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Bb]uild/
+/[Bb]uilds/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/.vs/
+/.idea/
+/.vscode/
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+sysinfo.txt
+*.stacktrace
+crash.dmp
+.DS_Store
+Thumbs.db
+
+# Local credentials, signing material and generated workflow evidence.
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+*.keystore
+*.jks
+**/Library/Pipeline/
+/.codex/runs/
+__pycache__/
+*.py[cod]
+/error_json.json
+
+# Combat is local reference material, not part of this repository yet.
+/Assets/CombatEditor/
+/Assets/CombatEditor.meta
+/Assets/ScriptableObjects/
+/Assets/ScriptableObjects.meta
+
+# Duplicate CLI copied into Assets; the workflow uses Tools/UnityCLI instead.
+/Assets/Tools/
+/Assets/Tools.meta

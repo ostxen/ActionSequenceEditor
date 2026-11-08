@@ -1,0 +1,25 @@
+{
+    "name": "UniTask.YooAsset",
+    "rootNamespace": "",
+    "references": [
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "YooAsset"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITASK_YOOASSET_SUPPORT"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.tuyoogame.yooasset",
+            "expression": "",
+            "define": "UNITASK_YOOASSET_SUPPORT"
+        }
+    ],
+    "noEngineReferences": false
+}
