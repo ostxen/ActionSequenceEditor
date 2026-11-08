@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：`implementing`，已获准依序实施 ActionEditor A00–B06；Combat 专属实施与验收暂缓。
-- 当前执行任务：`A00`。
-- 下一任务：`A01`，须先通过本轮范围内的 A00 验收。
+- 当前执行任务：`A01`（待确认隔离持久化样本范围）。
+- 下一任务：完成 `A01` 技术验证及格式定案，再进入 `A02`。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -30,7 +30,7 @@
 5. 涉及真实 Unity 状态时先读 `.codex/skills/unity-cli/SKILL.md`，运行 `python .codex/scripts/workflow.py doctor`；确认唯一 Editor/PID 指向新路径。不要用仍打开的旧工程或旧 Player 兜底。
 6. 旧路径生成的预览/审批不可沿用；需要写入时在新路径重新预览、展示范围、取得真实确认和审批。不要复制连接描述符或读取鉴权内容。
 7. 根据“下一任务”和用户指示继续。上一任务为 `implementing`/`validating` 时先确认实际落地程度，不能直接重跑有副作用的步骤；为 `blocked` 时先处理阻塞。
-8. 完成一个任务后更新本文件的状态、证据、风险与下一任务，再停止等待用户安排。
+8. 完成一个任务后更新本文件的状态、证据、风险与下一任务。当前已授权串行推进 A00–B06；涉及新的资产写入、破坏性操作或必要取舍时仍须停下确认。
 
 首次执行背景：计划编写时 Unity 为 2022.3.62f3，工程没有 Git 仓库。此处是历史记录，不保证重开后的环境相同。既有工作流完整文档结构检查曾因缺少 PyYAML、markdown-it-py 阻塞，A00 应重新核实，不自动安装。
 
@@ -72,11 +72,11 @@
 
 ## 4. 总任务列表
 
-所有未勾选项均未实施。各任务具体工作和验收见下一节。
+勾选仅表示执行记录中明确范围已验收；用户暂缓的 Combat 专属项不计入本轮通过范围。未勾选项以当前任务及执行记录为准。
 
 | 完成 | ID | 任务 | 前置依赖 |
 |---|---|---|---|
-| [ ] | A00 | 重命名后环境、源码和行为基线 | 用户重开工程并要求开始 |
+| [x] | A00 | 重命名后环境、源码和行为基线（仅本轮 ActionEditor 范围） | 用户重开工程并要求开始 |
 | [ ] | A01 | 编辑数据与持久化方案验证、定案 | A00 |
 | [ ] | A02 | 时间、身份、顺序和业务扩展契约定案 | A01 |
 | [ ] | A03 | 保留路径的数据安全修复与回归 | A00、A01 |
@@ -282,4 +282,19 @@
 
 - 已核对架构文档：第 13 节是阶段路线，第 16.3 节仍有实施前决策，原文不是逐项任务清单。
 - 已核对工程内 ActionEditor、Combat 目录和现有 Agent/任务模板；本次未修改实现、资源、程序集或项目设置。
-- 后续执行记录追加在本节之后。当前所有实施任务均未完成。
+- 后续执行记录追加在本节之后；本节仅描述计划编写时的历史状态。
+
+### A00 执行记录
+
+- 状态 / 日期：`complete`（仅用户确认的 ActionEditor 范围），2026-11-09。本地工作流记录 UTC 时间为 2026-11-08，保留原始运行 ID，不改写时间戳。
+- 用户请求与允许范围：初始化 Git；依序实施 A00–B06；Combat 专属验收暂缓；逐项本地提交，远程地址后补。
+- 开始前现状：真实根目录为 `E:/Unity Projects/ActionEditor`，无 Git，现已建立 `main`，初始化提交为 `77b7069`。ActionEditor 包 2.0.0；Unity 2022.3.62f3；Pipeline 0.10.0-exp.1；CLI 1.0.0-beta.16。doctor 确认唯一当前项目 Editor 为 ready。初始测试发现 0 用例，未当作通过。
+- 关键决策：不修改原始业务或样本。测试使用内存构造的非 Combat 对象图，不创建持久资产。Combat 目录及 `Assets/ScriptableObjects/` 下的战斗示例连同对应根 `.meta` 均忽略；重复 CLI `Assets/Tools/` 忽略。没有读取 Pipeline 凭据。
+- 修改文件与交付物：根 `.gitignore`、`.gitattributes`、`README.md`、本任务记录；`Assets/ActionEditor/Tests/Editor/NBC.ActionEditor.Editor.Tests.asmdef` 与 `LegacyBaselineTests.cs`。所有新增 `.meta` 均由 Unity 生成。
+- 原始样本：`LegacyBaselineTests.CreateSample()` 建立一个 Group、一个 Track、0.25–0.75 秒区间（Message=`baseline`、Amount=7）及 1.25 秒点事件。真实入口 `Asset.Init`/`Json.Serialize`/`Json.Deserialize` 校验父子关系及往返；`StartTimePointer`/`EndTimePointer` 校验一次进入、结束及倒退回调。最短空文档 0.1 秒和点事件长度 0 为独立显式预期。
+- 实际验证：`python .codex/scripts/workflow.py doctor` 通过；初始 Editor 编译通过且无错误；`python -m unittest discover -s .codex/tests -p "test_*.py" -v` 为 33/33 通过；真实生成方案覆盖为 17 个项目、597 个源文件；最终 `dotnet build ActionEditor.sln --nologo -v:q -clp:ErrorsOnly` 成功，0 错误、45 警告（包含原有第三方/业务代码，不宣称零警告）。
+- 测试身份及最终结果：程序集 `NBC.ActionEditor.Editor.Tests`，EditMode；`DocumentLength_HasExistingMinimumForEmptyGraph`、`Json_RoundTripPreservesPolymorphicTimesAndParameters`、`ObjectGraph_RebuildsParentsAndDuration`、`PreviewPointers_ForwardEndAndRewindHaveObservableCallbacks`、`Signal_HasZeroDurationAndClampsNegativeStart`。通过 `verify --profile unity --test-filter "NBC.ActionEditor.Editor.Tests" --filter-type assembly --test-mode editor --timeout 300` 在执行前重新发现，终态核对 5/5 passed、0 failed/skipped/inconclusive。
+- Unity 报告：`.codex/runs/20261108T180123Z-4de351b6/`（doctor）、`20261108T180451Z-d12b514d/`（未改源码编译）、`20261108T181127Z-4edc19a8/`（首次测试身份）、`20261108T181450Z-cd796194/`（最终 5 用例编译/测试）。这些本地生成证据不提交，以上身份与结果摘要纳入 Git。
+- 上游核查：读取 `https://github.com/NoBugCn/ActionEditor` 及 master 的 `Editor/App.cs`、`Runtime/Utility/FullSerializerExtensions.cs`，主页显示最新提交 `7943620ffe5314ff268e368979e1b24012ce3369`（2025-07-24），无 release/tag；两个文件仍包含先切目标、失败返回空串和 `TimeSpan.Seconds` 代码，没有可直接移植的 master 修复。未覆盖所有分支及 forks，不宣称穷尽核查。保留来源，本地和主页根目录未见独立许可证，公开再分发前需确认许可。
+- 未运行与风险：完整文档结构检查因缺 `PyYAML`、`markdown-it-py` 为 blocked（报告 `.codex/runs/20261108T180758Z-5d2ea1b7/`），未安装。未运行 PlayMode、Player Build、UI 手势/视觉验收、完整资源引用验证。Combat 攻击样本播放/预览/中断按用户选择暂缓。保存失败、损坏数据、60/120 秒等仍为 A03 待复现，不以静态审查冒充已修复。
+- 下一任务：A01，先明确隔离测试资产的创建、编辑、保存、重开、Undo/Redo 和清理范围；不覆盖原始资产。

@@ -1,0 +1,7 @@
+{
+    "name": "NBC.ActionEditor.Editor.Tests",
+    "references": ["NBC.ActionEditor", "NBC.ActionEditor.Editor"],
+    "includePlatforms": ["Editor"],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "autoReferenced": false
+}
