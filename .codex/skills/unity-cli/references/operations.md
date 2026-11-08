@@ -29,7 +29,9 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
-当前审计封装仅支持 `asset delete`、`settings.player set`、`build set_settings`、`build run`。其他写入需先核实包内实现并补充策略及离线测试，不直接运行原始 CLI 绕过封装。
+当前审计封装支持 `asset delete`、`settings.player set`、`build set_settings`、`build run`，以及项目专用 `actioneditor.validation persistence_probe`。其他写入需先核实包内实现并补充策略及离线测试，不直接运行原始 CLI 绕过封装。
+
+`actioneditor.validation persistence_probe` 是 A01 的固定范围验证命令，不接受任意路径或代码。dry-run 只列目标；apply 要求真实确认。它拒绝已存在的 `Assets/ActionEditorValidationA01` 及对应 `.meta`，仅在本次新建文件夹内创建 `Document.asset` 和 `Resource.asset`，验证两个多态事件、时间、参数、Unity 资源引用、Undo/Redo 及保存/卸载/重载，然后在 finally 中仅清理本次创建的文件夹。不调用全工程 SaveAssets，不修改包、设置或 Combat。清理失败时报错，超时结果未知时先检查固定目标，不能重放。正式存储仍待 A01 定案，该命令不代表新平台存储已完成。
 
 以下仅示范流程，不代表授权删除。先写一份参数 JSON，例如 `{"asset":"Assets/Example.asset"}`，随后：
 

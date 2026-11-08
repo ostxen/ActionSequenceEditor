@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：`implementing`，已获准依序实施 ActionEditor A00–B06；Combat 专属实施与验收暂缓。
-- 当前执行任务：`A01`（待确认隔离持久化样本范围）。
-- 下一任务：完成 `A01` 技术验证及格式定案，再进入 `A02`。
+- 当前执行任务：`A02`。
+- 下一任务：完成 `A02` 时间/身份/扩展契约，再进入 `A03`。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -77,7 +77,7 @@
 | 完成 | ID | 任务 | 前置依赖 |
 |---|---|---|---|
 | [x] | A00 | 重命名后环境、源码和行为基线（仅本轮 ActionEditor 范围） | 用户重开工程并要求开始 |
-| [ ] | A01 | 编辑数据与持久化方案验证、定案 | A00 |
+| [x] | A01 | 编辑数据与持久化方案验证、定案 | A00 |
 | [ ] | A02 | 时间、身份、顺序和业务扩展契约定案 | A01 |
 | [ ] | A03 | 保留路径的数据安全修复与回归 | A00、A01 |
 | [ ] | A04 | 数据基础和 Runtime/Editor 依赖整理 | A02、A03 |
@@ -271,7 +271,7 @@
 
 | 决策 | 负责解决的任务 | 当前状态 |
 |---|---|---|
-| 编辑资产形式、Undo 和资源引用 | A01 | 未决定，需最小验证 |
+| 编辑资产形式、Undo 和资源引用 | A01 | 已定案：单根 ScriptableObject + SerializeReference，见架构 7.7 |
 | 时间存储、边界、排序、身份、窗口/重叠表达 | A02 | 未决定，需测试真值表 |
 | 预览隔离方案与角色脚本控制 | C03 | 未决定，需实测 |
 | 第二个非战斗业务选择 | E01 | 未决定 |
@@ -298,3 +298,22 @@
 - 上游核查：读取 `https://github.com/NoBugCn/ActionEditor` 及 master 的 `Editor/App.cs`、`Runtime/Utility/FullSerializerExtensions.cs`，主页显示最新提交 `7943620ffe5314ff268e368979e1b24012ce3369`（2025-07-24），无 release/tag；两个文件仍包含先切目标、失败返回空串和 `TimeSpan.Seconds` 代码，没有可直接移植的 master 修复。未覆盖所有分支及 forks，不宣称穷尽核查。保留来源，本地和主页根目录未见独立许可证，公开再分发前需确认许可。
 - 未运行与风险：完整文档结构检查因缺 `PyYAML`、`markdown-it-py` 为 blocked（报告 `.codex/runs/20261108T180758Z-5d2ea1b7/`），未安装。未运行 PlayMode、Player Build、UI 手势/视觉验收、完整资源引用验证。Combat 攻击样本播放/预览/中断按用户选择暂缓。保存失败、损坏数据、60/120 秒等仍为 A03 待复现，不以静态审查冒充已修复。
 - 下一任务：A01，先明确隔离测试资产的创建、编辑、保存、重开、Undo/Redo 和清理范围；不覆盖原始资产。
+
+### A01 准备记录（不是完成证据）
+
+- 状态：`implementing`，准备固定目标 Unity 持久化探针，尚未执行资产写入或决定正式格式。
+- 新增独立 Editor 验证程序集 `NBC.ActionEditor.Validation.Editor`，只依赖数据层和 Pipeline Attributes；正式核心不依赖此程序集。使用 ScriptableObject 根资产及 SerializeReference 多态列表进行最小验证。
+- 命令 `actioneditor.validation persistence_probe` 只允许在不存在的 `Assets/ActionEditorValidationA01/` 新建两个资产，测试后清理自己新建的文件夹，拒绝覆盖既有路径。已经补充工作流 mutation 策略、操作说明及三项离线审批契约测试，不能通过 query 或任意求值调用。
+- 准备验证：Editor 编译通过（`.codex/runs/20261108T181858Z-183406be/`）；离线测试 36/36 通过。真实持久化验证仍等待 preview 后的用户确认，不将准备代码或离线 mock 当作 A01 通过。
+
+### A01 执行记录
+
+- 状态 / 日期：`complete`，2026-11-09。
+- 用户确认：已展示固定目录、两个资产、修改/Undo/Redo/保存/重载及 finally 清理，用户选择“批准本次隔离验证及清理”；审批记录 `.codex/runs/20261108T182418Z-8de5fc8f/approval.json`，未虚构授权。
+- 实际写入：经 `unity preview "actioneditor.validation persistence_probe"` → approve → apply，当前项目 Editor 对 `Assets/ActionEditorValidationA01/Document.asset` 与 `Resource.asset` 创建、编辑、撤销、重做、保存、卸载并重载，逐字段比较两种事件、时间、参数和 Unity 资源引用；最终返回 passed，随后只读检查目录及根 `.meta` 均不存在，原始资产未改。
+- 方案比较及定案：旧 FullSerializer 普通对象图已由 A00 验证基本往返，但没有可直接用的 Unity Undo 根对象和持久资源引用契约；维持 JSON 需额外引用解析、命令历史及可靠提交服务。单根 ScriptableObject + SerializeReference 实测可用，根拥有内部全部值对象，不跨文档共享可变事件，比多子资产减少独立资源/Undo 生命周期。选择此方案；正式字段/ID 在 A02/A04 建立，可靠存储在 A03/A05 实施。同步架构 7.7、16.3。
+- 修改：独立 Editor 验证程序集、固定目标命令及数据探针、工作流审核策略、三个离线审批回归、操作规程、架构与本记录。命令不接收任意路径/代码，目录存在时拒绝覆盖；不调用全工程 SaveAssets，不修改包/设置；`.meta` 由 Unity 生成。
+- 实际检查：Unity 编译通过；生成方案 18 项目/599 源文件，dotnet build 0 错误、46 警告；离线测试 36/36 通过。A00 5 个 Unity 测试的最终结果仍是其独立记录，本任务不把离线 mock 说成真实持久化测试。
+- 报告：`.codex/runs/20261108T182044Z-6d336db1/`（真实 dry-run）、`20261108T182431Z-86ae09c0/`（真实 apply，六类检查通过并清理）。
+- 未覆盖：这是实际卸载/重载，不是 Editor 进程重启；首版完整窗口关闭重开、正式存储故障、未知类型、跨文档会话、Player Build 尚待后续任务。未迁移或删除旧资产，没有声称正式平台完成。
+- 下一任务：A02。
