@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：`implementing`，已获准依序实施 ActionEditor A00–B06；Combat 专属实施与验收暂缓。
-- 当前执行任务：`A02`。
-- 下一任务：完成 `A02` 时间/身份/扩展契约，再进入 `A03`。
+- 当前执行任务：`A03`。
+- 下一任务：完成 `A03` 保留路径数据安全回归，再进入 `A04`。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -78,7 +78,7 @@
 |---|---|---|---|
 | [x] | A00 | 重命名后环境、源码和行为基线（仅本轮 ActionEditor 范围） | 用户重开工程并要求开始 |
 | [x] | A01 | 编辑数据与持久化方案验证、定案 | A00 |
-| [ ] | A02 | 时间、身份、顺序和业务扩展契约定案 | A01 |
+| [x] | A02 | 时间、身份、顺序和业务扩展契约定案 | A01 |
 | [ ] | A03 | 保留路径的数据安全修复与回归 | A00、A01 |
 | [ ] | A04 | 数据基础和 Runtime/Editor 依赖整理 | A02、A03 |
 | [ ] | A05 | 文档会话、工作区与可靠存储 | A04 |
@@ -272,7 +272,7 @@
 | 决策 | 负责解决的任务 | 当前状态 |
 |---|---|---|
 | 编辑资产形式、Undo 和资源引用 | A01 | 已定案：单根 ScriptableObject + SerializeReference，见架构 7.7 |
-| 时间存储、边界、排序、身份、窗口/重叠表达 | A02 | 未决定，需测试真值表 |
+| 时间存储、边界、排序、身份、窗口/重叠表达 | A02 | 已定案：double 秒、稳定 GUID、显式边界排序；见时间契约 |
 | 预览隔离方案与角色脚本控制 | C03 | 未决定，需实测 |
 | 第二个非战斗业务选择 | E01 | 未决定 |
 | 目标构建平台与输出范围 | E02 | 待明确授权 |
@@ -317,3 +317,14 @@
 - 报告：`.codex/runs/20261108T182044Z-6d336db1/`（真实 dry-run）、`20261108T182431Z-86ae09c0/`（真实 apply，六类检查通过并清理）。
 - 未覆盖：这是实际卸载/重载，不是 Editor 进程重启；首版完整窗口关闭重开、正式存储故障、未知类型、跨文档会话、Player Build 尚待后续任务。未迁移或删除旧资产，没有声称正式平台完成。
 - 下一任务：A02。
+
+### A02 执行记录
+
+- 状态 / 日期：`complete`，2026-11-09；范围是具体契约、类型草案及真值表，不是 Combat 播放器。
+- 交付：`Docs/ActionEditor-Contracts.md`；`Runtime/Model/TimelineTime.cs` 的时间转换/跨点/区间/循环计数、稳定 ID 及 BoundaryKey；`TimeContractTests.cs`。
+- 决策：平台有限非负 double 秒，业务 Tick/采样率显式转换；区间左闭右开；首次含零、随后 `(previous,current]`；末端点先于完成；排序为绝对时间、循环号、Exit/Point/Enter、Group/Track/Event 次序及 ordinal ID。文档/事件复制生成新 GUID，重排不改 ID；Logic/Presentation 分类；Allow/Reject 区间重叠策略；注册冲突拒绝、不覆盖；明确 Completed/Stopped/Cancelled/Faulted 和跳转预览区别。接口职责及正式字段草案已给出，不将它们冒充已实现会话/调度器。
+- 真值表：0/末端、重复时间、跨多个点、短区间、跨多循环、同刻事件、循环末端与下轮零点、停止/取消区别均有明确预期。21 个新增参数化/普通测试实际验证基础算法和排序，5 个原始基线继续通过。
+- 验证：`verify --profile unity --test-filter "NBC.ActionEditor.Editor.Tests" --filter-type assembly --test-mode editor --timeout 300`，报告 `.codex/runs/20261108T183008Z-b6b6ea92/`，26/26 passed，0 failed/skipped/inconclusive；真实方案 18 项目/601 源文件，dotnet build 0 错误、47 警告。
+- 中间失败：第一次编译请求已受理，但域重载期间 CLI 连接断开导致封装报告 failed（`.codex/runs/20261108T182806Z-12876b0c/`）。先只读确认 Editor ready、console 无编译错误，再执行最终验证，未重放任何资产写入。
+- 未覆盖：真实播放实例的停止/取消清理及完整事件展开在业务任务验证；没有声称已支持 Combat、联网或确定性模拟。未创建持久资产，`.meta` 由 Unity 生成。
+- 下一任务：A03。
