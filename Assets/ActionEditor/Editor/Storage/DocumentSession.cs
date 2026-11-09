@@ -6,6 +6,11 @@ using UnityEngine;
 
 namespace NBC.ActionEditor.Storage
 {
+    public sealed class SessionSelection : ScriptableObject
+    {
+        public List<string> Ids = new();
+    }
+
     [Serializable]
     public sealed class WorkspaceState
     {
@@ -28,7 +33,10 @@ namespace NBC.ActionEditor.Storage
         public ActionDocument Document { get; private set; }
         public string Path { get; private set; }
         public WorkspaceState Workspace { get; } = new();
-        public List<string> Selection { get; } = new();
+        private readonly SessionSelection selection = ScriptableObject.CreateInstance<SessionSelection>();
+        internal SessionSelection SelectionObject => selection;
+        public List<string> Selection => selection.Ids;
+        internal bool TransactionActive;
         public bool IsDirty => Document != null && EditorJsonUtility.ToJson(Document) != savedState;
         public double LastSaveTime { get; private set; }
         public event Action Changed;
@@ -36,6 +44,7 @@ namespace NBC.ActionEditor.Storage
         public DocumentSession(IDocumentStore store = null)
         {
             this.store = store ?? new DocumentStore();
+            selection.hideFlags = HideFlags.HideAndDontSave;
             Undo.undoRedoPerformed += OnUndoRedo;
         }
 
@@ -64,6 +73,7 @@ namespace NBC.ActionEditor.Storage
         public void Save(string newPath = null)
         {
             EnsureAlive();
+            if (TransactionActive) throw new InvalidOperationException("Finish or cancel the active edit before saving.");
             if (Document == null) throw new InvalidOperationException("No document.");
             var target = newPath ?? Path;
             if (string.IsNullOrWhiteSpace(target)) throw new InvalidOperationException("Choose a document target.");
@@ -79,6 +89,7 @@ namespace NBC.ActionEditor.Storage
         public void DiscardAndClose()
         {
             EnsureAlive();
+            if (TransactionActive) throw new InvalidOperationException("Finish or cancel the active edit before closing.");
             Release();
             NotifyChanged();
         }
@@ -118,11 +129,13 @@ namespace NBC.ActionEditor.Storage
             savedState = null;
             revision = null;
             Selection.Clear();
+            Undo.ClearUndo(selection);
         }
 
         private void EnsureCanSwitch()
         {
             EnsureAlive();
+            if (TransactionActive) throw new InvalidOperationException("Finish or cancel the active edit first.");
             if (IsDirty) throw new InvalidOperationException("Save or explicitly discard the current document first.");
         }
         private void EnsureAlive() { if (disposed) throw new ObjectDisposedException(nameof(DocumentSession)); }
@@ -132,6 +145,8 @@ namespace NBC.ActionEditor.Storage
             if (disposed) return;
             Undo.undoRedoPerformed -= OnUndoRedo;
             Release();
+            Undo.ClearUndo(selection);
+            UnityEngine.Object.DestroyImmediate(selection);
             Changed = null;
             disposed = true;
         }
