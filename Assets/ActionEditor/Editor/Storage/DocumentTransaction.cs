@@ -36,7 +36,7 @@ namespace NBC.ActionEditor.Storage
             if (finished) throw new ObjectDisposedException(nameof(DocumentTransaction));
             if (original == null || session.Document != original || EditorJsonUtility.ToJson(original) != initialJson)
                 throw new InvalidOperationException("Document changed during candidate editing.");
-            DocumentValidation.RequireValid(Candidate);
+            session.Registry.RequireValid(Candidate);
             ValidateLocks(original, Candidate);
             var known = new HashSet<string>(Candidate.Groups.SelectMany(g => g.Tracks).SelectMany(t => t.Events).Select(e => e.Id));
             Selection.RemoveAll(id => !known.Contains(id));

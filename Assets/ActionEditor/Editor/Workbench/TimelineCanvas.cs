@@ -114,7 +114,8 @@ namespace NBC.ActionEditor.Workbench
                     if (rect.width <= 0 || rect.height <= 0) continue;
                     var color = Session.Selection.Contains(item.Id) ? new Color(0.95f, 0.67f, 0.25f) : item.Kind == EventKind.Point ? new Color(0.4f, 0.8f, 0.72f) : new Color(0.35f, 0.55f, 0.85f);
                     Fill(painter, rect, color);
-                    if (rect.width > 40) context.DrawText(item.Name, new Vector2(rect.x + 4, rect.y + 3), 11, Color.black);
+                    if (rect.width > 40) context.DrawText(Session.Registry.Find(item)?.Summary(item) ?? item.Name ?? item.TypeId,
+                        new Vector2(rect.x + 4, rect.y + 3), 11, Color.black);
                 }
             }
             Fill(painter, new Rect(0, 0, TimelineTransform.HeaderWidth, contentRect.height), new Color(0.16f, 0.17f, 0.19f));

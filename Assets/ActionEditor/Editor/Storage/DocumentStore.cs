@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using NBC.ActionEditor.Model;
+using NBC.ActionEditor.Extensibility;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
@@ -17,6 +18,8 @@ namespace NBC.ActionEditor.Storage
 
     public sealed class DocumentStore : IDocumentStore
     {
+        private readonly EventRegistry registry;
+        public DocumentStore(EventRegistry registry = null) { this.registry = registry ?? EventRegistry.CreateDefault(); }
         public ActionDocument Load(string path)
         {
             path = ValidatePath(path);
@@ -36,6 +39,7 @@ namespace NBC.ActionEditor.Storage
         {
             path = ValidatePath(path);
             DocumentValidation.RequireValid(document);
+            registry.RequireValid(document);
             if (SerializationUtility.HasManagedReferencesWithMissingTypes(document))
                 throw new InvalidDataException("Missing event types; saving would lose data.");
             var existed = File.Exists(path);

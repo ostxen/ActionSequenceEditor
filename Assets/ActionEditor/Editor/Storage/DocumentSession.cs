@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NBC.ActionEditor.Model;
+using NBC.ActionEditor.Extensibility;
 using UnityEditor;
 using UnityEngine;
 
@@ -40,10 +41,12 @@ namespace NBC.ActionEditor.Storage
         public bool IsDirty => Document != null && EditorJsonUtility.ToJson(Document) != savedState;
         public double LastSaveTime { get; private set; }
         public event Action Changed;
+        public EventRegistry Registry { get; }
 
-        public DocumentSession(IDocumentStore store = null)
+        public DocumentSession(IDocumentStore store = null, EventRegistry registry = null)
         {
-            this.store = store ?? new DocumentStore();
+            Registry = registry ?? EventRegistry.CreateDefault();
+            this.store = store ?? new DocumentStore(Registry);
             selection.hideFlags = HideFlags.HideAndDontSave;
             Undo.undoRedoPerformed += OnUndoRedo;
         }
@@ -75,6 +78,7 @@ namespace NBC.ActionEditor.Storage
             EnsureAlive();
             if (TransactionActive) throw new InvalidOperationException("Finish or cancel the active edit before saving.");
             if (Document == null) throw new InvalidOperationException("No document.");
+            Registry.RequireValid(Document);
             var target = newPath ?? Path;
             if (string.IsNullOrWhiteSpace(target)) throw new InvalidOperationException("Choose a document target.");
             store.Save(target, Document, target == Path ? revision : null);

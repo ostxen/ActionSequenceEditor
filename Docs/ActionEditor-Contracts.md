@@ -52,3 +52,11 @@ A02 定案，2026-11-09。实施进度仅记录在[唯一任务清单](../.codex
 注册先校验全部输入再发布。相同 TypeId 或定义类型发生冲突时拒绝整个候选注册并提供双方身份，不允许“后注册覆盖”。工厂返回独立事件，核心验证类型、时间和 ID。未知 TypeId、缺失 managed-reference 类型、失效资源引用保留可诊断状态并禁止保存，不静默删事件。
 
 预览只返回可释放的会话资源，必须明确取消来源和所有权，不约定 UniTask/业务框架。每个窗口持有自己的文档会话、注册上下文和选择，所有属性修改进入同一事务。
+
+### B05 已固化接口
+
+Editor 的 `NBC.ActionEditor.Extensibility.IEventRegistration.Describe()` 返回 `EventDescriptor`；由 TypeCache 发现无参构造 provider。每个描述符指定 TypeId、DefinitionType、Owner、Factory、Summary、Properties、Validate 及可选 Preview/Exporter 工厂。注册先验证整个批次，包括类型/ID 唯一性、工厂类型和独立实例/ID，再发布；不允许覆盖已有 owner。
+
+`EventPropertyContext` 提供原生字段与事务修改入口，业务属性不直接绑定正式文档的 SerializedObject。文档会话、事务和正式存储调用同一注册校验。未知类型可保留诊断，禁止保存；未知 managed-reference 类型不加载为可保存的空事件。资源允许 null，非空资源必须为有效持久引用。预览/导出工厂为可选能力，当前没有默认业务预览或导出实现，不把接口存在当作业务已接入。
+
+Unity 序列化会规范化 null 集合/字符串。平台示例为可空 Tags/Message/Name 保存显式空值标记，Undo/Redo 和保存不把用户 null 选择默认为 empty。业务新增其他可空值类型时同样需要给出序列化表示与往返测试。

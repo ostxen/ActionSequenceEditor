@@ -37,7 +37,9 @@ namespace NBC.ActionEditor.Model
     public abstract class TimelineEvent
     {
         public string Id = StableId.New();
-        public string Name = "Event";
+        [SerializeField] private string eventName = "Event";
+        [SerializeField] private bool nameNull;
+        public string Name { get => nameNull ? null : eventName; set { nameNull = value == null; eventName = value ?? ""; } }
         public double Start;
         public double Duration;
         public int Order;
@@ -50,9 +52,18 @@ namespace NBC.ActionEditor.Model
     [Serializable]
     public sealed class SignalEvent : TimelineEvent
     {
-        public string Message = "Signal";
+        [SerializeField] private string message = "Signal";
+        [SerializeField] private bool messageNull;
+        public string Message { get => messageNull ? null : message; set { messageNull = value == null; message = value ?? ""; } }
         public UnityEngine.Object Resource;
-        public List<string> Tags = new();
+        [SerializeField] private List<string> tags = new();
+        [SerializeField] private bool tagsNull;
+        // Unity normalizes serialized null lists to empty. Keep the user's null choice explicitly.
+        public List<string> Tags
+        {
+            get => tagsNull ? null : tags;
+            set { tagsNull = value == null; tags = value ?? new List<string>(); }
+        }
         public override string TypeId => "actioneditor.signal";
         public override EventKind Kind => EventKind.Point;
     }
