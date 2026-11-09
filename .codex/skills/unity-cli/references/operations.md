@@ -45,6 +45,8 @@ python .codex/scripts/workflow.py unity apply --plan "实际运行目录/preview
 预览有效期一小时，绑定工程路径、命令、参数、工作区内容指纹和指定输入。apply 再次比较实时预览后消耗一次性审批。文件变化、过期或预览变化均要求重新预览与授权。审批不是防恶意篡改的安全边界。
 工作区指纹不依赖 Git，覆盖 Assets、Packages、ProjectSettings、工作流、工具及文档输入，排除生成证据、缓存与 Pipeline 凭据目录。Unity 内存状态仍以二次预览为准。
 
+`actioneditor.validation session_probe` 是 A05 的固定范围验证命令，不接受路径/代码参数。仅新建不存在的 `Assets/ActionEditorValidationA05/`，在其中创建 A/B 正式文档及资源，使用 DocumentSession/DocumentStore 实际保存、重复提交、关闭重开、失败切换、资源引用往返，最后清理本次新建目录。原始资产、包和设置不改；必须先 preview 并展示三个目标及清理范围，再取得真实确认，不能沿用 A01 的审批。
+
 ## Player 和证据
 
 Development Player 查询必须显式使用 `unity runtime-status --runtime-path "Player工作目录绝对路径"`。返回工作目录必须匹配，不能借用另一个 Player。

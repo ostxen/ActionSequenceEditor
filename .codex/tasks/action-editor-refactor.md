@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：`implementing`，已获准依序实施 ActionEditor A00–B06；Combat 专属实施与验收暂缓。
-- 当前执行任务：`A05`。
-- 下一任务：完成 `A05` 正式文档会话与可靠存储，再进入 `B01`。
+- 当前执行任务：`B01`。
+- 下一任务：完成 `B01` 编辑事务与 Undo/Redo，再进入 `B02`。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -81,7 +81,7 @@
 | [x] | A02 | 时间、身份、顺序和业务扩展契约定案 | A01 |
 | [x] | A03 | 保留路径的数据安全修复与回归 | A00、A01 |
 | [x] | A04 | 数据基础和 Runtime/Editor 依赖整理（Combat 专属项暂缓） | A02、A03 |
-| [ ] | A05 | 文档会话、工作区与可靠存储 | A04 |
+| [x] | A05 | 文档会话、工作区与可靠存储 | A04 |
 | [ ] | B01 | 编辑命令、事务和 Undo/Redo | A05 |
 | [ ] | B02 | 原生 UI Toolkit 工作台与文档切换 | B01 |
 | [ ] | B03 | 时间轴绘制、坐标和命中检测 | B02 |
@@ -348,3 +348,19 @@
 - 验证：`.codex/runs/20261108T184204Z-94c6b760/`，46/46 EditMode passed，0 failed/skipped/inconclusive；新增模型合法性、非变异诊断、邻接/重叠、Unity 克隆不共享集合且保留多态类型测试。实际生成方案覆盖 18 项目/608 源文件，dotnet build 0 错误、43 警告。
 - 未覆盖：未授权 Player Build，Editor 编译和源码依赖检查不能替代 E02 的实际 Player 边界验证。尚未保存正式模型资产，真实引用与会话往返由 A05 验收；没有把 A01 探针当作正式模型已验收。
 - 下一任务：A05。
+
+### A05 准备记录（不是完成证据）
+
+- 状态：`implementing`。新增 DocumentSession/WorkspaceState、DocumentStore，工作副本与持久定义隔离，成功后切换，保存后更新路径/修订/成功时间，dirty 文档切换必须显式保存或丢弃；重复关闭/释放、失败打开/保存及会话独立性已通过内存测试。
+- 正式存储用 Unity 序列化 API 编码及读回验证，可靠提交基础原子替换目标后通过 AssetDatabase.ImportAsset 导入，不手写 YAML/GUID/meta。未知托管引用和无效模型阻止保存。
+- 当前 `.codex/runs/20261108T184543Z-ac5584b9/` 编译/Unity 测试通过，但真实正式文档保存和引用往返尚未执行。已新增固定目录 session_probe，待新 preview、真实确认后才可创建/清理资产，不沿用 A01 授权。
+
+### A05 执行记录
+
+- 状态 / 日期：`complete`，2026-11-09。
+- 实现：独立 DocumentSession、工作副本、内容脏比较、WorkspaceState、选择、成功后切换与保存、显式丢弃关闭和幂等 Dispose。保存失败不更新目标/修订/成功时间，dirty 切换拒绝；自动保存接入总时长单调计时，成功后更新标记。正式原生存储通过 Unity 序列化编码、卸载读回校验、可靠文件提交及 AssetDatabase.ImportAsset，拒绝未知托管类型/非法定义/非 Assets 路径/已有目标无修订覆盖。
+- 真实验收：固定新目录 `Assets/ActionEditorValidationA05/` 下 A/B 正式文档与 Texture2D 引用，完成两次保存、释放重开、参数/引用逐字段比较、失败打开保留 A、A/B 切换、重复关闭。最终资产目录及根 `.meta` 已只读确认不存在，无原始资产改动。
+- 授权证据：初次预览过期后审批被拒绝（`.codex/runs/20261108T234739Z-851d555c/`），没有执行写入。重新 preview `.codex/runs/20261108T234758Z-d0ddf512/` 并展示范围，用户再次选择“批准这份新预览并执行”，审批 `.codex/runs/20261109T003536Z-8323a67a/`；apply `.codex/runs/20261109T003552Z-a8be6a1e/` 真实返回 passed，六项内容/会话检查通过并清理。
+- 最终验证：`.codex/runs/20261109T003639Z-7ae51843/`，50/50 EditMode passed，0 failed/skipped/inconclusive；离线 37/37 passed；真实生成方案 18 项目/612 源文件，dotnet build 0 错误、43 警告。内存失败注入明确仅证明会话逻辑，不替代真实资产探针。
+- 未覆盖/风险：Editor 进程重启、断电、网络盘、完整工作台 UI 与持久用户工作区尚未验收；Unity 导入失败发生在文件已提交后会明确报错，用户需检查目标再决定下一步。新建文档尚无路径时不自动保存。未触碰 Combat，未运行 Player Build。保存使用 Unity 序列化输出而非手写 YAML，GUID/meta 仍由 Unity 管理。
+- 下一任务：B01。
