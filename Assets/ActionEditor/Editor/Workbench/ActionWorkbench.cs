@@ -20,6 +20,8 @@ namespace NBC.ActionEditor.Workbench
         private readonly List<string> paths = new();
         private bool refreshing;
         private TimelineCanvas canvas;
+        private TimelineInteraction interaction;
+        public TimelineInteraction Interaction => interaction;
 
         [MenuItem("NBC/Action Editor/Open Workbench", false, -10)]
         public static void Open() => GetWindow<ActionWorkbench>().Show();
@@ -35,12 +37,16 @@ namespace NBC.ActionEditor.Workbench
 
         private void OnDisable()
         {
+            interaction?.Dispose(); interaction = null;
             EditorApplication.projectChanged -= RefreshLibrary;
             if (Session != null) { Session.Changed -= Refresh; Session.Dispose(); Session = null; }
         }
 
+        private void OnLostFocus() => interaction?.Cancel();
+
         public void CreateGUI()
         {
+            interaction?.Dispose(); interaction = null;
             rootVisualElement.Clear();
             var toolbar = new Toolbar();
             toolbar.Add(new ToolbarButton(() => Run(NewDocument)) { text = "New", name = "new-document" });
@@ -69,6 +75,7 @@ namespace NBC.ActionEditor.Workbench
             var center = new VisualElement(); center.style.flexGrow = 1; center.style.minWidth = 250;
             timelineHost = new VisualElement { name = "timeline-host" }; timelineHost.style.flexGrow = 1;
             canvas = new TimelineCanvas(Session);
+            interaction = new TimelineInteraction(canvas, message => { if (status != null) status.text = message; });
             timelineHost.Add(canvas);
             center.Add(timelineHost);
             status = new Label("No document"); status.style.whiteSpace = WhiteSpace.Normal; status.style.maxHeight = 100;
