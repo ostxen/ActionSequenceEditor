@@ -25,6 +25,7 @@ READ_ONLY = frozenset({
 
 # Explicit catalog, not a prefix heuristic. Only implemented return/poll contracts are admitted.
 MUTATIONS = {
+    "actioneditor.validation workbench_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation session_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation persistence_probe": {"dry_run": True, "confirm": True, "poll": None},
     "asset delete": {"dry_run": True, "confirm": True, "poll": None},

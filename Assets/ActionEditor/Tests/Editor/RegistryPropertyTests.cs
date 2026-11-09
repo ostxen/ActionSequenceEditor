@@ -86,6 +86,15 @@ namespace NBC.ActionEditor.Tests
             {
                 window.position = new Rect(50, 50, 1200, 700); window.Show(); yield return null;
                 window.NewDocument(); window.AddEvent("actioneditor.signal");
+                var canvas = window.rootVisualElement.Q<TimelineCanvas>();
+                canvas.Focus();
+                var playhead = window.Session.Workspace.Playhead;
+                window.Interaction.Begin(new Vector2(250, 10), 0, false);
+                Assert.That(window.Interaction.IsActive, Is.True);
+                using (var escape = KeyDownEvent.GetPooled(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape }))
+                { escape.target = canvas; canvas.SendEvent(escape); }
+                Assert.That(window.Interaction.IsActive, Is.False);
+                Assert.That(window.Session.Workspace.Playhead, Is.EqualTo(playhead));
                 var a = window.Session.Selection.Single();
                 window.AddEvent("actioneditor.signal"); var b = window.Session.Selection.Single();
                 window.Session.Selection.Clear(); window.Session.Selection.Add(a); window.Session.Selection.Add(b); window.Session.NotifyChanged();

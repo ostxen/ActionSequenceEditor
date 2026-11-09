@@ -117,9 +117,9 @@ namespace NBC.ActionEditor.Workbench
             Session.DiscardAndClose(); return true;
         }
 
-        public void SaveDocument()
+        public void SaveDocument(string target = null)
         {
-            var path = Session.Path;
+            var path = target ?? Session.Path;
             if (string.IsNullOrEmpty(path)) path = EditorUtility.SaveFilePanelInProject("Save ActionEditor document", "ActionDocument", "asset", "Choose a new document path.");
             if (!string.IsNullOrEmpty(path)) Session.Save(path);
         }

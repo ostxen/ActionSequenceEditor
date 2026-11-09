@@ -12,6 +12,17 @@ from workflow_lib.unity import Unity, READ_ONLY, MUTATIONS
 
 
 class ActionEditorValidationTests(unittest.TestCase):
+    def test_workbench_probe_is_fixed_mutation_not_read_only(self):
+        command = "actioneditor.validation workbench_probe"
+        self.assertNotIn(command, READ_ONLY)
+        self.assertEqual(MUTATIONS[command], {"dry_run": True, "confirm": True, "poll": None})
+        unity = Unity(SimpleNamespace(context=Context()))
+        unity.ready = Mock()
+        unity.call = Mock()
+        with self.assertRaises(WorkflowError):
+            unity.query(command, {})
+        unity.call.assert_not_called()
+
     def test_session_probe_is_fixed_mutation_not_read_only(self):
         command = "actioneditor.validation session_probe"
         self.assertNotIn(command, READ_ONLY)

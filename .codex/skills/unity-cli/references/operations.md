@@ -49,6 +49,8 @@ python .codex/scripts/workflow.py unity apply --plan "实际运行目录/preview
 
 ## Player 和证据
 
+`actioneditor.validation workbench_probe` 是 B06 的固定范围命令，不接受路径/代码参数。仅新建不存在的 `Assets/ActionEditorValidationB06/` 中 Sample.asset 和 Resource.asset，打开本次专属原生工作台窗口，通过真实原生字段编辑点/区间、集合/null、Esc 取消、Undo/Redo、SaveDocument 保存、关闭并在新窗口重开，检查 ID/参数/引用及保存后撤销脏状态；最后关闭本次窗口，清理本次目录。不操作用户已打开窗口，不改包/设置/Combat，不调用全工程 SaveAssets。必须独立 preview、展示目标与清理范围、真实确认后 approve/apply，不沿用 A01/A05 授权。超时结果未知先只读检查，不能重放。
+
 Development Player 查询必须显式使用 `unity runtime-status --runtime-path "Player工作目录绝对路径"`。返回工作目录必须匹配，不能借用另一个 Player。
 每次执行生成 `.codex/runs/<运行ID>/report.json` 与 `report.md`。`report --run "实际运行目录"` 只重新呈现已有证据，不执行验证。
 只读白名单不包含截图、文件读取、任意代码求值和菜单执行。截图会写文件，必须按具体任务范围处理，不代表视觉验收。

@@ -2,9 +2,9 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：`implementing`，已获准依序实施 ActionEditor A00–B06；Combat 专属实施与验收暂缓。
-- 当前执行任务：`B06`。
-- 下一任务：准备 `B06` 固定隔离样本的真实工作台闭环，资产写入前单独 preview 和确认。
+- 总体状态：本轮 ActionEditor A00–B06 `complete`；Combat 专属实施与验收暂缓。
+- 当前执行任务：无，已完成本轮授权范围。
+- 下一任务：等待用户指定；不自动开始 C01 或扩大 Combat 接入。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -87,7 +87,7 @@
 | [x] | B03 | 时间轴绘制、坐标和命中检测 | B02 |
 | [x] | B04 | 选择、拖动、缩放、吸附与取消 | B03 |
 | [x] | B05 | 业务注册、原生属性编辑与校验反馈 | B04 |
-| [ ] | B06 | 通用平台最小闭环阶段验收 | B05 |
+| [x] | B06 | 通用平台最小闭环阶段验收 | B05 |
 | [ ] | C01 | Combat 定义映射与确定性数据构建 | B06 |
 | [ ] | C02 | Combat 播放实例与最小运行时接入 | C01 |
 | [ ] | C03 | 预览会话、动画求值和资源所有权 | C02 |
@@ -417,3 +417,20 @@
 - 实际验证：`.codex/runs/20261109T112114Z-89753e38/`，69/69 EditMode passed，0 failed/skipped/inconclusive；测试包括冲突整批回滚、共享工厂拒绝、自定义类型属性/校验/Undo/Redo、真实窗口集合/null/多选、向量和数值、错误定位与修正、未知类型及临时资源保护。真实方案覆盖 18 项目/623 源文件，dotnet build 0 错误、43 警告。
 - 未覆盖：可选预览/导出是业务扩展入口，本轮不实现 Combat 播放器或实际导出业务；资源字段空引用允许，引用存在时要求持久且有效。平台 UI 提供字符串集合，其他复杂集合由业务属性 provider 扩展；不使用旧反射 IMGUI Inspector。本任务无持久资产写入，完整真实保存重开链路待 B06。
 - 下一任务：B06。
+
+### B06 准备记录（不是完成证据）
+
+- 状态：`implementing`，新增固定范围 `actioneditor.validation workbench_probe`；只允许新建 `Assets/ActionEditorValidationB06/Sample.asset` 和 `Resource.asset`，操作本次创建的工作台窗口，最后清理本次目录。源码已审核，不接受任意路径/代码参数，不操作用户已有窗口。
+- 准备验证：`.codex/runs/20261109T112547Z-05f93df0/` Editor 编译和 69 个 EditMode 用例通过；离线审批策略 38/38 通过。真实保存/关闭/重开尚未执行，等待独立 preview 与用户确认，不沿用 A05 授权。
+- 首次真实 apply `20261109T113418Z-d82af82b` 在 Esc 检查失败；finally 已清理，随后只读确认目录及根 meta 均不存在，没有重放。探针合成键盘事件前遗漏 canvas.Focus，已补齐，真实窗口同场景回归 `20261109T113531Z-0dfd1427` 69/69 passed。需新预览和新用户确认，不能复用已消耗审批，尚未宣称持久闭环通过。
+
+### B06 执行记录
+
+- 状态 / 日期：`complete`（本轮通用平台范围），2026-11-09。
+- 授权与真实执行：新 preview `.codex/runs/20261109T113723Z-c894641c/preview.json` 展示两个新资产及清理范围后，用户再次批准；approval `20261109T113832Z-653f8061`，apply `20261109T113848Z-6f29c45e` 实际 passed。没有复用首次消耗的审批。
+- 固定样本及入口：`Assets/ActionEditorValidationB06/Sample.asset`、`Resource.asset`，新建专属 ActionWorkbench 窗口；经 NewDocument/AddEvent 注册入口创建点与区间，通过真实 TextField/DoubleField/Vector3Field/ObjectField 与集合按钮编辑，Esc 事件取消工作区定位；Undo/Redo 恢复参数。SaveDocument 使用与工具栏同一保存路径，新增可选目标参数避免测试触发文件选择对话框，不改变无参用户行为。
+- 独立预期：点 0.25 秒、消息 B06 point、Name=null、Tags=null；区间 1.25 秒/0.5 秒、Value=7、Offset=(1,2,3)，两者引用同一持久资源。保存关闭窗口、卸载原资产，在新窗口 OpenDocument 重开后比较原 ID 与全部上述参数/引用。非法负长度属性修改不改原文及已保存字节；保存后 Undo 为 dirty、Redo 回到保存态为 clean。验证命令返回八项通过，不以截图或 mock 替代真实资产往返。
+- 清理：finally 关闭本次窗口并删除本次新建目录；apply 后只读检查目录及根 `.meta` 均不存在。未修改用户已有窗口、Combat、原始资产、包或设置。
+- 最终验证：`.codex/runs/20261109T113932Z-0959f722/`，69/69 EditMode passed，0 failed/skipped/inconclusive；离线审批/工作流 38/38 passed。真实方案覆盖 18 项目/624 源文件；最终 dotnet build 0 错误、43 警告。无通用完整资产检查，未提供目标的 asset-validation 明确 skipped，不当作所有资产通过。
+- 未覆盖与交付边界：实际窗口与 UI Toolkit 事件/字段已执行，但不是人工鼠标视觉验收或 Editor 进程重启；未做 Player Build、Combat 播放/预览、性能门禁及持久工作区布局。A00–B06 最小平台通过不代表 C–E 业务已完成。完整文档结构检查仍缺 PyYAML/markdown-it-py，未安装依赖。未公开发布或 push，远程地址仍待用户提供。
+- 下一步：停止于本轮授权边界，等待用户指定下一任务或远程地址。
