@@ -19,6 +19,7 @@ namespace NBC.ActionEditor.Workbench
         private ListView library;
         private readonly List<string> paths = new();
         private bool refreshing;
+        private TimelineCanvas canvas;
 
         [MenuItem("NBC/Action Editor/Open Workbench", false, -10)]
         public static void Open() => GetWindow<ActionWorkbench>().Show();
@@ -67,6 +68,8 @@ namespace NBC.ActionEditor.Workbench
             right.style.flexGrow = 1;
             var center = new VisualElement(); center.style.flexGrow = 1; center.style.minWidth = 250;
             timelineHost = new VisualElement { name = "timeline-host" }; timelineHost.style.flexGrow = 1;
+            canvas = new TimelineCanvas(Session);
+            timelineHost.Add(canvas);
             center.Add(timelineHost);
             status = new Label("No document"); status.style.whiteSpace = WhiteSpace.Normal; status.style.maxHeight = 100;
             center.Add(status);
@@ -139,10 +142,9 @@ namespace NBC.ActionEditor.Workbench
             if (Session == null || timelineHost == null) return;
             hasUnsavedChanges = Session.IsDirty;
             saveChangesMessage = "Save ActionEditor changes before closing?";
-            timelineHost.Clear();
             inspector.Clear();
             var document = Session.Document;
-            timelineHost.Add(new Label(document == null ? "Create or open an ActionEditor document." : document.Title));
+            canvas?.MarkDirtyRepaint();
             if (document != null)
             {
                 var title = new TextField("Title") { value = document.Title };
