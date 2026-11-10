@@ -78,10 +78,18 @@ namespace NBC.ActionEditor
         {
             if (obj is TextAsset textAsset)
             {
+                var path = AssetDatabase.GetAssetPath(textAsset);
+                if (!string.IsNullOrEmpty(path) && !IsJsonDocumentPath(path))
+                {
+                    Debug.LogWarning("请选择 .json 格式的 ActionEditor 文档。");
+                    return;
+                }
                 if (textAsset != TextAsset && !ConfirmDocumentSwitch()) return;
                 TextAsset = textAsset;
             }
         }
+
+        public static bool IsJsonDocumentPath(string path) => string.Equals(System.IO.Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase);
 
         public static bool ConfirmDocumentSwitch()
         {

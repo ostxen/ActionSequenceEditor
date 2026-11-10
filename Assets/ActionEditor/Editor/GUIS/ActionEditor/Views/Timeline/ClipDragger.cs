@@ -300,14 +300,15 @@ namespace NBC.ActionEditor
                 {
                     var cursorTime = asset.SnapTime(asset.PosToTime(nowPos.x, App.Width) - offsetTime);
                     cursorTime = CheckMagnetSnapTime(cursorTime, clipItem.Length);
-                    subTimes.Add(asset.SnapTime(cursorTime - clipItem.StartTime));
+                    var delta = cursorTime - _dragBeginStartTime[clipItem].StartTime;
+                    subTimes.Add(NowDragClips.Count == 1 ? delta : asset.SnapTime(delta));
                 }
             }
 
-            var max = subTimes.Max();
+            var max = Mathf.Max(subTimes.Max(), -NowDragClips.Min(clip => _dragBeginStartTime[clip].StartTime));
             foreach (var clipItem in NowDragClips)
             {
-                var newTime = asset.SnapTime(clipItem.StartTime + max);
+                var newTime = _dragBeginStartTime[clipItem].StartTime + max;
                 clipItem.StartTime = newTime;
                 CheckBlendInOut(clipItem);
             }
@@ -342,6 +343,8 @@ namespace NBC.ActionEditor
         private static void OnBeginDragLength(PointerEventData eventData, Clip clip, bool isStart)
         {
             DragType = isStart ? ItemDragType.StretchStart : ItemDragType.StretchEnd;
+            TryResetTracks();
+            CacheMagnetSnapInfo(App.SelectItems);
             CacheDragStretchOffset(clip, eventData.MousePosition);
 
             if (isStart)

@@ -55,6 +55,7 @@ namespace NBC.ActionEditor
         private Object _lastSelectedObject;
         private Texture2D _lastSelectedObjectIcon;
         private Action<Object> _itemSelectedCallback;
+        private Predicate<string> _assetPathFilter;
         private BuiltinRes _noneBuiltinRes;
         private bool _showNoneItem;
         private Vector2 _scrollPosition;
@@ -137,10 +138,10 @@ namespace NBC.ActionEditor
         /// <param name="folderPath">所属的文件夹路径</param>
         /// <param name="allowedInstanceIDs"></param>
         public static void ShowObjectPicker<T>(Object obj, Action<Object> itemSelectedCallback,
-            string folderPath = "Assets", List<int> allowedInstanceIDs = null) where T : Object
+            string folderPath = "Assets", List<int> allowedInstanceIDs = null, Predicate<string> assetPathFilter = null) where T : Object
         {
             Type typeFromHandle = typeof(T);
-            get.Show(obj, typeFromHandle, null, itemSelectedCallback, folderPath, allowedInstanceIDs);
+            get.Show(obj, typeFromHandle, null, itemSelectedCallback, folderPath, allowedInstanceIDs, assetPathFilter);
         }
 
         /// <summary>
@@ -182,7 +183,7 @@ namespace NBC.ActionEditor
         }
 
         public void Show(Object obj, Type requiredType, SerializedProperty property,
-            Action<Object> itemSelectedCallback, string folderPath, List<int> allowedInstanceIDs = null)
+            Action<Object> itemSelectedCallback, string folderPath, List<int> allowedInstanceIDs = null, Predicate<string> assetPathFilter = null)
         {
             string requiredTypeName = string.Empty;
             if (property != null)
@@ -195,12 +196,13 @@ namespace NBC.ActionEditor
                 requiredTypeName = requiredType.Name;
             }
 
-            Show(obj, requiredTypeName, property, itemSelectedCallback, folderPath, allowedInstanceIDs);
+            Show(obj, requiredTypeName, property, itemSelectedCallback, folderPath, allowedInstanceIDs, assetPathFilter);
         }
 
         public void Show(Object obj, string requiredType, SerializedProperty property,
-            Action<Object> itemSelectedCallback, string folderPath, List<int> allowedInstanceIDs = null)
+            Action<Object> itemSelectedCallback, string folderPath, List<int> allowedInstanceIDs = null, Predicate<string> assetPathFilter = null)
         {
+            _assetPathFilter = assetPathFilter;
             _folderPath = folderPath;
             if (!Directory.Exists(folderFullPath))
             {
@@ -239,6 +241,7 @@ namespace NBC.ActionEditor
                 {
                     BuiltinRes builtinRes = new BuiltinRes();
                     string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    if (_assetPathFilter != null && !_assetPathFilter(assetPath)) continue;
                     builtinRes.name = assetPath.Substring(lenFolderPath, assetPath.LastIndexOf('.') - lenFolderPath);
                     builtinRes.icon = AssetDatabase.GetCachedIcon(assetPath);
                     builtinRes.path = assetPath;
@@ -250,6 +253,7 @@ namespace NBC.ActionEditor
                 foreach (var allowedInstanceID in allowedInstanceIDs)
                 {
                     string assetPath = AssetDatabase.GetAssetPath(allowedInstanceID);
+                    if (_assetPathFilter != null && !_assetPathFilter(assetPath)) continue;
                     Object obj = EditorUtility.InstanceIDToObject(allowedInstanceID);
                     bool isSub = AssetDatabase.IsSubAsset(allowedInstanceID);
                     string assetName = isSub
@@ -277,6 +281,7 @@ namespace NBC.ActionEditor
         private void OnDisable()
         {
             _itemSelectedCallback = null;
+            _assetPathFilter = null;
             _currentBuiltinResources = null;
             _activeBuiltinList = null;
             _lastSelectedObject = null;
@@ -709,7 +714,8 @@ namespace NBC.ActionEditor
 
             if (callback && _itemSelectedCallback != null)
             {
-                _itemSelectedCallback(_lastSelectedObject);
+                if (_lastSelectedObject == null || _assetPathFilter == null || _assetPathFilter(AssetDatabase.GetAssetPath(_lastSelectedObject)))
+                    _itemSelectedCallback(_lastSelectedObject);
             }
             else if (callback && _cacheProperty != null)
             {

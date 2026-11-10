@@ -34,7 +34,7 @@ namespace NBC.ActionEditor
             if (GUILayout.Button($"[{gName}]", EditorStyles.toolbarDropDown, GUILayout.Width(width)))
             {
                 App.AutoSave();
-                ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, App.OnObjectPickerConfig, "Assets/");
+                ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, App.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath);
             }
         }
 

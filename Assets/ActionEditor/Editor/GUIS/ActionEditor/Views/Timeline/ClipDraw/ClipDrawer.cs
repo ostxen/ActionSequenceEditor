@@ -24,7 +24,7 @@ namespace NBC.ActionEditor
         public static List<IDirectable> GetClips(Rect rect)
         {
             List<IDirectable> list = new List<IDirectable>();
-            foreach (var clip in _clipDraws.Keys)
+            foreach (var clip in _clipDraws.Keys.Where(IsVisible))
             {
                 var draw = _clipDraws[clip];
                 if (rect.Overlaps(draw.ClipRealRect))
@@ -38,7 +38,7 @@ namespace NBC.ActionEditor
 
         public static bool ClipContainsByRealRect(Vector2 pos)
         {
-            foreach (var clip in _clipDraws.Keys)
+            foreach (var clip in _clipDraws.Keys.Where(IsVisible))
             {
                 var draw = _clipDraws[clip];
                 if (draw.ClipRealRect.Contains(pos))
@@ -52,7 +52,7 @@ namespace NBC.ActionEditor
 
         public static Clip GetClipByTrackPosition(IDirectable track, Vector2 mousePosition)
         {
-            foreach (var clip in _clipDraws.Keys)
+            foreach (var clip in _clipDraws.Keys.Where(IsVisible))
             {
                 if (clip.Parent != track) continue;
                 var draw = _clipDraws[clip];
@@ -68,6 +68,8 @@ namespace NBC.ActionEditor
         #endregion
 
         #region Draw
+
+        private static bool IsVisible(Clip clip) => clip.Parent is Track track && track.Group != null && !track.Group.IsCollapsed;
 
         public static void Reset()
         {

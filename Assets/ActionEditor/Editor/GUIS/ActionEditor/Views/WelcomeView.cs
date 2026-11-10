@@ -46,7 +46,7 @@ namespace NBC.ActionEditor
 
             if (DrawCenteredButton("打开 JSON 资源"))
             {
-                ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, App.OnObjectPickerConfig, "Assets/");
+                ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, App.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath);
             }
 
             GUI.backgroundColor = Color.white;

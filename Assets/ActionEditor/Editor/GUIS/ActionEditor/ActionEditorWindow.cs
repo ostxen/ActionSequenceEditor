@@ -83,6 +83,7 @@ namespace NBC.ActionEditor
         {
             if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
             {
+                _timelineView?.CancelNavigation();
                 ItemDragger.Cancel(); Event.current.Use();
             }
             if (App.AssetData != null && Event.current.type != EventType.Layout && Event.current.type != EventType.Repaint)
@@ -125,7 +126,11 @@ namespace NBC.ActionEditor
             base.DiscardChanges();
         }
 
-        void OnLostFocus() { if (ItemDragger.DragType != ItemDragType.None) ItemDragger.Cancel(); }
+        void OnLostFocus()
+        {
+            _timelineView?.CancelNavigation();
+            if (ItemDragger.DragType != ItemDragType.None) ItemDragger.Cancel();
+        }
 
         void OnWillSaveScene(UnityEngine.SceneManagement.Scene scene, string path)
         {

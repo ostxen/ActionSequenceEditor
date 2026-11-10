@@ -21,10 +21,17 @@ namespace NBC.ActionEditor.Tests
             public System.Collections.Generic.List<string> Values = new System.Collections.Generic.List<string> { "one", "two" };
             public int[] Numbers = { 1, 2 };
             public string[] Empty;
+            public System.Collections.Generic.List<int> Missing;
         }
         private sealed class CollectionInspector : InspectorsBase
         {
-            public Rect RemoveRect;
+            public Rect RemoveRect, AddRect;
+            protected override bool DrawAddButton()
+            {
+                var clicked = base.DrawAddButton();
+                if (Event.current.type == EventType.Repaint) AddRect = GUILayoutUtility.GetLastRect();
+                return clicked;
+            }
             protected override bool DrawRemoveButton()
             {
                 var clicked = base.DrawRemoveButton();
@@ -59,6 +66,19 @@ namespace NBC.ActionEditor.Tests
             private void OnGUI() { if (Original && inspector != null) inspector.OnInspectorGUI(); }
             private void OnDisable() { if (inspector != null) DestroyImmediate(inspector); if (preview != null) DestroyImmediate(preview); }
         }
+        private sealed class DragEventWindow : EditorWindow
+        {
+            public Vector2 ContentOffset;
+            private void OnGUI()
+            {
+                ContentOffset = GUIUtility.GUIToScreenPoint(Vector2.zero) - position.position;
+                var ev = Event.current;
+                var pointer = new NBC.ActionEditor.Events.PointerEventData(ev);
+                if (ev.type == EventType.MouseDown) ItemDragger.OnBeginDrag(pointer);
+                else if (ev.type == EventType.MouseDrag) ItemDragger.OnDrag(pointer);
+                else if (ev.type == EventType.MouseUp) ItemDragger.OnEndDrag(pointer);
+            }
+        }
         [UnityTest] public IEnumerator OriginalCollectionDeleteClicksKeepGUILayoutBalancedAndNullArrayUnchanged()
         {
             var window = ScriptableObject.CreateInstance<CollectionWindow>();
@@ -84,6 +104,161 @@ namespace NBC.ActionEditor.Tests
                 LogAssert.NoUnexpectedReceived();
             }
             finally { window.Close(); }
+        }
+
+        [UnityTest] public IEnumerator NullCollectionFoldoutsPersistAndFirstItemCanBeCreated()
+        {
+            var window = ScriptableObject.CreateInstance<CollectionWindow>();
+            try
+            {
+                window.Value = new CollectionFixture(); window.Inspector = new CollectionInspector();
+                window.Show(); window.position = new Rect(80, 80, 400, 400);
+                foreach (var field in new[] { "Empty", "Missing" })
+                {
+                    window.Field = field; window.Inspector.AddRect = default;
+                    window.Focus(); window.Repaint(); yield return null; yield return null;
+                    Assert.That(window.Inspector.AddRect.width, Is.Zero, "Expanding another null field must not expand this field.");
+                    var foldout = new Vector2(8, 8) + window.ContentOffset;
+                    window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = foldout });
+                    window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = foldout });
+                    window.Repaint(); yield return null; yield return null;
+                    Assert.That(window.Inspector.AddRect.width, Is.GreaterThan(0), field + " plus button must remain visible after repaint.");
+                    var add = window.Inspector.AddRect.center + window.ContentOffset;
+                    window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = add });
+                    window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = add });
+                    window.Repaint(); yield return null; yield return null;
+                    var value = typeof(CollectionFixture).GetField(field).GetValue(window.Value) as System.Collections.IList;
+                    Assert.That(value, Is.Not.Null, field + " must retain expansion until the plus button can be clicked.");
+                    Assert.That(value.Count, Is.EqualTo(1));
+                }
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally { window.Close(); }
+        }
+
+        [Test] public void JsonPickerRejectsNonJsonBeforeDecodingAndKeepsCurrentDocument()
+        {
+            var before = App.AssetData;
+            var script = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/ActionEditor/Runtime/Interfaces/IDirectable.cs");
+            Assert.That(script, Is.Not.Null);
+            LogAssert.Expect(LogType.Warning, "请选择 .json 格式的 ActionEditor 文档。");
+            App.OnObjectPickerConfig(script);
+            Assert.That(App.AssetData, Is.SameAs(before));
+        }
+
+        [UnityTest] public IEnumerator OriginalMultiMoveClampsOneDeltaAndKeepsSpacingAtZero()
+        {
+            var previousWidth = App.Width;
+            var window = ScriptableObject.CreateInstance<DragEventWindow>();
+            try
+            {
+                window.Show(); window.position = new Rect(60, 60, 1000, 600); window.Focus();
+                yield return null; yield return null;
+                App.Width = 700;
+                var first = App.AssetData.groups[0].Tracks[0].Clips[0];
+                var second = App.AssetData.groups[0].Tracks[1].Clips[0];
+                first.StartTime = 1; second.StartTime = 3;
+                App.SelectWithoutInspector(first, second); ClipDrawer.Reset();
+                ClipDrawer.GetDraw(first).ClipRealRect = new Rect(100, 20, 150, 26);
+                var down = new Vector2(Styles.TimelineLeftTotalWidth + 120, 30) + window.ContentOffset;
+                window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = down, shift = true });
+                Assert.That(ItemDragger.DragType, Is.EqualTo(ItemDragType.Pos));
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down - new Vector2(App.Width * 2 / 7, 0), shift = true });
+                Assert.That(first.StartTime, Is.Zero.Within(.0001f));
+                Assert.That(second.StartTime, Is.EqualTo(2).Within(.0001f), "Both items must use the same zero-clamped delta.");
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down - new Vector2(400, 0), shift = true });
+                Assert.That(first.StartTime, Is.Zero.Within(.0001f));
+                Assert.That(second.StartTime, Is.EqualTo(2).Within(.0001f));
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down + new Vector2(100, 0), shift = true });
+                Assert.That(first.StartTime, Is.EqualTo(2).Within(.0001f));
+                Assert.That(second.StartTime, Is.EqualTo(4).Within(.0001f));
+                ItemDragger.Cancel();
+                Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(1).Within(.0001f));
+            }
+            finally { ItemDragger.Cancel(); window.Close(); App.Width = previousWidth; }
+        }
+
+        [Test] public void DocumentPickerFiltersBothDiscoveryPathsWithoutRestrictingGenericResources()
+        {
+            var selector = ScriptableObject.CreateInstance<ObjectSelectorWindow>();
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var type = typeof(ObjectSelectorWindow);
+            var filter = type.GetField("_assetPathFilter", flags);
+            var init = type.GetMethod("InitBuiltinList", flags);
+            var list = type.GetField("_currentBuiltinResources", flags);
+            try
+            {
+                var script = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/ActionEditor/Runtime/Interfaces/IDirectable.cs");
+                type.GetField("_folderPath", flags).SetValue(selector, "Assets/ActionEditor");
+                filter.SetValue(selector, (Predicate<string>)App.IsJsonDocumentPath);
+                init.Invoke(selector, new object[] { "TextAsset", null });
+                foreach (var entry in (Array)list.GetValue(selector))
+                    Assert.That(App.IsJsonDocumentPath((string)entry.GetType().GetField("path").GetValue(entry)), Is.True);
+                var allowed = new System.Collections.Generic.List<int> { script.GetInstanceID() };
+                init.Invoke(selector, new object[] { "TextAsset", allowed });
+                Assert.That(((Array)list.GetValue(selector)).Length, Is.Zero);
+                filter.SetValue(selector, null);
+                init.Invoke(selector, new object[] { "TextAsset", allowed });
+                Assert.That(((Array)list.GetValue(selector)).Length, Is.EqualTo(1), "Generic resource pickers still accept non-JSON TextAssets.");
+                Assert.That(App.IsJsonDocumentPath("Assets/Sample.JSON"), Is.True);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(selector); }
+        }
+
+        [Test] public void CollapsedClipsCannotBeHitThroughRetainedDrawGeometry()
+        {
+            var group = App.AssetData.groups[0]; var track = group.Tracks[0]; var clip = track.Clips[0];
+            ClipDrawer.Reset();
+            var draw = ClipDrawer.GetDraw(clip); draw.ClipRect = draw.ClipRealRect = new Rect(10, 10, 20, 20);
+            Assert.That(ClipDrawer.GetClipByTrackPosition(track, new Vector2(15, 15)), Is.SameAs(clip));
+            group.IsCollapsed = true; ClipDrawer.Reset();
+            Assert.That(ClipDrawer.GetClipByTrackPosition(track, new Vector2(15, 15)), Is.Null);
+            Assert.That(ClipDrawer.ClipContainsByRealRect(new Vector2(15, 15)), Is.False);
+            CollectionAssert.DoesNotContain(ClipDrawer.GetClips(new Rect(10, 10, 20, 20)), clip);
+        }
+
+        [Test] public void StretchRefreshesMagnetReferencesWithoutPreviousMoveGesture()
+        {
+            var oldEvent = Event.current; var oldWidth = App.Width;
+            try
+            {
+                App.Width = 700;
+                var clip = App.AssetData.groups[0].Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
+                typeof(ItemDragger).GetField("magnetSnapTimesCache", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).SetValue(null, new[] { 12345f });
+                var source = new Event { type = EventType.MouseDrag, button = 0,
+                    mousePosition = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(clip.EndTime, App.Width) - 2, 30) };
+                Event.current = source;
+                var pointer = new NBC.ActionEditor.Events.PointerEventData(); pointer.SetEvent(source);
+                ItemDragger.OnBeginDrag(pointer);
+                Assert.That(ItemDragger.DragType, Is.EqualTo(ItemDragType.StretchEnd));
+                Assert.That(ItemDragger.HasMagnetSnapTime(2.5f), Is.True);
+                Assert.That(ItemDragger.HasMagnetSnapTime(12345), Is.False);
+                Assert.That(ItemDragger.HasMagnetSnapTime(clip.StartTime), Is.False, "The selected item is not a snap reference.");
+            }
+            finally { ItemDragger.Cancel(); Event.current = oldEvent; App.Width = oldWidth; }
+        }
+
+        [UnityTest] public IEnumerator OriginalMiddlePanReleaseOutsideDoesNotConsumeLaterLeftDrag()
+        {
+            var previousWindow = App.Window;
+            var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            try
+            {
+                window.Show(); window.position = new Rect(60, 60, 1000, 600); window.Focus();
+                yield return null; yield return null;
+                App.AssetData.ViewTimeMax = 8; App.AssetData.ViewTimeMin = 1;
+                var start = new Vector2(Styles.TimelineLeftTotalWidth + 100, 100);
+                window.SendEvent(new Event { type = EventType.MouseDown, button = 2, mousePosition = start });
+                window.SendEvent(new Event { type = EventType.MouseUp, button = 2, mousePosition = new Vector2(10, 100) });
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = start + new Vector2(40, 0) });
+                Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1).Within(.001f));
+                Assert.That(App.AssetData.ViewTimeMax, Is.EqualTo(8).Within(.001f));
+                window.SendEvent(new Event { type = EventType.MouseDown, button = 2, mousePosition = start });
+                window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 2, mousePosition = start + new Vector2(40, 0) });
+                Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1).Within(.001f), "Escape must cancel navigation even when the window consumes the key first.");
+            }
+            finally { window.DiscardChanges(); window.Close(); App.Window = previousWindow; }
         }
         private TextAsset previous, fixture;
         private string recovery;

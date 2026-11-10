@@ -14,11 +14,14 @@ namespace NBC.ActionEditor
         protected object target;
 
         private Dictionary<int, bool> _unfoldDictionary = new Dictionary<int, bool>();
+        private System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<FieldInfo, bool>> _collectionFoldouts =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<FieldInfo, bool>>();
 
         public void SetTarget(object t)
         {
             target = t;
             _unfoldDictionary.Clear();
+            _collectionFoldouts = new System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<FieldInfo, bool>>();
         }
 
         public virtual void OnInspectorGUI()
@@ -123,7 +126,7 @@ namespace NBC.ActionEditor
             {
                 Type elementType = fieldType.GetGenericArguments()[0];
                 IList list = (IList)value;
-                var foldout = EditorGUILayout.Foldout(GetFoldout(value), field.GetShowName());
+                var foldout = EditorGUILayout.Foldout(GetCollectionFoldout(obj, field, value), field.GetShowName());
                 if (foldout)
                 {
                     GUILayout.Space(6);
@@ -157,7 +160,7 @@ namespace NBC.ActionEditor
                     GUILayout.Space(6);
                     EditorGUILayout.BeginHorizontal();
                     GUILayout.FlexibleSpace();
-                    if (GUILayout.Button("+", GUILayout.Width(30)))
+                    if (DrawAddButton())
                     {
                         if (list == null)
                         {
@@ -173,6 +176,7 @@ namespace NBC.ActionEditor
                     GUILayout.EndVertical();
                 }
 
+                _collectionFoldouts.GetOrCreateValue(obj)[field] = foldout;
                 SetFoldout(value, foldout);
             }
             // 处理数组类型
@@ -186,7 +190,7 @@ namespace NBC.ActionEditor
                     array = Array.CreateInstance(elementType, 0);
                 }
 
-                var foldout = EditorGUILayout.Foldout(GetFoldout(value), field.GetShowName());
+                var foldout = EditorGUILayout.Foldout(GetCollectionFoldout(obj, field, value), field.GetShowName());
                 if (foldout)
                 {
                     GUILayout.Space(6);
@@ -229,7 +233,7 @@ namespace NBC.ActionEditor
                     GUILayout.Space(6);
                     EditorGUILayout.BeginHorizontal();
                     GUILayout.FlexibleSpace();
-                    if (GUILayout.Button("+", GUILayout.Width(30)))
+                    if (DrawAddButton())
                     {
                         Array newArray = Array.CreateInstance(elementType, array != null ? array.Length + 1 : 1);
                         if (array != null)
@@ -248,6 +252,7 @@ namespace NBC.ActionEditor
                     GUILayout.EndVertical();
                 }
 
+                _collectionFoldouts.GetOrCreateValue(obj)[field] = foldout;
                 SetFoldout(value, foldout);
             }
             else if (showType == typeof(int))
@@ -417,6 +422,13 @@ namespace NBC.ActionEditor
         }
 
         protected virtual bool DrawRemoveButton() => GUILayout.Button("X", GUILayout.Width(20));
+        protected virtual bool DrawAddButton() => GUILayout.Button("+", GUILayout.Width(30));
+
+        private bool GetCollectionFoldout(object owner, FieldInfo field, object value)
+        {
+            var fields = _collectionFoldouts.GetOrCreateValue(owner);
+            return fields.TryGetValue(field, out var expanded) ? expanded : GetFoldout(value);
+        }
 
         private int FieldsSort(FieldInfo f1, FieldInfo f2)
         {

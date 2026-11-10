@@ -89,7 +89,7 @@ namespace NBC.ActionEditor.Workbench
             head.Add(transport);
             var right = new VisualElement(); right.style.flexGrow = 1; right.style.minWidth = 0; right.style.marginLeft = Styles.SplitterWidth;
             toolbar = new Toolbar { name = "json-document-toolbar" }; toolbar.style.height = 20;
-            documents = new ToolbarButton(() => Run(() => { if (ConfirmSwitch()) ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, App.OnObjectPickerConfig, "Assets/"); }))
+            documents = new ToolbarButton(() => Run(() => { if (ConfirmSwitch()) ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, App.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath); }))
                 { text = "[]", name = "json-document-picker", tooltip = Lan.SelectAssetTips };
             documents.AddToClassList("unity-toolbar-menu"); toolbar.Add(documents);
             var dropdownArrow = new Label("▼") { pickingMode = PickingMode.Ignore }; dropdownArrow.style.position = Position.Absolute;

@@ -87,10 +87,15 @@ namespace NBC.ActionEditor
         private bool _isMouseButton2Down;
         private float _lastZoomX;
 
+        public void CancelNavigation() => _isMouseButton2Down = false;
+
         public void DoZoomAndPan()
         {
             var e = Event.current;
 
+            if ((e.rawType == EventType.MouseUp && e.button == 2) ||
+                (e.rawType == EventType.KeyDown && e.keyCode == KeyCode.Escape))
+                CancelNavigation();
             if (!_pointerRect.Contains(e.mousePosition)) return;
 
             // var ev = Event.current;
@@ -151,7 +156,7 @@ namespace NBC.ActionEditor
                 rect.height -= Styles.HeaderHeight;
                 EditorGUIUtility.AddCursorRect(rect, MouseCursor.Pan);
 
-                if (e.type == EventType.MouseDrag || e.type == EventType.MouseDown || e.type == EventType.MouseUp)
+                if (e.button == 2 && (e.type == EventType.MouseDrag || e.type == EventType.MouseDown || e.type == EventType.MouseUp))
                 {
                     var offset = e.mousePosition.x - _lastZoomX;
                     var t = Mathf.Abs(offset) / App.Width * asset.ViewTime;

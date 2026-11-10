@@ -69,7 +69,7 @@ namespace NBC.ActionEditor.Workbench
                 guide.Add(label); guideLines[i] = guide; dragGuides.Add(guide);
             }
             create = new Button(() => CreateAssetWindow.Show()) { text = "创建 JSON 资源" };
-            open = new Button(() => ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, App.OnObjectPickerConfig, "Assets/")) { text = "打开 JSON 资源" };
+            open = new Button(() => ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, App.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath)) { text = "打开 JSON 资源" };
             welcome = new VisualElement { name = "json-welcome" }; welcome.style.position = Position.Absolute;
             welcome.style.left = welcome.style.right = welcome.style.top = welcome.style.bottom = 0;
             welcome.style.alignItems = Align.Center; welcome.style.justifyContent = Justify.Center;
