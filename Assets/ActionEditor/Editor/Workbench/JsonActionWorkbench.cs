@@ -218,5 +218,11 @@ namespace NBC.ActionEditor.Workbench
             else App.SaveAsset();
         }
         public override void SaveChanges() { Save(); if (!App.Session.IsDirty) base.SaveChanges(); }
+        public override void DiscardChanges()
+        {
+            Canvas?.Cancel();
+            App.Session.DiscardChanges();
+            base.DiscardChanges();
+        }
     }
 }

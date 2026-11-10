@@ -101,6 +101,82 @@ namespace NBC.ActionEditor.Tests
             UnityEngine.Object.DestroyImmediate(fixture);
         }
 
+        [UnityTest] public IEnumerator DiscardFromEitherWindowRestoresSharedBaselineAndClearsPendingUndo()
+        {
+            var previousWindow = App.Window;
+            var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            try
+            {
+                original.Show(); native.Show(); yield return null; yield return null;
+                foreach (var window in new EditorWindow[] { original, native })
+                {
+                    App.Session.Edit("discard payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 19);
+                    App.Session.BeginEdit();
+                    App.AssetData.groups[0].Tracks[0].Clips[0].StartTime = 1;
+                    window.DiscardChanges();
+                    Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+                    Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
+                    Assert.That(App.Session.IsDirty, Is.False);
+                    Assert.That(App.Session.IsEditing, Is.False);
+                    Assert.That(native.Document, Is.SameAs(App.AssetData));
+                    Undo.PerformUndo(); Undo.PerformRedo();
+                    Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1), "Discarded changes must not return through Undo/Redo.");
+                    yield return null; yield return null;
+                    Assert.That(original.hasUnsavedChanges, Is.False);
+                    Assert.That(native.hasUnsavedChanges, Is.False);
+                }
+                App.Session.Edit("new edit", () => ((LegacyExperienceAsset)App.AssetData).Version = 7);
+                Undo.PerformUndo(); Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+                Undo.PerformRedo(); Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(7));
+            }
+            finally
+            {
+                App.TextAsset = fixture;
+                original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close(); App.Window = previousWindow;
+            }
+        }
+
+        [UnityTest] public IEnumerator ClosingOriginalStopsSharedPlaybackAndReopeningDoesNotResume()
+        {
+            var previousWindow = App.Window;
+            var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            var stops = 0;
+            CallbackFunction stopped = () => stops++;
+            try
+            {
+                original.Show(); native.Show(); yield return null; yield return null;
+                App.OnStop += stopped;
+                App.Play(); AssetPlayer.Inst.Sample(1); App.Pause();
+                Assert.That(App.IsPlay && App.IsPause, Is.True);
+                original.Close(); original = null;
+                Assert.That(App.IsPlay, Is.False);
+                Assert.That(App.IsPause, Is.False);
+                Assert.That(AssetPlayer.Inst.CurrentTime, Is.Zero);
+                Assert.That(AssetPlayer.Inst.IsInitialized, Is.False);
+                Assert.That(stops, Is.EqualTo(1));
+                yield return null; yield return null;
+                Assert.That(App.IsPlay, Is.False, "The remaining native window must not resume playback.");
+                original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
+                yield return null; yield return null;
+                Assert.That(App.IsPlay, Is.False);
+                Assert.That(AssetPlayer.Inst.CurrentTime, Is.Zero);
+                native.Close(); native = null;
+                App.Play(); AssetPlayer.Inst.Sample(1);
+                original.Close(); original = null;
+                Assert.That(App.IsPlay || App.IsPause || AssetPlayer.Inst.IsInitialized, Is.False);
+                Assert.That(AssetPlayer.Inst.CurrentTime, Is.Zero);
+            }
+            finally
+            {
+                App.OnStop -= stopped;
+                if (original != null) { original.DiscardChanges(); original.Close(); }
+                if (native != null) { native.DiscardChanges(); native.Close(); }
+                App.Window = previousWindow;
+            }
+        }
+
         [Test] public void SampleRoundtripContainsAllGroupsTracksClipsAndFields()
         {
             var sample = (LegacyExperienceAsset)App.AssetData;
@@ -203,6 +279,21 @@ namespace NBC.ActionEditor.Tests
             Assert.That(((LegacyExperienceAsset)restored.Document).Version, Is.EqualTo(9));
             Assert.That(restored.IsDirty, Is.True);
         }
+        [Test] public void RecoveryKeepsDiscardBaselineIncludingViewStateAndRepeatedDiscard()
+        {
+            App.AssetData.ViewTimeMin = 1; App.AssetData.ViewTimeMax = 10;
+            App.Session.Edit("change", () => ((LegacyExperienceAsset)App.AssetData).Version = 9);
+            using var restored = new JsonDocumentSession();
+            restored.RestoreRecovery(App.Session.CaptureRecovery());
+            restored.DiscardChanges();
+            Assert.That(((LegacyExperienceAsset)restored.Document).Version, Is.EqualTo(1));
+            Assert.That(restored.Document.ViewTimeMin, Is.Zero);
+            Assert.That(restored.Document.ViewTimeMax, Is.EqualTo(7));
+            Assert.That(restored.Document.groups[2].IsCollapsed, Is.True);
+            Assert.That(restored.IsDirty, Is.False);
+            restored.DiscardChanges();
+            Assert.That(restored.IsDirty || restored.IsEditing, Is.False);
+        }
         [Test] public void MultipleEditsHaveIndependentUndoStepsAndFailureRollsBack()
         {
             App.Session.Edit("one", () => ((LegacyExperienceAsset)App.AssetData).Version = 2);
@@ -302,6 +393,94 @@ namespace NBC.ActionEditor.Tests
             if (type == EventType.MouseDown) { using var e = PointerDownEvent.GetPooled(source); e.target = target; target.SendEvent(e); }
             else if (type == EventType.MouseDrag) { using var e = PointerMoveEvent.GetPooled(source); e.target = target; target.SendEvent(e); }
             else { using var e = PointerUpEvent.GetPooled(source); e.target = target; target.SendEvent(e); }
+        }
+
+        [Serializable] private sealed class InteractionBaseline
+        {
+            public string CapturedUtc, UnityVersion;
+            public float PixelsPerPoint, SnapInterval, LeftWidth;
+            public int FrameRate, TimeStepMode, AutoSaveSeconds, Groups, Tracks, Clips;
+            public bool MagnetSnapping, ScrollWheelZooms;
+            public Vector2 OriginalMinSize, NativeMinSize;
+            public float OriginalWheelMax, NativeWheelMax, OriginalPanMin, NativePanMin;
+            public float NativeScale, NativeHeaderHeight, NativeFooterHeight;
+        }
+
+        [UnityTest] public IEnumerator BaselineWindowNavigationRecordsCurrentPreferencesAndWheelPanResults()
+        {
+            var previousWindow = App.Window;
+            var previousScroll = Styles.TimelineScrollPos;
+            var originalWindow = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            JsonActionWorkbench nativeWindow = null;
+            var baseline = new InteractionBaseline
+            {
+                CapturedUtc = DateTime.UtcNow.ToString("O"), UnityVersion = Application.unityVersion,
+                PixelsPerPoint = EditorGUIUtility.pixelsPerPoint, SnapInterval = Prefs.SnapInterval,
+                FrameRate = Prefs.FrameRate, TimeStepMode = (int)Prefs.timeStepMode, AutoSaveSeconds = Prefs.autoSaveSeconds,
+                MagnetSnapping = Prefs.MagnetSnapping, ScrollWheelZooms = Prefs.scrollWheelZooms,
+                Groups = App.AssetData.groups.Count, Tracks = App.AssetData.groups.Sum(g => g.Tracks.Count),
+                Clips = App.AssetData.groups.SelectMany(g => g.Tracks).Sum(t => t.Clips.Count)
+            };
+            try
+            {
+                originalWindow.Show(); originalWindow.position = new Rect(60, 60, 1000, 600);
+                originalWindow.Focus(); originalWindow.Repaint(); yield return null; yield return null; yield return null;
+                baseline.OriginalMinSize = originalWindow.minSize;
+                baseline.LeftWidth = Styles.TimelineLeftWidth;
+                App.AssetData.ViewTimeMax = 8; App.AssetData.ViewTimeMin = 1;
+                var point = new Vector2(Styles.TimelineLeftTotalWidth + 100, 100);
+                originalWindow.SendEvent(new Event { type = EventType.ScrollWheel, mousePosition = point, delta = new Vector2(0, 120) });
+                baseline.OriginalWheelMax = App.AssetData.ViewTimeMax;
+                Assert.That(baseline.OriginalWheelMax, Is.EqualTo(8.525f).Within(.001f), "Original wheel keeps the left boundary and normalizes wheel magnitude.");
+                Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1));
+                App.AssetData.ViewTimeMax = 8; App.AssetData.ViewTimeMin = 1;
+                originalWindow.SendEvent(new Event { type = EventType.MouseDown, mousePosition = point, button = 2 });
+                originalWindow.SendEvent(new Event { type = EventType.MouseDrag, mousePosition = point + new Vector2(20, 0), button = 2 });
+                originalWindow.SendEvent(new Event { type = EventType.MouseUp, mousePosition = point + new Vector2(20, 0), button = 2 });
+                baseline.OriginalPanMin = App.AssetData.ViewTimeMin;
+                Assert.That(baseline.OriginalPanMin, Is.EqualTo(1 - 20 * 7 / (1000 - Styles.TimelineLeftTotalWidth)).Within(.002f));
+                Assert.That(App.AssetData.ViewTime, Is.EqualTo(7).Within(.001f));
+
+                nativeWindow = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+                nativeWindow.Show(); nativeWindow.position = new Rect(60, 60, 1000, 600);
+                nativeWindow.Focus(); yield return null; yield return null;
+                baseline.NativeMinSize = nativeWindow.minSize;
+                App.AssetData.ViewTimeMax = 8; App.AssetData.ViewTimeMin = 1;
+                var canvas = nativeWindow.Canvas;
+                point = new Vector2(canvas.Left + 100, 100);
+                using (var wheel = WheelEvent.GetPooled(new Event { type = EventType.ScrollWheel,
+                    mousePosition = canvas.LocalToWorld(point), delta = new Vector2(0, 120) }))
+                { wheel.target = canvas; canvas.SendEvent(wheel); }
+                baseline.NativeWheelMax = App.AssetData.ViewTimeMax;
+                Assert.That(baseline.NativeWheelMax, Is.EqualTo(Prefs.scrollWheelZooms ? 9.575f : 8).Within(.001f), "Native wheel currently uses three times the original zoom increment.");
+                Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1));
+                App.AssetData.ViewTimeMax = 8; App.AssetData.ViewTimeMin = 1;
+                baseline.NativeScale = canvas.Scale;
+                Pointer(canvas, EventType.MouseDown, point, 2);
+                Pointer(canvas, EventType.MouseDrag, point + new Vector2(20, 0), 2);
+                Pointer(canvas, EventType.MouseUp, point + new Vector2(20, 0), 2);
+                baseline.NativePanMin = App.AssetData.ViewTimeMin;
+                Assert.That(baseline.NativePanMin, Is.EqualTo(1 - 20 / baseline.NativeScale).Within(.001f));
+                Assert.That(App.AssetData.ViewTime, Is.EqualTo(7).Within(.001f));
+                baseline.NativeHeaderHeight = nativeWindow.rootVisualElement.Q("json-header").resolvedStyle.height;
+                baseline.NativeFooterHeight = nativeWindow.rootVisualElement.Q("json-footer").resolvedStyle.height;
+                foreach (var size in new[] { new Vector2(500, 250), new Vector2(1000, 600) })
+                {
+                    nativeWindow.position = new Rect(new Vector2(60, 60), size); yield return null; yield return null;
+                    Assert.That(canvas.Scale, Is.EqualTo((size.x - canvas.Left) / App.AssetData.ViewTime).Within(.01f));
+                    Assert.That(canvas.contentRect.height, Is.EqualTo(size.y - 56).Within(1));
+                    Assert.That(nativeWindow.rootVisualElement.Query<IMGUIContainer>().ToList(), Is.Empty);
+                }
+                Assert.That(App.Session.IsDirty || App.Session.IsEditing, Is.False);
+                File.WriteAllText(System.IO.Path.Combine(Application.dataPath, "../Temp/rf01-interaction-baseline.json"), JsonUtility.ToJson(baseline, true));
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally
+            {
+                if (nativeWindow != null) { nativeWindow.DiscardChanges(); nativeWindow.Close(); }
+                if (originalWindow != null) { originalWindow.DiscardChanges(); originalWindow.Close(); }
+                App.Window = previousWindow; Styles.TimelineScrollPos = previousScroll;
+            }
         }
 
         [UnityTest] public IEnumerator NativeDragResizeCancelAndCaptureLossUseRealPointerEvents()
@@ -633,6 +812,7 @@ namespace NBC.ActionEditor.Tests
             {
                 view.Send(new Event { type = EventType.MouseDrag, mousePosition = new Vector2(20, 20), button = 0 }); Assert.That(view.Started, Is.Zero);
                 view.Send(new Event { type = EventType.MouseDown, mousePosition = new Vector2(20, 20), button = 0 });
+                view.Send(new Event { type = EventType.MouseDrag, mousePosition = new Vector2(21, 20), button = 0 }); Assert.That(view.Started, Is.Zero, "One pixel is not yet a drag.");
                 view.Send(new Event { type = EventType.MouseDrag, mousePosition = new Vector2(150, 20), button = 0 }); Assert.That(view.Started, Is.EqualTo(1));
                 view.Send(new Event { type = EventType.MouseUp, mousePosition = new Vector2(150, 20), button = 0 }); Assert.That(view.Ended, Is.EqualTo(1));
             }

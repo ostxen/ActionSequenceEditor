@@ -62,7 +62,7 @@ namespace NBC.ActionEditor
             ItemDragger.Cancel();
             if (App.Window == this) App.Window = null;
             this.ReleaseViews();
-            AssetPlayer.Inst.Reset();
+            App.Stop();
             EditorSceneManager.sceneSaving -= OnWillSaveScene;
             EditorApplication.update -= OnEditorUpdate;
             
@@ -118,7 +118,12 @@ namespace NBC.ActionEditor
         }
 
         public override void SaveChanges() { App.SaveAsset(); if (!App.Session.IsDirty) base.SaveChanges(); }
-        public override void DiscardChanges() { base.DiscardChanges(); }
+        public override void DiscardChanges()
+        {
+            ItemDragger.Cancel(); ownsGuiEdit = false;
+            App.Session.DiscardChanges();
+            base.DiscardChanges();
+        }
 
         void OnLostFocus() { if (ItemDragger.DragType != ItemDragType.None) ItemDragger.Cancel(); }
 

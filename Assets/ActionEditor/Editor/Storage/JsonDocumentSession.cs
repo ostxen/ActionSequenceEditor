@@ -23,11 +23,11 @@ namespace NBC.ActionEditor.Storage
         public bool IsEditing => pending != null;
         [Serializable] private sealed class Recovery
         {
-            public string Json, Path, Saved, Revision;
+            public string Json, Path, Saved, SavedJson, Revision;
         }
         public string CaptureRecovery() => Document == null ? "" : JsonUtility.ToJson(new Recovery
         {
-            Json = Encode(Document), Path = Path, Saved = saved, Revision = revision == null ? null : Convert.ToBase64String(revision)
+            Json = Encode(Document), Path = Path, Saved = saved, SavedJson = savedJson, Revision = revision == null ? null : Convert.ToBase64String(revision)
         });
         public void RestoreRecovery(string json)
         {
@@ -35,12 +35,13 @@ namespace NBC.ActionEditor.Storage
             var data = JsonUtility.FromJson<Recovery>(json);
             var document = Decode(data.Json);
             var bytes = string.IsNullOrEmpty(data.Revision) ? null : Convert.FromBase64String(data.Revision);
-            ReleaseState(); Document = document; Path = data.Path; saved = data.Saved; revision = bytes; pending = null;
+            ReleaseState(); Document = document; Path = data.Path; saved = data.Saved; savedJson = data.SavedJson ?? data.Saved; revision = bytes; pending = null;
             state = ScriptableObject.CreateInstance<JsonUndoState>(); state.hideFlags = HideFlags.HideAndDontSave; state.Json = Encode(document);
             Changed?.Invoke();
         }
         private JsonUndoState state;
         private string saved;
+        private string savedJson;
         private byte[] revision;
         private string pending;
         public JsonDocumentSession() { Undo.undoRedoPerformed += UndoRedo; }
@@ -94,9 +95,20 @@ namespace NBC.ActionEditor.Storage
             if (candidate != null)
             {
                 state = ScriptableObject.CreateInstance<JsonUndoState>(); state.hideFlags = HideFlags.HideAndDontSave;
-                state.Json = encoded; saved = content;
+                state.Json = encoded; saved = content; savedJson = encoded;
             }
-            else saved = null;
+            else { saved = null; savedJson = null; }
+            Changed?.Invoke();
+        }
+
+        public void DiscardChanges()
+        {
+            if (Document == null) return;
+            var candidate = Decode(savedJson);
+            var encoded = Encode(candidate);
+            ReleaseState();
+            Document = candidate; pending = null;
+            state = ScriptableObject.CreateInstance<JsonUndoState>(); state.hideFlags = HideFlags.HideAndDontSave; state.Json = encoded;
             Changed?.Invoke();
         }
 
@@ -153,7 +165,7 @@ namespace NBC.ActionEditor.Storage
                 if (differences.Count != 0) throw new InvalidDataException("JSON 读回内容不一致，拒绝提交。差异字段：" + string.Join(", ", differences.Take(8)));
             }, same ? revision : null);
             // Advance the revision before import. A failed import must not make the committed bytes unknown.
-            Path = target; revision = File.ReadAllBytes(target); saved = Content(Document);
+            Path = target; revision = File.ReadAllBytes(target); saved = Content(Document); savedJson = serialized;
             AssetDatabase.ImportAsset(target, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
             if (AssetDatabase.LoadAssetAtPath<TextAsset>(target) == null) throw new IOException("JSON 字节已提交，但导入失败，请检查目标，不要重复创建。");
             Changed?.Invoke();

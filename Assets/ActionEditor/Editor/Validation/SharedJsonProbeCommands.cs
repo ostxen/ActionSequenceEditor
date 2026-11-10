@@ -26,6 +26,7 @@ namespace NBC.ActionEditor.Validation
                 operations = new[] { "capture and finally restore current in-memory session including unsaved content",
                     "create isolated Shared.json from the existing sample type", "edit through common JSON session",
                     "atomic save, Undo/Redo saved-state tracking and reload", "save public graph time edits with stale derived duration and reload",
+                    "discard committed and pending edits to the last saved baseline without writing bytes or losing disk revision",
                     "eight fractional timeline edit/save/import/reload cycles with exact float preservation",
                     "reject externally modified target without overwriting it",
                     "delete only this newly created fixture folder" },
@@ -54,6 +55,13 @@ namespace NBC.ActionEditor.Validation
                 Require(!App.Session.IsDirty, "Saved payload is dirty.");
                 Undo.PerformUndo(); Require(App.Session.IsDirty && ((LegacyExperienceAsset)App.AssetData).Version == 1, "Undo after save failed.");
                 Undo.PerformRedo(); Require(!App.Session.IsDirty && ((LegacyExperienceAsset)App.AssetData).Version == 42, "Redo to saved state failed.");
+                App.Session.Edit("R10 discarded payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 99);
+                App.Session.BeginEdit(); ((LegacyExperienceAsset)App.AssetData).Version = 100;
+                App.Session.DiscardChanges(); App.TryAutoSave();
+                Require(!App.Session.IsDirty && !App.Session.IsEditing && ((LegacyExperienceAsset)App.AssetData).Version == 42
+                    && File.ReadAllBytes(Path).SequenceEqual(committed), "Discard did not restore saved baseline without writes.");
+                Undo.PerformUndo(); Undo.PerformRedo();
+                Require(((LegacyExperienceAsset)App.AssetData).Version == 42, "Discarded edits returned through Undo/Redo.");
                 App.TextAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Path);
                 Require(((LegacyExperienceAsset)App.AssetData).Version == 42 && ((LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[1]).Count == 17, "Persistent JSON reload lost fields.");
                 Require(App.AssetData.groups.Sum(g => g.Tracks.Count) == 7 && App.AssetData.Length == 6, "Persistent graph changed.");
@@ -88,7 +96,7 @@ namespace NBC.ActionEditor.Validation
                 var rejected = false;
                 try { App.SaveAsset(); } catch (IOException) { rejected = true; }
                 Require(rejected && File.ReadAllBytes(Path).SequenceEqual(external), "External edits were overwritten.");
-                return new { status = "passed", checks = new[] { "atomic create", "shared edit/save", "saved-state Undo/Redo", "polymorphic graph reload", "stale duration save/reload", "eight exact fractional save/reload cycles", "external edit protection" }, bytes = committed.Length, cleanup = "owned folder deleted and prior session restored before response" };
+                return new { status = "passed", checks = new[] { "atomic create", "shared edit/save", "saved-state Undo/Redo", "discard restores saved baseline without writing", "polymorphic graph reload", "stale duration save/reload", "eight exact fractional save/reload cycles", "external edit protection" }, bytes = committed.Length, cleanup = "owned folder deleted and prior session restored before response" };
             }
             finally
             {
