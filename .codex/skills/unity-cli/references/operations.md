@@ -4,6 +4,10 @@
 
 ## 查询与编译
 
+`actioneditor.validation json_status` 只读诊断当前 JSON 往返差异字段路径，不输出字段值，不调用源图 OnBeforeSerialize，不修改会话/资产，仅在独立反序列化副本 Init。用于保存校验失败定位，不接受参数。
+
+`actioneditor.validation window_status` 为固定只读现场诊断：返回新旧 ActionEditor 窗口类型、标题、尺寸、焦点、原生 canvas 是否存在、旧欢迎页/时间轴分支和两个已加载菜单的声明绑定。不打开/聚焦/关闭窗口，不执行菜单，不读资产内容，不写文件或资源；不能接受代码、路径或操作参数。
+
 ```powershell
 python .codex/scripts/workflow.py doctor
 python .codex/scripts/workflow.py unity list
@@ -28,6 +32,8 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 没有自定义完整资源验证器，`--asset` 显式报告 blocked。`asset find` 和 `asset get_import_settings` 只证明查询到的内容，不代表丢失引用或业务规则已通过。
 
 ## 写入审批
+
+`actioneditor.validation shared_json_probe` 为 R10 固定隔离 JSON 持久探针，不接受路径/代码参数。只新建不存在的 `Assets/ActionEditorValidationR10/Shared.json`，使用共用 JSON 会话修改、原子保存、Undo/Redo、导入重载及拒绝外部修改；finally 恢复原会话快照（含未保存内容）并清理本次目录。无窗口操作，不改既有 JSON/Combat/设置。必须 preview/approve/apply。R01–R10 最新用户明确无人值守授权涵盖该固定范围验证，审批原因应引用这条真实授权，不伪造新的确认。超时结果未知时先检查目标和报告，不重放。
 
 当前审计封装支持 `asset delete`、`settings.player set`、`build set_settings`、`build run`，以及项目专用 `actioneditor.validation persistence_probe`。其他写入需先核实包内实现并补充策略及离线测试，不直接运行原始 CLI 绕过封装。
 

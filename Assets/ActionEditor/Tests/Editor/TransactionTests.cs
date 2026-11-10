@@ -9,6 +9,24 @@ namespace NBC.ActionEditor.Tests
     public class TransactionTests
     {
         [Test]
+        public void RowUnlockAllowsOnlyLockFlagChangeAndRetainsUndo()
+        {
+            using var session = new DocumentSession(); session.New();
+            var group = new DocumentGroup { Locked = true };
+            var track = new DocumentTrack { Locked = true }; group.Tracks.Add(track); session.Document.Groups.Add(group);
+            using (var edit = new DocumentTransaction(session, "bad unlock"))
+            {
+                edit.Candidate.Groups[0].Locked = false; edit.Candidate.Groups[0].Name = "bad";
+                Assert.Throws<InvalidOperationException>(() => edit.Commit());
+            }
+            using (var edit = new DocumentTransaction(session, "unlock group")) { edit.Candidate.Groups[0].Locked = false; edit.Commit(); }
+            using (var edit = new DocumentTransaction(session, "unlock track")) { edit.Candidate.Groups[0].Tracks[0].Locked = false; edit.Commit(); }
+            Assert.That(session.Document.Groups[0].Tracks[0].Locked, Is.False);
+            Undo.PerformUndo(); Assert.That(session.Document.Groups[0].Tracks[0].Locked, Is.True);
+            Undo.PerformUndo(); Assert.That(session.Document.Groups[0].Locked, Is.True);
+        }
+
+        [Test]
         public void CancelAndInvalidCommitNeverMutateDocument()
         {
             using var session = new DocumentSession();

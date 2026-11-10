@@ -65,7 +65,7 @@ namespace NBC.ActionEditor
             set
             {
                 rangeMax = value;
-                if (rangeMax < length) rangeMax = length;
+                rangeMax = Mathf.Max(rangeMax, rangeMin + 0.001f);
             }
         }
 

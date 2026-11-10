@@ -9,18 +9,18 @@ namespace NBC.ActionEditor
         [MenuItem("NBC/Action Editor/Open Action Editor", false, 0)]
         public static void OpenDirectorWindow()
         {
-            var window = GetWindow(typeof(ActionEditorWindow)) as ActionEditorWindow;
-            if (window == null) return;
-            window.Show();
+            GetWindow<ActionEditorWindow>().Show();
         }
 
         private WelcomeView _welcomeView;
         private TimelineView _timelineView;
+        private bool ownsGuiEdit;
 
         #region Init
 
         void InitializeAll()
         {
+            this.ReleaseViews();
             Lan.Load();
             Styles.Load();
             Prefs.InitializeAssetTypes();
@@ -59,7 +59,10 @@ namespace NBC.ActionEditor
 
         void OnDisable()
         {
-            App.Window = null;
+            ItemDragger.Cancel();
+            if (App.Window == this) App.Window = null;
+            this.ReleaseViews();
+            AssetPlayer.Inst.Reset();
             EditorSceneManager.sceneSaving -= OnWillSaveScene;
             EditorApplication.update -= OnEditorUpdate;
             
@@ -78,6 +81,26 @@ namespace NBC.ActionEditor
 
         void OnGUI()
         {
+            if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
+            {
+                ItemDragger.Cancel(); Event.current.Use();
+            }
+            if (App.AssetData != null && Event.current.type != EventType.Layout && Event.current.type != EventType.Repaint)
+            {
+                if (!App.Session.IsEditing) ownsGuiEdit = true;
+                App.Session.BeginEdit();
+            }
+            try { DrawEditor(); }
+            finally
+            {
+                if (ownsGuiEdit && Event.current.rawType != EventType.MouseDrag && ItemDragger.DragType == ItemDragType.None)
+                { ownsGuiEdit = false; App.Session.EndEdit(); }
+                hasUnsavedChanges = App.Session.IsDirty;
+            }
+        }
+
+        void DrawEditor()
+        {
             if (App.AssetData == null)
             {
                 // Test();
@@ -87,13 +110,17 @@ namespace NBC.ActionEditor
 
             if (Event.current.type == EventType.MouseMove)
             {
-                Debug.Log("MouseMove===11");
                 Repaint();
             }
             
             _timelineView.OnGUI(this.position);
             App.OnGUIEnd();
         }
+
+        public override void SaveChanges() { App.SaveAsset(); if (!App.Session.IsDirty) base.SaveChanges(); }
+        public override void DiscardChanges() { base.DiscardChanges(); }
+
+        void OnLostFocus() { if (ItemDragger.DragType != ItemDragType.None) ItemDragger.Cancel(); }
 
         void OnWillSaveScene(UnityEngine.SceneManagement.Scene scene, string path)
         {

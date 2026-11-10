@@ -68,6 +68,7 @@ namespace NBC.ActionEditor
                 _itemViews.Add(view);
             }
 
+            foreach (var item in _itemViews) item.Release();
             _itemViews.Clear();
             if (asset == null) return;
             foreach (var group in asset.groups)
@@ -160,7 +161,7 @@ namespace NBC.ActionEditor
                 }
                 else
                 {
-                    asset.AddGroup<Group>();
+                    if (list.Count == 1) asset.AddGroup(list[0].type);
                     App.Refresh();
                 }
             }
@@ -192,6 +193,7 @@ namespace NBC.ActionEditor
 
         public void OnPointerDown(PointerEventData ev)
         {
+            if (!ev.IsLeft()) return;
             _pointerDown = true;
             _pointerDownPos = ev.MousePosition;
         }

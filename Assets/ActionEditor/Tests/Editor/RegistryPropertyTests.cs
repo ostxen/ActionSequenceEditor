@@ -85,6 +85,9 @@ namespace NBC.ActionEditor.Tests
             try
             {
                 window.position = new Rect(50, 50, 1200, 700); window.Show(); yield return null;
+                var propertyView = window.CreatePropertyView();
+                propertyView.style.position = Position.Absolute; propertyView.style.right = 0; propertyView.style.width = 280;
+                window.rootVisualElement.Add(propertyView);
                 window.NewDocument(); window.AddEvent("actioneditor.signal");
                 var canvas = window.rootVisualElement.Q<TimelineCanvas>();
                 canvas.Focus();
@@ -98,41 +101,41 @@ namespace NBC.ActionEditor.Tests
                 var a = window.Session.Selection.Single();
                 window.AddEvent("actioneditor.signal"); var b = window.Session.Selection.Single();
                 window.Session.Selection.Clear(); window.Session.Selection.Add(a); window.Session.Selection.Add(b); window.Session.NotifyChanged();
-                window.rootVisualElement.Q<TextField>("event-Message").value = "edited both";
+                window.Properties.Q<TextField>("event-Message").value = "edited both";
                 Assert.That(((SignalEvent)DocumentCommands.Event(window.Session.Document, a)).Message, Is.EqualTo("edited both"));
                 Assert.That(((SignalEvent)DocumentCommands.Event(window.Session.Document, b)).Message, Is.EqualTo("edited both"));
-                var add = window.rootVisualElement.Q<Button>("add-Tags");
+                var add = window.Properties.Q<Button>("add-Tags");
                 using (var submit = NavigationSubmitEvent.GetPooled()) { submit.target = add; add.SendEvent(submit); }
                 Assert.That(((SignalEvent)DocumentCommands.Event(window.Session.Document, a)).Tags.Count, Is.EqualTo(1));
-                window.rootVisualElement.Q<TextField>("Tags-0").value = "tag";
+                window.Properties.Q<TextField>("Tags-0").value = "tag";
                 Assert.That(((SignalEvent)DocumentCommands.Event(window.Session.Document, b)).Tags[0], Is.EqualTo("tag"));
-                var nullList = window.rootVisualElement.Q<Button>("null-Tags");
+                var nullList = window.Properties.Q<Button>("null-Tags");
                 using (var submit = NavigationSubmitEvent.GetPooled()) { submit.target = nullList; nullList.SendEvent(submit); }
                 Assert.That(((SignalEvent)DocumentCommands.Event(window.Session.Document, a)).Tags, Is.Null);
                 Undo.PerformUndo();
                 Assert.That(((SignalEvent)DocumentCommands.Event(window.Session.Document, a)).Tags.Single(), Is.EqualTo("tag"));
-                var nullText = window.rootVisualElement.Q<Button>("null-Message");
+                var nullText = window.Properties.Q<Button>("null-Message");
                 using (var submit = NavigationSubmitEvent.GetPooled()) { submit.target = nullText; nullText.SendEvent(submit); }
                 Assert.That(((SignalEvent)DocumentCommands.Event(window.Session.Document, a)).Message, Is.Null);
                 Undo.PerformUndo();
                 Assert.That(((SignalEvent)DocumentCommands.Event(window.Session.Document, b)).Message, Is.EqualTo("edited both"));
                 var previous = EditorJsonUtility.ToJson(window.Session.Document);
-                window.rootVisualElement.Q<DoubleField>("event-Start").value = -1;
+                window.Properties.Q<DoubleField>("event-Start").value = -1;
                 Assert.That(EditorJsonUtility.ToJson(window.Session.Document), Is.EqualTo(previous));
                 StringAssert.Contains("invalid", window.rootVisualElement.Q<Label>("document-status").text);
                 window.AddEvent("actioneditor.interval");
                 var intervalId = window.Session.Selection.Single();
-                window.rootVisualElement.Q<DoubleField>("event-Value").value = 3.25;
-                window.rootVisualElement.Q<Vector3Field>("event-Offset").value = new Vector3(1, 2, 3);
+                window.Properties.Q<DoubleField>("event-Value").value = 3.25;
+                window.Properties.Q<Vector3Field>("event-Offset").value = new Vector3(1, 2, 3);
                 Assert.That(((IntervalEvent)DocumentCommands.Event(window.Session.Document, intervalId)).Value, Is.EqualTo(3.25f));
                 Assert.That(((IntervalEvent)DocumentCommands.Event(window.Session.Document, intervalId)).Offset, Is.EqualTo(new Vector3(1, 2, 3)));
                 ((IntervalEvent)DocumentCommands.Event(window.Session.Document, intervalId)).Value = float.NaN;
                 window.Session.Selection.Clear(); window.Session.NotifyChanged();
-                var issue = window.rootVisualElement.Q<Button>("issue-" + intervalId);
+                var issue = window.Properties.Q<Button>("issue-" + intervalId);
                 Assert.That(issue, Is.Not.Null);
                 using (var submit = NavigationSubmitEvent.GetPooled()) { submit.target = issue; issue.SendEvent(submit); }
                 Assert.That(window.Session.Selection, Is.EquivalentTo(new[] { intervalId }));
-                window.rootVisualElement.Q<DoubleField>("event-Value").value = 2;
+                window.Properties.Q<DoubleField>("event-Value").value = 2;
                 Assert.That(window.Session.Registry.Inspect(window.Session.Document), Is.Empty);
                 window.Session.DiscardAndClose();
             }

@@ -57,6 +57,7 @@ namespace NBC.ActionEditor
             get => startTime;
             set
             {
+                if (float.IsNaN(value) || float.IsInfinity(value)) throw new System.IO.InvalidDataException("开始时间必须为有限数值。");
                 if (Math.Abs(startTime - value) > 0.0001f)
                 {
                     startTime = Mathf.Max(value, 0);

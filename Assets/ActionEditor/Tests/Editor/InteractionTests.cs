@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using NBC.ActionEditor.Model;
 using NBC.ActionEditor.Storage;
 using NBC.ActionEditor.Workbench;
@@ -13,6 +14,54 @@ namespace NBC.ActionEditor.Tests
     public class InteractionTests
     {
         [UnityTest]
+        public IEnumerator PlainWheelZoomPanAndContextMenusMatchOriginalEntryPoints()
+        {
+            var window = ScriptableObject.CreateInstance<ActionWorkbench>();
+            try
+            {
+                window.position = new Rect(50, 50, 1200, 700); window.Show(); yield return null;
+                window.NewDocument();
+                var canvas = window.rootVisualElement.Q<TimelineCanvas>();
+                var before = EditorJsonUtility.ToJson(window.Session.Document);
+                window.Session.Workspace.ScrollTime = 0.5;
+                var scale = window.Session.Workspace.PixelsPerSecond;
+                using (var wheel = WheelEvent.GetPooled(new Event { type = EventType.ScrollWheel, delta = new Vector2(0, 1), mousePosition = canvas.LocalToWorld(new Vector2(400, 100)) }))
+                { wheel.target = canvas; canvas.SendEvent(wheel); }
+                Assert.That(window.Session.Workspace.PixelsPerSecond, Is.LessThan(scale));
+                Assert.That(window.Session.Workspace.ScrollTime, Is.EqualTo(0.5));
+                window.Interaction.Begin(new Vector2(400, 100), 2, false);
+                window.Interaction.End(new Vector2(800, 180));
+                Assert.That(window.Session.Workspace.ScrollTime, Is.Zero);
+                Assert.That(window.Session.Workspace.ScrollY, Is.Zero);
+                window.Interaction.Begin(new Vector2(canvas.Transform.ToX(1.26), 10), 0, false);
+                window.Interaction.End(new Vector2(canvas.Transform.ToX(1.26), 10));
+                Assert.That(window.Session.Workspace.Playhead, Is.EqualTo(1.3).Within(0.001));
+                Assert.That(EditorJsonUtility.ToJson(window.Session.Document), Is.EqualTo(before));
+                var menu = new DropdownMenu();
+                var position = new Vector2(canvas.Transform.ToX(1.26), canvas.Transform.ToY(1) + 10);
+                using (var trigger = PointerDownEvent.GetPooled(new Event { type = EventType.MouseDown, button = 1, mousePosition = canvas.LocalToWorld(position) }))
+                using (var context = ContextualMenuPopulateEvent.GetPooled(trigger, menu, canvas, null))
+                { context.target = canvas; canvas.SendEvent(context); }
+                var add = menu.MenuItems().OfType<DropdownMenuAction>().Single(a => a.name == "Add Event/actioneditor.signal");
+                add.Execute();
+                var item = window.Session.Document.Groups[0].Tracks[0].Events.Single();
+                Assert.That(item.Start, Is.EqualTo(1.3).Within(0.001));
+                menu = new DropdownMenu();
+                using (var trigger = PointerDownEvent.GetPooled(new Event { type = EventType.MouseDown, button = 1,
+                    mousePosition = canvas.LocalToWorld(new Vector2(canvas.Transform.ToX(item.Start), canvas.Transform.ToY(1) + 10)) }))
+                using (var context = ContextualMenuPopulateEvent.GetPooled(trigger, menu, canvas, null))
+                { context.target = canvas; canvas.SendEvent(context); }
+                Assert.That(menu.MenuItems().OfType<DropdownMenuAction>().Select(a => a.name), Is.EquivalentTo(new[] { "Duplicate", "Delete" }));
+                menu.MenuItems().OfType<DropdownMenuAction>().Single(a => a.name == "Duplicate").Execute();
+                Assert.That(window.Session.Document.Groups[0].Tracks[0].Events.Count, Is.EqualTo(2));
+                Undo.PerformUndo();
+                Assert.That(window.Session.Document.Groups[0].Tracks[0].Events.Count, Is.EqualTo(1));
+                window.Session.DiscardAndClose();
+            }
+            finally { if (window != null) { window.Session?.DiscardAndClose(); window.Close(); } }
+        }
+
+        [UnityTest]
         public IEnumerator DragCandidateCancelCommitUndoAndNoPressAreConsistent()
         {
             var window = ScriptableObject.CreateInstance<ActionWorkbench>();
@@ -26,7 +75,7 @@ namespace NBC.ActionEditor.Tests
                 var canvas = window.rootVisualElement.Q<TimelineCanvas>();
                 // Use the same gesture entry points as Pointer callbacks, with real laid-out coordinates.
                 var controller = window.Interaction;
-                var start = new Vector2(canvas.Transform.ToX(1.5), canvas.Transform.ToY(0) + 10);
+                var start = new Vector2(canvas.Transform.ToX(1.5), canvas.Transform.ToY(1) + 10);
                 controller.Move(start + new Vector2(100, 0));
                 Assert.That(DocumentCommands.Event(window.Session.Document, item.Id).Start, Is.EqualTo(1));
                 controller.Begin(start, 0, false); controller.Move(start + new Vector2(100, 0));
@@ -61,8 +110,8 @@ namespace NBC.ActionEditor.Tests
                 controller.Begin(start, 0, false);
                 canvas.RemoveFromHierarchy();
                 Assert.That(controller.IsActive, Is.False);
-                var time = canvas.Transform.ToTime(400); controller.Zoom(400, -2);
-                Assert.That(canvas.Transform.ToTime(400), Is.EqualTo(time).Within(0.000001));
+                controller.Zoom(400, -2);
+                Assert.That(window.Session.Workspace.ScrollTime, Is.EqualTo(0));
                 window.Session.DiscardAndClose();
             }
             finally { if (window != null) window.Close(); }
@@ -82,7 +131,7 @@ namespace NBC.ActionEditor.Tests
                 track.Events.Add(a); track.Events.Add(b);
                 var canvas = window.rootVisualElement.Q<TimelineCanvas>();
                 var controller = window.Interaction;
-                var y = canvas.Transform.ToY(0) + 10;
+                var y = canvas.Transform.ToY(1) + 10;
                 controller.Begin(new Vector2(canvas.Transform.ToX(2) - 1, y), 0, false);
                 controller.End(new Vector2(canvas.Transform.ToX(2.5) - 1, y));
                 Assert.That(DocumentCommands.Event(window.Session.Document, a.Id).Duration, Is.EqualTo(1.5).Within(0.001));
@@ -91,8 +140,8 @@ namespace NBC.ActionEditor.Tests
                 controller.End(new Vector2(canvas.Transform.ToX(0.5), y - 5));
                 Assert.That(window.Session.Selection.Count, Is.EqualTo(2));
                 var oldScroll = window.Session.Workspace.ScrollTime;
-                controller.Begin(new Vector2(300, 100), 2, false); controller.End(new Vector2(400, 100));
-                Assert.That(window.Session.Workspace.ScrollTime, Is.LessThan(oldScroll));
+                controller.Begin(new Vector2(300, 100), 2, false); controller.End(new Vector2(200, 130));
+                Assert.That(window.Session.Workspace.ScrollTime, Is.GreaterThan(oldScroll));
                 DocumentCommands.Event(window.Session.Document, a.Id).Locked = true;
                 controller.Begin(new Vector2(canvas.Transform.ToX(1.5), y), 0, false);
                 Assert.That(controller.IsActive, Is.False);
@@ -117,7 +166,7 @@ namespace NBC.ActionEditor.Tests
                 track.Events.Add(a); track.Events.Add(b);
                 var canvas = window.rootVisualElement.Q<TimelineCanvas>();
                 var controller = window.Interaction;
-                var y = canvas.Transform.ToY(0) + 10;
+                var y = canvas.Transform.ToY(1) + 10;
                 Vector2 At(double time) => new(canvas.Transform.ToX(time), y);
                 var before = EditorJsonUtility.ToJson(window.Session.Document);
                 controller.Begin(At(1.5), 0, false); controller.End(At(3.5));

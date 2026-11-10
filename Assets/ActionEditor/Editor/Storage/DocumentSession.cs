@@ -22,6 +22,9 @@ namespace NBC.ActionEditor.Storage
         public float InspectorWidth = 280;
         public double Playhead;
         public double SnapSeconds = 0.1;
+        public string SelectedTrackId;
+        public string SelectedGroupId;
+        public float TrackHeaderWidth = 240;
         public List<string> CollapsedGroups = new();
     }
 
@@ -133,6 +136,11 @@ namespace NBC.ActionEditor.Storage
             savedState = null;
             revision = null;
             Selection.Clear();
+            Workspace.SelectedTrackId = null;
+            Workspace.SelectedGroupId = null;
+            Workspace.CollapsedGroups.Clear();
+            Workspace.ScrollTime = 0;
+            Workspace.ScrollY = 0;
             Undo.ClearUndo(selection);
         }
 

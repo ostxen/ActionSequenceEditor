@@ -25,13 +25,10 @@ namespace NBC.ActionEditor
             _pointerView = Window.CreateView<TimelinePointerView>();
             _bottomView = Window.CreateView<TimelineBottomView>();
 
-            Prefs.SnapInterval = 0.01f;
         }
 
         public override void OnDraw()
         {
-            asset.UpdateMaxTime();
-
             var headRect = new Rect(0, 0, Position.width, Styles.PlayControlHeight);
             GUILayout.BeginArea(headRect, EditorStyles.helpBox);
             _headerView.OnGUI(new Rect(0, 0, headRect.width, headRect.height));

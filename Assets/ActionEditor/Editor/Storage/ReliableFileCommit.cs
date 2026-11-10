@@ -51,7 +51,15 @@ namespace NBC.ActionEditor.Storage
                 validate(written);
                 if (expectedCurrent != null && (!files.Exists(target) || !Equal(files.Read(target), expectedCurrent)))
                     throw new IOException("Document changed during save.");
-                if (exists) files.Replace(staged, target);
+                if (exists)
+                {
+                    try { files.Replace(staged, target); }
+                    catch (IOException e)
+                    {
+                        throw new IOException("原子替换文档失败（HRESULT 0x" + e.HResult.ToString("X8")
+                            + "）。请检查文件占用或权限；提交结果需核对，未自动重试。", e);
+                    }
+                }
                 else files.Move(staged, target);
             }
             finally

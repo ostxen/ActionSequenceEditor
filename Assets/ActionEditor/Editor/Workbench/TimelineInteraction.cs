@@ -10,7 +10,7 @@ namespace NBC.ActionEditor.Workbench
 {
     public sealed class TimelineInteraction : IDisposable
     {
-        private enum Gesture { None, Move, ResizeStart, ResizeEnd, Marquee, Pan, Seek }
+        private enum Gesture { None, Move, ResizeStart, ResizeEnd, Marquee, Pan, Seek, Splitter }
         private readonly TimelineCanvas canvas;
         private readonly DocumentSession session;
         private readonly Action<string> error;
@@ -24,6 +24,9 @@ namespace NBC.ActionEditor.Workbench
         private int pointerId = -1;
         private readonly IVisualElementScheduledItem captureWatch;
         private double playhead;
+        private string trackBefore;
+        private string groupBefore;
+        private float headerBefore;
         public bool IsActive => gesture != Gesture.None;
 
         public TimelineInteraction(TimelineCanvas canvas, Action<string> error)
@@ -51,13 +54,31 @@ namespace NBC.ActionEditor.Workbench
             origin = position; scroll = session.Workspace.ScrollTime; scrollY = session.Workspace.ScrollY;
             playhead = session.Workspace.Playhead;
             selectionBefore = session.Selection.ToArray();
-            if (button == 2) { gesture = Gesture.Pan; return; }
+            trackBefore = session.Workspace.SelectedTrackId;
+            groupBefore = session.Workspace.SelectedGroupId;
+            headerBefore = session.Workspace.TrackHeaderWidth;
+            if (button == 2 && position.x >= canvas.LeftWidth) { gesture = Gesture.Pan; return; }
             if (button != 0) return;
-            if (position.y < TimelineTransform.RulerHeight && position.x >= TimelineTransform.HeaderWidth)
+            if (Math.Abs(position.x - (canvas.LeftWidth - 7)) <= 4) { gesture = Gesture.Splitter; return; }
+            if (position.y < TimelineTransform.RulerHeight && position.x >= canvas.LeftWidth)
             {
                 gesture = Gesture.Seek; Move(position); return;
             }
-            if (position.x < TimelineTransform.HeaderWidth) return;
+            var targetRow = canvas.RowAt(position);
+            if (targetRow >= 0)
+            {
+                var target = canvas.Rows()[targetRow];
+                if (target.Track != null) canvas.SelectTrack(target.Track.Id);
+                else
+                {
+                    session.Workspace.SelectedGroupId = target.Group.Id; session.Workspace.SelectedTrackId = null;
+                    if (position.x < 20) canvas.ToggleGroup(target.Group.Id);
+                }
+            }
+            if (position.x < canvas.LeftWidth)
+            {
+                session.Selection.Clear(); session.NotifyChanged(); return;
+            }
             var item = canvas.Hit(position);
             if (item == null)
             {
@@ -78,7 +99,7 @@ namespace NBC.ActionEditor.Workbench
             {
                 error?.Invoke("Selection includes locked content."); session.NotifyChanged(); return;
             }
-            var row = canvas.Rows().FindIndex(r => r.Track.Events.Exists(e => e.Id == item.Id));
+            var row = canvas.Rows().FindIndex(r => r.Track != null && r.Track.Events.Exists(e => e.Id == item.Id));
             var rect = canvas.Transform.EventRect(item, row);
             gesture = item.Kind == EventKind.Interval && Math.Abs(position.x - rect.xMin) <= 6 ? Gesture.ResizeStart
                 : item.Kind == EventKind.Interval && Math.Abs(position.x - rect.xMax) <= 6 ? Gesture.ResizeEnd : Gesture.Move;
@@ -94,10 +115,16 @@ namespace NBC.ActionEditor.Workbench
             var delta = position - origin;
             if (gesture == Gesture.Pan)
             {
-                session.Workspace.ScrollTime = scroll - delta.x / session.Workspace.PixelsPerSecond;
-                session.Workspace.ScrollY = Math.Max(0, scrollY - delta.y);
+                session.Workspace.ScrollTime = Math.Max(0, scroll - delta.x / session.Workspace.PixelsPerSecond);
             }
-            else if (gesture == Gesture.Seek) session.Workspace.Playhead = Math.Clamp(canvas.Transform.ToTime(position.x), 0, session.Document.Duration);
+            else if (gesture == Gesture.Splitter)
+                session.Workspace.TrackHeaderWidth = Math.Clamp(headerBefore + delta.x, 140, Math.Max(140, canvas.contentRect.width - 200));
+            else if (gesture == Gesture.Seek)
+            {
+                var time = canvas.Transform.ToTime(position.x);
+                var snap = session.Workspace.SnapSeconds;
+                session.Workspace.Playhead = Math.Clamp(snap > 0 ? Math.Round(time / snap, MidpointRounding.AwayFromZero) * snap : time, 0, session.Document.Duration);
+            }
             else if (gesture == Gesture.Marquee) canvas.Marquee = TimelineTransform.SelectionRect(origin, position);
             else if (edit != null)
             {
@@ -119,7 +146,7 @@ namespace NBC.ActionEditor.Workbench
                 }
                 else DocumentCommands.Resize(edit, activeId, source.Start, Snap(source.Start + source.Duration + change) - source.Start);
             }
-            canvas.MarkDirtyRepaint();
+            canvas.NotifyViewChanged();
         }
 
         public void End(Vector2 position)
@@ -135,7 +162,7 @@ namespace NBC.ActionEditor.Workbench
             {
                 var rows = canvas.Rows();
                 for (var row = 0; row < rows.Count; row++)
-                    foreach (var item in rows[row].Track.Events)
+                    foreach (var item in rows[row].Track?.Events ?? new System.Collections.Generic.List<TimelineEvent>())
                         if (canvas.Marquee.Value.Overlaps(canvas.Transform.EventRect(item, row)) && !session.Selection.Contains(item.Id)) session.Selection.Add(item.Id);
             }
             canvas.Marquee = null;
@@ -160,6 +187,9 @@ namespace NBC.ActionEditor.Workbench
             canvas.DisplayDocument = null; canvas.Marquee = null;
             session.Workspace.ScrollTime = scroll; session.Workspace.ScrollY = scrollY;
             session.Workspace.Playhead = playhead;
+            session.Workspace.SelectedTrackId = trackBefore;
+            session.Workspace.SelectedGroupId = groupBefore;
+            session.Workspace.TrackHeaderWidth = headerBefore;
             session.Selection.Clear(); session.Selection.AddRange(selectionBefore ?? Array.Empty<string>());
             ReleasePointer(); canvas.MarkDirtyRepaint();
             session.NotifyChanged();
@@ -168,10 +198,12 @@ namespace NBC.ActionEditor.Workbench
         public void Zoom(float x, float delta)
         {
             Cancel();
-            var time = canvas.Transform.ToTime(x);
-            session.Workspace.PixelsPerSecond = Math.Clamp(session.Workspace.PixelsPerSecond * Math.Pow(1.12, -delta), 10, 5000);
-            session.Workspace.ScrollTime = time - (x - TimelineTransform.HeaderWidth) / session.Workspace.PixelsPerSecond;
-            canvas.MarkDirtyRepaint();
+            if (delta == 0 || x < canvas.LeftWidth) return;
+            var width = Math.Max(1, canvas.contentRect.width - canvas.LeftWidth);
+            var range = width / session.Workspace.PixelsPerSecond;
+            range = Math.Clamp(range + Math.Sign(delta) * 3 * 75 / Math.Max(1, canvas.contentRect.width) * range, 0.01, 240);
+            session.Workspace.PixelsPerSecond = width / range;
+            canvas.NotifyViewChanged();
         }
 
         private void OnDown(PointerDownEvent evt)
@@ -190,8 +222,8 @@ namespace NBC.ActionEditor.Workbench
         }
         private void OnWheel(WheelEvent evt)
         {
-            if (evt.ctrlKey) Zoom(evt.localMousePosition.x, evt.delta.y);
-            else { Cancel(); session.Workspace.ScrollY = Math.Max(0, session.Workspace.ScrollY + evt.delta.y * 20); canvas.MarkDirtyRepaint(); }
+            if (evt.localMousePosition.x >= canvas.LeftWidth) Zoom(evt.localMousePosition.x, evt.delta.y);
+            else { Cancel(); session.Workspace.ScrollY = Math.Max(0, session.Workspace.ScrollY + evt.delta.y * 20); canvas.NotifyViewChanged(); }
             evt.StopPropagation();
         }
         private void ReleasePointer()

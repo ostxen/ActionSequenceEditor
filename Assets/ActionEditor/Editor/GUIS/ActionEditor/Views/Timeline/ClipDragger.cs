@@ -18,6 +18,7 @@ namespace NBC.ActionEditor
     struct DragBeginInfo
     {
         public float StartTime;
+        public float Length;
         public float BlendIn;
         public float BlendOut;
         public Track Parent;
@@ -25,6 +26,7 @@ namespace NBC.ActionEditor
         public DragBeginInfo(Clip clip)
         {
             StartTime = clip.StartTime;
+            Length = clip.Length;
             BlendIn = clip.BlendIn;
             BlendOut = clip.BlendOut;
             Parent = clip.Parent as Track;
@@ -93,6 +95,7 @@ namespace NBC.ActionEditor
         private static void CacheDragClipInfo()
         {
             DragItems.Clear();
+            _dragBeginStartTime.Clear();
             foreach (var select in App.SelectItems)
             {
                 if (select is Clip clip)
@@ -127,6 +130,7 @@ namespace NBC.ActionEditor
                     if (_dragBeginStartTime.TryGetValue(clip, out var dragBeginInfo))
                     {
                         clip.StartTime = dragBeginInfo.StartTime;
+                        if (clip.CanScale()) clip.Length = dragBeginInfo.Length;
                         clip.BlendIn = dragBeginInfo.BlendIn;
                         clip.BlendOut = dragBeginInfo.BlendOut;
                         if (clip.Parent != dragBeginInfo.Parent)
@@ -149,6 +153,8 @@ namespace NBC.ActionEditor
 
         public static void OnBeginDrag(PointerEventData eventData)
         {
+            if (!eventData.IsLeft() || App.SelectItems.Any(i => i.IsLocked)) return;
+            App.Session.BeginEdit();
             var asset = App.AssetData;
             if (asset == null) return;
             Clip stretchClip = null;
@@ -196,7 +202,6 @@ namespace NBC.ActionEditor
             }
             else
             {
-                Debug.LogError($"dragType={dragType}");
                 OnBeginDragLength(eventData, stretchClip, dragType == ItemDragType.StretchStart);
             }
         }
@@ -225,7 +230,15 @@ namespace NBC.ActionEditor
             }
 
             DragType = ItemDragType.None;
+            App.Session.EndEdit("Drag timeline items");
             eventData.StopPropagation();
+        }
+
+        public static void Cancel()
+        {
+            _dragType = ItemDragType.None; DragItems.Clear(); _dragBeginStartTime.Clear();
+            NowDragClips.Clear(); DragOffsetDictionary.Clear(); TimelineTrackItemView.MoveToItem = null;
+            App.Session.CancelEdit();
         }
 
         #endregion
@@ -455,8 +468,7 @@ namespace NBC.ActionEditor
                 {
                     if (trackItem.Data is Group group)
                     {
-                        targetTrack.Group.DeleteTrack(targetTrack);
-                        group.InsertTrack(targetTrack, 0);
+                        NBC.ActionEditor.Storage.JsonEditCommands.MoveTrack(targetTrack, group, 0);
                     }
                     else if (trackItem.Data is Track track)
                     {
@@ -478,8 +490,7 @@ namespace NBC.ActionEditor
                             index += 1;
                         }
 
-                        targetTrack.Group.DeleteTrack(targetTrack);
-                        track.Group.InsertTrack(targetTrack, index);
+                        NBC.ActionEditor.Storage.JsonEditCommands.MoveTrack(targetTrack, track.Group, index);
                     }
 
                     App.Refresh();

@@ -17,6 +17,33 @@ namespace NBC.ActionEditor.Validation
         private const string Root = "Assets/ActionEditorValidationB06";
         private const string DocumentPath = Root + "/Sample.asset";
 
+        [CliGroupCommand("actioneditor.validation", "Read-only current JSON roundtrip field paths only. Never returns field values or writes assets.")]
+        public static object JsonStatus() => new { differences = App.Session.InspectReadbackDifferences() };
+
+        [CliGroupCommand("actioneditor.validation", "Read-only ActionEditor window types, focus and loaded menu bindings. No asset contents or UI actions.")]
+        public static object WindowStatus()
+        {
+            var focused = EditorWindow.focusedWindow;
+            return new
+            {
+                focusedType = focused == null ? null : focused.GetType().FullName,
+                windows = Resources.FindObjectsOfTypeAll<EditorWindow>()
+                    .Where(w => w is ActionEditorWindow || w is ActionWorkbench || w is JsonActionWorkbench)
+                    .Select(w => new
+                    {
+                        type = w.GetType().FullName, title = w.titleContent.text, focused = w == focused,
+                        width = w.position.width, height = w.position.height,
+                        nativeTimeline = w.rootVisualElement.Q<TimelineCanvas>() != null || w.rootVisualElement.Q<JsonTimelineCanvas>() != null,
+                        legacyView = w is ActionEditorWindow ? (App.AssetData == null ? "welcome" : "timeline") : null
+                    }).ToArray(),
+                menuBindings = TypeCache.GetMethodsWithAttribute<MenuItem>()
+                    .SelectMany(method => method.GetCustomAttributes(typeof(MenuItem), false).Cast<MenuItem>()
+                        .Where(item => item.menuItem == "NBC/Action Editor/Open Action Editor" || item.menuItem == "NBC/Action Editor/Open Workbench")
+                        .Select(item => new { menu = item.menuItem, validation = item.validate, type = method.DeclaringType.FullName, method = method.Name }))
+                    .ToArray()
+            };
+        }
+
         [CliGroupCommand("actioneditor.validation", "B06 fixed isolated real workbench lifecycle. Preview and human approval required.")]
         public static object WorkbenchProbe(
             [CliArg("confirm", "Apply reviewed fixture lifecycle.")] bool confirm = false,
@@ -118,12 +145,15 @@ namespace NBC.ActionEditor.Validation
             {
                 window.position = new Rect(80, 80, 1200, 700);
                 window.Show(); window.CreateGUI();
+                var propertyView = window.CreatePropertyView();
+                propertyView.style.position = Position.Absolute; propertyView.style.right = 0; propertyView.style.width = 280;
+                window.rootVisualElement.Add(propertyView);
                 return window;
             }
             catch { window.Close(); throw; }
         }
         private static T Field<T>(ActionWorkbench window, string name) where T : VisualElement
-            => window.rootVisualElement.Q<T>(name) ?? throw new InvalidOperationException("Missing native field: " + name);
+            => (window.Properties.Q<T>(name) ?? window.rootVisualElement.Q<T>(name)) ?? throw new InvalidOperationException("Missing native field: " + name);
         private static void Submit(Button button)
         {
             using var evt = NavigationSubmitEvent.GetPooled(); evt.target = button; button.SendEvent(evt);

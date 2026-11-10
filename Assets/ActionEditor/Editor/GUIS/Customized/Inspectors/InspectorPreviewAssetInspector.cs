@@ -52,8 +52,16 @@ namespace NBC.ActionEditor
 
             GUILayout.Space(5);
 
-            DoAssetInspector();
-            DoSelectionInspector();
+            if (_lastAsset != App.AssetData) { directableEditors.Clear(); _currentAssetEditor = null; _currentDirectableEditor = null; _lastAsset = App.AssetData; }
+            var ownsEdit = !App.Session.IsEditing;
+            if (ownsEdit) App.Session.BeginEdit();
+            try
+            {
+                EditorGUI.BeginDisabledGroup(App.FistSelect?.IsLocked == true);
+                try { DoAssetInspector(); DoSelectionInspector(); }
+                finally { EditorGUI.EndDisabledGroup(); }
+            }
+            finally { if (ownsEdit) App.Session.EndEdit("Edit properties"); }
 
 
             if (_willResample)

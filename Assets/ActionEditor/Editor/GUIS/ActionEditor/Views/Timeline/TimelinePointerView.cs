@@ -258,8 +258,7 @@ namespace NBC.ActionEditor
             AssetPlayer.Inst.CurrentTime = asset.SnapTime(time);
             AssetPlayer.Inst.CurrentTime =
                 Mathf.Clamp(AssetPlayer.Inst.CurrentTime, 0 + float.Epsilon, asset.Length - float.Epsilon);
-            App.Play();
-            App.Pause();
+            AssetPlayer.Inst.Sample();
             Window.Repaint();
         }
 

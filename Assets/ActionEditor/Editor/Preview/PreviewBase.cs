@@ -30,6 +30,11 @@
         {
         }
 
+        public virtual void Dispose()
+        {
+            Reverse();
+        }
+
 
         public abstract void Update(float time, float previousTime);
     }

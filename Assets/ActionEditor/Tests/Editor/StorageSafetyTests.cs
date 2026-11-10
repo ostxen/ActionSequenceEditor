@@ -73,8 +73,15 @@ namespace NBC.ActionEditor.Tests
                 store.Save(target, () => new byte[] { 3, 4 }, _ => { }, new byte[] { 1, 2 });
                 Assert.Throws<InvalidDataException>(() => store.Save(target, () => new byte[] { 5 }, _ => throw new InvalidDataException()));
                 using (var locked = new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read))
-                    Assert.Throws<IOException>(() => store.Save(target, () => new byte[] { 6 }, _ => { }));
+                {
+                    var failure = Assert.Throws<IOException>(() => store.Save(target, () => new byte[] { 6 }, _ => { }));
+                    Assert.That(failure.Message, Does.Contain("HRESULT"));
+                    Assert.That(failure.InnerException, Is.TypeOf<IOException>());
+                }
                 Assert.That(File.ReadAllBytes(target), Is.EqualTo(new byte[] { 3, 4 }));
+                Assert.That(Directory.GetFiles(root).Length, Is.EqualTo(1));
+                store.Save(target, () => new byte[] { 7, 8 }, _ => { }, new byte[] { 3, 4 });
+                Assert.That(File.ReadAllBytes(target), Is.EqualTo(new byte[] { 7, 8 }));
                 Assert.That(Directory.GetFiles(root).Length, Is.EqualTo(1));
             }
             finally

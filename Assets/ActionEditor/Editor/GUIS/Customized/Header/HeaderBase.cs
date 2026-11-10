@@ -3,5 +3,6 @@
     public abstract class HeaderBase
     {
         public abstract void OnGUI();
+        public virtual UnityEngine.UIElements.VisualElement CreateGUI() => null;
     }
 }

@@ -31,7 +31,7 @@ namespace NBC.ActionEditor.Tests
                     canvas.MarkDirtyRepaint();
                     yield return null;
                     yield return null;
-                    var hit = canvas.Hit(new Vector2(canvas.Transform.ToX(1), canvas.Transform.ToY(0) + 10));
+                    var hit = canvas.Hit(new Vector2(canvas.Transform.ToX(1), canvas.Transform.ToY(1) + 10));
                     Assert.That(hit, Is.Not.Null);
                     Assert.That(Mathf.Abs((float)(hit.Start - 1) * (float)scale), Is.LessThanOrEqualTo(5));
                 }

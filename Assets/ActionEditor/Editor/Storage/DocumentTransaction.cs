@@ -63,11 +63,11 @@ namespace NBC.ActionEditor.Storage
             foreach (var group in before.Groups)
             {
                 var nextGroup = after.Groups.Find(g => g.Id == group.Id);
-                if (group.Locked && JsonUtility.ToJson(group) != JsonUtility.ToJson(nextGroup)) throw new InvalidOperationException("Group is locked.");
+                if (group.Locked && !OnlyUnlock(group, nextGroup)) throw new InvalidOperationException("Group is locked.");
                 foreach (var track in group.Tracks)
                 {
                     var nextTrack = nextGroup?.Tracks.Find(t => t.Id == track.Id);
-                    if (track.Locked && JsonUtility.ToJson(track) != JsonUtility.ToJson(nextTrack)) throw new InvalidOperationException("Track is locked.");
+                    if (track.Locked && !OnlyUnlock(track, nextTrack)) throw new InvalidOperationException("Track is locked.");
                     foreach (var item in track.Events.Where(e => e.Locked))
                     {
                         var next = nextTrack?.Events.Find(e => e.Id == item.Id);
@@ -75,6 +75,22 @@ namespace NBC.ActionEditor.Storage
                     }
                 }
             }
+        }
+
+        private static bool OnlyUnlock(DocumentGroup before, DocumentGroup after)
+        {
+            if (after == null) return false;
+            var locked = after.Locked;
+            try { after.Locked = before.Locked; return JsonUtility.ToJson(before) == JsonUtility.ToJson(after); }
+            finally { after.Locked = locked; }
+        }
+
+        private static bool OnlyUnlock(DocumentTrack before, DocumentTrack after)
+        {
+            if (after == null) return false;
+            var locked = after.Locked;
+            try { after.Locked = before.Locked; return JsonUtility.ToJson(before) == JsonUtility.ToJson(after); }
+            finally { after.Locked = locked; }
         }
 
         public void Dispose()

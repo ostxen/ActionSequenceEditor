@@ -47,7 +47,7 @@ namespace NBC.ActionEditor
             OnDraw();
             DrawDragCursor();
             DrawValid();
-            CheckBlendInAndOut();
+            // Drawing must not change serialized blend values. Editing commands own mutations.
         }
 
         protected virtual void OnDraw()

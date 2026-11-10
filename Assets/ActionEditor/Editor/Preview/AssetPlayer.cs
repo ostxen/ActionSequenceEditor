@@ -43,6 +43,18 @@ namespace NBC.ActionEditor
         public float previousTime { get; private set; }
 
         private bool preInitialized;
+        private readonly List<PreviewBase> previews = new List<PreviewBase>();
+        public bool IsInitialized => preInitialized;
+
+        public void Reset()
+        {
+            foreach (var preview in previews)
+            {
+                try { preview.Dispose(); } catch (Exception e) { Debug.LogException(e); }
+            }
+            previews.Clear(); timePointers = null; unsortedStartTimePointers = null;
+            preInitialized = false; previousTime = 0;
+        }
 
         public Asset Asset => App.AssetData;
 
@@ -75,13 +87,14 @@ namespace NBC.ActionEditor
 
         public void Sample(float time)
         {
+            if (Asset == null) { Reset(); return; }
             CurrentTime = time;
-            if ((currentTime == 0 || currentTime == Length) && previousTime == currentTime)
+            if (preInitialized && (currentTime == 0 || currentTime == Length) && previousTime == currentTime)
             {
                 return;
             }
             
-            if (!preInitialized && currentTime > 0 && previousTime == 0)
+            if (!preInitialized)
             {
                 InitializePreviewPointers();
             }
@@ -149,6 +162,8 @@ namespace NBC.ActionEditor
         /// </summary>
         public void InitializePreviewPointers()
         {
+            Reset();
+            if (Asset == null) return;
             timePointers = new List<IDirectableTimePointer>();
             unsortedStartTimePointers = new List<IDirectableTimePointer>();
 
@@ -192,6 +207,7 @@ namespace NBC.ActionEditor
                         if (Activator.CreateInstance(t1) is PreviewBase preview)
                         {
                             preview.SetTarget(track);
+                            previews.Add(preview);
                             var p3 = new StartTimePointer(preview);
                             timePointers.Add(p3);
                 
@@ -208,6 +224,7 @@ namespace NBC.ActionEditor
                             if (Activator.CreateInstance(t) is PreviewBase preview)
                             {
                                 preview.SetTarget(clip);
+                                previews.Add(preview);
                                 var p3 = new StartTimePointer(preview);
                                 timePointers.Add(p3);
                 
@@ -220,6 +237,7 @@ namespace NBC.ActionEditor
             }
 
             preInitialized = true;
+            timePointers = timePointers.OrderBy(p => p.time).ToList();
         }
     }
 }

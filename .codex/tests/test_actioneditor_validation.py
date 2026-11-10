@@ -12,6 +12,19 @@ from workflow_lib.unity import Unity, READ_ONLY, MUTATIONS
 
 
 class ActionEditorValidationTests(unittest.TestCase):
+    def test_json_status_is_fixed_read_only_query(self):
+        self.assertIn("actioneditor.validation json_status", READ_ONLY)
+        self.assertNotIn("actioneditor.validation json_status", MUTATIONS)
+
+    def test_shared_json_probe_is_fixed_mutation_not_read_only(self):
+        command = "actioneditor.validation shared_json_probe"
+        self.assertNotIn(command, READ_ONLY)
+        self.assertEqual(MUTATIONS[command], {"dry_run": True, "confirm": True, "poll": None})
+
+    def test_window_status_is_fixed_read_only_query(self):
+        self.assertIn("actioneditor.validation window_status", READ_ONLY)
+        self.assertNotIn("actioneditor.validation window_status", MUTATIONS)
+
     def test_workbench_probe_is_fixed_mutation_not_read_only(self):
         command = "actioneditor.validation workbench_probe"
         self.assertNotIn(command, READ_ONLY)

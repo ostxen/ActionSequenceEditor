@@ -46,6 +46,7 @@ namespace NBC.ActionEditor
                 OnDraw();
                 CheckPointerEvent();
             }
+            catch (ExitGUIException) { throw; }
             catch (Exception e)
             {
                 Debug.Log(e);
@@ -69,10 +70,20 @@ namespace NBC.ActionEditor
 
         protected void CheckPointerEvent()
         {
-            var ev = Event.current;
+            CheckPointerEvent(Event.current);
+        }
+
+        protected void CheckPointerEvent(Event ev)
+        {
+            if (ev == null) return;
             _eventData.SetEvent(ev);
             // Debug.Log("CheckPointerEvent");
             var hasRect = Position.Contains(ev.mousePosition);
+
+            // Children may consume the press for selection. Ancestors still need to remember
+            // its origin so a later drag cannot start without a corresponding mouse-down.
+            if (ev.type == EventType.Used && ev.rawType == EventType.MouseDown && hasRect)
+            { _havePointerDown = true; _dragStartPos = ev.mousePosition; _isDragging = false; }
 
             _eventData.HasRect = hasRect;
             if (ev.type == EventType.MouseDown)
@@ -80,6 +91,8 @@ namespace NBC.ActionEditor
                 if (hasRect)
                 {
                     _havePointerDown = true;
+                    _dragStartPos = ev.mousePosition;
+                    _isDragging = false;
                     if (this is IPointerDownHandler pointerDownHandler)
                     {
                         pointerDownHandler.OnPointerDown(_eventData);
@@ -90,9 +103,10 @@ namespace NBC.ActionEditor
                     _havePointerDown = false;
                 }
             }
-            else if (ev.type == EventType.MouseUp)
+            else if (ev.rawType == EventType.MouseUp)
             {
-                if (this is IPointerUpHandler pointerUpHandler)
+                var wasDragging = _isDragging;
+                if (_havePointerDown && this is IPointerUpHandler pointerUpHandler)
                 {
                     pointerUpHandler.OnPointerUp(_eventData);
                 }
@@ -105,7 +119,7 @@ namespace NBC.ActionEditor
 
                 if (hasRect)
                 {
-                    if (_havePointerDown && this is IPointerClickHandler pointerClickHandler)
+                    if (_havePointerDown && !wasDragging && this is IPointerClickHandler pointerClickHandler)
                     {
                         pointerClickHandler.OnPointerClick(_eventData);
                     }
@@ -114,10 +128,11 @@ namespace NBC.ActionEditor
                 {
                     _havePointerDown = false;
                 }
+                _havePointerDown = false; _isDragging = false;
             }
             else if (ev.type == EventType.MouseDrag)
             {
-                if (hasRect)
+                if (_havePointerDown)
                 {
                     if (!_isDragging && Vector2.Distance(_dragStartPos, ev.mousePosition) > DragThreshold)
                     {

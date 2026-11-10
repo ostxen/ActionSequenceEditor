@@ -11,6 +11,8 @@ from .core import WorkflowError, blocked, consume_approval, digest, make_plan
 
 
 READ_ONLY = frozenset({
+    "actioneditor.validation json_status",
+    "actioneditor.validation window_status",
     "editor status", "scene list_open", "scene get_hierarchy", "build get_settings",
     "build.target list", "build list_profiles", "test list", "test status", "script recompile_status",
     "settings.player get", "settings.audio get", "settings.graphics get", "settings.input get",
@@ -25,6 +27,7 @@ READ_ONLY = frozenset({
 
 # Explicit catalog, not a prefix heuristic. Only implemented return/poll contracts are admitted.
 MUTATIONS = {
+    "actioneditor.validation shared_json_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation workbench_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation session_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation persistence_probe": {"dry_run": True, "confirm": True, "poll": None},

@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 using System.Linq;
+using NBC.ActionEditor.Storage;
 
 namespace NBC.ActionEditor
 {
@@ -19,30 +20,51 @@ namespace NBC.ActionEditor
         public static CallbackFunction OnDisable;
         public static OpenAssetFunction OnOpenAsset;
         
-        public static Asset AssetData { get; private set; } = null;
+        public static readonly JsonDocumentSession Session = new JsonDocumentSession();
+        public static Asset AssetData => Session.Document;
+        public static event Action DocumentChanged;
+
+        static App()
+        {
+            Session.Changed += () =>
+            {
+                AssetPlayer.Inst.Reset();
+                _selectList.RemoveAll(item => AssetData == null || !AssetData.directables.Contains(item));
+                Refresh(); Repaint(); DocumentChanged?.Invoke();
+            };
+            AssemblyReloadEvents.beforeAssemblyReload += () =>
+            {
+                SessionState.SetString("ActionEditor.JsonRecovery", Session.CaptureRecovery());
+                AssetPlayer.Inst.Reset();
+            };
+            var recovery = SessionState.GetString("ActionEditor.JsonRecovery", "");
+            if (!string.IsNullOrEmpty(recovery))
+            {
+                try
+                {
+                    Session.RestoreRecovery(recovery);
+                    _textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Session.Path ?? "");
+                }
+                catch (Exception e) { Debug.LogError("ActionEditor 文档恢复失败，恢复快照仍保留：" + e.Message); }
+            }
+            EditorApplication.playModeStateChanged += _ => { Stop(); AssetPlayer.Inst.Reset(); };
+            UnityEditor.SceneManagement.EditorSceneManager.activeSceneChangedInEditMode += (_, __) => Stop();
+        }
 
         public static TextAsset TextAsset
         {
             get => _textAsset;
             set
             {
-                if (value == null)
+                try
                 {
-                    _textAsset = null;
-                    AssetData = null;
+                    Session.Open(value);
+                    _textAsset = value;
+                    IsPlay = false; IsPause = false;
+                    AssetPlayer.Inst.CurrentTime = 0;
+                    if (AssetData != null) OnOpenAsset?.Invoke(AssetData);
                 }
-                else
-                {
-                    var obj = Json.Deserialize(typeof(Asset), value.text);
-                    if (obj is Asset asset)
-                    {
-                        asset.Init();
-                        _textAsset = value;
-                        AssetData = asset;
-                        OnOpenAsset?.Invoke(AssetData);
-                        App.Refresh();
-                    }
-                }
+                catch (System.IO.InvalidDataException e) { Debug.LogError("ActionEditor 打开失败，原文档已保留：" + e.Message); }
             }
         }
 
@@ -56,13 +78,25 @@ namespace NBC.ActionEditor
         {
             if (obj is TextAsset textAsset)
             {
+                if (textAsset != TextAsset && !ConfirmDocumentSwitch()) return;
                 TextAsset = textAsset;
             }
         }
 
+        public static bool ConfirmDocumentSwitch()
+        {
+            if (!Session.IsDirty) return true;
+            var choice = EditorUtility.DisplayDialogComplex("未保存的 JSON", "切换前是否保存当前文档？", "保存", "取消", "放弃");
+            if (choice == 1) return false;
+            if (choice == 0) { SaveAsset(); return !Session.IsDirty; }
+            return true;
+        }
+
         public static void SaveAsset()
         {
-            throw new InvalidOperationException("Legacy JSON editing is read-only during the ActionEditor migration. Use the native document workbench when available; original files are not overwritten.");
+            Session.Save();
+            _lastSaveTime = DateTime.Now;
+            _lastSaveClock = EditorApplication.timeSinceStartup;
         }
 
         public static void OnGUIEnd()
@@ -91,18 +125,25 @@ namespace NBC.ActionEditor
         public static DateTime LastSaveTime => _lastSaveTime;
 
         private static DateTime _lastSaveTime = DateTime.Now;
+        private static double _lastSaveClock = EditorApplication.timeSinceStartup;
 
         /// <summary>
         /// 尝试自动保存
         /// </summary>
         public static void TryAutoSave()
         {
-            // Legacy JSON is reference-only. Native sessions own their save schedule.
+            if (Session.IsEditing) return;
+            if (AssetData == null || string.IsNullOrEmpty(Session.Path) || !Session.IsDirty) return;
+            if (NBC.ActionEditor.Model.AutoSaveSchedule.IsDue(_lastSaveClock, EditorApplication.timeSinceStartup, Prefs.autoSaveSeconds))
+            {
+                _lastSaveClock = EditorApplication.timeSinceStartup;
+                try { SaveAsset(); } catch (Exception e) { Debug.LogError("ActionEditor 自动保存失败，内存内容已保留：" + e.Message); }
+            }
         }
 
         public static void AutoSave()
         {
-            // Never autosave reference documents through the retired JSON path.
+            SaveAsset();
         }
 
         #endregion
@@ -194,6 +235,12 @@ namespace NBC.ActionEditor
             return _selectList.Contains(directable);
         }
 
+        public static void SelectWithoutInspector(params IDirectable[] items)
+        {
+            _selectList.Clear(); if (items != null) _selectList.AddRange(items.Where(i => i != null));
+            CanMultipleSelect = false; Repaint();
+        }
+
         #endregion
 
         #region Refresh
@@ -234,12 +281,14 @@ namespace NBC.ActionEditor
 
         public static void Play(Action callback = null)
         {
-            if (Application.isPlaying)
+            if (Application.isPlaying || AssetData == null)
             {
                 return;
             }
 
             OnPlay?.Invoke();
+            _editorPreviousTime = Time.realtimeSinceStartup;
+            IsPause = false;
             IsPlay = true;
         }
 
@@ -254,6 +303,7 @@ namespace NBC.ActionEditor
                 _player.CurrentTime = 0;
 
             OnStop?.Invoke();
+            _player.Reset();
             IsPlay = false;
             IsPause = false;
         }
@@ -262,46 +312,51 @@ namespace NBC.ActionEditor
         {
             if (Math.Abs(_player.CurrentTime - _player.Length) < 0.00001f)
             {
-                _player.CurrentTime = 0;
+                _player.Sample(0);
                 return;
             }
 
-            _player.CurrentTime += Prefs.SnapInterval;
+            _player.Sample(_player.CurrentTime + Prefs.SnapInterval);
         }
 
         public static void StepBackward()
         {
             if (_player.CurrentTime == 0)
             {
-                _player.CurrentTime = _player.Length;
+                _player.Sample(_player.Length);
                 return;
             }
 
-            _player.CurrentTime -= Prefs.SnapInterval;
+            _player.Sample(_player.CurrentTime - Prefs.SnapInterval);
         }
 
 
         private static void PlayerUpdate()
         {
-            if (_player == null) return;
+            if (AssetData == null) return;
             var delta = (Time.realtimeSinceStartup - _editorPreviousTime) * Time.timeScale;
 
             _editorPreviousTime = Time.realtimeSinceStartup;
-
-            _player.Sample();
 
             if (!IsPlay) return;
             
             if(IsPause) return;
 
-            if (_player.CurrentTime >= App.AssetData.Length)
+            var min = IsRange ? AssetData.RangeMin : 0;
+            var max = IsRange ? Mathf.Min(AssetData.RangeMax, AssetData.Length) : AssetData.Length;
+            if (max <= min) { Stop(); return; }
+            if (_player.CurrentTime + delta >= max)
             {
-                _player.Sample(0);
-                _player.Sample(delta);
+                var next = min + Mathf.Repeat(_player.CurrentTime + delta - max, max - min);
+                _player.Sample(max);
+                _player.Reset();
+                _player.Sample(next);
+                Repaint();
                 return;
             }
 
             _player.CurrentTime += delta; 
+            _player.Sample();
             Repaint();
         }
 

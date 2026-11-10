@@ -33,9 +33,10 @@ namespace NBC.ActionEditor
 
         public void DrawDefaultInspector(object obj)
         {
+            if (obj == null) { EditorGUILayout.LabelField("null"); return; }
             var t = obj.GetType();
             //得到字段的值,只能得到public类型的字典的值
-            FieldInfo[] fieldInfos = t.GetFields();
+            FieldInfo[] fieldInfos = t.GetFields(BindingFlags.Public | BindingFlags.Instance);
             //排序一下，子类的字段在后，父类的在前
             Array.Sort(fieldInfos, FieldsSprtBy);
 
@@ -134,9 +135,10 @@ namespace NBC.ActionEditor
                             object listItem = list[i];
                             EditorGUILayout.BeginHorizontal();
                             EditorGUILayout.LabelField($"Element {i}");
-                            if (GUILayout.Button("X", GUILayout.Width(20)))
+                            if (DrawRemoveButton())
                             {
-                                list.Remove(listItem);
+                                EditorGUILayout.EndHorizontal();
+                                list.RemoveAt(i);
                                 i--;
                                 continue;
                             }
@@ -145,7 +147,7 @@ namespace NBC.ActionEditor
                             EditorGUILayout.BeginHorizontal();
                             GUILayout.Space(12);
                             EditorGUILayout.BeginVertical();
-                            DrawDefaultInspector(listItem);
+                            list[i] = DrawElement(elementType, listItem);
                             EditorGUILayout.EndVertical();
                             EditorGUILayout.EndHorizontal();
                             DrawDivider();
@@ -163,7 +165,8 @@ namespace NBC.ActionEditor
                             field.SetValue(obj, list);
                         }
 
-                        list.Add(Activator.CreateInstance(elementType));
+                        list.Add(CreateElement(elementType));
+                        SetFoldout(list, true);
                     }
 
                     EditorGUILayout.EndHorizontal();
@@ -181,7 +184,6 @@ namespace NBC.ActionEditor
                 if (array == null)
                 {
                     array = Array.CreateInstance(elementType, 0);
-                    field.SetValue(obj, array);
                 }
 
                 var foldout = EditorGUILayout.Foldout(GetFoldout(value), field.GetShowName());
@@ -194,8 +196,9 @@ namespace NBC.ActionEditor
                         object listItem = array.GetValue(i);
                         EditorGUILayout.BeginHorizontal();
                         EditorGUILayout.LabelField($"Element {i}");
-                        if (GUILayout.Button("x", GUILayout.Width(20)))
+                        if (DrawRemoveButton())
                         {
+                            EditorGUILayout.EndHorizontal();
                             Array newArray = Array.CreateInstance(elementType, array.Length - 1);
                             for (int j = 0, k = 0; j < array.Length; j++)
                             {
@@ -217,7 +220,7 @@ namespace NBC.ActionEditor
                         EditorGUILayout.BeginHorizontal();
                         GUILayout.Space(12);
                         EditorGUILayout.BeginVertical();
-                        DrawDefaultInspector(listItem);
+                        array.SetValue(DrawElement(elementType, listItem), i);
                         EditorGUILayout.EndVertical();
                         EditorGUILayout.EndHorizontal();
                         DrawDivider();
@@ -234,7 +237,7 @@ namespace NBC.ActionEditor
                             array.CopyTo(newArray, 0);
                         }
 
-                        newArray.SetValue(Activator.CreateInstance(elementType), newArray.Length - 1);
+                        newArray.SetValue(CreateElement(elementType), newArray.Length - 1);
                         RemoveFoldout(value);
                         array = newArray;
                         field.SetValue(obj, array);
@@ -349,7 +352,7 @@ namespace NBC.ActionEditor
                 if (args[0] is Type type)
                 {
                     Object o = null;
-                    var path = value.ToString();
+                    var path = value as string;
                     if (!string.IsNullOrEmpty(path))
                     {
                         o = AssetDatabase.LoadAssetAtPath(path, type);
@@ -384,6 +387,36 @@ namespace NBC.ActionEditor
 
             return 0;
         }
+
+        public static object CreateElement(Type type)
+        {
+            if (type == typeof(string)) return "";
+            if (typeof(Object).IsAssignableFrom(type)) return null;
+            if (type.IsAbstract || type.IsInterface || !type.IsValueType && type.GetConstructor(Type.EmptyTypes) == null) return null;
+            return Activator.CreateInstance(type);
+        }
+
+        private object DrawElement(Type type, object value)
+        {
+            if (type == typeof(string)) return EditorGUILayout.TextField(value as string ?? "");
+            if (type == typeof(int)) return EditorGUILayout.IntField(value == null ? 0 : (int)value);
+            if (type == typeof(float)) return EditorGUILayout.FloatField(value == null ? 0 : (float)value);
+            if (type == typeof(bool)) return EditorGUILayout.Toggle(value != null && (bool)value);
+            if (type == typeof(Color)) return EditorGUILayout.ColorField(value == null ? Color.white : (Color)value);
+            if (type == typeof(Vector2)) return EditorGUILayout.Vector2Field("", value == null ? Vector2.zero : (Vector2)value);
+            if (type == typeof(Vector3)) return EditorGUILayout.Vector3Field("", value == null ? Vector3.zero : (Vector3)value);
+            if (type.IsEnum) return EditorGUILayout.EnumPopup((Enum)(value ?? Activator.CreateInstance(type)));
+            if (typeof(Object).IsAssignableFrom(type)) return EditorGUILayout.ObjectField((Object)value, type, false);
+            if (value == null)
+            {
+                EditorGUILayout.LabelField("null (" + type.Name + ")");
+                if (GUILayout.Button("创建元素")) return CreateElement(type);
+                return null;
+            }
+            DrawDefaultInspector(value); return value;
+        }
+
+        protected virtual bool DrawRemoveButton() => GUILayout.Button("X", GUILayout.Width(20));
 
         private int FieldsSort(FieldInfo f1, FieldInfo f2)
         {

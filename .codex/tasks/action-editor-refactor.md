@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：本轮 ActionEditor A00–B06 `complete`；Combat 专属实施与验收暂缓。
-- 当前执行任务：无，已完成本轮授权范围。
-- 下一任务：等待用户指定；不自动开始 C01 或扩大 Combat 接入。
+- 当前执行任务：R01–R10 原版可靠性补齐与共用 JSON 的 UI Toolkit 等价界面。用户已授权无人值守实施、编译与测试；原始资产保护、不提交/推送、Combat 暂缓仍有效。原有“暂停测试”已由最新授权取代。
+- 下一任务：用户验收接近原版的布局与操作后再决定后续改进；不自动开始 C01。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -434,3 +434,192 @@
 - 最终验证：`.codex/runs/20261109T113932Z-0959f722/`，69/69 EditMode passed，0 failed/skipped/inconclusive；离线审批/工作流 38/38 passed。真实方案覆盖 18 项目/624 源文件；最终 dotnet build 0 错误、43 警告。无通用完整资产检查，未提供目标的 asset-validation 明确 skipped，不当作所有资产通过。
 - 未覆盖与交付边界：实际窗口与 UI Toolkit 事件/字段已执行，但不是人工鼠标视觉验收或 Editor 进程重启；未做 Player Build、Combat 播放/预览、性能门禁及持久工作区布局。A00–B06 最小平台通过不代表 C–E 业务已完成。完整文档结构检查仍缺 PyYAML/markdown-it-py，未安装依赖。未公开发布或 push，远程地址仍待用户提供。
 - 下一步：停止于本轮授权边界，等待用户指定下一任务或远程地址。
+
+### B06 后续修复｜旧创建入口异常
+
+- 状态 / 日期：`complete`，2026-11-09。用户报告编辑器报错，本次仅修复相关入口，不开始 Combat 后续任务。
+- 现场证据：doctor `20261109T114628Z-0acaffb1` 绑定当前工程；console 查询 `20261109T114651Z-d4af085e` 显示 compilationFailed=false，最新异常为旧窗口 CreateAssetWindow.CreateConfirm 的 Legacy JSON creation is disabled。历史测试的损坏 JSON 预期日志与此异常区分记录，未清空 Console。
+- 复现：新增 LegacyCreateButtonOpensNativeWorkbenchWithoutThrowingOrChangingLegacyData，通过旧创建按钮同一方法复现异常，报告 `20261109T114806Z-50d9be10`，1 用例 failed（不是零用例，封装因零通过优先显示 Zero executed/passed）。
+- 修复：旧菜单 Open Action Editor 转到原生 ActionWorkbench；已打开旧窗口的欢迎页提供明确新工作台按钮；已打开旧创建弹窗移除无效旧格式输入，显示只读迁移说明并打开工作台，不抛禁用异常。不恢复旧 JSON 保存，不创建持久资产，也不自动创建或替换用户文档。旧窗口源码保留，未扩大退役删除范围。
+- 验证：最终 `20261109T115213Z-385de602`，70/70 EditMode passed、0 failed/skipped/inconclusive；同一旧创建入口不再抛异常，旧菜单不再新开旧窗口，旧文档/目标保持不变。真实方案 18 项目/624 源文件，dotnet build 0 错误、43 警告；git diff --check 通过。没有重跑涉及资产写入的 B06 探针，本修复不改变存储。
+- 用户文件：发现未跟踪 ProjectSettings/WhootActionSequencer.txt，未读取、修改或加入提交。本次修复暂留工作区，未另行 commit/push。
+
+### B06 后续诊断｜轨道显示与布局反馈
+
+- 用户先报告 + Track 无明显变化，随后确认轨道已出现，当前问题转为布局体验。新窗口通过真实 New 与 + Track 按钮确认文档中两行轨道及 canvas 非零布局，没有据此宣称用户全部布局正常。
+- 诊断截图原始 GPU 读取方向错误，像素区域断言失败不代表轨道未绘制；已移除该不可靠截图断言。保留工具栏结构回归 ToolbarTrackCreationUpdatesRowsInLaidOutCanvas，最终 `20261109T121108Z-5f4b144d` 1/1 EditMode passed；它仅验证按钮、行结构和布局尺寸，不是视觉验收。
+- 已知体验缺口：空文档提示不明显；轨道行/名称与新增反馈不足；没有明确的当前轨道选择，新事件仍进入第一轨道；固定初始分栏挤占窄窗口。此次没有擅自执行布局改版、持久资产写入或提交，待用户确定实施范围。
+
+### B06 后续布局改版｜待用户验收
+
+- 授权：用户要求继续实施布局改版，先接近原版布局操作，经其验收后才继续改进；参考用户提供的新工作台截图及本项目原 TimelineHeaderView/MiddleView/BottomView/TrackItemView，不恢复旧存储或扩展 Combat。
+- 实现：文档库默认收起、工具栏切换显示；文档工具与轨道/时间定位工具分行；左侧 200px 轨道头、40px 行高、组名与事件计数、当前轨道高亮；固定顶端秒刻度、中央事件、右侧分区属性、底部范围滑块和独立状态栏。无文档时显式 New/Open 提示，编辑工具禁用。轨道头点击选择、右侧重命名、+ Track 自动选中并定位、新事件进入当前轨道，右键菜单按所在轨道/时间新增。保持既有事件拖动/伸缩/撤销，新增定位开始/结束及 1/60 秒步进（仅定位，不执行事件）。
+- 视图：底部 MinMaxSlider 控制可见范围，适配按钮显示文档范围，原生竖向滚动条同步轨道头/事件；选择与滚动留在 WorkspaceState，不写入业务定义。分栏可调，文档库可切换；未实现跨 Editor 重启布局保存或完整 Group 折叠操作，不冒充原版所有功能均已迁移。
+- 实际验证：`20261109T122916Z-dc7eb0d2`，74/74 EditMode passed、0 failed/skipped/inconclusive。新增真实窗口回归覆盖 850/1024/1400 宽度的编辑区、面板边界、状态/范围栏顺序、属性和 Vector3 子输入宽度、New/+ Track 原生按钮、PointerDown 轨道选择、选中轨道新增、轨道重命名、长列表自动定位、范围/时间定位不改定义、文档库切换。首次宽度测试发现右侧越界，已修复并保留原断言；截图检查发现向量子标签过宽，已修复并增加宽度测试。
+- 最终生成方案覆盖 18 项目/624 源文件；dotnet build 0 错误、43 警告；实际窗口证据 `Temp/workbench-layout.png`，仅捕获本次新建测试窗口，经 Unity blit 材质校正方向。截图证明显示结果，不代替用户视觉和鼠标体验验收；右键菜单人工体验仍待用户检查。
+- 边界：本次只创建内存测试文档，不写持久 Unity 资产，不重放 B06 探针；未动 Combat、原始资源或用户 WhootActionSequencer 设置文件。代码和此前修复均留在工作区，未 commit/push。状态为等待用户验收，不自动继续后续业务。
+
+### B06 后续原版布局还原｜第二版待用户验收
+
+- 用户反馈：第一版布局仍有问题，要求尽可能还原原版布局与操作手感。第一版 74 个用例不代表用户验收；本轮按原始 Styles、TimelineHeader/Middle/Bottom/TrackItem/Pointer、HeaderGUI 和 InspectorPreviewAssetInspector 重新核对，不沿用自行设计的大行高和常驻右属性栏。
+- 布局：原生 UI Toolkit 全宽时间轴，移除常驻右属性栏；通过每窗口独立的临时 Inspector target 与 CustomEditor.CreateInspectorGUI 接入 Unity Inspector，不使用旧反射 IMGUI。轨道头默认 240px，加原版 5px 分隔和 4px 间隔，支持拖动；20px 顶部工具行加 20px 刻度，与原版总 40px 一致；26px 行加 2px 间隔，独立 Group 行、缩进 Track 行和折叠箭头。底部范围条 16px，起点与时间区对齐。文档库默认收起，通过文档菜单打开，不占默认编辑宽度。
+- 操作：点击组/轨道/事件将属性送到 Unity Inspector；Group 折叠只改工作区；Add Group 与当前组 Add Track；时间区普通滚轮沿左边界缩放，中键只横向平移且不越过 0，轨道头滚轮/右滚动条纵向滚动；标尺定位使用工作区吸附；范围条双击适配。空白轨道右键按吸附光标时间新增，事件右键 Duplicate/Delete，组/轨道头右键新增/锁定/解锁/删除；定义修改进入事务、删除结构带真实确认，保留拖动取消和 Undo。
+- 锁定：原事务拒绝任何 locked 内容差异，导致新增 Unlock 菜单无法工作。现在只允许单独更改 Group/Track 锁标记，不允许借解锁同时改名称、子对象或删除；父组锁仍保护子轨道。新增拒绝混合修改及逐次 Undo 回归。
+- 实际验证：最终 `.codex/runs/20261109T131047Z-1cf3b1e5/`，当前工程唯一 Editor 的真实编译及 76/76 EditMode passed，0 failed/skipped/inconclusive；生成方案 18 项目/625 源文件。真实 Show 窗口覆盖 850/1024/1400 宽度、完整时间轴宽度、实际 CustomEditor 原生字段修改、挂载属性视图的多选/集合/null/向量、重建、关闭重开、Group 折叠、分隔条提交/取消、滚轮事件、吸附定位、上下文菜单事件及复制 Undo。测试使用内存文档及本次专属窗口，不改持久资产。
+- 中间失败如实保留：`20261109T130108Z-d3a8629b` 两项失败，原测试字段移出面板后事件不派发、宽度 NaN，改为挂载真实原生 Inspector 视图而非放宽断言；`20261109T130525Z-e594806e` 测试误用当前 Unity 不存在的三参菜单事件 API，修正为文档声明的四参后重新完整验证。新增源码导入前旧生成方案未包含 InspectorTarget 导致 dotnet 首次失败，Unity 导入后方案已覆盖；没有手改生成项目。
+- 证据：`Temp/workbench-layout.png` 只捕获本次专属测试窗口，已检查全宽时间轴和层级行；截图不是人工鼠标验收。实际持久 B06 探针本轮未执行，仅更新属性控件定位以适配新入口，不沿用此前资产写入授权。
+- 有意保留差异/未覆盖：播放、暂停预览未接入，按钮禁用并给出说明；无 Combat、业务激活/隐藏语义或播放区间实现。保留 New/Open、底部 Add Track 与薄状态栏作为新平台入口/反馈；Add Group 当前固定底部，不完全复刻旧版随内容滚动的位置；未逐像素复刻全部旧图标/配色。未做 Player Build、Editor 进程重启、持久工作区恢复或性能门禁，完整文档结构检查依赖仍未安装。
+- 边界及下一步：未修改 Combat、原始资产、包/设置和 WhootActionSequencer.txt；新增 meta 由 Unity 生成。全部布局与此前入口修复暂不提交、不推送；等待用户验收后再决定后续改进，不推进 C01。
+
+### B06 后续双入口｜保留原版窗口参照
+
+- 用户请求 / 日期：2026-11-09，确认原版代码是否保留，并要求 Open Workbench 打开新版、Open Action Editor 打开原版。该请求取代之前将旧菜单重定向到新版的入口决定，不代表解除旧存储保护。
+- 实现：Open Action Editor 恢复打开原 ActionEditorWindow，其 WelcomeView/TimelineView 与原 Inspector/交互代码保留；Open Workbench 继续打开独立原生 ActionWorkbench。旧欢迎页补充原版参照及旧 JSON 创建/保存已禁用说明，保留显式打开新版按钮。
+- 边界：原版不是完全未改动副本，A03 的安全修复和旧创建弹窗迁移提示继续有效。旧 JSON 可读取和查看，不恢复创建/手动保存/自动保存，不声称已验证全部旧播放或 Combat 行为；新旧格式不自动互转。本轮只分离入口，不改 Combat、资产或设置。
+- 实际验证：`.codex/runs/20261109T133827Z-3901ac0a/` 为真实编译与 77/77 EditMode passed，0 failed/skipped/inconclusive。新增 LegacyAndWorkbenchMenusOpenSeparateWindowTypesWithoutChangingDocuments，调用同一菜单处理函数，确认旧 WelcomeView/TimelineView 已初始化、旧入口不打开新工作台、新入口打开新工作台，既有新旧文档保持不变，旧保存继续拒绝；finally 只关闭本次创建窗口。工具返回曾被中断，用户要求继续后先读取完整终态报告，确认已通过而未重复测试；doctor `20261109T140026Z-09802491` 再次确认当前工程 ready。
+- 最终 dotnet build 0 错误、43 警告，git diff --check 通过。没有持久 Unity 资产写入、Player Build、提交或推送；原版真实样本的人工布局/操作验收及新版第二版验收仍待用户。
+
+### 旧版体验入口与创建恢复｜未验证，等待用户体验
+
+- 现场诊断：用户报告旧菜单仍显示新版。新增固定只读 `actioneditor.validation window_status`，只返回新旧窗口类型/标题/尺寸/焦点、原生 canvas 是否存在、旧欢迎页/时间轴分支、已加载的两个菜单声明，不执行菜单、不改变窗口、不读取文档内容。命令经审计加入 READ_ONLY，附离线策略用例和操作说明。真实 query `20261109T141455Z-be1d1be5` 显示只有旧 ActionEditorWindow、无 ActionWorkbench，旧窗口为 welcome；菜单声明绑定正确。欢迎页原先主按钮跳转新版，造成使用入口混淆。
+- 用户先选择恢复旧 JSON 选择为主入口，随后明确要求暂停测试、先恢复创建旧版资源以体验原版。这覆盖此前禁用旧创建的决定，但不授权覆盖原始资产或恢复自动保存，也不继续新版布局设计。
+- 实现：欢迎页提供“创建旧版 JSON 资源”和“打开旧版 JSON 资源”，不再放新版跳转按钮。创建弹窗恢复旧 Asset 业务类型和文件名选择，过滤抽象/无无参构造/测试类型；由用户在项目内选择新 .json 目标，再展示具体类型和路径并确认。新对象旧 JSON 序列化、读回校验、同目录唯一暂存、Flush 和字节读回比较，使用 create-only Move 提交，任何已有文件/目录/meta 拒绝覆盖；拒绝 CombatEditor/ScriptableObjects 原始资源目录。导入成功后通过原 App.OnObjectPickerConfig 打开并显示旧窗口，不转到新版。不会由代理代用户创建实际资源。
+- 边界：旧手动保存/自动保存仍禁用，界面明确提示“编辑后保存暂未恢复”；本轮只恢复新建文件与进入原版操作，不声称旧编辑结果可保存。没有业务扩展类型时明确提示，不用测试类型冒充正式业务类型。旧创建重定向新版的过时回归已改为非法类型拒绝且不改会话，不再要求与本轮需求矛盾的行为。
+- 验证状态：用户叫停测试前 `20261109T142002Z-8badcb0f` 为旧入口专项 12 用例、11 passed/1 failed；新用例确实进入旧 TimelineView，但断言窗口宽度 >500 与实际 500 不符，已改为匹配实际窗口几何。后续调用被取消，结果未确认。本轮新增创建实现以后没有运行任何测试、编译命令、持久创建探针或实际资源写入，不沿用之前 77 项结果宣称通过。用户原版体验优先，保留这些验证缺口。
+- 状态/下一步：源码实施完成但未验证，等待用户自己创建新 JSON 并体验；不提交、不推送、不扩大 Combat/保存/新版设计范围。若用户体验发现问题再按其指示处理。
+
+### 旧版功能体验样例｜源码已实现，未编译/测试验收
+
+- 用户请求：提供旧版样例，包含大部分常用功能。延续“先不要测试了，先实现”，不运行测试或主动编译，不推进新版布局或 Combat。
+- 实现：新增 Runtime/Samples/LegacyExperience/LegacyExperienceAsset.cs，公开具体 Asset 类型“旧版功能体验样例（预置轨道）”。构造时预填 3 组、7 轨、13 个片段/点事件，总长 6 秒；包含可伸缩区间、渐入渐出、同类交叉混合、零长度点事件、内循环、锁定轨道、未激活轨道和折叠组。样例模型归属 NBC.ActionEditor Runtime 程序集，Editor 仅引用模型，不反向依赖 Editor 或默认 Assembly-CSharp。
+- 属性：文字、int/float、bool、枚举、颜色、向量、曲线、参数对象列表、选项及条件字段、可选音频资源路径。资源路径不播放、不执行业务逻辑。可伸缩区间显式重写 Length，以匹配旧 CanScale 的反射判定。
+- 预览：新增 Editor/Samples/LegacyExperiencePreview.cs，通过原版 CustomHeader 的“样例状态预览”打开只读状态窗口，按当前播放头求区间/渐变权重/循环相位/历史标记，颜色块仅绘制在窗口内，不创建场景对象。使用片段本地时间求权重、旧内循环时间轴偏移语义；标记列表明确不是实际触发记录。
+- 用法：Unity 自动编译后重开创建弹窗，选择上述类型，由用户选择全新 JSON 目标并确认，再进入旧时间轴。操作指引在 Assets/ActionEditor/Samples/LegacyExperience/README.md。代理未代用户创建持久 JSON、未改原始资产/Combat/包/项目设置，未提交或推送；新增源码 meta 交给 Unity 自动生成。
+- 静态核对：对照旧 Asset/Group/Track/Clip/ClipSignal/ClipCrossBlend、CanScale、ISubClipContainable、Inspector 字段属性、CustomHeader、程序集引用和权重公式，修正样例程序集位置和预览本地时间。未以静态核对冒充编译或功能通过。
+- 限制：旧保存/自动保存仍禁用，内存编辑可能在关闭/切换/重编译时丢失；复制/剪切等旧占位菜单不计为样例支持。没有真实动画/音频/特效/Combat 执行。
+- 验证：`git diff --check` 通过（仅补丁空白格式）；按用户要求未运行测试、主动编译、Unity 探针或实际创建操作。状态为等待用户体验，不继承此前测试结果；若编译或使用反馈有问题，按用户指示修复。
+
+### R01–R10 无人值守重整计划（2026-11-09）
+
+评估：可行。用户最新要求取代 A01 的“两个正式编辑格式不共用”及“旧 UI 不必修完整”的实施取舍。两种界面使用同一 Asset/Group/Track/Clip 对象图与 FullSerializer JSON，不进行有损互转。已有 ActionDocument .asset 实验代码保留，不删除、不转换资产，主 Open Workbench 入口改为共用 JSON 的原生 UI Toolkit 窗口。两种视图共享一个当前文档会话，避免同一文件两份内存互相覆盖；长期多文档实例隔离另列限制。
+
+授权：用户明确“长任务完全开放授权操作，不用再由我确认”，允许本范围源码/文档、编译和测试。仅操作本工程唯一 Editor。测试用临时隔离数据和本次拥有的窗口，不覆盖用户已有 Jsons、Combat、ScriptableObjects，不修改包/设置，不提交/推送。真实持久探针仍遵循项目 preview/审批策略；没有必要时使用 Temp 文件系统验证与内存窗口用例。不伪造额外确认。
+
+| 编号 | 任务与交付 | 验收 | 状态 |
+|---|---|---|---|
+| R01 | 核对文档缺陷、上游修复及现有用户改动，确定共用模型与范围 | 有来源、变更清单和可执行任务；未知项明列 | complete |
+| R02 | 共用 JSON 存储：序列化/读回/结构校验、原子提交、外部修改检测、成功后切换 | 损坏/空数据/失败不改当前文档；保存重开一致；禁止覆盖保护目录 | complete（当前样例/字符串资源路径范围） |
+| R03 | 共用 JSON 撤销快照与编辑命令；复制/剪切/粘贴/副本/重命名 | 时间/参数/类型保留、锁定保护、一次拖动一次撤销、失败回滚 | complete（已列测试覆盖范围） |
+| R04 | 原版输入：按下前提、拖出区域、结束清理、ExitGUI 正常传播 | 未按下不能拖、区域外松开结束、正常 GUI 退出不报错 | complete（专项输入与实际窗口回归） |
+| R05 | 原版 View 注册释放、预览缓存失效与关闭清理、时钟与自动保存 | 重建不增长注册；切换/结构修改/停止释放；60/120 秒规则 | complete（无 Combat 场景副作用验收） |
+| R06 | 集合 Inspector：布局闭合、基础/空元素、数组、创建失败；补菜单 | 列表删除无布局错误，常用字段/空值不崩溃，菜单无无效占位 | complete（原版列表/数组删除真实点击已覆盖） |
+| R07 | 原生 UI Toolkit 原版等价布局：顶部播放区/文档栏、轨道头、标尺、滚动内容、底部范围、独立 Inspector | 不嵌 IMGUIContainer；关键几何相同；同一样例展示完整 | validating（自动几何通过，人工体验未验收） |
+| R08 | UI Toolkit 共用编辑、属性、复制、拖动/伸缩/多选/吸附、播放/循环、折叠锁定、内循环/渐变显示 | 操作作用于同一 JSON/会话，可跨界面撤销与保存；捕获取消可靠 | validating（主要操作落地；显示与自定义面板仍有差异） |
+| R09 | 更新架构/契约/使用说明，明确替代历史决策与剩余能力 | 用户能从两个菜单编辑同一文档；限制不隐瞒 | complete |
+| R10 | 真实生成解决方案编译、Unity 编译、发现专项用例后执行、入口/几何与截图验收 | 失败先修复，不以旧结果或截图冒充通过；人工视觉验收留待用户 | validating（编译/97 测试/保存探针通过；文档解析器与人工验收未完成） |
+
+上游：https://github.com/NoBugCn/ActionEditor master 最新 7943620（2025-07-24）仅 README；README 明确 2.0 仍有 UI bug 且维护精力不足，无发布版本。未发现可直接移植的更新修复，本轮最小本地修复，不升级依赖。main 不存在有效历史，已改查 master。
+
+环境：首次 doctor 被此前取消运行遗留 editor.lock 阻塞。锁 PID 36524，经 Win32_Process 精确 PID 查询无存活进程，仅读取后移除本次已知的失效锁，再重新绑定 Editor；不删除活动锁。
+
+### R01–R10 本轮交付与证据（2026-11-09）
+
+- 范围：原版可靠性 + 共用 JSON 原生界面，未开始 C01、未改 Combat/包/设置、未提交或推送。保留用户未跟踪的 `Assets/ActionEditor/Jsons/NewAction.json` 和 `ProjectSettings/WhootActionSequencer.txt`，不清理既有工作区更改。
+- 原版修复：整图 JSON Undo/Redo，复制/剪切/粘贴/副本/重命名与锁定命令；拖动必须先按下、区域外释放、Esc/失焦取消；非法伸缩恢复长度；嵌套命令归同一事务；View 重建释放；预览停止/切换/重载失效、首帧零时刻初始化；自动保存跳过未完成手势并使用单调时钟；集合删除补齐布局闭合、空数组绘制不写数据。
+- 共用服务：`JsonDocumentSession` 读成功后才切换，结构/有限时间校验、暂存读回内容比较、原子提交、外部磁盘版本保护；保存后 Undo 为脏、Redo 回保存状态为净。SessionState 恢复未保存快照及版本基线，但不是跨进程备份系统。
+- 原生入口：`Open Workbench → JsonActionWorkbench`。不含 IMGUIContainer。40px 顶部、20px 标尺、28px 行距、16px 底部、独立 Unity Inspector、分栏读取原版宽度；绘制共用图、折叠/选择、复制菜单、拖动/伸缩/框选、磁吸/缩放/平移、轨道重排、范围循环起止、播放/逐步、原生常用值/集合/条件属性。`Open Action Editor` 仍为 GUILayout，两个入口只共享一个当前文档。
+- 文档：架构与契约增加覆盖历史 A01/A02 取舍的当前决策；样例说明与预览提示移除过期“不能保存/未测试”。旧 `.asset` 实验保留，不自动迁移或删除。
+
+实际最终验证：
+
+| 检查 | 最终结果与证据 |
+|---|---|
+| Unity 编译 + 完整项目 Editor 测试 | `.codex/runs/20261109T170023Z-87c7280a/report.json`，程序集 `NBC.ActionEditor.Editor.Tests`、EditMode，97/97 passed，0 failed/skipped/inconclusive |
+| 共享 JSON 专项 | 完整套件包含 19 项，共用多态样例 3组/7轨/13事件、Undo/Redo/回滚、嵌套、复制、锁定、范围、真实指针移动/伸缩/释放捕获取消、标尺连续拖动/Esc、实际 Inspector 修改、View 注册释放、恢复快照、首帧预览 |
+| 真实生成解决方案 | `.codex/runs/20261109T170023Z-146828af/report.json`，18 projects/635 sources，dotnet build 0 errors、43 warnings（未宣称零警告）；工作流单元测试 40/40 passed |
+| 文档结构 | 同一 code profile 整体 blocked，缺少 `yaml`/`markdown_it`，未安装依赖、不能算全绿 |
+| 最终保存路径专项 | `.codex/runs/20261109T165427Z-f3022647/report.json`，共用 session 原子新建/修改保存/保存后 Undo/Redo/导入重开/拒绝外部版本修改全部通过，31,002 bytes；自有 `Assets/ActionEditorValidationR10` 已清理，原内存文档恢复。后续改动仅 Inspector 空数组、界面分栏和首帧预览，未改保存服务 |
+| 审批链 | preview `20261109T165250Z-3147118e` → 明确引用本轮用户无人值守授权的 approve `20261109T165352Z-e44e2cba` → apply 上行记录；不是伪造新确认 |
+| 布局证据 | `Temp/shared-json-original.png`、`Temp/shared-json-native.png`，仅测试拥有窗口的 GrabPixels，不截桌面；850/1024/1400 宽度检查，无固定内嵌属性栏；已读取图片检查。截图不代替人工验收 |
+| 差异检查 | `git diff --check` 通过；没有 Player Build、Combat 运行或完整项目资产引用验收，asset-validation 无目标而 skipped |
+
+中间失败未隐瞒：早期 SharedJson 8/11，修复 NaN setter、Event.current 测试路径与绘制期修改样式后 11/11；后续 17/19 的失败来自非法合成捕获事件以及标尺默认动作夺走焦点，改为真实 ReleasePointer 并阻止标尺默认焦点动作后通过。完整套件曾 96/97（新增打开错误日志未声明预期），修正精确日志预期后最终 97/97。保留失败 run，不用旧成功替换最终证据。
+
+仍未关闭的验收点：
+1. R06 原版集合删除真实按钮/复杂自定义 Inspector 尚无专项点击证据；基础构建和原生 Inspector 不等于该场景全部验收。
+2. R07/R08 不是逐像素复刻：点事件外形、交叉混合填充/遮罩、部分状态样式仍不同；旧业务自定义 IMGUI Header/Inspector 不自动转换到原生 Toolkit。不能标记“原版全部功能等价完成”。
+3. 共享图沿用 float 时间、旧类型和预览回调，不等于旧 `.asset` 实验平台的稳定 ID/确定性调度契约。只支持一个当前文档，多窗口不是多文档隔离。
+4. 任意 UnityEngine.Object 跨重启引用持久化未验收，样例使用字符串资源路径；真实 Combat 副作用、域重载跨窗口手动恢复与操作舒适度留待后续实际验收。
+5. 用户仍需体验两个菜单的同一独立样例。只有用户认可接近原版的布局操作后才进入后续改进；不自动开启 Combat。
+
+### R06 与显示补齐后的最终证据（覆盖上行旧计数及集合缺口）
+
+- 原版集合真实点击专项已补齐：在测试拥有的 EditorWindow 内直接调用 `InspectorsBase.FieldDefaultInspector`，从实际 GUILayout 删除按钮记录位置，转换窗口内容坐标，通过 `EditorWindow.SendEvent` 发出 MouseDown/MouseUp，分别断言列表和数组从 2 项变为 1 项，后续绘制无意外日志；空数组仍为 null。测试只观察实际按钮 Rect，不替换按钮返回值。最初点击未转换标题栏偏移而未命中，修正坐标后 `20261109T171726Z-0070f013` 通过。
+- 原生点事件补为原版式标记轮廓，渐入/渐出补齐裁剪后的三角填充；新截图已读取检查。仍不声称业务自定义 Header/Inspector、交叉混合复杂遮罩或所有状态样式逐像素一致。
+- **最终源码** Unity 编译及完整回归：`.codex/runs/20261109T172012Z-c9bbd2b6/report.json`，`NBC.ActionEditor.Editor.Tests` EditMode **98/98 passed**，0 failed/skipped/inconclusive；共享 JSON 专项现为 20 项。
+- **最终源码** code profile：`.codex/runs/20261109T172012Z-e6c1a2f5/report.json`，工作流 **40/40 passed**；生成解决方案 18 projects/635 sources，**0 errors、43 warnings**。整体仍 blocked，唯一结构检查阻塞为缺少 yaml/markdown_it；未安装依赖。
+- 本次补齐没有更改 JSON 存储服务，持久保存探针继续对应 `20261109T165427Z-f3022647`。最终截图仍为 `Temp/shared-json-original.png` 与 `Temp/shared-json-native.png`，不等同于用户视觉验收。
+- 上行“仍未关闭”第 1 项现已关闭；第 2 项点事件与渐变基础显示已补齐，其余保留。未验证的任意业务扩展和人工验收不以继续运行同一套自动测试冒充完成。
+
+### 用户反馈“编辑器还有报错”的修复记录（2026-11-10，运行目录使用环境 UTC 日期 20261109）
+
+- 现场不是只有旧日志：`20261109T224634Z-e70ed7ad` 确认 `TryAutoSave → Save` 每约 5 秒产生“JSON 读回内容不一致，拒绝提交”，编译本身正常。
+- 新增固定只读 `actioneditor.validation json_status`，仅返回往返差异字段路径，不输出字段值，不写会话/资产。编译重载后当前副本差异已为空，所以不能声称已捕获重载前的具体用户字段差异。
+- 独立复现：通过既有公共 Clip 属性直接改时间/长度，总时长缓存未更新；保存源 JSON 的 `length` 与 Decode.Init 重算后的 `length` 不同。新测试先断言仅出现 `$.length (value)`，再检验保存快照时长与参数保留。修复为保存序列化回调完成后校验结构并调用 UpdateMaxTime，仍保留完整读回一致性与磁盘外部版本保护，不以忽略任意差异绕过校验。
+- 暴露旧测试隔离缺陷：菜单测试假定当前无持久文档，却调用 App.SaveAsset，用户当前文档可保存时断言失败。LegacySafetyTests 现先捕获并清空自己的会话、结束后恢复原文档快照，菜单测试改走实际 JsonActionWorkbench 入口。首次完整回归 98/99 未假报通过，修复后 99/99。
+- 最终 Unity 编译及回归：`.codex/runs/20261109T230517Z-73dd9977/report.json`，Editor 程序集 99/99 passed、0 failed/skipped/inconclusive；共享 JSON 专项 21 项。
+- 隔离真实保存：preview `20261109T230729Z-81cbf2f4` → 引用既有用户无人值守授权的 approve `20261109T230914Z-9574be1d` → apply `20261109T230952Z-609c37ec` passed。验证过期时长 6→11 的公开图修改仍能保存重载并保留参数，原有 Undo/Redo/外部覆盖保护通过；仅新建并清理自有目录，恢复原会话。
+- 最终 code profile `20261109T231105Z-9e80305e`：41/41 工作流测试 passed；生成解决方案 18 projects/635 sources、0 errors/43 warnings。整体仍因 yaml/markdown_it 缺失 blocked，未安装依赖。
+- 当前日志 `20261109T231105Z-d32e0a41`：最后一条自动保存失败仍为修复前 22:53:48Z，之后无新自动保存错误。23:11:31Z 当前 Console 留有 2 条 Error，均为 `FailedLegacyOpenDoesNotChangeDocumentOrTarget` 故意输入 `not json` 的预期错误，已在测试中声明，但 Unity 仍在 Console 显示；未擅自清空用户 Console。不能将其说成当前 Console 零错误。
+- 未主动改写已有 NewAction.json；正常已启用自动保存仍按既有行为运行。最终 `git diff --check` passed。下一步用户在原来文档中继续保存/编辑确认；若有不同异常需按新栈定位，不以本次修复覆盖所有未知问题。
+
+### R07/R08 原版布局重新还原（2026-11-10，执行中）
+
+- 用户最新明确“那就按原版还原”。不以之前几何/回归通过代替原版布局验收。唯一参照为当前修复后的 GUILayout：同一样例、窗口尺寸、分栏、视域、选择和播放状态比较。
+- 移除自行新增的文字保存/属性/常驻样例预览/循环数字字段；还原文档选择、类型自定义 Header、右侧保存时间与保存/磁吸/设置图标。播放区宽度为原版左栏宽，不包含分隔条。
+- 还原居中欢迎页、原生设置弹窗、轨道头缩进/图标/菜单/状态、标尺刻度及播放/循环手柄、选中片段白框/底色条/居中类型名称、Inspector 的 IN/长度/OUT 与混合栏。保持原生 UI Toolkit，不嵌 IMGUIContainer。
+- 需要相同状态截图及真实操作回归；完成前不标记 R07/R08/R10 accepted。保护用户 JSON、设置和已有工作区，未开始 Combat。
+
+#### 本轮实现与最终验证
+
+- 已按上行矩阵实现。顶部多余按钮/循环字段移除，类型 Header 原生挂点及样例入口接入；轨道折叠/菜单/锁定/停用图标复用原版贴图，左右菜单按原版分类；片段改为原版底色、4px 色条、居中粗体类型名称、选中白框和相邻重叠混合显示。去掉原版没有的时间轴网格及循环分段线。播放头仅播放时显示，循环显示原版图标和线。设置为原生 popup，非 IMGUIContainer。
+- 同状态截图：`Temp/shared-json-{original,native}.png`（1000×600、左栏320、视域0..7、同一内存样例）；另有 `-selected`、`-scrolled`、`-welcome`、`-inspector` 配对及 `shared-json-native-settings.png`。真实滚动曾发现头/文字移动而绘制缓存未更新，已在 SyncView 统一 MarkDirtyRepaint，最终图片读取确认轨道内容同步；滚动条尺寸按可见比例调整。
+- 新用例实际编辑 Inspector 长度并 Undo，检查欢迎页三个按钮、设置原生控件、顶部没有旧循环数字字段、样例 Header、850/1024/1400宽度及滚动时坐标变换。只操作自有窗口和内存样例，finally 恢复原会话及分栏/滚动值。
+- 中间失败：初次22项回归有1项来自浮点布局16.000015与整数严格比较，改为0.001容差；完整100项初次有1项来自旧测试先设置position再Show导致上次窗口高度覆盖，改为Show后设置测试尺寸。没有降低实际几何要求。最终 `.codex/runs/20261110T011219Z-fc084b29/report.json`：Unity编译passed，Editor **100/100 passed**、0failed/skipped/inconclusive，包含共享JSON22项。
+- `.codex/runs/20261110T011405Z-c0705717/report.json`：工作流 **41/41 passed**；生成解决方案18projects/636sources，**0errors/43warnings**；文档结构仍因缺yaml/markdown_it blocked，未安装依赖。`git diff --check` passed。无Player Build、Combat或完整资源引用验收。
+- 日志不能沿用前轮“之后无新保存失败”：本轮观察到00:34及00:54有新增读回不一致，00:34:47另有文件替换失败。重载后只读 `20261110T010003Z-bd7c781b` 差异为空，未捕获失败当时字段，不能断言这些现场问题已完全解决；本次不修改/重试覆盖用户文档。最终console读取 `20261110T011543Z-5976641f` 当前2Error为01:13故意损坏JSON测试预期日志，01:00后没有新保存失败，但这不是用户真实保存成功的证据。保留独立保存问题追踪。
+- R07/R08本轮还原实现与自动回归完成，仍等待用户布局验收，不宣称任意自定义业务Inspector自动转换或逐像素皮肤相同。Toolkit/IMGUI内建字体、滑块皮肤、抗锯齿差异及保存现场异常如实保留；未推进Combat、未提交/推送。
+
+### R08 事件块边缘拉伸提示补齐（2026-11-10）
+
+- 用户指出原生时间轴缺少原版左右边缘的拉伸提示。原版 `DrawDragCursor` 在5px边缘使用ResizeHorizontal；原生此前只有伸缩命中，没有光标样式。新增原生USS `cursor: resize-horizontal`，在可伸缩且未锁定的片段左右5px区域应用，点击命中复用相同判断。片段中部、点事件、锁定轨道不显示；拖动越过边缘仍保持提示，取消/失焦/捕获丢失/退出后恢复。
+- 新增真实指针专项，读取Unity2022内部computedStyle验证USS实际光标改变，而不只检查类名；覆盖左右边缘、中部、点事件、锁定和取消。初次测试引用IResolvedStyle.cursor编译失败，已改为测试侧反射读取实际计算样式，生产代码不依赖反射。
+- 回归暴露双窗口事务归属问题：原版OnGUI重绘会结束原生拖动事务，导致捕获丢失后不能回滚。新增断言先确认拖动期间IsEditing，并将原版EndEdit限制为自身开启的GUI事务，最终取消用例恢复原位置。View注册专项另补显式Focus/Repaint和实际8行初始化断言，避免后台窗口仅7个基础View尚未绘制就记录基线；不放松后续不增长断言。
+- 最终Unity编译及完整Editor回归：`.codex/runs/20261110T115842Z-10766e77/report.json`，**101/101 passed**、0failed/skipped/inconclusive，含共享JSON23项。源码/工作流：`20261110T115842Z-5ccc2752`，41/41 passed，18projects/636sources、0errors/43warnings；文档结构因yaml/markdown_it缺失仍blocked，未安装依赖。
+- 本次未改保存服务、用户JSON或设置，未做持久写探针、Combat或PlayerBuild，不将本轮光标修复视为此前保存现场异常已解决。
+
+### R08 多选拖动对齐辅助轴补齐（2026-11-10）
+
+- 按用户要求先读原版 `TimelinePointerView.DrawDragLine`、`DrawTools.DrawDashedLine` 与 `ItemDragger.HasMagnetSnapTime/CacheMagnetSnapInfo`。原版使用整组选中事件的最早起点与最晚终点；移动显示两轴，左右拉伸仅显示对应边；非参考时刻灰色0.48虚线（每约10px一节、半节实线），与缓存参考时刻差小于0.00001秒时白色实线；顶部黑底18px高、两位小数时间标签。不是每个片段各画两轴，也不是永久网格。
+- 原生用独立 `json-drag-guides` 覆盖层与Painter2D绘制，范围标尺y20至底栏上方，拾取忽略；坐标复用Canvas.X，按同一拖动起点缓存候选时刻供磁吸与线型判断。移动后显示，松开、Esc、失焦、捕获丢失、Detach/Dispose隐藏或释放。保持原生渲染，不新增IMGUIContainer、不改JSON。
+- 新真实指针用例 `NativeMultiClipDragGuidesMatchBoundsSnappingAndGestureLifetime`：跨两轨多选移动保留相对时间、最早/最晚轴和标签正确、Shift旁路的双虚线、拖到1秒的吸附白实线、放开隐藏、Undo恢复两事件、左右拉伸只显示一轴、Esc和实际ReleasePointer取消恢复、Dispose移除覆盖层。专项 `20261110T122713Z-c5d352a0` passed；图片 `Temp/shared-json-native-multi-drag-dashed.png` 与 `-snapped.png` 已读取核对。
+- 最终Unity编译+完整程序集回归 `.codex/runs/20261110T122942Z-10d4d3de/report.json`：**102/102 passed**、0failed/skipped/inconclusive，含SharedJson24项。代码检查 `20261110T122942Z-efea630f`：工作流41/41 passed；18projects/636sources、0errors/43warnings，文档结构仍因yaml/markdown_it缺失blocked，未安装依赖。
+- 本次不改变原版或Combat、不覆盖用户JSON/设置、不运行持久写探针、不提交推送；未宣称此前保存异常已修复。截图只是本轮实现证据，仍待用户实际布局操作验收。
+
+### JSON 保存异常续查（2026-11-10，可复现精度问题已修复）
+
+- 用户本轮选择“排查 JSON 保存异常”。沿用 R01–R10 源码、编译与隔离测试授权，不主动覆盖用户 JSON、不修改 Combat/包/设置、不提交推送。
+- 当前 doctor `20261110T132303Z-1599347c` ready；只读 `20261110T132346Z-398d93a5` 差异为空。当前日志中的打开失败来自资源选择器选到 C# 文本，不是保存失败，本轮不扩大到资源选择器修复。
+- 独立复现：`System.Random(1937)` 对样例13片段反复设置非整数起点/长度；第5轮 `$.length` 不同。`20261110T133348Z-7289e858` 专项确实失败。浮点序列化经 decimal 舍入，Decode.Init 重算起点+长度后总时长不同。较早 `20261110T132945Z-5c3cfc26` 还先捕获位级时长16.3388195→16.3388176；未放宽容差解决。
+- 上游核查：jacobdufault/fullserializer master 的 fsPrimitiveConverter 仍包含 float→decimal；fsJsonPrinter 也未见可直接移植的完整精度修复。不升级/改 DLL，以项目局部 converter 直接提升 Single→Double。上游 LICENSE 和 LICENSE.txt 路径返回404，不宣称许可证已核实。
+- 当前修复：保持严格读回比较并输出最多8个差异字段路径，不输出值；原子替换 IOException 增加 HRESULT 并保留 InnerException，拒绝删目标降级及自动重放。物理占用测试继续检查失败原字节保留、临时文件清理，并补占用解除后的显式再次提交成功。
+- 初步专项 `20261110T133702Z-e23d5cb5` 通过；随后增加物理失败恢复断言与8轮真实保存探针，最终完整回归和实际持久探针仍待运行。首次新增完整方法名筛选运行0例，已如实失败并改用真实发现的类筛选，不算通过。
+
+#### 最终验证及范围
+
+- 更正上行首次运行描述：`20261110T132655Z-2b9f316a` 包装器显示“Zero executed/passed”，但底层日志实际为1 total/0 passed/1 failed，是无通过用例而非真正零执行。后续读取真实测试终态确认了浮点断言失败，不能将包装器摘要当作准确执行计数。
+- 最终源码 `20261110T134009Z-d7b233ab/report.json`：Unity 编译通过；程序集 `NBC.ActionEditor.Editor.Tests` EditMode **104/104 passed**，0 failed/skipped/inconclusive。含共享JSON26项、80轮连续浮点编辑及严格读回、512个随机位模式中的全部有限Single及极值/次正规数的位级往返、旧数字格式读取；物理文件占用失败原字节保留、临时文件清理和解除占用后显式提交通过。
+- `20261110T134208Z-f1d35cc3/report.json`：工作流 **41/41 passed**，真实生成解决方案18projects/636sources、**0errors/43warnings**。文档结构仍因缺yaml/markdown_it blocked，未安装依赖。
+- 真实持久验证：preview `20261110T134208Z-3355e185` → 引用已有无人值守验证授权 approve `20261110T134327Z-15a07811` → apply `20261110T134344Z-c57d031d` passed。经真实 `App.SaveAsset → JsonDocumentSession.Save → AssetDatabase.ImportAsset` 验证8轮浮点编辑保存/导入/重开时间完全一致，以及原有Undo/Redo、过期时长和外部修改保护；样例字节31,287。finally恢复原会话并清理本次自有目录，工具再查无目录/meta残留。
+- 恢复后只读 `20261110T134451Z-b22bad91` 差异为空。`git diff --check` 通过。没有主动保存或覆盖用户已有JSON，没有Combat、PlayerBuild或完整资产引用验收；保存探针并非用户原文档实际保存成功证据。
+- 结论：已修复本轮独立复现的浮点舍入→总时长读回不一致；历史00:34文件替换失败未确定现场占用者或权限来源，不能宣称已消除。新增错误诊断且故障保护/恢复验证通过，不删目标绕过，也不自动重放。布局验收和任意业务自定义序列化仍待用户；不推进Combat、不提交推送。

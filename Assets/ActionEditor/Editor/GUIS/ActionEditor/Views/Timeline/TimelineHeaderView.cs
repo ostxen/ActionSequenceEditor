@@ -30,20 +30,20 @@ namespace NBC.ActionEditor
             var rect = new Rect(0, 0, Styles.TimelineLeftWidth, Styles.PlayControlHeight);
             GUILayout.BeginArea(rect);
 
-            _buttonWidth = rect.width / 7;
+            _buttonWidth = rect.width / 8;
 
             GUILayout.BeginHorizontal(EditorStyles.toolbar);
 
             if (DrawButton(Styles.BackIcon, Lan.BackMenuTips))
             {
-                App.TextAsset = null;
+                if (App.ConfirmDocumentSwitch()) App.TextAsset = null;
                 // GUILayout.EndHorizontal();
                 // return;
             }
 
             if (DrawButton(Styles.FirstFrameIcon, Lan.FirstFrame))
             {
-                AssetPlayer.Inst.CurrentTime = 0;
+                AssetPlayer.Inst.Sample(0);
             }
 
             if (DrawButton(Styles.PrevFrameIcon, Lan.StepBackwardTips))
@@ -67,6 +67,7 @@ namespace NBC.ActionEditor
                 }
             }
 
+            EditorGUI.BeginChangeCheck();
             var isPause = DrawToggle(App.IsPause, Styles.PauseIcon, Lan.PauseTips);
             if (EditorGUI.EndChangeCheck())
             {
@@ -80,7 +81,7 @@ namespace NBC.ActionEditor
 
             if (DrawButton(Styles.LastFrameIcon, Lan.PlayForwardTips))
             {
-                AssetPlayer.Inst.CurrentTime = AssetPlayer.Inst.Length;
+                AssetPlayer.Inst.Sample(AssetPlayer.Inst.Length);
             }
 
             App.IsRange = DrawToggle(App.IsRange, Styles.RangeIcon, Lan.StepBackwardTips);

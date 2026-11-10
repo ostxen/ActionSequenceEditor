@@ -29,19 +29,32 @@ namespace NBC.ActionEditor
 
             GUILayout.Space(20);
 
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            GUILayout.Label("同一份 JSON，可在 GUILayout 与 UI Toolkit 界面编辑");
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
             GUI.backgroundColor = new Color(0.8f, 0.8f, 1, 1f);
 
-            if (DrawCenteredButton(Lan.CreateAsset))
+            if (DrawCenteredButton("创建 JSON 资源"))
             {
                 CreateAssetWindow.Show();
             }
 
             GUI.backgroundColor = Color.white;
-            if (DrawCenteredButton(Lan.SelectAsset))
+
+            if (DrawCenteredButton("打开 JSON 资源"))
             {
-                // ObjectSelectorWindow.ShowObjectPicker<Asset>(null, App.OnObjectPickerConfig, "Assets/");
                 ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, App.OnObjectPickerConfig, "Assets/");
             }
+
+            GUI.backgroundColor = Color.white;
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            GUILayout.Label("Open Workbench 使用 UI Toolkit，数据与本窗口共用");
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
 
             if (DrawCenteredButton(Lan.Seeting))
             {

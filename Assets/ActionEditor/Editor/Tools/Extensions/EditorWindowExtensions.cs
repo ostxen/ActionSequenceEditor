@@ -32,12 +32,19 @@ namespace NBC.ActionEditor
         {
             if (_views.TryGetValue(window, out var list))
             {
-                foreach (var view in list)
+                foreach (var view in list.ToArray())
                 {
                     if (!view.Visible) continue;
                     view.Update();
                 }
             }
         }
+
+        public static void RemoveView(this EditorWindow window, ViewBase view)
+        {
+            if (_views.TryGetValue(window, out var list)) list.Remove(view);
+        }
+        public static void ReleaseViews(this EditorWindow window) => _views.Remove(window);
+        public static int RegisteredViewCount(this EditorWindow window) => _views.TryGetValue(window, out var list) ? list.Count : 0;
     }
 }

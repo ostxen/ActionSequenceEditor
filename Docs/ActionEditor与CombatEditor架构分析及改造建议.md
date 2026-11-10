@@ -7,6 +7,16 @@
 
 ---
 
+## 后续实施决策：原版优先与共用 JSON
+
+2026-11-09 用户在体验后否定先前工作台的布局与完成度，要求先补原版可靠性，再用原生 UI Toolkit 尽量复刻原布局和操作。该决定覆盖本文早期“无需完善旧 UI”及 A01 的 `.asset` 正式入口取舍，历史分析不删除，但不再当作当前入口现状。
+
+当前 `Open Action Editor` 与 `Open Workbench` 分别为 GUILayout 和原生 UI Toolkit，二者共用 `App.Session`、原有 Asset/Group/Track/Clip 和同一 FullSerializer JSON，不做旧新格式互转。共用服务负责原子保存、外部修改保护、Undo 快照和编辑命令。先前 ActionDocument `.asset` 工作台保留为实验，不自动转换或删除用户数据。Combat 仍暂缓，不因本轮 UI 完成而开始业务接入。
+
+原生界面沿用顶部播放区、文档栏、标尺、轨道头、滚动时间轴、底部范围与独立 Inspector。几何检查、真实指针事件、保存重载和截图只提供证据，最终布局与操作验收由用户完成。自定义 IMGUI 业务 Header/Inspector、任意 Unity Object 引用持久化及逐像素显示差异必须单独说明，不能声称自动等价。进度和实际测试计数只维护在[唯一任务清单](../.codex/tasks/action-editor-refactor.md)。
+
+---
+
 ## 目录
 
 1. [执行摘要与项目约束](#1-执行摘要与项目约束)
