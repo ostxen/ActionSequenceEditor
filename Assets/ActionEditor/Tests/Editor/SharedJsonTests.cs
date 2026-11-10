@@ -276,6 +276,124 @@ namespace NBC.ActionEditor.Tests
             UnityEngine.Object.DestroyImmediate(fixture);
         }
 
+        [Test] public void SharedContextOwnsStateAndServicesWithoutAnEditorWindow()
+        {
+            using (var context = new ActionEditorContext(new JsonDocumentSession()))
+            {
+                context.Open(fixture);
+                var clip = context.Document.groups[0].Tracks[0].Clips[0];
+                context.Selection.Set(new IDirectable[] { clip }, false);
+                context.Clipboard.Item = clip;
+                Assert.That(context.Source, Is.SameAs(fixture));
+                Assert.That(context.Document, Is.Not.SameAs(App.AssetData));
+                Assert.That(context.Selection.First, Is.SameAs(clip));
+                Assert.That(context.Clipboard.Item, Is.SameAs(clip));
+                context.Playback.Play(10);
+                Assert.That(context.Playback.Update(10.25f, 1), Is.True);
+                Assert.That(context.Player.CurrentTime, Is.EqualTo(.25f).Within(.0001f));
+                context.Playback.Pause(true); context.Playback.Update(11, 1);
+                Assert.That(context.Player.CurrentTime, Is.EqualTo(.25f).Within(.0001f));
+                context.Playback.Pause(false); context.Playback.Update(11.25f, 1);
+                Assert.That(context.Player.CurrentTime, Is.EqualTo(.5f).Within(.0001f));
+                context.Open(null);
+                Assert.That(context.Selection.Count, Is.Zero);
+                Assert.That(context.Playback.IsPlaying || context.Playback.IsPaused || context.Player.IsInitialized, Is.False);
+                Assert.That(context.Player.CurrentTime, Is.Zero);
+            }
+        }
+
+        [Test] public void FailedOpenKeepsSharedContextStateAndFacadeHasNoSecondPlayer()
+        {
+            var context = App.Context; var document = context.Document;
+            var clip = document.groups[0].Tracks[0].Clips[0];
+            App.SelectWithoutInspector(clip);
+            var invalid = new TextAsset("{}");
+            try
+            {
+                LogAssert.Expect(LogType.Error, new Regex("Cannot create an instance of an interface or abstract type"));
+                LogAssert.Expect(LogType.Error, new Regex("ActionEditor 打开失败"));
+                App.TextAsset = invalid;
+                Assert.That(context.Document, Is.SameAs(document));
+                Assert.That(context.Source, Is.SameAs(fixture));
+                Assert.That(context.Selection.First, Is.SameAs(clip));
+                Assert.That(AssetPlayer.Inst, Is.SameAs(context.Player));
+                JsonEditCommands.Copy(clip);
+                Assert.That(context.Clipboard.Item, Is.SameAs(App.CopyAsset));
+                Assert.That(context.Clipboard.Type, Is.EqualTo(clip.GetType()));
+                App.Pause(); Assert.That(context.Playback.IsPaused, Is.True);
+                context.Playback.Pause(false); Assert.That(App.IsPause, Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(invalid); }
+        }
+
+        [Test] public void ViewRegistrationIsIdempotentAndTransfersUpdateOwnership()
+        {
+            var views = new ActionEditorViews(); var first = new object(); var second = new object();
+            var paints = 0; var changes = 0;
+            views.Attach(first, () => paints++, () => changes++);
+            views.Attach(first, () => paints++, () => changes++);
+            views.Attach(second, () => paints++, () => changes++);
+            Assert.That(views.Count, Is.EqualTo(2));
+            Assert.That(views.OwnsUpdate(first), Is.True);
+            Assert.That(views.OwnsUpdate(second), Is.False);
+            views.Repaint(); views.NotifyChanged();
+            Assert.That(paints, Is.EqualTo(2)); Assert.That(changes, Is.EqualTo(2));
+            views.Detach(first); views.Detach(first);
+            Assert.That(views.OwnsUpdate(second), Is.True);
+            views.Detach(second);
+            Assert.That(views.Count, Is.Zero);
+            Assert.That(views.OwnsUpdate(first) || views.OwnsUpdate(second), Is.False);
+        }
+
+        [UnityTest] public IEnumerator BothWindowOpenOrdersShareContextAndRebuildWithoutRegistrationLeaks()
+        {
+            var count = App.Views.Count; var previousWindow = App.Window;
+            ActionEditorWindow original = null; JsonActionWorkbench native = null;
+            var alternate = new TextAsset(JsonDocumentSession.Encode(new LegacyExperienceAsset { Version = 7 }));
+            try
+            {
+                foreach (var nativeFirst in new[] { false, true })
+                {
+                    if (nativeFirst)
+                    {
+                        native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show();
+                        original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
+                    }
+                    else
+                    {
+                        original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
+                        native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show();
+                    }
+                    yield return null; yield return null;
+                    Assert.That(App.Views.Count, Is.EqualTo(count + 2));
+                    Assert.That(original.Context, Is.SameAs(native.Context));
+                    Assert.That(original.Context.Session, Is.SameAs(App.Session));
+                    native.CreateGUI(); native.CreateGUI();
+                    Assert.That(App.Views.Count, Is.EqualTo(count + 2));
+                    const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                    typeof(JsonActionWorkbench).GetMethod("OnEnable", flags).Invoke(native, null);
+                    typeof(ActionEditorWindow).GetMethod("OnEnable", flags).Invoke(original, null);
+                    Assert.That(App.Views.Count, Is.EqualTo(count + 2), "Repeated enable must replace registrations rather than duplicate them.");
+                    native.Select(App.AssetData.groups[0].Tracks[0].Clips[0]);
+                    Assert.That(original.Context.Selection.First, Is.SameAs(App.FistSelect));
+                    App.TextAsset = alternate;
+                    Assert.That(original.Context.Document, Is.SameAs(native.Document));
+                    Assert.That(((LegacyExperienceAsset)native.Document).Version, Is.EqualTo(7));
+                    Assert.That(App.SelectCount, Is.Zero);
+                    App.TextAsset = fixture;
+                    if (nativeFirst) { native.Close(); native = null; original.Close(); original = null; }
+                    else { original.Close(); original = null; native.Close(); native = null; }
+                    Assert.That(App.Views.Count, Is.EqualTo(count));
+                }
+            }
+            finally
+            {
+                if (original != null) { original.DiscardChanges(); original.Close(); }
+                if (native != null) { native.DiscardChanges(); native.Close(); }
+                App.Window = previousWindow; UnityEngine.Object.DestroyImmediate(alternate);
+            }
+        }
+
         [UnityTest] public IEnumerator DiscardFromEitherWindowRestoresSharedBaselineAndClearsPendingUndo()
         {
             var previousWindow = App.Window;

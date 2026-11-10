@@ -14,20 +14,10 @@ namespace NBC.ActionEditor
     
     public class AssetPlayer
     {
-        private static AssetPlayer _inst;
-
-        public static AssetPlayer Inst
-        {
-            get
-            {
-                if (_inst == null)
-                {
-                    _inst = new AssetPlayer();
-                }
-
-                return _inst;
-            }
-        }
+        public static AssetPlayer Inst => App.Context.Player;
+        private readonly Func<Asset> document;
+        public AssetPlayer() : this(() => App.AssetData) { }
+        public AssetPlayer(Func<Asset> document) => this.document = document ?? throw new ArgumentNullException(nameof(document));
 
         private List<IDirectableTimePointer> timePointers;
 
@@ -56,7 +46,7 @@ namespace NBC.ActionEditor
             preInitialized = false; previousTime = 0;
         }
 
-        public Asset Asset => App.AssetData;
+        public Asset Asset => document();
 
         /// <summary>
         /// 当前时间

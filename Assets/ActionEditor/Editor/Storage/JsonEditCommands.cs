@@ -6,9 +6,9 @@ namespace NBC.ActionEditor.Storage
 {
     public static class JsonEditCommands
     {
-        private static string clipboard;
-        private static Type copiedType;
-        private static IDirectable cutSource;
+        private static string clipboard { get => App.Context.Clipboard.Json; set => App.Context.Clipboard.Json = value; }
+        private static Type copiedType { get => App.Context.Clipboard.Type; set => App.Context.Clipboard.Type = value; }
+        private static IDirectable cutSource { get => App.Context.Clipboard.CutSource; set => App.Context.Clipboard.CutSource = value; }
         public static bool HasClipboard => clipboard != null;
         public static Type CopiedType => copiedType;
         public static void Copy(IDirectable item, bool cut = false)

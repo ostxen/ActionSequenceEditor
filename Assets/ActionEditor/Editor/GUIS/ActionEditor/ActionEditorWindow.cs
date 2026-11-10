@@ -6,6 +6,7 @@ namespace NBC.ActionEditor
 {
     public class ActionEditorWindow : EditorWindow
     {
+        public ActionEditorContext Context => App.Context;
         [MenuItem("NBC/Action Editor/Open Action Editor", false, 0)]
         public static void OpenDirectorWindow()
         {
@@ -45,6 +46,7 @@ namespace NBC.ActionEditor
         void OnEnable()
         {
             App.Window = this;
+            App.Views.Attach(this, Repaint, OnDocumentChanged);
             EditorSceneManager.sceneSaving -= OnWillSaveScene;
             EditorSceneManager.sceneSaving += OnWillSaveScene;
 
@@ -60,6 +62,7 @@ namespace NBC.ActionEditor
         void OnDisable()
         {
             ItemDragger.Cancel();
+            App.Views.Detach(this);
             if (App.Window == this) App.Window = null;
             this.ReleaseViews();
             App.Stop();
@@ -76,8 +79,10 @@ namespace NBC.ActionEditor
             {
                 this.Repaint();
             }
-            App.OnUpdate();
+            App.UpdateView(this);
         }
+
+        private void OnDocumentChanged() { hasUnsavedChanges = Context.Session.IsDirty; Repaint(); }
 
         void OnGUI()
         {
@@ -122,7 +127,7 @@ namespace NBC.ActionEditor
         public override void DiscardChanges()
         {
             ItemDragger.Cancel(); ownsGuiEdit = false;
-            App.Session.DiscardChanges();
+            Context.Session.DiscardChanges();
             base.DiscardChanges();
         }
 

@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
-using System.Linq;
 using NBC.ActionEditor.Storage;
 
 namespace NBC.ActionEditor
@@ -14,24 +12,24 @@ namespace NBC.ActionEditor
 
     public static class App
     {
-        private static TextAsset _textAsset;
-
         public static CallbackFunction OnInitialize;
         public static CallbackFunction OnDisable;
         public static OpenAssetFunction OnOpenAsset;
         
-        public static readonly JsonDocumentSession Session = new JsonDocumentSession();
-        public static Asset AssetData => Session.Document;
+        public static ActionEditorContext Context { get; } = new ActionEditorContext(new JsonDocumentSession());
+        public static ActionEditorViews Views { get; } = new ActionEditorViews();
+        public static JsonDocumentSession Session => Context.Session;
+        public static Asset AssetData => Context.Document;
         public static event Action DocumentChanged;
 
         static App()
         {
-            Session.Changed += () =>
+            Context.Changed += () =>
             {
-                AssetPlayer.Inst.Reset();
-                _selectList.RemoveAll(item => AssetData == null || !AssetData.directables.Contains(item));
-                Refresh(); Repaint(); DocumentChanged?.Invoke();
+                Refresh(); Views.NotifyChanged(); Repaint(); DocumentChanged?.Invoke();
             };
+            Context.Playback.Played += () => OnPlay?.Invoke();
+            Context.Playback.Stopped += () => OnStop?.Invoke();
             AssemblyReloadEvents.beforeAssemblyReload += () =>
             {
                 SessionState.SetString("ActionEditor.JsonRecovery", Session.CaptureRecovery());
@@ -43,7 +41,7 @@ namespace NBC.ActionEditor
                 try
                 {
                     Session.RestoreRecovery(recovery);
-                    _textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Session.Path ?? "");
+                    Context.RestoreSource(AssetDatabase.LoadAssetAtPath<TextAsset>(Session.Path ?? ""));
                 }
                 catch (Exception e) { Debug.LogError("ActionEditor 文档恢复失败，恢复快照仍保留：" + e.Message); }
             }
@@ -53,15 +51,12 @@ namespace NBC.ActionEditor
 
         public static TextAsset TextAsset
         {
-            get => _textAsset;
+            get => Context.Source;
             set
             {
                 try
                 {
-                    Session.Open(value);
-                    _textAsset = value;
-                    IsPlay = false; IsPause = false;
-                    AssetPlayer.Inst.CurrentTime = 0;
+                    Context.Open(value);
                     if (AssetData != null) OnOpenAsset?.Invoke(AssetData);
                 }
                 catch (System.IO.InvalidDataException e) { Debug.LogError("ActionEditor 打开失败，原文档已保留：" + e.Message); }
@@ -128,6 +123,11 @@ namespace NBC.ActionEditor
             PlayerUpdate();
         }
 
+        public static void UpdateView(object owner)
+        {
+            if (Views.OwnsUpdate(owner)) OnUpdate();
+        }
+
         #region AutoSave
 
         public static DateTime LastSaveTime => _lastSaveTime;
@@ -158,20 +158,19 @@ namespace NBC.ActionEditor
 
         #region Copy&Cut
 
-        public static IDirectable CopyAsset { get; set; }
-        public static bool IsCut { get; set; }
+        public static IDirectable CopyAsset { get => Context.Clipboard.Item; set => Context.Clipboard.Item = value; }
+        public static bool IsCut { get => Context.Clipboard.IsCut; set => Context.Clipboard.IsCut = value; }
 
         #endregion
 
         #region Select
 
-        public static IDirectable[] SelectItems => _selectList.ToArray();
-        public static int SelectCount => _selectList.Count;
-        private static readonly List<IDirectable> _selectList = new List<IDirectable>();
+        public static IDirectable[] SelectItems => Context.Selection.Items;
+        public static int SelectCount => Context.Selection.Count;
 
-        public static IDirectable FistSelect => _selectList.Count > 0 ? _selectList.First() : null;
+        public static IDirectable FistSelect => Context.Selection.First;
 
-        public static bool CanMultipleSelect { get; set; }
+        public static bool CanMultipleSelect { get => Context.Selection.CanMultipleSelect; set => Context.Selection.CanMultipleSelect = value; }
 
         [System.NonSerialized] private static InspectorPreviewAsset _currentInspectorPreviewAsset;
 
@@ -190,63 +189,22 @@ namespace NBC.ActionEditor
 
         public static void Select(params IDirectable[] objs)
         {
-            var change = false;
-            if (objs == null)
-            {
-                if (_selectList.Count > 0) change = true;
-            }
-            else
-            {
-                if (objs.Length != _selectList.Count) change = true;
-                else
-                {
-                    var pickCount = 0;
-                    foreach (var obj in objs)
-                    {
-                        if (_selectList.Contains(obj)) pickCount++;
-                    }
-
-                    if (pickCount != objs.Length)
-                    {
-                        change = true;
-                    }
-                }
-            }
-
-            if (!change) return;
-            _selectList.Clear();
+            if (!Context.Selection.Set(objs, true)) return;
             if (objs != null)
             {
-                foreach (var obj in objs)
-                {
-                    _selectList.Add(obj);
-                }
-
                 Selection.activeObject = CurrentInspectorPreviewAsset;
                 EditorUtility.SetDirty(CurrentInspectorPreviewAsset);
-
-                // DirectorUtility.selectedObject = FistSelect;
-            }
-
-            if (_selectList.Count == 1 && _selectList[0] is not Clip)
-            {
-                CanMultipleSelect = true;
-            }
-            else
-            {
-                CanMultipleSelect = false;
             }
         }
 
         public static bool IsSelect(IDirectable directable)
         {
-            return _selectList.Contains(directable);
+            return Context.Selection.Contains(directable);
         }
 
         public static void SelectWithoutInspector(params IDirectable[] items)
         {
-            _selectList.Clear(); if (items != null) _selectList.AddRange(items.Where(i => i != null));
-            CanMultipleSelect = false; Repaint();
+            Context.Selection.Set(items, false); Repaint();
         }
 
         #endregion
@@ -265,7 +223,8 @@ namespace NBC.ActionEditor
 
         public static void Repaint()
         {
-            if (Window != null)
+            Views.Repaint();
+            if (Views.Count == 0 && Window != null)
             {
                 Window.Repaint();
             }
@@ -278,14 +237,9 @@ namespace NBC.ActionEditor
         public static CallbackFunction OnPlay;
         public static CallbackFunction OnStop;
 
-        private static AssetPlayer _player => AssetPlayer.Inst;
-
-        public static bool IsPlay { get; private set; }
-        public static bool IsPause { get; private set; }
-
-        public static bool IsRange { get; set; }
-
-        private static float _editorPreviousTime;
+        public static bool IsPlay => Context.Playback.IsPlaying;
+        public static bool IsPause => Context.Playback.IsPaused;
+        public static bool IsRange { get => Context.Playback.IsRange; set => Context.Playback.IsRange = value; }
 
         public static void Play(Action callback = null)
         {
@@ -294,78 +248,33 @@ namespace NBC.ActionEditor
                 return;
             }
 
-            OnPlay?.Invoke();
-            _editorPreviousTime = Time.realtimeSinceStartup;
-            IsPause = false;
-            IsPlay = true;
+            Context.Playback.Play(Time.realtimeSinceStartup);
         }
 
         public static void Pause(bool pause = true)
         {
-            IsPause = pause;
+            Context.Playback.Pause(pause);
         }
 
         public static void Stop()
         {
-            if (AssetData != null)
-                _player.CurrentTime = 0;
-
-            OnStop?.Invoke();
-            _player.Reset();
-            IsPlay = false;
-            IsPause = false;
+            Context.Playback.Stop();
         }
 
         public static void StepForward()
         {
-            if (Math.Abs(_player.CurrentTime - _player.Length) < 0.00001f)
-            {
-                _player.Sample(0);
-                return;
-            }
-
-            _player.Sample(_player.CurrentTime + Prefs.SnapInterval);
+            Context.Playback.StepForward(Prefs.SnapInterval);
         }
 
         public static void StepBackward()
         {
-            if (_player.CurrentTime == 0)
-            {
-                _player.Sample(_player.Length);
-                return;
-            }
-
-            _player.Sample(_player.CurrentTime - Prefs.SnapInterval);
+            Context.Playback.StepBackward(Prefs.SnapInterval);
         }
 
 
         private static void PlayerUpdate()
         {
-            if (AssetData == null) return;
-            var delta = (Time.realtimeSinceStartup - _editorPreviousTime) * Time.timeScale;
-
-            _editorPreviousTime = Time.realtimeSinceStartup;
-
-            if (!IsPlay) return;
-            
-            if(IsPause) return;
-
-            var min = IsRange ? AssetData.RangeMin : 0;
-            var max = IsRange ? Mathf.Min(AssetData.RangeMax, AssetData.Length) : AssetData.Length;
-            if (max <= min) { Stop(); return; }
-            if (_player.CurrentTime + delta >= max)
-            {
-                var next = min + Mathf.Repeat(_player.CurrentTime + delta - max, max - min);
-                _player.Sample(max);
-                _player.Reset();
-                _player.Sample(next);
-                Repaint();
-                return;
-            }
-
-            _player.CurrentTime += delta; 
-            _player.Sample();
-            Repaint();
+            if (Context.Playback.Update(Time.realtimeSinceStartup, Time.timeScale)) Repaint();
         }
 
         #endregion

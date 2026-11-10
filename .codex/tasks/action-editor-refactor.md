@@ -2,9 +2,9 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01、RF02工程验收 `complete`，人工体验待用户次日验收；RF03–RF15 `planned`。Combat 专属实施与验收暂缓。
+- 总体状态：RF01–RF03工程验收 `complete`，人工体验待用户次日验收；RF04–RF15 `planned`。Combat 专属实施与验收暂缓。
 - 当前执行任务：2026-11-10用户要求夜间继续、人工差异次日汇总验收；缩放步长明确采用新版。每项实现并通过工程验收后本地中文提交，连同ActionEditor专属文档，不推送。
-- 下一任务：RF03应用上下文、状态所有权与窗口适配；人工体验清单见文末，不以其延期阻塞已具备证据的安全迁移。
+- 下一任务：RF04编辑事务令牌与取消生命周期；人工体验清单见文末，不以其延期阻塞已具备证据的安全迁移。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -124,7 +124,7 @@
 |---|---|---|---|---|---|
 | [x] | RF01 | complete（工程验收；人工待验） | 原版布局、操作与细节基线 | 当前用户计划请求及“开始吧” | RF0 |
 | [x] | RF02 | complete（工程验收；人工待验） | 六项源码候选复现与缺陷处置 | RF01 | RF0 |
-| [ ] | RF03 | planned | 应用上下文、状态所有权与窗口适配 | RF02 | RF1 |
+| [x] | RF03 | complete（工程验收；人工待验） | 应用上下文、状态所有权与窗口适配 | RF02 | RF1 |
 | [ ] | RF04 | planned | 编辑事务令牌与取消生命周期 | RF03 | RF1 |
 | [ ] | RF05 | planned | 会话、编解码与存储边界 | RF04 | RF1 |
 | [ ] | RF06 | planned | 类型目录、能力与扩展解析 | RF05 | RF2 |
@@ -911,3 +911,16 @@
 - 只读现场：doctor `20261110T151235Z-321c9e8a` 绑定本工程PID19104 ready；`window_status` `20261110T152434Z-85880340`见原版1000×250.333窗口，焦点Console。未知归属仍不关闭，H08据实更新。保留旧Console错误，不声称已清理所有窗口。
 - 次日重点：H02检查原版完整选择→多选起拖手感；H03首次左右拉伸磁吸；H04中键区域外释放/Esc/切窗后不残留；H07 JSON选择器不列脚本、null数组/列表首项及增删后展开状态。本项不改变缩放步长，用户新版决策留RF10落实。
 - 未运行：本项无持久JSON写入、PlayerBuild、Combat、冷启动性能、其他DPI、自定义Inspector全覆盖、系统保存对话框人工点击；无提交推送用户JSON及个人配置。下一任务RF03。
+
+### RF03 执行记录｜共用上下文与窗口适配（2026-11-10）
+
+- 状态：`complete`（工程验收），人工体验仍按H01–H08待验。RF02已提交 `e014bcb fix: 修复RF02文档选择与时间轴交互缺陷`，15个白名单代码/测试/专属文档文件，无推送，用户未跟踪JSON及个人设置不变。
+- 输入与范围：读取App、两窗口生命周期、AssetPlayer、JsonDocumentSession、JsonEditCommands及相关测试；延续一份当前文档/选择/播放头，不引入多文档、DI、程序集或存储格式变更。本项是状态归属和真实调用入口迁移，不是RF04事务令牌或RF12完整预览调度验收。
+- 实施：新增 `ActionEditorContext.cs`，持有唯一Session、Source、Selection、Clipboard和Playback/Player；状态及播放运算不引用EditorWindow、Event或Unity Selection。App的旧状态字段变为无重复数据的转发，保留Unity恢复/对话框/自动保存/Inspector适配。AssetPlayer.Inst转发上下文Player，实例通过文档getter求值，不另建静态播放器；JsonEditCommands的序列化剪贴板、类型、剪切来源移入同一Clipboard。
+- 两个真实窗口都暴露同一Context，原版放弃/状态通知及Toolkit文档/选择/放弃迁移到它；Unity Selection仍在各UI适配层。新增ActionEditorViews注册表，只保存owner和窄回调，重复Attach替换、Detach幂等，最先注册窗口负责现有更新入口，关闭时转交下一窗。App.Repaint通知所有注册窗口，Toolkit不再依赖App.Window是否为null推断更新资格。未改变布局和现有原版关闭即停播语义；最后一个Toolkit关闭停播。按窗口关闭/失焦取消编辑的旧规则本项尚未改，留RF04。
+- 保留的过渡依赖：App.Window/Width/Frame、静态原版View与ItemDragger、Prefs/Styles及Scene/reload宿主仍在；预览类型扫描、异常策略、循环语义与更新总线最终整理归RF06/RF12。不将新增Context包装称为全部业务彻底UI无关，也不宣称解决跨窗事务取消。
+- 新增4个回归：独立Context无窗口打开/选择/播放/暂停/续播/关闭；幂等窗口注册及更新资格转交；打开失败保留同一图/Source/选择且旧Facade与Context共享同一Player/Clipboard；原版先开和Toolkit先开两种顺序，连续CreateGUI与重复OnEnable、切换文档、清旧选择、两种关闭顺序及注册计数回归初值。独立Context仅用于验证依赖隔离，不是新增多文档产品能力。
+- 初步专项 `20261110T153235Z-6de4b723` Unity编译及40/40 SharedJsonTests通过。后续 `20261110T153549Z-e2a64236` 编译阶段Pipeline暂不可达，tests skipped，未冒充通过；先doctor `20261110T153733Z-c74e0f77`确认本工程PID19104恢复，再只读recompile_status `20261110T153802Z-d532fe65`确认completed/failed=false，之后才发起新的验证，未重放未知资产写入或连接其他工程。
+- 首轮完整 `20261110T153843Z-893ea8e4` 118/119，失败是新增非法JSON测试漏声明FullSerializer预期Error日志，不是失败打开更改了状态；补精确预期日志后重跑，不禁用日志断言。**最终** `.codex/runs/20261110T154131Z-17fca87e/report.json` Unity编译passed，程序集 `NBC.ActionEditor.Editor.Tests` EditMode **119/119 passed**，0failed/skipped/inconclusive；SharedJsonTests41项，其余保留实验测试。
+- `verify --profile code` `.codex/runs/20261110T154338Z-8786a93a/report.md`：工作流 **41/41 passed**，真实方案18projects/**637sources**，新增Context已纳入真实编译，**0errors/43warnings**；完整文档结构仍因缺yaml/markdown_it blocked，未安装。新增源码meta由Unity生成，未手写GUID。git diff --check通过。
+- 人工补充：H01/H05观察双窗交替打开、关闭、重开后选择和播放状态仍共用，关闭原版不续播；H06/H07确认Inspector焦点与撤销体验未变。未运行域重载完整状态恢复、持久探针、实际PlayerBuild、Combat、性能测量或未知窗口清理。下一任务RF04；本任务工程通过不等于已完成用户人工体验验收。

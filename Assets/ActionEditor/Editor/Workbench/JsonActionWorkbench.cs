@@ -31,7 +31,8 @@ namespace NBC.ActionEditor.Workbench
         private bool scheduled;
         private double lastTick;
         public string LastError { get; private set; }
-        public Asset Document => App.AssetData;
+        public ActionEditorContext Context => App.Context;
+        public Asset Document => Context.Document;
 
         [MenuItem("NBC/Action Editor/Open Workbench", false, -10)]
         public static void Open() => GetWindow<JsonActionWorkbench>().Show();
@@ -40,21 +41,23 @@ namespace NBC.ActionEditor.Workbench
             Styles.Load();
             LeftWidth = Styles.TimelineLeftWidth;
             titleContent = new GUIContent("行为时间轴 · UI Toolkit"); minSize = new Vector2(500, 250);
+            if (target != null) DestroyImmediate(target);
             target = CreateInstance<JsonInspectorTarget>(); target.hideFlags = HideFlags.HideAndDontSave; target.Owner = this;
-            App.DocumentChanged += Refresh;
+            App.Views.Attach(this, Repaint, Refresh);
+            EditorApplication.update -= Tick;
             EditorApplication.update += Tick;
             lastTick = EditorApplication.timeSinceStartup;
         }
         private void OnDisable()
         {
-            Canvas?.Dispose(); App.DocumentChanged -= Refresh; EditorApplication.update -= Tick;
+            Canvas?.Dispose(); App.Views.Detach(this); EditorApplication.update -= Tick;
             if (target != null) DestroyImmediate(target);
-            if (Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Length == 0) App.Stop();
+            if (App.Views.Count == 0) App.Stop();
         }
         private void OnLostFocus() => Canvas?.Cancel();
         private void Tick()
         {
-            if (App.Window == null) App.OnUpdate();
+            App.UpdateView(this);
             if (EditorApplication.timeSinceStartup - lastTick < 0.03) return;
             lastTick = EditorApplication.timeSinceStartup;
             Canvas?.MarkDirtyRepaint();
@@ -180,7 +183,7 @@ namespace NBC.ActionEditor.Workbench
             finally { syncing = false; }
             Canvas.MarkDirtyRepaint();
         }
-        public void Select(params IDirectable[] items) { App.SelectWithoutInspector(items); ShowProperties(); }
+        public void Select(params IDirectable[] items) { Context.Selection.Set(items, false); App.Repaint(); ShowProperties(); }
         public void ShowProperties() { Selection.activeObject = target; Refresh(); }
         public VisualElement CreatePropertyView()
         {
@@ -221,7 +224,7 @@ namespace NBC.ActionEditor.Workbench
         public override void DiscardChanges()
         {
             Canvas?.Cancel();
-            App.Session.DiscardChanges();
+            Context.Session.DiscardChanges();
             base.DiscardChanges();
         }
     }
