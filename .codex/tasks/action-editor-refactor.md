@@ -2,9 +2,9 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01–RF04工程验收 `complete`，人工体验待用户次日验收；RF05–RF15 `planned`。Combat 专属实施与验收暂缓。
+- 总体状态：RF01–RF05工程验收 `complete`，人工体验待用户次日验收；RF06–RF15 `planned`。Combat 专属实施与验收暂缓。
 - 当前执行任务：2026-11-10用户要求夜间继续、人工差异次日汇总验收；缩放步长明确采用新版。每项实现并通过工程验收后本地中文提交，连同ActionEditor专属文档，不推送。
-- 下一步：RF04工程验收已恢复并通过，独立本地提交后进入RF05存储边界；持久样本继续遵守preview/真实授权/approve/apply。人工体验清单见文末。
+- 下一步：RF05工程验收通过，独立本地提交后进入RF06类型目录；持久样本继续遵守preview/真实授权/approve/apply。人工体验清单见文末。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -126,7 +126,7 @@
 | [x] | RF02 | complete（工程验收；人工待验） | 六项源码候选复现与缺陷处置 | RF01 | RF0 |
 | [x] | RF03 | complete（工程验收；人工待验） | 应用上下文、状态所有权与窗口适配 | RF02 | RF1 |
 | [x] | RF04 | complete（工程验收；人工待验） | 编辑事务令牌与取消生命周期 | RF03 | RF1 |
-| [ ] | RF05 | planned | 会话、编解码与存储边界 | RF04 | RF1 |
+| [x] | RF05 | complete（工程验收；人工待验） | 会话、编解码与存储边界 | RF04 | RF1 |
 | [ ] | RF06 | planned | 类型目录、能力与扩展解析 | RF05 | RF2 |
 | [ ] | RF07 | planned | 创建及结构编辑命令归一 | RF06 | RF2 |
 | [ ] | RF08 | planned | 可见布局、坐标与命中归一 | RF07 | RF3 |
@@ -948,3 +948,22 @@
 - 语义边界：Begin(owner)排他、同owner复用；Update异常回滚；Commit/Cancel重复或陈旧调用无效；无参legacy入口不能终止外窗token。Session.Edit保持原有环境式嵌套命令归外层事务，并非所有命令的多调用者隔离或安全沙箱。自动保存已有IsEditing保护；显式保存的事务策略及持久验证归RF05，本项不宣称已验证活动手势中的所有保存入口。
 - 跨窗测试精确范围：真实窗口与Toolkit事件起拖，直接调用另一窗生命周期处理器证明不误取消；实际Close可能使owner自身失焦，此时按既定习惯取消。未以反射测试冒充完整桌面焦点链；选择沿用换图后清理无效引用策略，不新增稳定ID映射。H09补充人工操作，两UI阈值、最短长度、缩放差异仍按H01–H08及RF09/RF10处理。
 - 提交范围：明确9个ActionEditor代码/测试文件及唯一任务、Contracts、架构文档；不包含用户JSON/Jsons.meta/个人设置、生成证据、Combat、包或项目设置。不推送。未运行持久写入、域重载完整恢复、PlayerBuild、冷启动性能或其他DPI。下一任务RF05。
+
+### RF05 进行中记录（2026-11-11）
+
+- RF04已提交 `5b7e91c refactor: 明确RF04编辑事务归属与取消生命周期`，12文件，无推送。当前按夜间授权串行实施RF05，仍不修改Combat、用户JSON、包或设置。
+- 初步提取JsonDocumentCodec（现有FullSerializer、校验、作者内容比较和严格读回）与JsonDocumentStore（路径、磁盘版本、ReliableFileCommit和Unity导入），Session保留事务、Undo、基线和恢复状态。Session静态旧入口只转发，不创建第二正式存储，不增加DI接口或更改格式。新增源码meta由Unity生成。
+- 初步 `.codex/runs/20261111T000530Z-8ad099d6/report.json`编译和124项Editor通过，但不代表持久路径已验收。接下来补存储边界回归与当次R10固定隔离探针preview；R10授权及固定唯一目标/清理范围见项目operations.md，不能扩展目标后冒称旧审批可用。
+
+### RF05 最终验收记录（2026-11-11）
+
+- 状态：`complete`（工程验收），两个UI的系统文件对话框/输入焦点/保存按键仍按H06/H07待人工。只提取现有JSON路径，不改格式、时间精度、窗口布局或可靠替换算法；旧`.asset` DocumentStore保留实验路径，不合并为第二套正式JSON存储。
+- 实施边界：JsonDocumentCodec负责原Encode/Decode/RequireValid、保存快照重算时长、忽略工作区的作者内容比较及严格差异路径；JsonDocumentStore负责路径限制、字节版本、同路径外部版本保护、拒绝覆盖既有另存目标、ReliableFileCommit和同步Unity导入。Session仍持有图/事务/Undo/保存基线/Recovery，旧静态方法只转发。提交返回JSON与磁盘revision，Session在导入前推进已提交基线，保留导入失败不自动重放的规则；未注入故障模拟Unity导入失败，不宣称该现场已实测。
+- 保持原顺序：拒绝覆盖发生在序列化回调前。最后审阅发现提取初稿把该检查移至快照之后，已将快照封装在Store.Commit的目标检查后，无需会话重复文件判断。最终代码编译及持久探针重新运行，不引用初稿结果替代终验。
+- 新增ExtractedJsonCodecPreservesFormatAndRejectsPayloadDifferences：相同样例旧门面/Codec编码一致，改视域/折叠不计内容差异，Count变化精确指出路径且不泄漏值，非法公共图拒绝保存快照且不改原会话。原有80轮分数时间、失败打开、Recovery、放弃、窗口入口和真实物理Commit占用/验证失败用例保留。最终 `.codex/runs/20261111T002151Z-740d308b/report.json` 编译passed，NBC.ActionEditor.Editor.Tests EditMode **125/125 passed**，0failed/skipped/inconclusive，SharedJsonTests47项，运行27.83秒。
+- 固定持久探针不扩目录/目标，只在不存在的Assets/ActionEditorValidationR10/Shared.json增加断言：另存拒绝覆盖、失败打开保留图、恢复未保存内容与基线、文件占用失败保留字节/脏状态/路径、解锁后保存、App.AutoSave入口和活动令牌时App.TryAutoSave不写盘。已有原子新建、保存后Undo/Redo、全局放弃、重载、8轮严格浮点和外部保护同跑。没有新增任意路径或代码参数，不操作窗口或改用户资产。
+- 最终授权链：preview `20261111T002423Z-131ec25c` 展示同一目标及上述全部操作 → 引用任务R01–R10真实“长任务完全开放授权操作，不用再由我确认”及夜间RF05验收的approve `20261111T002506Z-d74cedc3` → apply `.codex/runs/20261111T002523Z-12228706/report.md` **passed**，14项检查，31,287bytes。finally恢复原会话并清理，仅自有目录；随后Glob再次确认目录/根meta均无残留。未复用已消耗审批。
+- 中间证据：初始探针 `20261111T001410Z-367e6d66`8项通过，补检查版 `20261111T002013Z-5b026083`14项通过，但之后有检查顺序修正，最终证据以002523为准。首次只读preview在60秒工具超时，未apply；doctor遇editor.lock，读取锁确认PID33416及其子进程均已不存在后仅删除该自有孤儿锁；doctor `20261111T001237Z-5e29a967`恢复，再重新生成预览。未杀Editor、未重放未知写入。
+- 最终离线 `.codex/runs/20261111T002423Z-c23ff66c/report.md`：工作流**41/41**，真实方案18projects/**639sources**、**0errors/43warnings**，两个新增源码纳入真实编译、meta由Unity生成。完整code profile仍缺yaml/markdown_it blocked，未安装。git diff --check提交前检查。
+- 保留策略与缺口：自动保存定时器已有IsEditing保护，实测App.AutoSave和活动事务时TryAutoSave，未篡改个人自动保存时长或时钟以冒充定时器到期端到端。显式保存不强制提交/取消当前事务，保留既有入口行为，本项不新增活动手势中的快捷键路由；焦点消费归RF10。另存成功使用内存文档Save(target)的真实新建路径，既有另存目标拒绝覆盖；未新增第二持久目标以越过固定授权范围。系统文件对话框、跨重启Unity对象引用、真实导入失败、完整域重载、PlayerBuild/Combat/性能/其他DPI未验，不据本样例声称用户原文件问题全部解决。
+- 修改范围：Session、Codec/Store及其Unity生成meta、SharedJsonTests、SharedJsonProbeCommands、唯一任务和两份专属设计文档。用户未跟踪JSON/Jsons.meta/个人配置不纳入；不推送。下一任务RF06。

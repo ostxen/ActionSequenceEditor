@@ -22,6 +22,8 @@ RF03所有权：`App.Context`为产品内唯一`ActionEditorContext`，拥有Jso
 
 RF04当前JSON编辑生命周期：BeginEdit(owner)返回发起者令牌，同owner复用、其他owner返回null。Update异常、Commit校验失败回滚整图，取消/重复提交/陈旧令牌不能结束新事务；无参legacy入口只结束自身legacy事务。两窗口、原版Inspector和拖动器持有自己的令牌，失焦/关闭只取消本方；全局放弃、打开、Undo/Redo使旧令牌失效。嵌套Session.Edit仍归活动外层，不是安全隔离。错误鼠标按钮释放不提交，活动Toolkit手势不弹上下文菜单。自身失焦仍按原习惯回滚；关闭另一窗口若导致owner自身失焦，也属于该规则。换图后清理旧选择引用，不承诺恢复对象身份。显式保存的活动事务策略与持久验证归RF05。
 
+RF05存储边界：JsonDocumentCodec集中现有FullSerializer格式、图校验、作者内容比较与严格读回路径；JsonDocumentStore集中JSON路径、字节版本、原子提交和Unity导入。Session保留事务/Undo/基线/Recovery，旧静态入口转发。先拒绝覆盖既有另存目标再序列化，成功提交后先记录基线再导入，导入失败不得自动重放。既有自动保存跳过活动事务，显式保存不隐式结束令牌；保存焦点/快捷键仍由UI适配处理。隔离持久样例已覆盖占用失败不损字节、解锁后保存、恢复、保存后撤销和外部保护；不代表系统文件对话框、跨重启Unity引用或真实导入失败已验收。
+
 ## 时间坐标和数据草案
 
 平台时间存储为有限、非负的 double 秒。文档长度必须大于 0；点事件 duration=0，区间 duration>0，start+duration 不得超出文档长度。所有非法数值在提交前拒绝，不在绘制时修正。界面帧吸附是显式编辑操作，不反向量化已有数据。

@@ -28,6 +28,9 @@ namespace NBC.ActionEditor.Validation
                     "atomic save, Undo/Redo saved-state tracking and reload", "save public graph time edits with stale derived duration and reload",
                     "discard committed and pending edits to the last saved baseline without writing bytes or losing disk revision",
                     "eight fractional timeline edit/save/import/reload cycles with exact float preservation",
+                    "reject save-as onto existing fixture, preserve current graph on failed open and restore recovery baseline",
+                    "reject locked fixture replacement without changing bytes or baseline, then save after unlocking",
+                    "verify automatic save entry and suppression during an owned edit",
                     "reject externally modified target without overwriting it",
                     "delete only this newly created fixture folder" },
                 touchesExistingAssets = false, changesPackagesOrSettings = false
@@ -62,6 +65,50 @@ namespace NBC.ActionEditor.Validation
                     && File.ReadAllBytes(Path).SequenceEqual(committed), "Discard did not restore saved baseline without writes.");
                 Undo.PerformUndo(); Undo.PerformRedo();
                 Require(((LegacyExperienceAsset)App.AssetData).Version == 42, "Discarded edits returned through Undo/Redo.");
+                using (var other = new JsonDocumentSession())
+                {
+                    other.Open(memory);
+                    var refused = false;
+                    try { other.Save(Path); } catch (IOException) { refused = true; }
+                    Require(refused && string.IsNullOrEmpty(other.Path) && File.ReadAllBytes(Path).SequenceEqual(committed), "Save-as overwrote an existing fixture.");
+                }
+                var beforeOpen = App.AssetData;
+                var invalid = new LegacyExperienceAsset(); invalid.groups.Add(null);
+                var invalidText = new TextAsset(JsonDocumentSession.Encode(invalid));
+                try
+                {
+                    var refused = false;
+                    try { App.Session.Open(invalidText); } catch (InvalidDataException) { refused = true; }
+                    Require(refused && ReferenceEquals(App.AssetData, beforeOpen), "Failed open replaced the current graph.");
+                }
+                finally { UnityEngine.Object.DestroyImmediate(invalidText); }
+                App.Session.Edit("R10 recovery payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 88);
+                using (var restored = new JsonDocumentSession())
+                {
+                    restored.RestoreRecovery(App.Session.CaptureRecovery());
+                    Require(restored.IsDirty && ((LegacyExperienceAsset)restored.Document).Version == 88, "Recovery lost unsaved content.");
+                    restored.DiscardChanges();
+                    Require(!restored.IsDirty && restored.Path == Path && ((LegacyExperienceAsset)restored.Document).Version == 42, "Recovery lost saved baseline.");
+                }
+                App.Session.DiscardChanges();
+                App.Session.Edit("R10 locked payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 43);
+                using (var locked = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    var refused = false;
+                    try { App.SaveAsset(); } catch (IOException) { refused = true; }
+                    Require(refused && App.Session.IsDirty && App.Session.Path == Path && File.ReadAllBytes(Path).SequenceEqual(committed), "Locked save changed bytes or baseline.");
+                }
+                App.SaveAsset(); Require(!App.Session.IsDirty, "Save after unlocking failed.");
+                App.Session.DiscardChanges(); Require(((LegacyExperienceAsset)App.AssetData).Version == 43, "Successful save did not advance baseline.");
+                var active = App.Session.BeginEdit(new object());
+                ((LegacyExperienceAsset)App.AssetData).Version = 44;
+                var beforeAuto = File.ReadAllBytes(Path);
+                App.TryAutoSave();
+                Require(active.IsActive && File.ReadAllBytes(Path).SequenceEqual(beforeAuto), "Automatic save wrote an active gesture.");
+                active.Cancel();
+                App.Session.Edit("R10 automatic payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 42);
+                App.AutoSave();
+                Require(!App.Session.IsDirty && File.ReadAllBytes(Path).SequenceEqual(committed), "Automatic save entry did not persist the completed edit.");
                 App.TextAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Path);
                 Require(((LegacyExperienceAsset)App.AssetData).Version == 42 && ((LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[1]).Count == 17, "Persistent JSON reload lost fields.");
                 Require(App.AssetData.groups.Sum(g => g.Tracks.Count) == 7 && App.AssetData.Length == 6, "Persistent graph changed.");
@@ -96,7 +143,7 @@ namespace NBC.ActionEditor.Validation
                 var rejected = false;
                 try { App.SaveAsset(); } catch (IOException) { rejected = true; }
                 Require(rejected && File.ReadAllBytes(Path).SequenceEqual(external), "External edits were overwritten.");
-                return new { status = "passed", checks = new[] { "atomic create", "shared edit/save", "saved-state Undo/Redo", "discard restores saved baseline without writing", "polymorphic graph reload", "stale duration save/reload", "eight exact fractional save/reload cycles", "external edit protection" }, bytes = committed.Length, cleanup = "owned folder deleted and prior session restored before response" };
+                return new { status = "passed", checks = new[] { "atomic create", "shared edit/save", "saved-state Undo/Redo", "discard restores saved baseline without writing", "existing-target save-as protection", "failed open preserves graph", "recovery and saved baseline", "locked target bytes and baseline preserved", "save after unlocking", "automatic save entry and active-edit suppression", "polymorphic graph reload", "stale duration save/reload", "eight exact fractional save/reload cycles", "external edit protection" }, bytes = committed.Length, cleanup = "owned folder deleted and prior session restored before response" };
             }
             finally
             {

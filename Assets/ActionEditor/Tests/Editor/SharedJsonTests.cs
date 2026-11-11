@@ -497,6 +497,26 @@ namespace NBC.ActionEditor.Tests
             Assert.That(((LegacyExperienceInterval)loaded.groups[0].Tracks[0].Clips[0]).Count, Is.EqualTo(27));
             Assert.That(App.Session.InspectReadbackDifferences(), Is.Empty);
         }
+        [Test] public void ExtractedJsonCodecPreservesFormatAndRejectsPayloadDifferences()
+        {
+            var document = App.AssetData;
+            var json = JsonDocumentSession.Encode(document);
+            Assert.That(JsonDocumentCodec.Encode(document), Is.EqualTo(json));
+            var decoded = JsonDocumentCodec.Decode(json);
+            Assert.That(JsonDocumentCodec.ReadbackDifferences(json, decoded), Is.Empty);
+            decoded.ViewTimeMin = 1; decoded.ViewTimeMax = 9;
+            decoded.groups[0].IsCollapsed = !decoded.groups[0].IsCollapsed;
+            Assert.That(JsonDocumentCodec.ReadbackDifferences(json, decoded), Is.Empty, "Workspace-only changes remain excluded.");
+            ((LegacyExperienceInterval)decoded.groups[0].Tracks[0].Clips[0]).Count = 91;
+            var differences = JsonDocumentCodec.ReadbackDifferences(json, decoded);
+            Assert.That(differences, Has.Length.EqualTo(1));
+            Assert.That(differences[0], Does.Contain("Count"));
+            Assert.That(differences[0], Does.Not.Contain("91"), "Diagnostics must contain paths, not user values.");
+            decoded.groups[0].Tracks[0].Clips.Add(null);
+            Assert.Throws<InvalidDataException>(() => JsonDocumentCodec.CreateSaveSnapshot(decoded));
+            Assert.That(App.AssetData, Is.SameAs(document));
+            Assert.That(App.Session.IsDirty, Is.False);
+        }
         [Test] public void FractionalTimelineEditsKeepSaveReadbackStable()
         {
             var random = new System.Random(1937);
