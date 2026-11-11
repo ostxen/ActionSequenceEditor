@@ -28,9 +28,18 @@ namespace NBC.ActionEditor.Tests
             public string Field;
             public Rect Input;
             public Vector2 ContentOffset;
+            public OriginalTimelineGesture Gesture;
             private readonly FieldInspector inspector = new FieldInspector();
             private void OnGUI()
             {
+                if (Gesture != null)
+                {
+                    ContentOffset = GUIUtility.GUIToScreenPoint(Vector2.zero) - position.position;
+                    var pointer = new NBC.ActionEditor.Events.PointerEventData(Event.current);
+                    if (Event.current.type == EventType.MouseDown) Gesture.OnBeginDrag(pointer);
+                    else if (Event.current.type == EventType.MouseDrag) Gesture.OnDrag(pointer);
+                    else if (Event.current.type == EventType.MouseUp) Gesture.OnEndDrag(pointer);
+                }
                 if (Value == null) return;
                 ContentOffset = GUIUtility.GUIToScreenPoint(Vector2.zero) - position.position;
                 inspector.Draw(Value, Field);
@@ -140,6 +149,112 @@ namespace NBC.ActionEditor.Tests
             }
             finally { original.Value = null; original.Close(); window.DiscardChanges(); window.Close(); }
         }
+        private static void Pointer(VisualElement target, EventType type, Vector2 point)
+        {
+            var source = new Event { type = type, button = 0, shift = true, mousePosition = target.LocalToWorld(point) };
+            if (type == EventType.MouseDown) { using var e = PointerDownEvent.GetPooled(source); e.target = target; target.SendEvent(e); }
+            else if (type == EventType.MouseDrag) { using var e = PointerMoveEvent.GetPooled(source); e.target = target; target.SendEvent(e); }
+            else { using var e = PointerUpEvent.GetPooled(source); e.target = target; target.SendEvent(e); }
+        }
+        [UnityTest] public IEnumerator BothUiSequencesKeepOneGraphThroughCopyDragResizeCancelReopenAndPlayback()
+        {
+            var previousWindow = App.Window; var previousWidth = App.Width;
+            var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            var events = ScriptableObject.CreateInstance<FieldWindow>();
+            TextAsset reopened = null;
+            try
+            {
+                original.Show(); native.Show(); native.position = new Rect(50, 50, 1000, 600);
+                events.Show(); events.position = new Rect(100, 100, 1000, 200);
+                yield return null; yield return null;
+                for (var ui = 0; ui < 2; ui++)
+                {
+                    App.TextAsset = fixture;
+                    var type = typeof(LegacyExperienceInterval);
+                    LogAssert.Expect(LogType.Log, "type=" + type + " newAction=" + type);
+                    if (ui == 0) OriginalCreate(App.AssetData.groups[0].Tracks[0], type);
+                    else NativeCreate(native, 0, type);
+                    var created = Last(0); JsonEditCommands.Copy(created);
+                    var copy = (Clip)JsonEditCommands.Paste(created.Parent, 9);
+                    Assert.That(copy, Is.Not.SameAs(created));
+                    App.AssetData.ViewTimeMax = 12; native.SyncView();
+                    native.Select(created, copy); yield return null;
+                    var start = created.StartTime; var spacing = copy.StartTime - start;
+                    if (ui == 0)
+                    {
+                        App.Width = 700; events.Gesture = original.Gesture; events.Focus(); events.Repaint(); yield return null;
+                        ClipDrawer.Reset(); ClipDrawer.GetDraw(created).ClipRealRect = new Rect(100, 20, 150, 26);
+                        var down = new Vector2(Styles.TimelineLeftTotalWidth + 120, 30) + events.ContentOffset;
+                        foreach (var kind in new[] { EventType.MouseDown, EventType.MouseDrag, EventType.MouseUp })
+                            events.SendEvent(new Event { type = kind, button = 0, shift = true, mousePosition = down + (kind == EventType.MouseDown ? Vector2.zero : new Vector2(App.Width * .5f / 12, 0)) });
+                        events.Gesture = null;
+                    }
+                    else
+                    {
+                        var canvas = native.Canvas; var down = canvas.ClipRect(created, 1).center;
+                        Pointer(canvas, EventType.MouseDown, down);
+                        Pointer(canvas, EventType.MouseDrag, down + new Vector2(canvas.Scale * .5f, 0));
+                        Pointer(canvas, EventType.MouseUp, down + new Vector2(canvas.Scale * .5f, 0));
+                    }
+                    Assert.That(created.StartTime, Is.EqualTo(start + .5f).Within(.001));
+                    Assert.That(copy.StartTime - created.StartTime, Is.EqualTo(spacing).Within(.001));
+                    Undo.PerformUndo(); created = App.AssetData.groups[0].Tracks[0].Clips.Last(c => c.StartTime < 8);
+                    Assert.That(created.StartTime, Is.EqualTo(start).Within(.001));
+                    Undo.PerformRedo(); created = App.AssetData.groups[0].Tracks[0].Clips.Last(c => c.StartTime < 8);
+                    native.Select(created); var length = created.Length;
+                    if (ui == 0)
+                    {
+                        events.Gesture = original.Gesture; events.Focus(); events.Repaint(); yield return null;
+                        var down = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(created.EndTime, App.Width), 30) + events.ContentOffset;
+                        events.SendEvent(new Event { type = EventType.MouseDown, button = 0, shift = true, mousePosition = down });
+                        Assert.That(original.Gesture.DragType, Is.EqualTo(ItemDragType.StretchEnd));
+                        events.SendEvent(new Event { type = EventType.MouseDrag, button = 0, shift = true, mousePosition = down + new Vector2(App.Width * .25f / 12, 0) });
+                        events.SendEvent(new Event { type = EventType.MouseUp, button = 0, shift = true, mousePosition = down + new Vector2(App.Width * .25f / 12, 0) });
+                        events.Gesture = null;
+                    }
+                    else
+                    {
+                        var canvas = native.Canvas; var rect = canvas.ClipRect(created, 1); var down = new Vector2(rect.xMax - 2, rect.center.y);
+                        Pointer(canvas, EventType.MouseDown, down); Pointer(canvas, EventType.MouseDrag, down + new Vector2(canvas.Scale * .25f, 0));
+                        Pointer(canvas, EventType.MouseUp, down + new Vector2(canvas.Scale * .25f, 0));
+                    }
+                    Assert.That(created.Length, Is.EqualTo(length + .25f).Within(.001));
+                    var field = type.GetField("Caption"); var initial = field.GetValue(created);
+                    var token = App.Session.BeginEdit(this); new JsonPropertyPath(created).Field(field).Write("cancelled"); token.Cancel();
+                    created = App.AssetData.groups[0].Tracks[0].Clips.Last(c => c.StartTime < 8);
+                    Assert.That(field.GetValue(created), Is.EqualTo(initial));
+                    token = App.Session.BeginEdit(this); new JsonPropertyPath(created).Field(field).Write("RF15"); token.Commit();
+                    Undo.PerformUndo(); Undo.PerformRedo();
+                    var encoded = JsonDocumentCodec.CreateSaveSnapshot(App.AssetData);
+                    var expected = JsonDocumentCodec.Content(JsonDocumentCodec.Decode(encoded));
+                    var invalid = new TextAsset("not-json");
+                    LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("Error while parsing: Expected u"));
+                    try { Assert.Throws<System.IO.InvalidDataException>(() => App.Context.Open(invalid)); }
+                    finally { UnityEngine.Object.DestroyImmediate(invalid); }
+                    Assert.That(JsonDocumentCodec.Content(App.AssetData), Is.EqualTo(expected));
+                    App.Session.DiscardChanges(); original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close();
+                    App.TextAsset = null; reopened = new TextAsset(encoded); App.TextAsset = reopened;
+                    original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
+                    native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show(); yield return null;
+                    Assert.That(original.Context.Document, Is.SameAs(native.Document));
+                    Assert.That(JsonDocumentCodec.Content(native.Document), Is.EqualTo(expected));
+                    Assert.That(((LegacyExperienceInterval)native.Document.groups[0].Tracks[0].Clips.Last(c => c.StartTime < 8)).Caption, Is.EqualTo("RF15"));
+                    var now = (float)EditorApplication.timeSinceStartup; App.Context.Playback.Play(now); App.Context.Playback.Update(now + .1f, 1);
+                    Assert.That(App.Context.Playback.IsPlaying, Is.True); Assert.That(App.Context.Player.CurrentTime, Is.GreaterThan(0));
+                    App.Stop(); Assert.That(App.Context.Player.IsInitialized, Is.False); Assert.That(App.Context.Player.CurrentTime, Is.Zero);
+                    App.TextAsset = fixture; UnityEngine.Object.DestroyImmediate(reopened); reopened = null;
+                }
+            }
+            finally
+            {
+                events.Gesture = null; original.Gesture.Cancel(); App.Session.CancelEdit();
+                events.Close(); original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close();
+                App.Window = previousWindow; App.Width = previousWidth;
+                if (reopened != null) UnityEngine.Object.DestroyImmediate(reopened);
+            }
+        }
+
         [Test] public void ExistingSampleUsesMetadataAndOptionalAdaptersWithoutBusinessBranches()
         {
             Assert.That(DirectableTypeInfo.For(typeof(LegacyExperienceMarker)).IsSignal, Is.True);
