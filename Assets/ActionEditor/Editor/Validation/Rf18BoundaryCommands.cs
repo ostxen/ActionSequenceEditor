@@ -87,6 +87,70 @@ namespace NBC.ActionEditor.Validation
             if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
                 throw new InvalidOperationException("Requires ready EditMode.");
         }
+        [CliGroupCommand("actioneditor.validation", "RF20 fixed export lifecycle, both UI shared save-menu callbacks and independent new JSON targets. Restores prior session and cleans only owned fixtures.")]
+        public static object Rf20ExportProbe([CliArg("confirm", "Apply isolated export lifecycle.")] bool confirm = false,
+            [CliArg("dry-run", "Read-only preview.")] bool dryRun = false)
+        {
+            Ready();
+            const string root = "Assets/ActionEditorValidationRF20";
+            if (Directory.Exists(root) || File.Exists(root) || File.Exists(root + ".meta")) throw new IOException("Fixture exists, refusing overwrite.");
+            if (App.Session.IsEditing || App.IsPlay) throw new InvalidOperationException("Requires no active edit/playback in previous session.");
+            if (dryRun) return new { root, targets = new[] { root + "/Source.json", root + "/Clean.json", root + "/Dirty.json" },
+                operations = new[] { "capture/restore prior session", "create isolated source", "open shared export window from IMGUI/Toolkit save menu", "export clean/dirty new JSON and read back", "verify source identity, content, baseline, Undo, selection and paused playback unchanged", "reject source alias, existing target and active gesture", "delete only owned fixture folder" } };
+            if (!confirm) throw new InvalidOperationException("Preview and explicit approval required.");
+            var recovery = App.Session.CaptureRecovery(); var previous = App.TextAsset; var owns = false;
+            DocumentExportWindow window = null;
+            try
+            {
+                owns = !string.IsNullOrEmpty(AssetDatabase.CreateFolder("Assets", "ActionEditorValidationRF20"));
+                if (!owns) throw new IOException("Fixture folder creation failed.");
+                App.TextAsset = DocumentCreationService.Create(typeof(Samples.LegacyExperience.LegacyExperienceAsset), root + "/Source.json");
+                var sourceBytes = File.ReadAllBytes(App.Session.Path);
+                for (var dirty = 0; dirty < 2; dirty++)
+                {
+                    if (dirty != 0) App.Session.Edit("RF20 business", () => ((Samples.LegacyExperience.LegacyExperienceAsset)App.AssetData).Version = 9);
+                    App.SelectWithoutInspector(App.AssetData.groups[0].Tracks[0].Clips[0]);
+                    App.Context.Player.Sample(.5f); App.Play(); App.Pause();
+                    var source = App.AssetData; var selection = App.FistSelect; var before = App.Session.CaptureRecovery(); var path = App.Session.Path;
+                    Action open = null;
+                    ActionEditorHost.PopulateSaveMenu((label, action) => { if (label == "导出…") open = action; });
+                    if (open == null) throw new InvalidOperationException("Both UI shared menu missing export.");
+                    open(); window = Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Single();
+                    var target = root + (dirty == 0 ? "/Clean.json" : "/Dirty.json");
+                    if (DocumentExportWindow.ExportTo("actioneditor.json", null)) throw new InvalidOperationException("Cancel exported a file.");
+                    DocumentExportWindow.ExportTo("actioneditor.json", target);
+                    window.Close(); window = null;
+                    var loaded = JsonDocumentCodec.Decode(File.ReadAllText(target));
+                    if (((Samples.LegacyExperience.LegacyExperienceAsset)loaded).Version != (dirty == 0 ? 1 : 9)) throw new InvalidOperationException("Export lost business content.");
+                    foreach (var rejected in new[] { target, root.ToLowerInvariant() + "/./Source.JSON" })
+                    {
+                        var refused = false;
+                        try { DocumentExportWindow.ExportTo("actioneditor.json", rejected); } catch (Exception error) when (error is IOException || error is ArgumentException) { refused = true; }
+                        if (!refused) throw new InvalidOperationException("Unsafe export target accepted.");
+                    }
+                    if (!ReferenceEquals(source, App.AssetData) || App.Session.CaptureRecovery() != before || path != App.Session.Path
+                        || !ReferenceEquals(selection, App.FistSelect) || !App.IsPlay || !App.IsPause || App.Context.Player.CurrentTime != .5f
+                        || !File.ReadAllBytes(path).SequenceEqual(sourceBytes)) throw new InvalidOperationException("Export changed source/session/selection/playback.");
+                    App.Stop();
+                }
+                Undo.PerformUndo();
+                if (((Samples.LegacyExperience.LegacyExperienceAsset)App.AssetData).Version != 1) throw new InvalidOperationException("Export changed Undo.");
+                Undo.PerformRedo();
+                if (((Samples.LegacyExperience.LegacyExperienceAsset)App.AssetData).Version != 9) throw new InvalidOperationException("Export changed Redo.");
+                var edit = App.Session.BeginEdit(new object());
+                var refusedEdit = false;
+                try { DocumentExportWindow.ExportTo("actioneditor.json", root + "/Active.json"); } catch (InvalidOperationException) { refusedEdit = true; }
+                if (!refusedEdit || !edit.IsActive || File.Exists(root + "/Active.json")) throw new InvalidOperationException("Export ended active gesture.");
+                edit.Cancel();
+                return new { status = "passed", checks = new[] { "clean/dirty exact readback", "export window/menu entry", "cancel no writes", "existing/source alias rejected", "active edit remains owned", "source/baseline/selection/paused playback/Undo unchanged" } };
+            }
+            finally
+            {
+                if (window != null) window.Close();
+                try { App.Stop(); App.TextAsset = previous; App.Session.RestoreRecovery(recovery); }
+                finally { if (owns && !AssetDatabase.DeleteAsset(root)) throw new IOException("Owned fixture cleanup failed."); }
+            }
+        }
         private static string Hash(string path)
         { using (var hash = SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(File.ReadAllBytes(path))).Replace("-", "").ToLowerInvariant(); }
     }

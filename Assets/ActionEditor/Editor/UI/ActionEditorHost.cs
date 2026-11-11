@@ -84,6 +84,7 @@ namespace NBC.ActionEditor
         {
             add("保存", App.SaveAsset);
             add("另存为…", SaveAs);
+            add("导出…", DocumentExportWindow.ShowForCurrent);
         }
     }
 }

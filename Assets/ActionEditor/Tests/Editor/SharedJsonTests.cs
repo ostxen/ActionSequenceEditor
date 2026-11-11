@@ -785,7 +785,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(requests, Is.EqualTo(2)); Assert.That(App.AssetData, Is.SameAs(source));
                 Assert.That(App.Session.CaptureRecovery(), Is.EqualTo(before)); Assert.That(App.Session.IsDirty, Is.True);
                 var entries = new System.Collections.Generic.List<string>(); ActionEditorHost.PopulateSaveMenu((label, action) => entries.Add(label));
-                Assert.That(entries, Is.EqualTo(new[] { "保存", "另存为…" }));
+                Assert.That(entries, Is.EqualTo(new[] { "保存", "另存为…", "导出…" }));
             }
             finally
             {

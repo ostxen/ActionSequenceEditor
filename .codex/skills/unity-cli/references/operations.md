@@ -33,6 +33,8 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
+`actioneditor.validation rf20_export_probe`为固定零参数新格式导出验证，只创建不存在的Assets/ActionEditorValidationRF20中的Source/Clean/Dirty.json，从共享保存菜单打开导出窗口，验证干净/脏文档输出、取消/目标存在/源别名/活动手势拒绝及源对象/来源/基线/Undo/选择/暂停播放不变；finally关闭本次导出窗口、恢复原会话、仅删本次目录。不修改已有数据，活动编辑/播放时拒绝开始；必须独立preview/approve/apply。
+
 `actioneditor.validation cancel_save_dialog`是Windows固定模态恢复，不是Pipeline代码执行：只读CLI实例列表绑定本工程唯一PID，EnumWindows只筛该PID、#32770、保存/Save/Save As/另存为及IDCANCEL取消按钮；preview记录句柄与按钮，approve/apply复核PID/句柄/指纹后仅PostMessage WM_COMMAND IDCANCEL。无参数、不选文件、不保存/覆盖、不退出或强杀；其他模态/多个匹配拒绝。只用于本系列测试已明确触发的保存框；返回cancel_requested后重新查询实际状态，不冒充取消已完成。
 
 RF18增加三个固定零参数审核命令，均按独立preview/approve/apply并引用本系列真实连续授权：`actioneditor.validation rf18_move`只移动RF16-C指定的FullSerializerExtensions.cs至Runtime/Serialization，核对固定GUID、源码/meta哈希及目标不存在，再由Unity生成项目；`actioneditor.validation rf18_reference_probe`只新建不存在的Assets/ActionEditorValidationRF18，创建References.asset主/子Texture2D和Document.json，用唯一新格式写盘、卸载后按GUID/localFileId解析，验证类型不符/资源失效拒绝，finally仅删除本次目录，不接触当前会话或全工程SaveAssets；`actioneditor.validation sync_projects`只调用Unity当前IDE的SyncAll生成sln/csproj，不写源码/配置。禁止任意路径/代码/force覆盖。超时先检查目标，不重放。
