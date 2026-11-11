@@ -35,11 +35,10 @@ namespace NBC.ActionEditor
             _clip = clip;
             Select = select;
             TrackRect = trackRect;
-            StartPosX = clip.Root.TimeToPos(clip.StartTime, App.Width) + trackRect.x;
-            EndPosX = clip.Root.TimeToPos(clip.EndTime, App.Width) + trackRect.x;
-
-            ClipRect = new Rect(StartPosX, TrackRect.y, EndPosX - StartPosX, Styles.LineHeight);
-            ClipRealRect = new Rect(StartPosX, trackRightRect.y, EndPosX - StartPosX, Styles.LineHeight);
+            var transform = new JsonTimelineTransform(clip.Root.ViewTimeMin, clip.Root.ViewTime, App.Width, trackRect.x);
+            StartPosX = transform.X(clip.StartTime); EndPosX = transform.X(clip.EndTime);
+            ClipRect = transform.ClipRect(clip, TrackRect.y, Styles.LineHeight, 0, 0);
+            ClipRealRect = new Rect(ClipRect.x, trackRightRect.y, ClipRect.width, Styles.LineHeight);
 
             _overlapIn = PreviousClip != null ? Mathf.Max(PreviousClip.EndTime - _clip.StartTime, 0) : 0;
             _overlapOut = NextClip != null ? Mathf.Max(_clip.EndTime - NextClip.StartTime, 0) : 0;

@@ -28,6 +28,8 @@ RF06类型目录：DirectableTypeInfo缓存现有Attribute与点/伸缩/混合�
 
 RF07结构编辑：两UI创建、批量删除和轨道移动经窄JsonEditCommand统一CanExecute(reason)/Execute，菜单打开后状态变化仍在执行时重验；失败回滚、不留部分创建/删除。复制/剪切/粘贴保留序列化参数，成功后才完成剪切和选择，剪切源新锁定拒绝，Duplicate失败保留旧剪贴板。原版创建轨道后选择等已有UI习惯保留，不强行添加新版选择变化；新建文档仍共用CreateLegacyAsset，不产生另一套存储。
 
+RF08几何：两UI消费JsonTimelineTransform的float时间变换及TimelineGeometry可见行、矩形、折叠可见性、框选与手柄优先级；尺寸由各UI提供，各自绘制。Toolkit极短区间最少4px、点8px，原版点图标仍由原绘制器扩展，不强制统一外观。完整时间区宽不随垂直滚动条变化；几何计算不改作者数据，反向框选归一，短片段手柄相交左侧优先。
+
 ## 时间坐标和数据草案
 
 平台时间存储为有限、非负的 double 秒。文档长度必须大于 0；点事件 duration=0，区间 duration>0，start+duration 不得超出文档长度。所有非法数值在提交前拒绝，不在绘制时修正。界面帧吸附是显式编辑操作，不反向量化已有数据。

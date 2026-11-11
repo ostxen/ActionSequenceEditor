@@ -71,15 +71,7 @@ namespace NBC.ActionEditor
             foreach (var item in _itemViews) item.Release();
             _itemViews.Clear();
             if (asset == null) return;
-            foreach (var group in asset.groups)
-            {
-                AddView(group);
-                if (group.IsCollapsed) continue;
-                foreach (var track in group.Tracks)
-                {
-                    AddView(track);
-                }
-            }
+            foreach (var item in TimelineGeometry.VisibleRows(asset)) AddView(item);
         }
 
 

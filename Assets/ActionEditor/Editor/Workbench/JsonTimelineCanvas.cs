@@ -33,9 +33,10 @@ namespace NBC.ActionEditor.Workbench
         private bool hasHoverPosition;
         public float Left => owner.LeftWidth + 9;
         private Asset Asset => owner.Document;
-        public float Scale => Mathf.Max(1, owner.rootVisualElement.contentRect.width - Left) / Mathf.Max(.001f, Asset?.ViewTime ?? 7);
-        public float X(float time) => Left + (time - (Asset?.ViewTimeMin ?? 0)) * Scale;
-        public float TimeAt(float x) => (Asset?.ViewTimeMin ?? 0) + (x - Left) / Scale;
+        private JsonTimelineTransform Transform => new JsonTimelineTransform(Asset?.ViewTimeMin ?? 0, Asset?.ViewTime ?? 7, owner.rootVisualElement.contentRect.width - Left, Left);
+        public float Scale => Transform.Scale;
+        public float X(float time) => Transform.X(time);
+        public float TimeAt(float x) => Transform.Time(x);
         public JsonTimelineCanvas(JsonActionWorkbench owner)
         {
             this.owner = owner; name = "json-timeline"; focusable = true;
@@ -178,20 +179,16 @@ namespace NBC.ActionEditor.Workbench
         public void SyncRuler() { ruler.style.left = Left; ruler.MarkDirtyRepaint(); }
         public List<IDirectable> Rows()
         {
-            var rows = new List<IDirectable>(); if (Asset == null) return rows;
-            foreach (var group in Asset.groups) { rows.Add(group); if (!group.IsCollapsed) rows.AddRange(group.Tracks); }
-            return rows;
+            return TimelineGeometry.VisibleRows(Asset);
         }
         public Rect ClipRect(Clip clip, int row)
         {
-            var point = DirectableTypeInfo.For(clip.GetType()).IsSignal || clip.Length == 0;
-            return new Rect(X(clip.StartTime) - (point ? 4 : 0), row * 28 - owner.ScrollY,
-                point ? 8 : Mathf.Max(4, clip.Length * Scale), 26);
+            return Transform.ClipRect(clip, row * 28 - owner.ScrollY, 26, 8, 4);
         }
         public Clip Hit(Vector2 p)
         {
             if (p.x < Left) return null;
-            var rows = Rows(); var row = Mathf.FloorToInt((p.y + owner.ScrollY) / 28);
+            var rows = Rows(); var row = TimelineGeometry.RowAt(p.y, owner.ScrollY, 28);
             return row >= 0 && row < rows.Count && rows[row] is Track track ? track.Clips.LastOrDefault(c => ClipRect(c, row).Contains(p)) : null;
         }
         private float Snap(float time)
@@ -202,10 +199,10 @@ namespace NBC.ActionEditor.Workbench
         private int ResizeMode(Clip clip, Vector2 position)
         {
             if (clip == null || clip.IsLocked || !clip.CanScale()) return 0;
-            var row = Mathf.FloorToInt((position.y + owner.ScrollY) / 28);
+            var row = TimelineGeometry.RowAt(position.y, owner.ScrollY, 28);
             var rect = ClipRect(clip, row);
-            if (position.x - rect.xMin < Styles.ClipScaleRectWidth) return 2;
-            return rect.xMax - position.x < Styles.ClipScaleRectWidth ? 3 : 0;
+            var edge = TimelineGeometry.ResizeEdge(rect, position, Styles.ClipScaleRectWidth);
+            return edge < 0 ? 2 : edge > 0 ? 3 : 0;
         }
         private void UpdateResizeCursor()
         {
@@ -220,7 +217,7 @@ namespace NBC.ActionEditor.Workbench
             if (Asset == null || e.button == 1) return;
             if (owner.Context.Session.IsEditing && edit?.IsActive != true) return;
             Focus(); down = last = e.localPosition;
-            var rows = Rows(); var row = Mathf.FloorToInt((down.y + owner.ScrollY) / 28);
+            var rows = Rows(); var row = TimelineGeometry.RowAt(down.y, owner.ScrollY, 28);
             hit = Hit(down);
             if (e.button == 2) mode = 4;
             else if (Mathf.Abs(down.x - (Left - 7)) < 5) mode = 5;
@@ -306,7 +303,7 @@ namespace NBC.ActionEditor.Workbench
             }
             if (mode == 6 && marquee.HasValue)
             {
-                var rows = Rows(); owner.Select(rows.SelectMany((r, i) => r is Track t ? t.Clips.Where(c => ClipRect(c, i).Overlaps(marquee.Value)) : Enumerable.Empty<Clip>()).Cast<IDirectable>().ToArray());
+                var rows = Rows(); owner.Select(rows.SelectMany((r, i) => r is Track t ? t.Clips.Where(c => TimelineGeometry.Overlaps(ClipRect(c, i), marquee.Value)) : Enumerable.Empty<Clip>()).Cast<IDirectable>().ToArray());
             }
             var captured = pointer; var wasEdit = mode >= 1 && mode <= 3; pointer = -1; mode = 0; marquee = null; movingTrack = null;
             dragMoved = false; SyncDragGuides();
@@ -427,7 +424,7 @@ namespace NBC.ActionEditor.Workbench
         {
             if (mode != 0 || edit?.IsActive == true) { e.PreventDefault(); e.StopImmediatePropagation(); return; }
             if (Asset == null) return;
-            var p = this.WorldToLocal(e.mousePosition); var rows = Rows(); var row = Mathf.FloorToInt((p.y + owner.ScrollY) / 28);
+            var p = this.WorldToLocal(e.mousePosition); var rows = Rows(); var row = TimelineGeometry.RowAt(p.y, owner.ScrollY, 28);
             var clip = Hit(p); IDirectable item = clip ?? (row >= 0 && row < rows.Count ? rows[row] : null);
             if (item != null && p.x < Left) { e.menu.ClearItems(); ShowHeaderMenu(item); return; }
             if (item == null) return;

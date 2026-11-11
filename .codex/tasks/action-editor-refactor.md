@@ -2,7 +2,7 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01–RF07工程验收 `complete`，人工体验待用户次日验收；RF08–RF15 `planned`。Combat 专属实施与验收暂缓。
+- 总体状态：RF01–RF08工程验收 `complete`，人工体验待用户次日验收；RF09–RF15 `planned`。Combat 专属实施与验收暂缓。
 - 当前执行任务：2026-11-10用户要求夜间继续、人工差异次日汇总验收；缩放步长明确采用新版。每项实现并通过工程验收后本地中文提交，连同ActionEditor专属文档，不推送。
 - 下一步：RF06工程验收通过，独立本地提交后进入RF07结构命令。2026-11-11用户明确要求一直继续直至本系列结束，不逐项等待继续指令；不扩大持久写入、包/设置、Combat、删除及人工验收授权。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
@@ -129,7 +129,7 @@
 | [x] | RF05 | complete（工程验收；人工待验） | 会话、编解码与存储边界 | RF04 | RF1 |
 | [x] | RF06 | complete（工程验收；人工待验） | 类型目录、能力与扩展解析 | RF05 | RF2 |
 | [x] | RF07 | complete（工程验收；人工待验） | 创建及结构编辑命令归一 | RF06 | RF2 |
-| [ ] | RF08 | planned | 可见布局、坐标与命中归一 | RF07 | RF3 |
+| [x] | RF08 | complete（工程验收；人工待验） | 可见布局、坐标与命中归一 | RF07 | RF3 |
 | [ ] | RF09 | planned | 移动、拉伸、吸附与拖动反馈归一 | RF08 | RF3 |
 | [ ] | RF10 | planned | 选择、导航、快捷键和工作区适配 | RF09 | RF3 |
 | [ ] | RF11 | planned | 属性描述、集合与双 UI 属性编辑 | RF10 | RF4 |
@@ -987,3 +987,11 @@
 - 新增SharedJson两项：菜单校验后锁定再Execute拒绝；构造失败整图/编辑状态恢复；成功创建一次Undo/Redo；旧图目标过期；批量含锁定对象零修改；剪切后锁定拒绝且剪贴板保留，解锁粘贴一次Undo恢复两轨；批量删除一次Undo。已有复制轨道参数、跨组重排、双UI/快捷键/窗口回归同跑。
 - 最终 `.codex/runs/20261111T010120Z-1ed7bfc2/report.json` Unity编译passed，NBC.ActionEditor.Editor.Tests EditMode **132/132passed**、0failed/skipped/inconclusive。离线 `20261111T010317Z-d51459d7`工作流41/41，18projects/644sources、0errors/43warnings；code profile缺yaml/markdown_it仍blocked，未安装。新增JsonEditCommand.meta由Unity生成。git diff --check提交前检查。
 - 未验/保留：没有用菜单真正弹出并人工逐项点击替代逻辑测试，系统新建保存对话框仍H07；不改资源格式或系统对话框，新建磁盘路径验收沿RF05，不宣称此轮新执行了持久探针。旧全局App依赖逐渐收敛而非本项完全消除。用户JSON/个人配置、Combat、包/设置未动，不推送。下一任务RF08。
+
+### RF08 执行与验收记录（2026-11-11）
+
+- 状态：`complete`（工程验收），RF07已提交0c0d7f0。提取只读JsonTimelineTransform与TimelineGeometry，两个UI共同使用时间↔像素/宽度↔时长、可见组/轨道行、片段矩形与折叠可见性；原版ClipDraw与Toolkit分别提供高度、起点、最小宽度/点宽，保留各自绘制。原版原有点图标扩展仍在SignalClipDraw，不在本项统一外观或把图标尺寸写进内容。
+- Toolkit缩放/命中/框选和原版TimeToPos/PosToTime/WidthToTime、行构建、ClipDrawer框选与显示判断均消费共享几何。ResizeEdge明确短片段左右手柄相交时左边优先，矩形外无手柄；反向框选用Overlaps(...,true)。时间区宽仍由完整窗口减左栏确定，不跟垂直滚动条变化；绘制不修改模型。隐藏片段不命中沿RF02规则保留。
+- 新增TimelineGeometryTests五项（含3参数场景）：500/1000/1400窗口和不同分栏/视域对原公式独立预期及往返；8行样例/折叠后5行及编码不变；点8px/短片段4px、滚动行、反向框选、重叠手柄。既有真实双UI不同窗口宽、滚动、折叠、属性/指针/多选/辅助线测试同时通过，不据公式测试声称所有DPI已人工验收。
+- 首轮 `20261111T010827Z-c592dd1f`编译失败：名称撞保留实验工作台TimelineTransform，改名JsonTimelineTransform，不改实验double模型或格式。随后完整137/137；最终 `.codex/runs/20261111T011200Z-48290c02/report.json` Unity编译passed，NBC.ActionEditor.Editor.Tests EditMode **137/137passed**、0failed/skipped/inconclusive。
+- 离线 `.codex/runs/20261111T011410Z-081f7214/report.md`工作流41/41、18projects/646sources、0errors/43warnings；完整code profile缺yaml/markdown_it仍blocked，未安装。新增两源码meta由Unity生成，git diff --check通过。未运行JSON持久写入、PlayerBuild、Combat或其他DPI现场；布局/极短片段外观与操作手感仍H01–H04人工待验。下一任务RF09。

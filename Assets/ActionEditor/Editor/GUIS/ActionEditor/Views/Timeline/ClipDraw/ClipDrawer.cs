@@ -27,7 +27,7 @@ namespace NBC.ActionEditor
             foreach (var clip in _clipDraws.Keys.Where(IsVisible))
             {
                 var draw = _clipDraws[clip];
-                if (rect.Overlaps(draw.ClipRealRect))
+                if (TimelineGeometry.Overlaps(rect, draw.ClipRealRect))
                 {
                     list.Add(clip);
                 }
@@ -69,7 +69,7 @@ namespace NBC.ActionEditor
 
         #region Draw
 
-        private static bool IsVisible(Clip clip) => clip.Parent is Track track && track.Group != null && !track.Group.IsCollapsed;
+        private static bool IsVisible(Clip clip) => TimelineGeometry.IsVisible(clip);
 
         public static void Reset()
         {

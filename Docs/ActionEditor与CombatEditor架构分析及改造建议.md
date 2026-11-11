@@ -68,6 +68,8 @@ RF06已由DirectableTypeInfo缓存类型事实，ActionEditorTypeCatalog缓存�
 
 RF07用JsonEditCommand表达窄校验与事务执行，JsonEditCommands承载当前图归属、挂载/唯一性、锁定和批量预检；两UI菜单及现有快捷键消费它，不引入总线。新建文档继续现有共用创建函数。选择展示差异暂留UI适配，命令失败不推进剪贴板状态。
 
+RF08将可见行、时间像素变换和基础几何提为只读服务，双UI提供尺寸与滚动偏移并分别绘制；原版ClipDrawer不再另判折叠可见性。JsonTimelineTransform与保留实验工作台double变换有明确不同名称，不混用文档格式。
+
 **所有权规则：**
 
 - 文档内容和保存基线归 DocumentSession；不通过窗口脏标志推断是否保存。
