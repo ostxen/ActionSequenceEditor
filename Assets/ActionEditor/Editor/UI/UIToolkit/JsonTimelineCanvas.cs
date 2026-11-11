@@ -72,17 +72,17 @@ namespace NBC.ActionEditor.Workbench
                 label.style.unityTextAlign = TextAnchor.MiddleCenter; label.style.marginLeft = label.style.marginTop = 0;
                 guide.Add(label); guideLines[i] = guide; dragGuides.Add(guide);
             }
-            create = new Button(() => CreateAssetWindow.Show()) { text = "创建 JSON 资源" };
-            open = new Button(() => ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, ActionEditorHost.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath)) { text = "打开 JSON 资源" };
+            create = new Button(() => CreateAssetWindow.Show()) { text = Lan.CreateAsset };
+            open = new Button(() => ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, ActionEditorHost.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath)) { text = Lan.SelectAsset };
             welcome = new VisualElement { name = "json-welcome" }; welcome.style.position = Position.Absolute;
             welcome.style.left = welcome.style.right = welcome.style.top = welcome.style.bottom = 0;
             welcome.style.alignItems = Align.Center; welcome.style.justifyContent = Justify.Center;
             if (Styles.Logo != null) { var logo = new Image { image = Styles.Logo }; logo.style.width = logo.style.height = 128; welcome.Add(logo); }
-            var title = new Label("行为时间轴编辑器"); title.style.fontSize = 30; title.style.unityFontStyleAndWeight = FontStyle.Bold; welcome.Add(title);
-            var hint = new Label("同一份 JSON，可在 GUILayout 与 UI Toolkit 界面编辑"); hint.style.marginTop = 20; welcome.Add(hint);
+            var title = new Label(Lan.Title); title.style.fontSize = 30; title.style.unityFontStyleAndWeight = FontStyle.Bold; welcome.Add(title);
+            var hint = new Label(Lan.WelcomeHint); hint.style.marginTop = 20; welcome.Add(hint);
             foreach (var button in new[] { create, open }) { button.style.width = 220; button.style.height = 40; welcome.Add(button); }
             create.style.backgroundColor = new Color(.56f, .56f, .63f);
-            welcome.Add(new Label("Open Workbench 使用 UI Toolkit，数据与本窗口共用"));
+            welcome.Add(new Label(Lan.WelcomeHelp));
             var preferences = new Button(() => JsonPreferencesWindow.ShowFor(owner)) { text = Lan.Seeting }; preferences.style.width = 220; preferences.style.height = 40; welcome.Add(preferences); Add(welcome);
             rowHeaders = new VisualElement { name = "json-row-headers", pickingMode = PickingMode.Ignore }; rowHeaders.style.position = Position.Absolute; rowHeaders.style.left = rowHeaders.style.top = 0; Add(rowHeaders);
             clipLabels = new VisualElement { pickingMode = PickingMode.Ignore }; clipLabels.style.position = Position.Absolute; clipLabels.style.top = clipLabels.style.right = clipLabels.style.bottom = 0;

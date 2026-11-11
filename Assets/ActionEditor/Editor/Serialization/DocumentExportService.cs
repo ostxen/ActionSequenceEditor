@@ -13,15 +13,15 @@ namespace NBC.ActionEditor.Storage
 
         public bool Export(JsonDocumentSession session, string formatId, string target)
         {
-            if (session == null || session.Document == null) throw new InvalidOperationException("没有打开的资源。");
-            if (session.IsEditing) throw new InvalidOperationException("请先完成或取消当前编辑，再导出。");
+            if (session == null || session.Document == null) throw new InvalidOperationException(Lan.NoDocument);
+            if (session.IsEditing) throw new InvalidOperationException(Lan.FinishEditBeforeExport);
             var format = registry.ById(formatId);
-            if (!format.CanExport || !format.CanWrite) throw new InvalidOperationException("文件格式不支持导出。");
+            if (!format.CanExport || !format.CanWrite) throw new InvalidOperationException(Lan.UnsupportedExport);
             if (string.IsNullOrEmpty(target)) return false;
             var store = new JsonDocumentStore(files);
             target = JsonDocumentStore.ValidatePath(target, format);
             if (!string.IsNullOrEmpty(session.Path) && string.Equals(target, JsonDocumentStore.ValidatePath(session.Path), StringComparison.OrdinalIgnoreCase))
-                throw new IOException("导出目标不能是当前源文件，请选择新文件名。");
+                throw new IOException(Lan.ExportSourceTarget);
             store.ValidateNewPath(target, format);
             var snapshot = DocumentSnapshots.Capture(session.Document, true);
             var expected = DocumentValueConverter.Capture(snapshot, typeof(Asset), DocumentFormats.Context).ContentKey();
@@ -32,7 +32,7 @@ namespace NBC.ActionEditor.Storage
                     var loaded = format.Deserialize(bytes, DocumentFormats.Context);
                     if (loaded == null || loaded.GetType() != snapshot.GetType()
                         || DocumentValueConverter.Capture(loaded, typeof(Asset), DocumentFormats.Context).ContentKey() != expected)
-                        throw new InvalidDataException("导出读回内容不一致，未提交文件。");
+                        throw new InvalidDataException(Lan.ExportReadbackFailed);
                 }
                 store.ValidateNewPath(target, format);
             }, createOnly: true);

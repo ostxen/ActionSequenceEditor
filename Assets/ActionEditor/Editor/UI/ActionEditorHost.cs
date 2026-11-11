@@ -64,15 +64,15 @@ namespace NBC.ActionEditor
         public static bool ConfirmDocumentSwitch()
         {
             if (!App.Session.IsDirty) return true;
-            var choice = EditorUtility.DisplayDialogComplex("未保存的 JSON", "切换前是否保存当前文档？", "保存", "取消", "放弃");
+            var choice = EditorUtility.DisplayDialogComplex(Lan.UnsavedChanges, Lan.SaveBeforeSwitch, Lan.Save, Lan.TipsCancel, Lan.Discard);
             if (choice == 1) return false;
             if (choice == 0) { App.SaveAsset(); return !App.Session.IsDirty; }
             return true;
         }
-        private static string ChooseSavePath(bool saveAs) => EditorUtility.SaveFilePanelInProject(saveAs ? "另存为" : "保存", App.TextAsset != null ? App.TextAsset.name : "Action", "json", "选择新文件路径，不会覆盖已有资源。");
+        private static string ChooseSavePath(bool saveAs) => EditorUtility.SaveFilePanelInProject(saveAs ? Lan.SaveAs : Lan.Save, App.TextAsset != null ? App.TextAsset.name : "Action", "json", Lan.NewPathHint);
         public static void SaveAs()
         {
-            if (App.Session.IsEditing) throw new InvalidOperationException("请先完成或取消当前编辑，再另存为。");
+            if (App.Session.IsEditing) throw new InvalidOperationException(Lan.FinishEditBeforeSave);
             var path = ChooseSavePath(true);
             if (!string.IsNullOrEmpty(path))
             {
@@ -82,9 +82,9 @@ namespace NBC.ActionEditor
         }
         public static void PopulateSaveMenu(Action<string, Action> add)
         {
-            add("保存", App.SaveAsset);
-            add("另存为…", SaveAs);
-            add("导出…", DocumentExportWindow.ShowForCurrent);
+            add(Lan.Save, App.SaveAsset);
+            add(Lan.SaveAs, SaveAs);
+            add(Lan.Export, DocumentExportWindow.ShowForCurrent);
         }
     }
 }

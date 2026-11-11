@@ -770,6 +770,48 @@ namespace NBC.ActionEditor.Tests
             Assert.That(App.Session.IsDirty, Is.False);
             Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1)); Assert.That(App.AssetData.ViewTimeMax, Is.EqualTo(10));
         }
+        [UnityTest] public IEnumerator ProductTermsMatchBothLanguageCatalogsAndRealWindowEntrypoints()
+        {
+            var fields = typeof(Lan).GetFields(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public).Where(f => f.FieldType == typeof(string)).ToArray();
+            var previousTerms = fields.Select(f => f.GetValue(null)).ToArray();
+            var previousHost = ActionEditorHost.Window;
+            ActionEditorWindow original = null; JsonActionWorkbench native = null;
+            try
+            {
+                foreach (var language in new[] { typeof(LanCHS), typeof(LanEN) })
+                {
+                    App.TextAsset = null;
+                    original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
+                    native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show();
+                    foreach (var field in fields)
+                    {
+                        var translated = language.GetField(field.Name);
+                        Assert.That(translated, Is.Not.Null, language.Name + "." + field.Name);
+                        Assert.That(translated.GetValue(null) as string, Is.Not.Null.And.Not.Empty);
+                        field.SetValue(null, translated.GetValue(null));
+                    }
+                    original.Repaint(); native.CreateGUI();
+                    yield return null; yield return null;
+                    Assert.That(original.titleContent.text, Is.EqualTo(Lan.Title));
+                    Assert.That(native.titleContent.text, Is.EqualTo(Lan.Title + " · UI Toolkit"));
+                    var buttons = native.rootVisualElement.Q("json-welcome").Query<Button>().ToList();
+                    Assert.That(buttons.Select(b => b.text), Does.Contain(Lan.CreateAsset).And.Contain(Lan.SelectAsset));
+                    var labels = native.rootVisualElement.Q("json-welcome").Query<Label>().ToList();
+                    Assert.That(labels.Select(l => l.text), Does.Contain(Lan.WelcomeHint).And.Contain(Lan.WelcomeHelp));
+                    Assert.That(Prefs.GetAssetTypeName(typeof(LegacyExperienceAsset)), Is.EqualTo(Lan.FeatureSample));
+                    var menu = new System.Collections.Generic.List<string>(); ActionEditorHost.PopulateSaveMenu((label, action) => menu.Add(label));
+                    Assert.That(menu, Is.EqualTo(new[] { Lan.Save, Lan.SaveAs, Lan.Export }));
+                    Assert.That(string.Join(" ", menu) + Lan.WelcomeHint + Lan.CreateSafety + Lan.FeatureSample, Does.Not.Contain("JSON").And.Not.Contain("旧版").And.Not.Contain("新版"));
+                    native.Close(); original.Close(); native = null; original = null;
+                }
+            }
+            finally
+            {
+                if (native != null) native.Close(); if (original != null) original.Close();
+                for (var i = 0; i < fields.Length; i++) fields[i].SetValue(null, previousTerms[i]);
+                ActionEditorHost.Window = previousHost;
+            }
+        }
         [Test] public void BothSaveChangesEntrypointsUseTheSameCancelablePathRequest()
         {
             var previousRequest = App.SavePathRequested;
@@ -785,7 +827,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(requests, Is.EqualTo(2)); Assert.That(App.AssetData, Is.SameAs(source));
                 Assert.That(App.Session.CaptureRecovery(), Is.EqualTo(before)); Assert.That(App.Session.IsDirty, Is.True);
                 var entries = new System.Collections.Generic.List<string>(); ActionEditorHost.PopulateSaveMenu((label, action) => entries.Add(label));
-                Assert.That(entries, Is.EqualTo(new[] { "保存", "另存为…", "导出…" }));
+                Assert.That(entries, Is.EqualTo(new[] { Lan.Save, Lan.SaveAs, Lan.Export }));
             }
             finally
             {
@@ -1380,7 +1422,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(native.Canvas.Scale, Is.EqualTo((1000 - 329) / 7f).Within(1));
                 Assert.That(native.rootVisualElement.Q("json-loop-start"), Is.Null);
                 Assert.That(native.rootVisualElement.Query<IMGUIContainer>().ToList(), Is.Empty);
-                Assert.That(native.rootVisualElement.Q("json-custom-header").Q<Button>().text, Is.EqualTo("样例状态预览"));
+                Assert.That(native.rootVisualElement.Q("json-custom-header").Q<Button>().text, Is.EqualTo(Lan.PreviewTitle));
                 foreach (var width in new[] { 850, 1024, 1400 })
                 {
                     native.position = new Rect(60, 60, width, 600); yield return null; yield return null;

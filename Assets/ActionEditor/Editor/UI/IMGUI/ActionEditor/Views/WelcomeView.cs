@@ -23,7 +23,7 @@ namespace NBC.ActionEditor
             GUIStyle titleStyle = new GUIStyle(GUI.skin.label);
             titleStyle.fontSize = 30;
             titleStyle.fontStyle = FontStyle.Bold;
-            GUILayout.Label("行为时间轴编辑器", titleStyle);
+            GUILayout.Label(Lan.Title, titleStyle);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
@@ -31,20 +31,20 @@ namespace NBC.ActionEditor
 
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            GUILayout.Label("同一份 JSON，可在 GUILayout 与 UI Toolkit 界面编辑");
+            GUILayout.Label(Lan.WelcomeHint);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
             GUI.backgroundColor = new Color(0.8f, 0.8f, 1, 1f);
 
-            if (DrawCenteredButton("创建 JSON 资源"))
+            if (DrawCenteredButton(Lan.CreateAsset))
             {
                 CreateAssetWindow.Show();
             }
 
             GUI.backgroundColor = Color.white;
 
-            if (DrawCenteredButton("打开 JSON 资源"))
+            if (DrawCenteredButton(Lan.SelectAsset))
             {
                 ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, ActionEditorHost.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath);
             }
@@ -52,7 +52,7 @@ namespace NBC.ActionEditor
             GUI.backgroundColor = Color.white;
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            GUILayout.Label("Open Workbench 使用 UI Toolkit，数据与本窗口共用");
+            GUILayout.Label(Lan.WelcomeHelp);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 

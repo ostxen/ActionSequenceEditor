@@ -113,7 +113,7 @@ namespace NBC.ActionEditor.Validation
                     App.Context.Player.Sample(.5f); App.Play(); App.Pause();
                     var source = App.AssetData; var selection = App.FistSelect; var before = App.Session.CaptureRecovery(); var path = App.Session.Path;
                     Action open = null;
-                    ActionEditorHost.PopulateSaveMenu((label, action) => { if (label == "导出…") open = action; });
+                    ActionEditorHost.PopulateSaveMenu((label, action) => { if (label == Lan.Export) open = action; });
                     if (open == null) throw new InvalidOperationException("Both UI shared menu missing export.");
                     open(); window = Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Single();
                     var target = root + (dirty == 0 ? "/Clean.json" : "/Dirty.json");

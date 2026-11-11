@@ -195,6 +195,7 @@ namespace NBC.ActionEditor
 
         public static string GetAssetTypeName(Type type)
         {
+            if (type == typeof(Samples.LegacyExperience.LegacyExperienceAsset)) return Lan.FeatureSample;
             foreach (var key in AssetTypes.Keys)
             {
                 var v = AssetTypes[key];
@@ -204,7 +205,7 @@ namespace NBC.ActionEditor
                 }
             }
 
-            return string.Empty;
+            return type?.GetCustomAttributes(typeof(NameAttribute), false).OfType<NameAttribute>().FirstOrDefault()?.name ?? type?.Name.SplitCamelCase() ?? string.Empty;
         }
     }
 }

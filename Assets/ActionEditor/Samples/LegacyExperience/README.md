@@ -1,15 +1,15 @@
-# 旧版功能体验样例
+# 功能体验样例
 
-此样例扩展原有 Asset/Group/Track/Clip 模型，由 GUILayout 和原生 UI Toolkit 界面共用，不依赖 Combat，不修改原始资源或场景。
+此样例扩展原有 Asset/Group/Track/Clip 模型，由 IMGUI 和原生 UI Toolkit 界面共用，不依赖 Combat，不修改原始资源或场景。
 
 ## 创建与打开
 
 1. 等 Unity 自动编译完成，关闭并重开创建弹窗。
-2. `NBC > Action Editor > Open Action Editor`（GUILayout）或 `Open Workbench`（原生 UI Toolkit）。
-3. 点击欢迎页“创建 JSON 资源”，类型选择“旧版功能体验样例（预置轨道）”。
+2. `NBC > Action Editor > Open Action Editor`（IMGUI）或 `Open Workbench`（原生 UI Toolkit）。
+3. 点击欢迎页“新建资源”，类型选择“功能体验样例（预置轨道）”。
 4. 建议文件名 `LegacyExperience`，选择 Assets 下的新路径并确认。创建后进入对应时间轴。
 
-两个窗口共用一个当前文档、选择、Undo 和播放头，不是两个独立副本。不需要转换 JSON。保存会比较打开时的磁盘版本；文件被外部修改时拒绝覆盖并保留内存内容。切换脏文档时可以保存、取消或明确放弃；脚本重载使用 SessionState 恢复内存快照，但不等同于磁盘备份。
+两个窗口共用一个当前文档、选择、Undo 和播放头，不是两个独立副本。保存使用当前唯一文档格式。保存会比较打开时的磁盘版本；文件被外部修改时拒绝覆盖并保留内存内容。切换脏文档时可以保存、取消或明确放弃；脚本重载使用 SessionState 恢复内存快照，但不等同于磁盘备份。
 
 这不是空白模板：新建后预置 3 个组、7 条轨道、13 个片段/点事件，总长 6 秒。源码构造函数只在创建对象时提供初始内容，已有 JSON 的内容由反序列化恢复，不会在每次绘制时补回已删除片段。
 

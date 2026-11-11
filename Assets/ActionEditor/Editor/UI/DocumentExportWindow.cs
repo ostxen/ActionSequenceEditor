@@ -12,25 +12,25 @@ namespace NBC.ActionEditor
         private string error;
         public static void ShowForCurrent()
         {
-            if (App.AssetData == null) throw new InvalidOperationException("没有打开的资源。");
-            if (App.Session.IsEditing) throw new InvalidOperationException("请先完成或取消当前编辑，再导出。");
+            if (App.AssetData == null) throw new InvalidOperationException(Lan.NoDocument);
+            if (App.Session.IsEditing) throw new InvalidOperationException(Lan.FinishEditBeforeExport);
             var window = CreateInstance<DocumentExportWindow>();
-            window.titleContent = new GUIContent("导出"); window.minSize = new Vector2(360, 130); window.ShowUtility();
+            window.titleContent = new GUIContent(Lan.Export); window.minSize = new Vector2(360, 130); window.ShowUtility();
         }
         private void OnGUI()
         {
             var formats = DocumentFormats.Registry.Exportable;
-            EditorGUILayout.LabelField("导出", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("导出独立副本，不改变当前来源或未保存的修改。仅创建新文件。", MessageType.Info);
-            if (formats.Count == 0) { EditorGUILayout.HelpBox("没有已实现的导出格式。", MessageType.Warning); return; }
-            selected = EditorGUILayout.Popup("文件格式", Mathf.Clamp(selected, 0, formats.Count - 1), formats.Select(f => f.DisplayName).ToArray());
+            EditorGUILayout.LabelField(Lan.Export, EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(Lan.ExportHint, MessageType.Info);
+            if (formats.Count == 0) { EditorGUILayout.HelpBox(Lan.NoExportFormats, MessageType.Warning); return; }
+            selected = EditorGUILayout.Popup(Lan.FileFormat, Mathf.Clamp(selected, 0, formats.Count - 1), formats.Select(f => f.DisplayName).ToArray());
             if (!string.IsNullOrEmpty(error)) EditorGUILayout.HelpBox(error, MessageType.Error);
-            if (GUILayout.Button("导出"))
+            if (GUILayout.Button(Lan.Export))
             {
                 try
                 {
                     var format = formats[selected];
-                    var target = EditorUtility.SaveFilePanelInProject("导出", (App.TextAsset != null ? App.TextAsset.name : "Action") + "-Export", format.Extension.TrimStart('.'), "选择新的独立文件，不覆盖源文件。");
+                    var target = EditorUtility.SaveFilePanelInProject(Lan.Export, (App.TextAsset != null ? App.TextAsset.name : "Action") + "-Export", format.Extension.TrimStart('.'), Lan.NewPathHint);
                     if (ExportTo(format.Id, target)) Close();
                 }
                 catch (ExitGUIException) { throw; }

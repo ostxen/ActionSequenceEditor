@@ -38,9 +38,10 @@ namespace NBC.ActionEditor.Workbench
         public static void Open() => GetWindow<JsonActionWorkbench>().Show();
         private void OnEnable()
         {
+            Lan.Load();
             Styles.Load();
             LeftWidth = Styles.TimelineLeftWidth;
-            titleContent = new GUIContent("行为时间轴 · UI Toolkit"); minSize = new Vector2(500, 250);
+            titleContent = new GUIContent(Lan.Title + " · UI Toolkit"); minSize = new Vector2(500, 250);
             if (target != null) DestroyImmediate(target);
             target = CreateInstance<JsonInspectorTarget>(); target.hideFlags = HideFlags.HideAndDontSave; target.Owner = this;
             App.Views.Attach(this, Repaint, Refresh);
@@ -64,6 +65,7 @@ namespace NBC.ActionEditor.Workbench
         }
         public void CreateGUI()
         {
+            titleContent = new GUIContent(Lan.Title + " · UI Toolkit");
             Canvas?.Dispose();
             rootVisualElement.Clear();
             headerType = null;
@@ -104,7 +106,7 @@ namespace NBC.ActionEditor.Workbench
                 var button = new ToolbarButton(() => Run(action)) { name = name, tooltip = hint }; button.style.width = 26;
                 button.style.flexShrink = 0; button.Add(new Image { image = texture, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore }); toolbar.Add(button); return button;
             }
-            var saveButton = IconButton("json-save", Styles.SaveIcon, Lan.Save + "（右键：另存为）", Save);
+            var saveButton = IconButton("json-save", Styles.SaveIcon, Lan.SaveMenuHint, Save);
             saveButton.AddManipulator(new ContextualMenuManipulator(e => ActionEditorHost.PopulateSaveMenu((label, action) => e.menu.AppendAction(label, _ => Run(action)))));
             magnet = new ToolbarToggle { name = "json-magnet", value = Prefs.MagnetSnapping, tooltip = Lan.OpenMagnetSnappingTips };
             magnet.style.width = 26; magnet.style.flexShrink = 0; magnet.Add(new Image { image = Styles.MagnetIcon, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore });

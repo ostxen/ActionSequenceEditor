@@ -9,12 +9,12 @@ namespace NBC.ActionEditor.Samples
     public sealed class LegacyExperienceHeader : HeaderBase
     {
         public override UnityEngine.UIElements.VisualElement CreateGUI() =>
-            new UnityEditor.UIElements.ToolbarButton(() => EditorWindow.GetWindow<LegacyExperiencePreview>("旧版样例预览").Show()) { text = "样例状态预览" };
+            new UnityEditor.UIElements.ToolbarButton(() => EditorWindow.GetWindow<LegacyExperiencePreview>(Lan.PreviewTitle).Show()) { text = Lan.PreviewTitle };
 
         public override void OnGUI()
         {
-            if (GUILayout.Button("样例状态预览", EditorStyles.toolbarButton))
-                EditorWindow.GetWindow<LegacyExperiencePreview>("旧版样例预览").Show();
+            if (GUILayout.Button(Lan.PreviewTitle, EditorStyles.toolbarButton))
+                EditorWindow.GetWindow<LegacyExperiencePreview>(Lan.PreviewTitle).Show();
         }
     }
 
@@ -25,14 +25,14 @@ namespace NBC.ActionEditor.Samples
 
         private void OnGUI()
         {
-            EditorGUILayout.HelpBox("跟随两个界面共用的播放头显示状态。不会创建场景对象，不播放音频，不执行战斗逻辑。修改可保存回同一 JSON。", MessageType.Info);
+            EditorGUILayout.HelpBox(Lan.PreviewHint, MessageType.Info);
             if (!(App.AssetData is LegacyExperienceAsset asset))
             {
-                EditorGUILayout.LabelField("请先在原版编辑器创建或打开“旧版功能体验样例”。");
+                EditorGUILayout.LabelField(Lan.OpenSampleFirst);
                 return;
             }
             var time = AssetPlayer.Inst.CurrentTime;
-            EditorGUILayout.LabelField("播放头", time.ToString("0.00") + " / " + asset.Length.ToString("0.00") + " 秒");
+            EditorGUILayout.LabelField(Lan.Playhead, time.ToString("0.00") + " / " + asset.Length.ToString("0.00") + " 秒");
             var draw = GUILayoutUtility.GetRect(100, 100, GUILayout.ExpandWidth(true));
             EditorGUI.DrawRect(draw, asset.Background);
             var clips = asset.groups.Where(g => g.IsActive).SelectMany(g => g.Tracks).Where(t => t.IsActive).SelectMany(t => t.Clips).ToArray();
@@ -47,16 +47,16 @@ namespace NBC.ActionEditor.Samples
                 EditorGUI.DrawRect(new Rect(x, draw.y + 12 + i % 3 * 25, 35, 20), tint);
             }
             scroll = EditorGUILayout.BeginScrollView(scroll);
-            EditorGUILayout.LabelField("当前区间", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(Lan.CurrentIntervals, EditorStyles.boldLabel);
             foreach (var clip in active)
-                EditorGUILayout.LabelField(clip.Caption, "进度 " + Mathf.Clamp01((time - clip.StartTime) / clip.Length).ToString("P0") + " · 偏移 " + clip.Offset);
-            EditorGUILayout.LabelField("当前循环", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(clip.Caption, string.Format(Lan.PreviewInterval, Mathf.Clamp01((time - clip.StartTime) / clip.Length).ToString("P0"), clip.Offset));
+            EditorGUILayout.LabelField(Lan.CurrentLoops, EditorStyles.boldLabel);
             foreach (var clip in clips.OfType<LegacyExperienceLoop>().Where(c => time >= c.StartTime && time < c.EndTime))
             {
                 var sourceTime = (time - clip.StartTime - clip.SubClipOffset) * clip.SubClipSpeed;
-                EditorGUILayout.LabelField(clip.Caption, "第 " + (Mathf.FloorToInt(sourceTime / clip.SubClipLength) + 1) + " 次 · 相位 " + Mathf.Repeat(sourceTime, clip.SubClipLength).ToString("0.00"));
+                EditorGUILayout.LabelField(clip.Caption, string.Format(Lan.PreviewLoop, Mathf.FloorToInt(sourceTime / clip.SubClipLength) + 1, Mathf.Repeat(sourceTime, clip.SubClipLength).ToString("0.00")));
             }
-            EditorGUILayout.LabelField("播放头之前的标记（状态，不是触发记录）", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(Lan.PreviousMarkers, EditorStyles.boldLabel);
             foreach (var clip in clips.OfType<LegacyExperienceMarker>().Where(c => c.StartTime <= time).OrderBy(c => c.StartTime))
                 EditorGUILayout.LabelField(clip.StartTime.ToString("0.00") + " 秒", clip.Message + " (#" + clip.EventCode + ")");
             EditorGUILayout.EndScrollView();

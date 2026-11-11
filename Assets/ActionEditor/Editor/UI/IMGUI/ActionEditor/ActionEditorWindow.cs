@@ -56,10 +56,10 @@ namespace NBC.ActionEditor
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
             
-            titleContent = new GUIContent(Lan.Title);
             minSize = new Vector2(500, 250);
             
             InitializeAll();
+            titleContent = new GUIContent(Lan.Title);
         }
 
         void OnDisable()
@@ -88,6 +88,7 @@ namespace NBC.ActionEditor
 
         void OnGUI()
         {
+            if (titleContent.text != Lan.Title) titleContent = new GUIContent(Lan.Title);
             if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
             {
                 _timelineView?.CancelNavigation();

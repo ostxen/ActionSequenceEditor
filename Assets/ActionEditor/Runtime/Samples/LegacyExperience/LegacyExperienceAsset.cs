@@ -5,11 +5,11 @@ using UnityEngine;
 namespace NBC.ActionEditor.Samples.LegacyExperience
 {
     [Serializable]
-    [Name("旧版功能体验样例（预置轨道）")]
-    [Description("独立旧版样例，不依赖 Combat。创建后已有分组、轨道、点事件、区间和内循环。")]
+    [Name("功能体验样例（预置轨道）")]
+    [Description("独立功能样例，不依赖 Combat。创建后已有分组、轨道、点事件、区间和内循环。")]
     public sealed class LegacyExperienceAsset : Asset
     {
-        [MenuName("样例说明")] public string Notes = "选择片段在 Inspector 编辑；拖动时间轴；预览状态从顶部按钮打开。两个界面共用同一 JSON，可保存与撤销。";
+        [MenuName("样例说明")] public string Notes = "选择片段查看属性，拖动时间轴或片段边缘；顶部按钮打开状态预览。修改后可保存与撤销。";
         [MenuName("版本")] public int Version = 1;
         [MenuName("预览背景")] public Color Background = new Color(0.15f, 0.18f, 0.22f);
 

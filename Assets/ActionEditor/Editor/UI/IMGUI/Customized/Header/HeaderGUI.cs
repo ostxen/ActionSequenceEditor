@@ -51,7 +51,7 @@ namespace NBC.ActionEditor
                 $"<size=11>{string.Format(Lan.HeaderLastSaveTime, App.LastSaveTime.ToString("HH:mm:ss"))}</size>");
             GUI.color = Color.white;
 
-            if (GUILayout.Button(new GUIContent(Styles.SaveIcon, Lan.Save), EditorStyles.toolbarButton,
+            if (GUILayout.Button(new GUIContent(Styles.SaveIcon, Lan.SaveMenuHint), EditorStyles.toolbarButton,
                     GUILayout.Width(26)))
             {
                 EditorApplication.delayCall += App.SaveAsset;

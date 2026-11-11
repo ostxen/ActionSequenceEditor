@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Text;
 using NBC.ActionEditor.Storage;
 using UnityEditor;
 using UnityEngine;
@@ -32,7 +31,7 @@ namespace NBC.ActionEditor
         public override void OnOpen()
         {
             Prefs.InitializeAssetTypes();
-            types = Prefs.AssetTypes.Values.Distinct()
+            types = ReflectionTools.GetImplementationsOf(typeof(Asset)).Distinct()
                 .Where(t => !t.IsAbstract && !t.ContainsGenericParameters && t.GetConstructor(Type.EmptyTypes) != null
                     && !t.Assembly.GetName().Name.EndsWith(".Tests", StringComparison.Ordinal))
                 .OrderBy(t => t.FullName, StringComparer.Ordinal).ToArray();
@@ -40,18 +39,19 @@ namespace NBC.ActionEditor
 
         public override void OnGUI(Rect rect)
         {
-            EditorGUILayout.LabelField("创建 ActionEditor JSON 资源", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("新建 JSON 可由 GUILayout 与 UI Toolkit 两种界面共同编辑、保存。只创建新文件，不覆盖已有资源。", MessageType.Info);
+            EditorGUILayout.LabelField(Lan.CreateAsset, EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(Lan.CreateSafety, MessageType.Info);
             if (types.Length == 0)
             {
-                EditorGUILayout.HelpBox("没有可创建的旧版 Asset 类型，请确认项目中的旧业务扩展已编译。", MessageType.Warning);
+                EditorGUILayout.HelpBox(Lan.NoResourceTypes, MessageType.Warning);
                 return;
             }
-            selectedType = EditorGUILayout.Popup("资源类型", selectedType,
-                types.Select(t => Prefs.GetAssetTypeName(t) + " (" + t.FullName + ")").ToArray());
-            createName = EditorGUILayout.TextField("文件名", createName);
+            selectedType = EditorGUILayout.Popup(new GUIContent(Lan.CrateAssetType), selectedType,
+                types.Select(t => new GUIContent(types.Count(other => Prefs.GetAssetTypeName(other) == Prefs.GetAssetTypeName(t)) > 1
+                    ? Prefs.GetAssetTypeName(t) + " (" + t.FullName + ")" : Prefs.GetAssetTypeName(t), t.FullName)).ToArray());
+            createName = EditorGUILayout.TextField(Lan.CrateAssetName, createName);
             if (!string.IsNullOrEmpty(error)) EditorGUILayout.HelpBox(error, MessageType.Error);
-            if (GUILayout.Button("选择保存位置并创建旧版 JSON"))
+            if (GUILayout.Button(Lan.CreateAssetConfirm))
             {
                 try { CreateConfirm(); }
                 catch (ExitGUIException) { throw; }
@@ -62,16 +62,15 @@ namespace NBC.ActionEditor
         void CreateConfirm()
         {
             if (!ActionEditorHost.ConfirmDocumentSwitch()) return;
-            if (types.Length == 0) throw new InvalidOperationException("没有可创建的旧版 Asset 类型。");
+            if (types.Length == 0) throw new InvalidOperationException(Lan.NoResourceTypes);
             var name = createName?.Trim();
             if (string.IsNullOrEmpty(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || name == "." || name == "..")
-                throw new ArgumentException("请输入有效文件名，不要包含路径。");
-            var path = EditorUtility.SaveFilePanelInProject("创建旧版 ActionEditor 资源", name, "json", "选择新 JSON 的位置，不会覆盖已有文件。");
+                throw new ArgumentException(Lan.InvalidResourceName);
+            var path = EditorUtility.SaveFilePanelInProject(Lan.CreateAsset, name, "json", Lan.NewPathHint);
             if (string.IsNullOrEmpty(path)) return;
             path = DocumentCreationService.ValidateNewPath(path);
             var type = types[selectedType];
-            if (!EditorUtility.DisplayDialog("确认创建旧版资源", "类型：" + type.FullName + "\n新文件：" + path
-                + "\n仅创建此文件并在原版时间轴打开，不覆盖已有资源。", "创建并打开", "取消")) return;
+            if (!EditorUtility.DisplayDialog(Lan.CreateAsset, string.Format(Lan.CreateConfirmation, Prefs.GetAssetTypeName(type), path), Lan.CreateAssetConfirm, Lan.TipsCancel)) return;
             var created = DocumentCreationService.Create(type, path);
             ActionEditorHost.OnObjectPickerConfig(created);
             if (!nativeOwner) ActionEditorWindow.OpenDirectorWindow();
