@@ -22,14 +22,46 @@ namespace NBC.ActionEditor.Tests
         [Unique, Attachable(typeof(LegacyExperienceGroup))] private sealed class UniqueTrack : Track { }
         private sealed class DisabledBlend : ClipCrossBlend { public override float BlendIn { get => -1; set { } } }
 
+        [Test] public void SharedFacadeAndSelectionHaveNoConcreteWindowOrInspectorOwnership()
+        {
+            var fields = typeof(App).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Assert.That(fields.Any(field => typeof(UnityEditor.EditorWindow).IsAssignableFrom(field.FieldType)
+                || typeof(UnityEngine.Object).IsAssignableFrom(field.FieldType)), Is.False);
+            Assert.That(typeof(App).GetMethod("ConfirmDocumentSwitch"), Is.Null);
+            Assert.That(typeof(App).GetMethod("OnObjectPickerConfig"), Is.Null);
+            Assert.That(typeof(EditorTools).GetNestedType("TypeMetaInfo"), Is.Null);
+            var selection = new ActionEditorSelection();
+            var requests = 0; selection.InspectorRequested += () => requests++;
+            var item = new Group();
+            selection.Set(new IDirectable[] { item }, false);
+            Assert.That(requests, Is.Zero);
+            selection.Set(Array.Empty<IDirectable>(), false);
+            selection.Set(new IDirectable[] { item }, true);
+            selection.Set(new IDirectable[] { item }, true);
+            Assert.That(requests, Is.EqualTo(1));
+            selection.Set(null, true);
+            Assert.That(requests, Is.EqualTo(1));
+        }
+
+        [Test] public void RelocatedStylesAndExtensionAdaptersKeepTheirResourceAndTypeBindings()
+        {
+            Assert.That(Resources.Load<GUISkin>("nbc/StyleSheet"), Is.Not.Null);
+            Assert.That(Styles.WhiteTexture, Is.Not.Null);
+            Assert.That(Styles.PlayIcon, Is.Not.Null);
+            Assert.That(EditorCustomFactory.GetHeader(new LegacyExperienceAsset()), Is.Not.Null);
+            Assert.That(EditorCustomFactory.GetInspector(new LegacyExperienceInterval()), Is.TypeOf<ActionClipInspector>());
+            Assert.That(typeof(Prefs).Assembly, Is.SameAs(typeof(App).Assembly));
+            Assert.That(typeof(Asset).Assembly.GetReferencedAssemblies().Any(a => a.Name == typeof(App).Assembly.GetName().Name), Is.False);
+        }
+
         [Test] public void BindingsRespectExactOptInNearestBaseAndDiagnoseBothSources()
         {
-            Assert.That(EditorCustomFactory.ResolveExtension(new[] { typeof(ExactHeader) }, typeof(BaseAsset), false), Is.EqualTo(typeof(ExactHeader)));
-            Assert.That(EditorCustomFactory.ResolveExtension(new[] { typeof(ExactHeader) }, typeof(ChildAsset), false), Is.Null);
-            Assert.That(EditorCustomFactory.ResolveExtension(new[] { typeof(InheritedHeader), typeof(DerivedHeader) }, typeof(ChildAsset), false), Is.EqualTo(typeof(DerivedHeader)));
-            Assert.That(EditorCustomFactory.ResolveExtension(new[] { typeof(ExactInspector) }, typeof(LegacyExperienceMarker), true), Is.Null);
-            Assert.That(EditorCustomFactory.ResolveExtension(new[] { typeof(InheritedInspector), typeof(SignalInspector) }, typeof(LegacyExperienceMarker), true), Is.EqualTo(typeof(SignalInspector)));
-            var error = Assert.Throws<InvalidOperationException>(() => EditorCustomFactory.ResolveExtension(new[] { typeof(InheritedHeader), typeof(ConflictingHeader) }, typeof(ChildAsset), false));
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(ExactHeader) }, typeof(BaseAsset), false), Is.EqualTo(typeof(ExactHeader)));
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(ExactHeader) }, typeof(ChildAsset), false), Is.Null);
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(InheritedHeader), typeof(DerivedHeader) }, typeof(ChildAsset), false), Is.EqualTo(typeof(DerivedHeader)));
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(ExactInspector) }, typeof(LegacyExperienceMarker), true), Is.Null);
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(InheritedInspector), typeof(SignalInspector) }, typeof(LegacyExperienceMarker), true), Is.EqualTo(typeof(SignalInspector)));
+            var error = Assert.Throws<InvalidOperationException>(() => ExtensionResolver.ResolveExtension(new[] { typeof(InheritedHeader), typeof(ConflictingHeader) }, typeof(ChildAsset), false));
             Assert.That(error.Message, Does.Contain(typeof(InheritedHeader).FullName).And.Contain(typeof(ConflictingHeader).FullName));
         }
         [Test] public void MetadataCachePreservesMenuOrderAndDoesNotExposeMutableParents()
@@ -37,11 +69,11 @@ namespace NBC.ActionEditor.Tests
             var original = ReflectionTools.GetImplementationsOf(typeof(Track)).Where(t => !t.ContainsGenericParameters && !t.IsDefined(typeof(ObsoleteAttribute), true))
                 .Select(t => (type: t, name: t.RTGetAttribute<NameAttribute>(true)?.name ?? t.Name.SplitCamelCase(), category: t.RTGetAttribute<CategoryAttribute>(true)?.category))
                 .OrderBy(t => t.name).ThenBy(t => t.category).Select(t => t.type).ToArray();
-            var actual = EditorTools.GetTypeMetaDerivedFrom(typeof(Track));
+            var actual = ActionEditorTypeCatalog.DerivedFrom(typeof(Track));
             Assert.That(actual.Select(i => i.type), Is.EqualTo(original));
             var item = actual.Single(i => i.type == typeof(LegacyIntervalTrack));
             item.attachableTypes[0] = typeof(Asset); actual.Clear();
-            Assert.That(EditorTools.GetTypeMetaDerivedFrom(typeof(Track)).Single(i => i.type == typeof(LegacyIntervalTrack)).attachableTypes, Is.EqualTo(new[] { typeof(LegacyExperienceGroup) }));
+            Assert.That(ActionEditorTypeCatalog.DerivedFrom(typeof(Track)).Single(i => i.type == typeof(LegacyIntervalTrack)).attachableTypes, Is.EqualTo(new[] { typeof(LegacyExperienceGroup) }));
             var info = DirectableTypeInfo.For(typeof(LegacyIntervalTrack));
             Assert.That(info, Is.SameAs(DirectableTypeInfo.For(typeof(LegacyIntervalTrack))));
             Assert.That(info.Color, Is.EqualTo(new Color(.3f, .65f, 1)));

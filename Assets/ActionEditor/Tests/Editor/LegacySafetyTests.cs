@@ -30,7 +30,7 @@ namespace NBC.ActionEditor.Tests
         public IEnumerator SelectingLegacyJsonDrawsOriginalTimelineWithoutOpeningWorkbench()
         {
             var previous = App.TextAsset;
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             var workbenches = Resources.FindObjectsOfTypeAll<ActionWorkbench>();
             var sample = new LegacyBaselineTests.BaselineAsset();
             var group = new Group { Name = "Reference" };
@@ -42,7 +42,7 @@ namespace NBC.ActionEditor.Tests
             {
                 window.Show(); window.position = new Rect(60, 60, 1000, 600);
                 // Same callback used by the welcome page's legacy resource picker.
-                App.OnObjectPickerConfig(json);
+                ActionEditorHost.OnObjectPickerConfig(json);
                 window.Repaint(); yield return null; yield return null;
                 Assert.That(App.TextAsset, Is.SameAs(json));
                 Assert.That(App.AssetData.groups[0].Tracks[0].Name, Is.EqualTo("Events"));
@@ -57,7 +57,7 @@ namespace NBC.ActionEditor.Tests
             }
             finally
             {
-                window.Close(); App.Window = previousWindow; App.TextAsset = previous;
+                window.Close(); ActionEditorHost.Window = previousWindow; App.TextAsset = previous;
                 UnityEngine.Object.DestroyImmediate(json);
             }
         }
@@ -70,7 +70,7 @@ namespace NBC.ActionEditor.Tests
             var target = App.TextAsset;
             try
             {
-                Assert.Throws<ArgumentException>(() => CreateAssetWindow.CreateLegacyAsset(typeof(string), "Assets/InvalidLegacyCreation.json"));
+                Assert.Throws<ArgumentException>(() => DocumentCreationService.Create(typeof(string), "Assets/InvalidLegacyCreation.json"));
                 Assert.That(Resources.FindObjectsOfTypeAll<ActionWorkbench>(), Is.EquivalentTo(existing));
                 Assert.That(App.AssetData, Is.SameAs(document));
                 Assert.That(App.TextAsset, Is.SameAs(target));

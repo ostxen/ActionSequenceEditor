@@ -93,7 +93,7 @@ namespace NBC.ActionEditor.Tests
         }
         [UnityTest] public IEnumerator BothWindowsKeepExactlyOneSharedEditorDriver()
         {
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             var source = App.TextAsset; var recovery = App.Session.CaptureRecovery();
             var fixture = new TextAsset(Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset())); App.TextAsset = fixture;
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
@@ -101,11 +101,11 @@ namespace NBC.ActionEditor.Tests
             try
             {
                 original.Show(); native.Show(); yield return null; yield return null;
-                Assert.That(EditorApplication.update.GetInvocationList().Count(callback => callback.Method.DeclaringType == typeof(App) && callback.Method.Name == "UpdateSharedEditor"), Is.EqualTo(1));
+                Assert.That(EditorApplication.update.GetInvocationList().Count(callback => callback.Method.DeclaringType == typeof(ActionEditorHost) && callback.Method.Name == "UpdateSharedEditor"), Is.EqualTo(1));
             }
             finally
             {
-                original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close(); App.Window = previousWindow;
+                original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close(); ActionEditorHost.Window = previousWindow;
                 App.TextAsset = source; App.Session.RestoreRecovery(recovery); UnityEngine.Object.DestroyImmediate(fixture);
             }
         }

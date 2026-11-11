@@ -143,19 +143,19 @@ namespace NBC.ActionEditor.Tests
             var script = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/ActionEditor/Runtime/Interfaces/IDirectable.cs");
             Assert.That(script, Is.Not.Null);
             LogAssert.Expect(LogType.Warning, "请选择 .json 格式的 ActionEditor 文档。");
-            App.OnObjectPickerConfig(script);
+            ActionEditorHost.OnObjectPickerConfig(script);
             Assert.That(App.AssetData, Is.SameAs(before));
         }
 
         [UnityTest] public IEnumerator OriginalMultiMoveClampsOneDeltaAndKeepsSpacingAtZero()
         {
-            var previousWidth = App.Width;
+            var previousWidth = ActionEditorHost.Width;
             var window = ScriptableObject.CreateInstance<DragEventWindow>();
             try
             {
                 window.Show(); window.position = new Rect(60, 60, 1000, 600); window.Focus();
                 yield return null; yield return null;
-                App.Width = 700;
+                ActionEditorHost.Width = 700;
                 var first = App.AssetData.groups[0].Tracks[0].Clips[0];
                 var second = App.AssetData.groups[0].Tracks[1].Clips[0];
                 first.StartTime = 1; second.StartTime = 3;
@@ -164,7 +164,7 @@ namespace NBC.ActionEditor.Tests
                 var down = new Vector2(Styles.TimelineLeftTotalWidth + 120, 30) + window.ContentOffset;
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = down, shift = true });
                 Assert.That(ItemDragger.DragType, Is.EqualTo(ItemDragType.Pos));
-                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down - new Vector2(App.Width * 2 / 7, 0), shift = true });
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down - new Vector2(ActionEditorHost.Width * 2 / 7, 0), shift = true });
                 Assert.That(first.StartTime, Is.Zero.Within(.0001f));
                 Assert.That(second.StartTime, Is.EqualTo(2).Within(.0001f), "Both items must use the same zero-clamped delta.");
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down - new Vector2(400, 0), shift = true });
@@ -187,7 +187,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(1).Within(.0001f));
                 Assert.That(App.AssetData.groups[0].Tracks[1].Clips[0].StartTime, Is.EqualTo(3).Within(.0001f));
             }
-            finally { ItemDragger.Cancel(); window.Close(); App.Width = previousWidth; }
+            finally { ItemDragger.Cancel(); window.Close(); ActionEditorHost.Width = previousWidth; }
         }
 
         [Test] public void DocumentPickerFiltersBothDiscoveryPathsWithoutRestrictingGenericResources()
@@ -231,14 +231,14 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void StretchRefreshesMagnetReferencesWithoutPreviousMoveGesture()
         {
-            var oldEvent = Event.current; var oldWidth = App.Width;
+            var oldEvent = Event.current; var oldWidth = ActionEditorHost.Width;
             try
             {
-                App.Width = 700;
+                ActionEditorHost.Width = 700;
                 var clip = App.AssetData.groups[0].Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
                 typeof(OriginalTimelineGesture).GetField("magnetSnapTimesCache", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(ItemDragger, new[] { 12345f });
                 var source = new Event { type = EventType.MouseDrag, button = 0,
-                    mousePosition = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(clip.EndTime, App.Width) - 2, 30) };
+                    mousePosition = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(clip.EndTime, ActionEditorHost.Width) - 2, 30) };
                 Event.current = source;
                 var pointer = new NBC.ActionEditor.Events.PointerEventData(); pointer.SetEvent(source);
                 ItemDragger.OnBeginDrag(pointer);
@@ -247,12 +247,12 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(ItemDragger.HasMagnetSnapTime(12345), Is.False);
                 Assert.That(ItemDragger.HasMagnetSnapTime(clip.StartTime), Is.False, "The selected item is not a snap reference.");
             }
-            finally { ItemDragger.Cancel(); Event.current = oldEvent; App.Width = oldWidth; }
+            finally { ItemDragger.Cancel(); Event.current = oldEvent; ActionEditorHost.Width = oldWidth; }
         }
 
         [UnityTest] public IEnumerator OriginalMiddlePanReleaseOutsideDoesNotConsumeLaterLeftDrag()
         {
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
             {
@@ -270,7 +270,7 @@ namespace NBC.ActionEditor.Tests
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 2, mousePosition = start + new Vector2(40, 0) });
                 Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1).Within(.001f), "Escape must cancel navigation even when the window consumes the key first.");
             }
-            finally { window.DiscardChanges(); window.Close(); App.Window = previousWindow; }
+            finally { window.DiscardChanges(); window.Close(); ActionEditorHost.Window = previousWindow; }
         }
         private TextAsset previous, fixture;
         [Test] public void SelectionCandidatesKeepExistingAddAndRetainScopesWithoutEditing()
@@ -336,7 +336,7 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void OriginalWindowsOwnIndependentGestureSnapshotsAndReferences()
         {
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             var first = ScriptableObject.CreateInstance<ActionEditorWindow>();
             var second = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
@@ -353,7 +353,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(first.Gesture.DragItems, Is.Empty);
                 Assert.That(first.Gesture.MoveToItem, Is.Null);
             }
-            finally { first.Gesture.Cancel(); second.Gesture.Cancel(); first.DiscardChanges(); second.DiscardChanges(); UnityEngine.Object.DestroyImmediate(first); UnityEngine.Object.DestroyImmediate(second); App.Window = previousWindow; }
+            finally { first.Gesture.Cancel(); second.Gesture.Cancel(); first.DiscardChanges(); second.DiscardChanges(); UnityEngine.Object.DestroyImmediate(first); UnityEngine.Object.DestroyImmediate(second); ActionEditorHost.Window = previousWindow; }
         }
         private string recovery;
         [SetUp] public void Setup()
@@ -481,7 +481,7 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator BothWindowOpenOrdersShareContextAndRebuildWithoutRegistrationLeaks()
         {
-            var count = App.Views.Count; var previousWindow = App.Window;
+            var count = App.Views.Count; var previousWindow = ActionEditorHost.Window;
             ActionEditorWindow original = null; JsonActionWorkbench native = null;
             var alternate = new TextAsset(JsonDocumentSession.Encode(new LegacyExperienceAsset { Version = 7 }));
             try
@@ -524,13 +524,13 @@ namespace NBC.ActionEditor.Tests
             {
                 if (original != null) { original.DiscardChanges(); original.Close(); }
                 if (native != null) { native.DiscardChanges(); native.Close(); }
-                App.Window = previousWindow; UnityEngine.Object.DestroyImmediate(alternate);
+                ActionEditorHost.Window = previousWindow; UnityEngine.Object.DestroyImmediate(alternate);
             }
         }
 
         [UnityTest] public IEnumerator DiscardFromEitherWindowRestoresSharedBaselineAndClearsPendingUndo()
         {
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
             var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
             try
@@ -560,13 +560,13 @@ namespace NBC.ActionEditor.Tests
             finally
             {
                 App.TextAsset = fixture;
-                original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close(); App.Window = previousWindow;
+                original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close(); ActionEditorHost.Window = previousWindow;
             }
         }
 
         [UnityTest] public IEnumerator ClosingOriginalStopsSharedPlaybackAndReopeningDoesNotResume()
         {
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
             var stops = 0;
@@ -600,7 +600,7 @@ namespace NBC.ActionEditor.Tests
                 App.OnStop -= stopped;
                 if (original != null) { original.DiscardChanges(); original.Close(); }
                 if (native != null) { native.DiscardChanges(); native.Close(); }
-                App.Window = previousWindow;
+                ActionEditorHost.Window = previousWindow;
             }
         }
 
@@ -856,7 +856,7 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator ToolkitUsesSameGraphNativeInspectorAndOriginalGeometry()
         {
-            var oldWindow = App.Window;
+            var oldWindow = ActionEditorHost.Window;
             var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
             try
             {
@@ -878,7 +878,7 @@ namespace NBC.ActionEditor.Tests
                 window.rootVisualElement.Remove(view);
                 window.DiscardChanges();
             }
-            finally { window.DiscardChanges(); window.Close(); App.Window = oldWindow; }
+            finally { window.DiscardChanges(); window.Close(); ActionEditorHost.Window = oldWindow; }
         }
 
         private static void Pointer(VisualElement target, EventType type, Vector2 local, int button = 0, bool shift = false)
@@ -903,7 +903,7 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator BaselineWindowNavigationRecordsCurrentPreferencesAndWheelPanResults()
         {
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             var previousScroll = Styles.TimelineScrollPos;
             var originalWindow = ScriptableObject.CreateInstance<ActionEditorWindow>();
             JsonActionWorkbench nativeWindow = null;
@@ -974,7 +974,7 @@ namespace NBC.ActionEditor.Tests
             {
                 if (nativeWindow != null) { nativeWindow.DiscardChanges(); nativeWindow.Close(); }
                 if (originalWindow != null) { originalWindow.DiscardChanges(); originalWindow.Close(); }
-                App.Window = previousWindow; Styles.TimelineScrollPos = previousScroll;
+                ActionEditorHost.Window = previousWindow; Styles.TimelineScrollPos = previousScroll;
             }
         }
 
@@ -1017,7 +1017,7 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator InactiveOriginalLifecycleDoesNotCancelNativeOwnedDrag()
         {
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             ActionEditorWindow original = null; JsonActionWorkbench native = null;
             try
             {
@@ -1046,7 +1046,7 @@ namespace NBC.ActionEditor.Tests
             {
                 if (native != null) { native.DiscardChanges(); native.Close(); }
                 if (original != null) { original.DiscardChanges(); original.Close(); }
-                App.Window = previousWindow;
+                ActionEditorHost.Window = previousWindow;
             }
         }
 
@@ -1121,7 +1121,7 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator InactiveNativeCancellationDoesNotTouchOriginalWindowToken()
         {
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             ActionEditorWindow original = null; JsonActionWorkbench native = null;
             const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             try
@@ -1144,7 +1144,7 @@ namespace NBC.ActionEditor.Tests
             {
                 if (native != null) { native.DiscardChanges(); native.Close(); }
                 if (original != null) { original.DiscardChanges(); original.Close(); }
-                App.Window = previousWindow;
+                ActionEditorHost.Window = previousWindow;
             }
         }
 
@@ -1334,7 +1334,7 @@ namespace NBC.ActionEditor.Tests
         {
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
             var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             var previousLeft = Styles.TimelineLeftWidth; var previousScroll = Styles.TimelineScrollPos;
             try
             {
@@ -1380,7 +1380,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(native.rootVisualElement.Q<Scroller>().resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
                 Assert.That(native.Canvas.Scale, Is.EqualTo((1000 - 329) / App.AssetData.ViewTime).Within(1));
             }
-            finally { original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close(); App.Window = previousWindow; Styles.TimelineLeftWidth = previousLeft; Styles.TimelineScrollPos = previousScroll; }
+            finally { original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close(); ActionEditorHost.Window = previousWindow; Styles.TimelineLeftWidth = previousLeft; Styles.TimelineScrollPos = previousScroll; }
         }
 
         [UnityTest] public IEnumerator OriginalInspectorWelcomeAndSettingsHaveNativeCounterparts()
@@ -1388,7 +1388,7 @@ namespace NBC.ActionEditor.Tests
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>(); var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
             var originalProperty = ScriptableObject.CreateInstance<PropertyEvidenceWindow>(); originalProperty.Original = true;
             var nativeProperty = ScriptableObject.CreateInstance<PropertyEvidenceWindow>(); var preferences = ScriptableObject.CreateInstance<JsonPreferencesWindow>();
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             try
             {
                 native.Show(); native.position = new Rect(60, 60, 1000, 600); yield return null; yield return null;
@@ -1424,7 +1424,7 @@ namespace NBC.ActionEditor.Tests
             finally
             {
                 originalProperty.Close(); nativeProperty.Close(); if (preferences != null) preferences.Close();
-                original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close(); App.Window = previousWindow;
+                original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close(); ActionEditorHost.Window = previousWindow;
             }
         }
         private static void Capture(EditorWindow window, string name)
@@ -1447,7 +1447,7 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator OriginalRebuildDoesNotLeakRegisteredViews()
         {
-            var previousWindow = App.Window;
+            var previousWindow = ActionEditorHost.Window;
             var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
             {
@@ -1459,7 +1459,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(window.RegisteredViewCount(), Is.EqualTo(baseline));
                 window.DiscardChanges();
             }
-            finally { window.DiscardChanges(); window.Close(); App.Window = previousWindow; }
+            finally { window.DiscardChanges(); window.Close(); ActionEditorHost.Window = previousWindow; }
             Assert.That(window.RegisteredViewCount(), Is.Zero);
         }
 

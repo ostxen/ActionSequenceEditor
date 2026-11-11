@@ -7,6 +7,30 @@
 
 ---
 
+## RF17 后的实际源码定位（2026-11-11）
+
+两套生产UI已分别归入`Editor/UI/IMGUI`与`Editor/UI/UIToolkit`，主类型命名空间和程序集不变。`Editor/Core/Documents/App.cs`仅保留共享状态/文档入口转发、自动保存和播放协调；Unity更新/场景/域重载、Inspector代理、对话框、窗口宽度和备用重绘由`Editor/UI/ActionEditorHost.cs`适配。选择服务通过事件请求Inspector，不反向引用宿主；共享Views仍只保存对象owner及Action回调。播放状态位于`Editor/Preview/ActionEditorPlayback.cs`。
+
+共享创建逻辑位于`Editor/Core/Documents/DocumentCreationService.cs`，创建弹窗只采集输入、确认、打开结果和返回原UI；本项尚不切换格式/可靠存储实现。`TypeMetaInfo`、`ActionEditorTypeCatalog`与`ExtensionResolver`在`Editor/Extensions`，两套UI直接调用目录/解析服务，已移除EditorTools中的转发和嵌套元数据。Header/Inspector实例化仍在`UI/Extensions/EditorCustomFactory.cs`，不把双绘制适配器当纯Core。Styles及Resources键不变。
+
+实验链源码在`Editor/Experiments/AssetWorkbench`与`Runtime/Experiments/AssetWorkbench`，仍参与原程序集/原测试；生产不依赖该链。唯一跨程序集移动为完全Editor条件编译的Prefs进入Editor/Preferences。79个原文件通过固定清单AssetDatabase命令移动，GUID及移动瞬间源码/meta字节逐项验证；所需新目录meta由Unity生成，不删除旧空目录。本文后续历史分析保留移动前路径及行号，其当前路径以唯一任务RF16-C映射和RF17执行证据为准，不能拿历史问题描述当当前缺陷。
+
+---
+
+## 2026-11-11 RF16 目录与序列化边界定案
+
+本节覆盖早期“本轮不改格式”的限制，不改写历史证据。保留两个真实窗口、float 的 Asset/Group/Track/Clip 和单一共享上下文；目录按 `UI/IMGUI`、`UI/UIToolkit`、`Core`、`Serialization`、`Storage`、`Extensions`、`Preview` 分职责整理，不新建程序集或兼容别名。逐文件源/目标映射、实际依赖及基线只在[唯一任务清单](../.codex/tasks/action-editor-refactor.md)的 RF16 记录维护。
+
+当前 `App` 混有 Editor 宿主和共享状态转发，不能整体搬进 Core：UI 弹窗/Selection/Editor更新/域重载留 `UI/ActionEditorHost.cs`，原公开 App 外观保留在 `Core/Documents/App.cs` 且不再暴露具体窗口。`ActionEditorContext` 的播放状态提取到 Preview。`EditorTools.TypeMetaInfo` 与扩展解析从具体 UI 控件依赖中分开，HeaderBase 的双绘制方法是有意保留的 UI 扩展适配，不伪称纯核心。两窗共同调用的创建/对象选择弹窗仍是 IMGUI；只把创建事务与存储移到共用服务，不为目录任务重做原生弹窗。
+
+较早 `ActionWorkbench → DocumentSession/DocumentTransaction → DocumentStore → ActionDocument` 是仍被测试和固定探针调用的 `.asset` 实验链，不是 `JsonActionWorkbench → App.Context/JsonDocumentSession` 生产链。前者连同其 EventRegistry/Toolkit 属性上下文隔离到 Experiments，保留类型命名空间和可编译性，不删除。`AutoSaveSchedule` 及 `TimelineTime` 也被当前生产代码调用，保留为现有 Runtime 共享工具，不连同实验模型误搬。InspectorPreviewAsset 是当前 IMGUI Inspector 代理，也不是实验业务资产。
+
+格式最小契约与唯一 JSON 的封套、受控完整类型身份、GUID/localFileId 引用、精确 float（含负零）、隔离快照和格式无关作者比较，定案于[合同 RF16 节](ActionEditor-Contracts.md#rf16-定案目录与唯一序列化契约2026-11-11)。FullSerializer 仅为实现细节，Runtime 转换不得访问 AssetDatabase；Editor 注入受控类型/引用解析并协调校验，Storage 才做可靠字节提交/版本保护/导入。创建、打开、保存、另存和独立导出使用同一格式目录，不建设旧格式检测/回退/双写或转换工具。契约样本在 RF16 仅离线检查，产品硬切与新格式读回由后续指定任务实施，不能据此宣称已经支持。
+
+资源移动必须由 AssetDatabase 保留 GUID/meta。当前 Pipeline 虽注册 `asset move`，项目 workflow 的已审核 mutation 目录没有它；RF17 实际移动前须单独核实实现、补审计契约并获用户授权，或由用户手动移动。RF16 不扩大该授权、不执行移动、不安装依赖或写持久探针。
+
+---
+
 ## 后续实施决策：原版优先与共用 JSON
 
 2026-11-09 用户在体验后否定先前工作台的布局与完成度，要求先补原版可靠性，再用原生 UI Toolkit 尽量复刻原布局和操作。该决定覆盖本文早期“无需完善旧 UI”及 A01 的 `.asset` 正式入口取舍，历史分析不删除，但不再当作当前入口现状。

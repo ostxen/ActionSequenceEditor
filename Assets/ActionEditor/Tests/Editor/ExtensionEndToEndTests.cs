@@ -158,7 +158,7 @@ namespace NBC.ActionEditor.Tests
         }
         [UnityTest] public IEnumerator BothUiSequencesKeepOneGraphThroughCopyDragResizeCancelReopenAndPlayback()
         {
-            var previousWindow = App.Window; var previousWidth = App.Width;
+            var previousWindow = ActionEditorHost.Window; var previousWidth = ActionEditorHost.Width;
             var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
             var events = ScriptableObject.CreateInstance<FieldWindow>();
@@ -183,11 +183,11 @@ namespace NBC.ActionEditor.Tests
                     var start = created.StartTime; var spacing = copy.StartTime - start;
                     if (ui == 0)
                     {
-                        App.Width = 700; events.Gesture = original.Gesture; events.Focus(); events.Repaint(); yield return null;
+                        ActionEditorHost.Width = 700; events.Gesture = original.Gesture; events.Focus(); events.Repaint(); yield return null;
                         ClipDrawer.Reset(); ClipDrawer.GetDraw(created).ClipRealRect = new Rect(100, 20, 150, 26);
                         var down = new Vector2(Styles.TimelineLeftTotalWidth + 120, 30) + events.ContentOffset;
                         foreach (var kind in new[] { EventType.MouseDown, EventType.MouseDrag, EventType.MouseUp })
-                            events.SendEvent(new Event { type = kind, button = 0, shift = true, mousePosition = down + (kind == EventType.MouseDown ? Vector2.zero : new Vector2(App.Width * .5f / 12, 0)) });
+                            events.SendEvent(new Event { type = kind, button = 0, shift = true, mousePosition = down + (kind == EventType.MouseDown ? Vector2.zero : new Vector2(ActionEditorHost.Width * .5f / 12, 0)) });
                         events.Gesture = null;
                     }
                     else
@@ -206,11 +206,11 @@ namespace NBC.ActionEditor.Tests
                     if (ui == 0)
                     {
                         events.Gesture = original.Gesture; events.Focus(); events.Repaint(); yield return null;
-                        var down = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(created.EndTime, App.Width), 30) + events.ContentOffset;
+                        var down = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(created.EndTime, ActionEditorHost.Width), 30) + events.ContentOffset;
                         events.SendEvent(new Event { type = EventType.MouseDown, button = 0, shift = true, mousePosition = down });
                         Assert.That(original.Gesture.DragType, Is.EqualTo(ItemDragType.StretchEnd));
-                        events.SendEvent(new Event { type = EventType.MouseDrag, button = 0, shift = true, mousePosition = down + new Vector2(App.Width * .25f / 12, 0) });
-                        events.SendEvent(new Event { type = EventType.MouseUp, button = 0, shift = true, mousePosition = down + new Vector2(App.Width * .25f / 12, 0) });
+                        events.SendEvent(new Event { type = EventType.MouseDrag, button = 0, shift = true, mousePosition = down + new Vector2(ActionEditorHost.Width * .25f / 12, 0) });
+                        events.SendEvent(new Event { type = EventType.MouseUp, button = 0, shift = true, mousePosition = down + new Vector2(ActionEditorHost.Width * .25f / 12, 0) });
                         events.Gesture = null;
                     }
                     else
@@ -250,7 +250,7 @@ namespace NBC.ActionEditor.Tests
             {
                 events.Gesture = null; original.Gesture.Cancel(); App.Session.CancelEdit();
                 events.Close(); original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close();
-                App.Window = previousWindow; App.Width = previousWidth;
+                ActionEditorHost.Window = previousWindow; ActionEditorHost.Width = previousWidth;
                 if (reopened != null) UnityEngine.Object.DestroyImmediate(reopened);
             }
         }

@@ -2,9 +2,9 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。Combat 专属实施与验收暂缓。
-- 当前执行任务：2026-11-10用户要求夜间继续、人工差异次日汇总验收；缩放步长明确采用新版。每项实现并通过工程验收后本地中文提交，连同ActionEditor专属文档，不推送。
-- 下一步：RF15工程验证已完成，独立本地提交后请用户按Docs/ActionEditor-RF15-Acceptance.md验收H01–H09。不自动进入Combat或扩展范围，不重建已取消循环；无关Shader等资源未保存/清脏/修改。
+- 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16 `complete`（职责/契约定案及本次基线，非产品硬切验收）；RF17–RF23仍 `planned`。Combat 专属实施与验收暂缓。
+- 当前执行任务：RF17工程验收完成，进入RF18。RF16完成后用户追加“我要先休息了，你往后执行任务。各种授权我都允许了，在这个系列任务中，不要等我回复而中断操作。”此真实授权覆盖RF17–RF23串行实施、必要的最小受审核工作流扩展、精确清单移动、隔离探针与逐项中文本地提交；不伪造另一次人工确认。
+- 下一步：先完成RF17固定清单移动审核、职责归位与验证，再按依赖继续RF18–RF23。保留两个UI与共用状态，数据格式按开发期硬切、不建设旧格式兼容。人工验收仍待用户实际使用，不自动进入Combat，不重建已取消循环，不保存/清脏/修改无关资源，不推送。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -22,6 +22,8 @@
 - 上述范围不包含删除原始资产、包/设置变更、平台切换、实际构建、公开发布，或绕过 Unity 写入的 preview/真实确认/approve/apply 流程。
 
 2026-11-10 当前约束覆盖上面的历史“无旧窗口/API/格式兼容要求”：两个现有 UI 入口、现有布局、正常操作习惯和 JSON 内容必须保留；内部 API 可随调用者渐进迁移。未确认的旧缺陷不作为兼容目标，必须先复现再明确列为行为修正。当前只有一个共用文档/选择/播放头，不引入多文档模式。最新夜间授权：人工差异汇总次日确认；缩放步长采用新版，其余默认保留原版正常习惯，无法安全决定的行为保持差异并记录。按顺序执行，逐项工程验收后中文本地提交（含ActionEditor专属文档），不追踪Combat或用户未跟踪JSON/个人配置、不推送。不把授权理解为可以伪造人工验收或放松数据安全门禁。
+
+2026-11-11最新决策覆盖上述“保留旧JSON格式”的限制：当前处于开发期，新阶段采用唯一序列化契约硬切，不提供旧格式探测回退、兼容转换器、双写或迁移工具。此决策不授权覆盖/删除用户既有数据，也不要求为了不兼容而刻意改坏可自然读取的数据；仍保留两个UI入口、布局/操作习惯、Asset/Group/Track/Clip业务模型、float字段和单一共用文档/选择/播放头。有限float保存读回不额外丢精度，界面显示舍入不写回数据。用户认为目前只是粗看无明显问题，尚不理解实际使用，不能判定人工验收通过。本轮授权只编写后续清单，等待新会话启动实施。
 
 ## 2. 重命名、重新打开后的恢复步骤
 
@@ -104,9 +106,9 @@
 | [ ] | E02 | Player 边界验证、旧路径退役与交付 | E01 |
 | [ ] | F01 | 具体联网项目增强，默认延期 | E02 + 明确联网需求和授权 |
 
-## 4.1 当前重构任务 RF01–RF15（2026-11-10）
+## 4.1 已完成工程阶段 RF01–RF15（2026-11-10，人工待验）
 
-本节是当前唯一的可执行拆分，细化架构文档 RF0–RF5，不重做历史 A/B/R 任务，也不将其完成标记转移给 RF。全部任务初始为 `planned`，实时状态以下表及执行记录为准。按编号串行执行，每次只推进明确指定范围。RF01 是第一项，不以编写本计划代替建立基线。
+本节保留RF01–RF15的范围、状态与验收依据，细化架构文档RF0–RF5；不重做历史A/B/R任务，不将完成标记转移给新阶段。下一阶段以第4.2节为准；本节原有格式兼容限制仅作为历史依据，由2026-11-11硬切决策覆盖，其余未冲突的数据安全和双UI边界继续有效。
 
 ### 4.1.1 不可退化的边界
 
@@ -253,7 +255,125 @@
 7. 按3.3模板追加实际证据、U矩阵结果、剩余风险与下一项；必需验证失败保持validating/blocked。完成一项再进入下一项，不把写下验收标准算完成。
 8. 上一轮任务准备仅改任务/架构说明，未运行Unity或新增RF测试；正式执行按实际授权和记录验证。文档检查依赖缺失如仍存在则如实保留，历史107/107等不是RF01–RF15完成证据。
 
-## 5. 分项实施与验收（A–F历史路线，当前优先第4.1节）
+## 4.2 目录分层、产品文案与序列化硬切 RF16–RF23（2026-11-11）
+
+### 4.2.1 目标、已定决策与执行边界
+
+- 用户要求：按已讨论建议整理代码目录、清理新旧/JSON实现文案、引入多格式序列化边界，首先实现JSON且下拉框只列已实现格式；开发期直接硬切，不维护兼容格式；将这些工作列成任务，在新会话实施。
+- 本节是新增工作的唯一任务清单。不得将本次写清单记为RF16完成，也不自动继承历史夜间无人值守、连续实施或持久化探针授权。新会话按用户指定ID/范围串行执行；本地提交沿用既有逐项中文提交约定的部分，仍须用户启动实施并核对范围，禁止推送。
+- 保留两个编辑入口和现有布局/操作习惯，继续共用一份文档、选择、剪贴板、播放头、Undo及保存基线。只改变界面文案、目录归属与所列数据边界，不引入多文档、稳定ID、double时间模型、DI/MVVM/通用总线或空程序集。
+- 当前编辑资源采用新契约唯一格式；首个格式为JSON。创建、打开、保存、另存为、导出接入共用边界。允许继续用FullSerializer作JSON实现细节，但不再让其旧磁盘结构成为兼容要求，不为换格式而无故换库或升级包。
+- 保存更新当前资源与保存基线；另存为创建新资源并切换当前来源，拒绝无授权覆盖；导出生成独立文件，不切换来源，不清除未保存标记，不改变Undo/选择/播放状态。已打开的源文件不得通过“导出”旁路覆盖。
+- 格式目录为唯一能力来源，导出选项仅来自已实现且支持导出的实现；首期仅JSON。可读回能力独立标明，未来只写导出器不强制提供反序列化。创建/打开只用具备编辑文档读写能力的格式，不把未来只写导出器当作可编辑文档。
+- 不做旧格式回退、双写、迁移工具或兼容格式菜单；同一新读写契约内仍须严格校验、错误显式反馈。旧文件是否恰好可读不是验收目标，不故意添加无业务价值的不兼容。
+- 不修改/覆盖/迁移用户JSON、Combat、包/设置或个人文件。受保护的未跟踪项包括但不限于`Assets/ActionEditor/Jsons/`及其meta、`Assets/NewAction.json`及meta、`ProjectSettings/WhootActionSequencer.txt`，重新开始时以实际git状态补充。受控失败、外部版本保护和可靠提交不因硬切而放松。
+- 源码移动先列精确映射与引用影响；资源身份通过Unity AssetDatabase保留，不手工编辑/重建GUID或meta。若现有白名单不支持受控移动，先报告阻塞并请求人工移动或单独批准审核契约，不用文件系统搬运绕过。不自动删除较早实验模块。
+
+### 4.2.2 目标目录及职责
+
+```text
+Assets/ActionEditor/
+  Runtime/
+    Serialization/       可用于Runtime的数据转换契约与JSON实现，不依赖UnityEditor
+    ...                  保留业务模型及其他现有Runtime职责
+  Editor/
+    UI/
+      IMGUI/              GUILayout窗口/视图/绘制器/属性控件/专用输入适配
+      UIToolkit/          原生窗口/VisualElement/属性控件/捕获与焦点适配
+    Core/
+      Documents/          共用上下文、会话、保存基线、选择与剪贴板
+      Editing/            事务、编辑命令与属性写入
+      Timeline/           共用几何、候选计算与导航规则
+      Properties/         字段描述及属性路径语义
+    Serialization/        编辑文档快照、格式目录、编辑期校验与导出协调
+    Storage/              文件读写、原子提交、路径/版本保护、Unity导入
+    Extensions/           共用扩展契约、类型目录与解析，不装具体UI控件
+    Preview/              共用播放/预览及资源生命周期
+    Languages/            面向用户的统一术语与本地化文本
+    Samples/              编辑期样例适配
+    Validation/           经审核的验证命令
+```
+
+目录名采用`IMGUI`和`UIToolkit`，不以Drawer概括整个UI。上述目录按真实职责落地，不为图示造空层；原有Resources等真实资源目录无须为整齐强迁。`Styles`、偏好设置、通用扩展等在RF16映射中按实际依赖归位，不建新的万能Tools/Common。Core不得依赖具体窗口、控件或GUI事件；允许会话使用UnityEditor Undo，不能误称其为可直接用于Runtime的纯库。
+
+### 4.2.3 顺序与任务状态
+
+| 完成 | ID | 状态 | 任务 | 前置依赖 |
+|---|---|---|---|---|
+| [x] | RF16 | complete（定案及本次基线；非产品硬切） | 源码职责映射、依赖与硬切契约定案 | 新会话启动实施 |
+| [x] | RF17 | complete | 两套UI分目录与共用职责归位 | RF16 |
+| [ ] | RF18 | planned | 唯一序列化边界与JSON实现、浮点精度保障 | RF17 |
+| [ ] | RF19 | planned | 新建/打开/保存/另存为统一接入与重复路径清理 | RF18 |
+| [ ] | RF20 | planned | 独立导出流程与已实现格式下拉框 | RF19 |
+| [ ] | RF21 | planned | 双界面产品文案、样例命名与术语统一 | RF20 |
+| [ ] | RF22 | planned | 最短使用教程与可重放样例操作链 | RF21 |
+| [ ] | RF23 | planned | 双UI/存储/精度完整回归及新会话交付 | RF22 |
+
+### 4.2.4 每项实施与验收
+
+**RF16｜源码职责映射、依赖与硬切契约定案**
+
+- 重读当前源码、真实程序集及测试；记录从`GUIS`、`Workbench`、`Tools`、`Storage`、根App/Context到目标目录的文件级映射、引用和Unity资源身份影响。区分当前`JsonActionWorkbench`/`JsonDocumentSession`生产链与较早`ActionWorkbench`/`DocumentStore`实验链，不将后者当作现行共享链。
+- 在本文件执行记录写清实验链的调用者与保留/隔离方案，未获删除授权则不删除；命名空间/公开扩展API只有真实需要才迁移，更新所有已知调用者，不同时建设兼容别名层。
+- 定案最小格式契约、唯一JSON文档结构、格式标识/显示名/扩展名/读写能力、业务派生类型与Unity引用表示，以及快照/内容比较与磁盘格式的边界。不要将任意显示名称作为持久类型身份，不任意实例化未知类型。
+- 验收：明确每个真实入口如何接入、每类代码归属与允许依赖；存在精确受控移动清单、新格式样本及校验预期；记录真实测试基线，不以RF15旧结果代替。修改设计时同步现有架构/合同文档，不另造状态表。
+
+**RF17｜两套UI分目录与共用职责归位**
+
+- 按RF16映射将当前两套UI分别归入`UI/IMGUI`和`UI/UIToolkit`，共用上下文/命令/时间轴计算/属性语义/存储/扩展解析按第4.2.2节归位。共享创建业务不再藏在具体弹窗中；IMGUI弹窗归IMGUI，即使被两窗调用也不因此算纯共用逻辑。
+- 不用IMGUIContainer冒充Toolkit；现有共用弹窗的跨UI调用与专用控件依赖如实记录，不为本次目录整理擅自重做所有弹窗。实验链经核实后单独隔离且保持可编译，不与生产核心混放，不自动删除。
+- 通过受审核Unity移动操作保持GUID/meta关联，新增源码meta由Unity产生。同步真实项目生成、必要路径引用和测试发现；不手改生成的csproj/sln。
+- 验收：两窗口入口、Inspector/自定义Header、资源加载及测试发现正常；共用核心无具体UI反向依赖、Runtime无Editor引用；同图编辑/Undo/播放/开关窗口不退化。记录移动前后对应身份与任何被阻塞项。
+
+**RF18｜唯一序列化边界与JSON实现、浮点精度保障**
+
+- 提取最小数据转换契约与唯一JSON实现；Runtime可用转换留在Runtime，AssetDatabase/会话/对话框不进入该层。编辑期格式目录、文档快照、内容比较、图校验与转换协调留在Editor；格式实现不自行写文件或操控会话。
+- 将现有FloatConverter的精度语义纳入新JSON实现，不保留“兼容旧数字格式”分支；正常JSON数字解析不算旧格式兼容。不全局改double/decimal，不固定小数位保存，不在保存时吸附到帧；显示格式与存储格式分离。
+- 新JSON样本校验派生业务类型、集合/数组/null、向量/业务参数与支持的Unity引用；不沿用JSON专有的字符串规范化作为所有未来格式的唯一内容语义。Undo/取消/恢复的快照策略须明确且共用，不另建第二份文档状态。
+- 验收：对有限float执行位模式读回检查，覆盖普通小数、时间/吸附计算结果、极大/极小/次正规值及固定种子随机样本，压缩与美化输出均测；明确正负零策略，非法NaN/Infinity用于文档时拒绝提交。新增契约的非空错误/未知类型/无效图有失败测试。旧测试改验新契约，不为放过错误而放宽数值断言。
+
+**RF19｜新建/打开/保存/另存为统一接入与重复路径清理**
+
+- 将`CreateAssetWindow.CreateLegacyAsset`内自行序列化、暂存和读回的创建流程收拢到共用创建/存储服务；两个UI仅收集输入、展示确认及结果。统一新建、打开、显式保存、自动保存、另存为与新格式的连接，当前源资源标识不得被导出设置混用。
+- 磁盘路径策略、ReliableFileCommit原子提交、严格读回、外部版本保护、只创建不覆盖、导入失败后的“字节已提交”状态继续成立；磁盘提交/会话基线/Unity导入的先后与失败状态明确。去掉当前生产链的旧格式入口，不以兼容转发维持两套实际写入路径。
+- 验收：新建并打开、编辑保存重开、另存切换、自动保存、取消、Undo/Redo/放弃与恢复走真实入口；目标存在/外部修改/文件锁/序列化校验失败/打开失败均不破坏当前图或原文件，导入失败不重复创建。持久探针必须新预览、真实授权，未获授权不得写用户资源。
+
+**RF20｜独立导出流程与已实现格式下拉框**
+
+- 两个UI提供同义导出入口，共用格式目录和导出服务；下拉框由真实实现及能力生成，当前仅`JSON (.json)`，不列未实现格式，不把“资源类型”与“文件格式”混成一个选择器。
+- 从隔离快照导出，避免序列化回调更新源文档、派生时长或其他可观察状态；定义进行中编辑的处理，推荐有未完成手势时明确拒绝，不偷偷提交/取消别窗事务。文件选择与取消不改变会话。
+- 复用可靠文件提交和精确目标校验；首期导出拒绝覆盖已存在目标及当前源文件，保持已有允许目录/受保护路径边界。不默认把新导出能力扩大为任意工程外写入，扩大范围另行确认。
+- 验收：分别在干净/脏文档及进行中手势状态验证导出；成功/取消/失败前后源对象图、内容、来源、脏标记、Undo/Redo、选择、播放状态不变，输出能通过JSON实现读回。使用测试专用假格式验证目录能力筛选，不将其注册到生产下拉框。覆盖目标存在、源路径别名及失败清理。
+
+**RF21｜双界面产品文案、样例命名与术语统一**
+
+- 欢迎页/弹窗/保存与导出提示使用“新建资源、打开资源、资源类型、资源名称、创建并打开、保存、另存为、导出、文件格式”等动作术语；去掉“创建JSON、原版/旧版/新版资源、同一份JSON由两界面共用”等实现说明及不准确的打开窗口描述。
+- 样例名称、预览标题、类型列表和正在使用的教程同步调整；类型默认显示业务名称，完整类名用于提示/重名区分。格式选项、扩展名、确有诊断价值的技术错误可保留JSON/类型信息。UI入口若需区分两套界面，可以IMGUI/UI Toolkit作为必要辨识，不以新旧版本区分。
+- 使用现有语言机制统一术语，覆盖项目当前支持的语言，不只替换一份硬编码文本；不改历史证据/第三方源码中的正常技术措辞，也不为清词更改业务类型身份或丢失扩展。
+- 验收：扫描当前生产用户界面和当前使用文档的相关文案，再从两套真实入口检查标题、类型、按钮、确认、错误、空态和导出格式；安全提示保留，新建后仍在发起界面编辑。布局和快捷键不因文案清理重做。
+
+**RF22｜最短使用教程与可重放样例操作链**
+
+- 在现有ActionEditor样例README中提供唯一入门正文；其他文档链接到它，不新增多份重复操作指南。内容为“打开任一界面→新建预置样例→选片段查看属性→移动/拉伸→Undo/Redo→播放观察样例状态→保存→关闭重开→独立导出”。
+- 每步列真实菜单/按钮、初态、可观察预期和样例能力限制；说明两UI共用编辑状态、保存/另存为/导出的区别、丢弃与取消、自动保存偏好及如何只在隔离样例中试用。补充最小业务接入说明：资源/轨道/片段/预览各负责什么，不进入Combat接入。
+- 验收：以干净的独立样例从教程首步重放到结尾，记录真实入口和输出，不能只读文字判断可用。没有用户授权的磁盘步骤保留待执行，不编造已完成。用户未亲自使用前，H01–H09继续待验，教程重放不代签人工验收。
+
+**RF23｜双UI/存储/精度完整回归及新会话交付**
+
+- 对最终代码运行真实生成方案检查、Unity编译、受影响测试与完整`NBC.ActionEditor.Editor.Tests` EditMode，实际发现用例后记录身份/终态/数量；补齐双UI真实入口上的新建→编辑→Undo/Redo→保存重开→导出连续链与导出隔离状态矩阵。
+- 覆盖RF18精度用例、业务派生类型/Unity引用、目录移动后的扩展发现、自动保存/恢复、外部修改保护、提交与导入失败等；复用已有受控探针，但需审计其断言是否仍代表新格式，不能静默跳过或降低安全检查。
+- 更新现有合同/架构/样例README及`Docs/ActionEditor-RF15-Acceptance.md`的当前入口和待验说明；历史RF15证据保留日期与原范围，不篡改为新格式已验证。新阶段证据与状态只记本文件，不增加第二份验收状态表。
+- 验收：每项记录交付、真实命令/报告、未运行项/阻塞和剩余人工步骤。检查精确diff与用户数据未动；不提交未知文件、不推送、不启动Combat或循环。RF23工程通过不代表用户使用或性能泛化验收通过。
+
+### 4.2.5 新会话启动与停止条件
+
+1. 读取AGENTS、本文件顶部及第4.2节，检查实际Git状态和更具体规则；复核用户此轮指定范围。最初计划会话只写清单；各后续会话的实际实施与验证以顶部状态和追加执行记录为准，不把历史计划说明当作当前状态。
+2. 从RF16开始，按RF16→RF23依赖推进；若用户只指定单项，完成该项后停止。每次只允许一个任务implementing/validating，证据按第3.3节追加。
+3. 与真实Unity有关先读项目skill、doctor绑定唯一工程/PID；所有Unity编译、导入、测试和写入串行，资源移动/持久探针按预览→真实确认→审批→应用执行。旧审批不可复用。
+4. 遇到实验模块删除、数据覆盖、工程外导出、包/设置变更、未知移动能力或布局/操作习惯冲突时停下确认；不得以“开发期硬切”扩大权限。编译、精度或数据安全验证失败不能勾选完成。
+5. 人工验收H01–H09保持待验，直到用户明确实际验证；当前的“粗看没明显问题”不作为通过。最终回复说明下一项与真实阻塞，不能把规划完成写成实现完成。
+
+## 5. 分项实施与验收（A–F历史路线，当前优先第4.2节）
 
 ### A00｜重命名后环境、源码和行为基线
 
@@ -1095,3 +1215,162 @@
 - U01–U14：Docs/ActionEditor-RF15-Acceptance.md逐行列两UI证据、保留差异、不适用及人工范围；只记录工程可证明部分，不将全部子项勾为真人通过。H01–H09可重放清单同时交付。
 - 保留缺口：系统文件/OS菜单/完整桌面焦点链、未知第三方绘制、其他平台/DPI、最大真实业务文档性能、精确进程到首绘制、独占分配/峰值、完整域重载恢复、跨进程Unity对象引用、真实Unity导入故障、任意业务副作用与PlayerBuild。原版/原生阈值、最小长度/邻接/吸附/网格/平移过零/选择策略差异不擅自统一；仅缩放按用户225选择。旧实验Workbench密集测试不能充作当前JSON真实密集样例证据。
 - 交付与下一步：只修改ExtensionEndToEndTests、唯一任务记录、新增ActionEditor专属验收文档，逐项本地中文提交，不推送。RF06–RF15串行工程工作结束，等待用户人工体验反馈；不自动进入Combat、迁移、Build或重新创建循环。用户JSON/个人配置及无关Shader未处理。
+
+### RF16 执行记录（2026-11-11）
+
+- 状态 / 日期：`complete`（职责/契约定案及本次基线），2026-11-11。交付限源码职责映射、依赖/资源身份分析与唯一序列化契约定案，不代表RF17移动或RF18格式已落地。
+- 用户请求与允许范围：本会话用户“按第4.2节从RF16开始，先完成RF16，记录证据和下一步，不自动推进”。不继承历史无人值守、受控退出/重开或持久探针授权；不移动/删除资源、不覆盖用户数据、不运行实际Build或推送。
+- 开始前现状：main分支，任务清单已有126行新增/6行删除的未提交计划，完整保留；未跟踪的`Assets/ActionEditor/Jsons.meta`、`Assets/ActionEditor/Jsons/`、`Assets/NewAction.json`及meta、`ProjectSettings/WhootActionSequencer.txt`均保护，不读取其内容、不纳入交付。工程下没有更具体AGENTS。最初Git命令路径反斜杠被执行层剥离而失败，改为正斜杠绝对路径后正常，非仓库故障。
+
+#### RF16-A 真实链路、程序集与允许依赖
+
+- 生产IMGUI：`NBC/Action Editor/Open Action Editor → ActionEditorWindow → WelcomeView/TimelineView → App.Context`。生产Toolkit：`NBC/Action Editor/Open Workbench → JsonActionWorkbench → JsonTimelineCanvas/JsonPropertyView → App.Context`。二者只有一个`JsonDocumentSession`，共用选择/剪贴板/Undo/播放；不是每窗一个DocumentSession。
+- 打开：两窗共用IMGUI `ObjectSelectorWindow`，发现和回调按`.json`过滤，`App.OnObjectPickerConfig → Context.Open → Session.Open → JsonDocumentCodec.Decode`。新建：两欢迎页都调IMGUI `CreateAssetWindow.Show`，其`CreateLegacyAsset`目前另含类型构造、暂存读回、Move只创建、导入、打开，是与Store并存的真实重复存储入口，不误称已经统一。
+- 保存：IMGUI Header/SaveChanges及Toolkit Save/SaveChanges、`App.TryAutoSave`最终进`Session.Save → JsonDocumentStore.Commit → ReliableFileCommit → Session更新Path/revision/saved/savedJson → Store.Import`。Toolkit无源路径时有保存对话框；IMGUI直接保存无路径失败，RF19需让两个入口使用共用流程，不据设计声明已有完整另存菜单。导出/格式下拉框当前尚不存在，RF20才实现。
+- 编辑：两窗菜单/快捷键共用`JsonEditCommands`、`JsonEditCommand`和`JsonPropertyEditing`，但剪贴板仍直接调`Json.Serialize/Deserialize`，也必须纳入RF18/19唯一转换边界。`JsonFieldDescription.cs`同时含JsonPropertyPath；两者目前共用App所有者校验，无具体控件。TimelineGeometry/Candidates/Navigation为共用计算；OriginalTimelineGesture（文件ClipDragger）及Events为IMGUI输入适配，不放Core。
+- 当前真实程序集：`NBC.ActionEditor`（Runtime，FullSerializer.dll）；`NBC.ActionEditor.Editor`（Editor-only，GUID引用Runtime=`7d31d11ba62f20b4d89380d87c02f0e4`）；`NBC.ActionEditor.Editor.Tests`（Editor-only、引用Runtime/Editor、TestAssemblies、非自动引用）；`NBC.ActionEditor.Validation.Editor`（Editor-only、引用Runtime/Editor/Unity.Pipeline.Attributes、非自动引用）。不更改asmdef，不增空程序集；真实ActionEditor.sln覆盖18项目/656源码。
+- 目标依赖：UI/宿主可组合Core、Serialization、Storage、Extensions、Preview、Languages及Runtime；Core/Documents→Serialization/Storage/Preview/Runtime，Editing→Documents/Properties/Timeline/Runtime，Timeline/Properties→Runtime/当前上下文（无需具体UI）；Editor Serialization→Runtime.Serialization/Extensions/Runtime，Storage→Editor Serialization/Runtime并承担AssetDatabase；Extensions→Runtime元数据与Preview契约，不依赖具体UI控件；Preview→Runtime及类型目录，不依赖窗口；Runtime转换只收注入的类型/引用解析，不引用Editor。Core允许Undo、SessionState等Editor设施，不是Runtime纯库。UI扩展typed factory不伪装为纯Extensions。
+- `App.cs`不能整文件搬到Core便宣称达标：拆出`UI/ActionEditorHost.cs`承担Editor更新/场景与域重载钩子、Selection、确认对话框和窗口宽度/重绘适配；Core保留App既有无UI状态转发/文档服务入口，Selection服务发通知由宿主适配，不让命令反向调控件。所有`App.Window/Width`生产调用者随RF17接到宿主/视图尺寸；不加另一份状态。`ActionEditorContext.cs`中的ActionEditorPlayback移到Preview，Context/Selection/Clipboard/Views继续共用；Views只存owner和Action回调，无EditorWindow字段。
+- `EditorTools`当前混有TypeMetaInfo/类型发现与GUILayout控件，必须提取`Extensions/TypeMetaInfo.cs`，两窗菜单、ActionEditorTypeCatalog、TypeCatalogTests全部改用它与现有目录；GetTypeLastSubclass的唯一调用者CustomizedDrawTools改调目录，不留兼容转发。`EditorCustomFactory` typed Header/Inspector构造留UI层，纯ResolveExtension提到`Extensions/ExtensionResolver.cs`，TypeCatalogTests跟随；HeaderBase同时有OnGUI/CreateGUI，是双UI扩展适配，不塞进纯核心。`Styles`是两窗当前共用GUISkin/Texture/尺寸状态，归UI/Styles并保留Resources加载键；不凭目录任务重写皮肤。
+- `Runtime/Const/Prefs.cs`全文件受UNITY_EDITOR保护、仅生产Editor使用，归Editor/Preferences（命名空间不变）；迁移改变声明程序集，须检查所有已知调用者，无磁盘格式依赖。`Runtime/Utility/CreateUtilities.cs`仅有条件编译AssetDatabase分支且无调用者，本轮不删除或额外迁移；不以此源码扫描冒充PlayerBuild。`InspectorPreviewAsset`是IMGUI当前代理，保留Runtime原位置/程序集，避免无必要改变Unity类型身份。Runtime其余业务接口/模型/Attribute/工具/样例和第三方DLL保持原位，除下面明确列出的文件。
+
+#### RF16-B 实验链调用者与隔离
+
+- `ActionWorkbench.Open`仍为public方法但无MenuItem；仅自身建立`DocumentSession`、`TimelineCanvas/TimelineInteraction`、`WorkbenchInspectorTarget`；`DocumentSession`拥有ActionDocument并调用`DocumentTransaction`、`EventRegistry`、`DocumentStore`。EventRegistry绑定ActionDocument/TimelineEvent及Toolkit EventPropertyContext，不能当成当前JSON生产目录或格式目录。
+- 已知直接调用者：WorkbenchTests、TimelineTests、InteractionTests、TransactionTests、SessionTests、RegistryPropertyTests；DocumentModelTests/TimeContractTests验证对应Runtime模型/时间。LegacySafetyTests只观察实验窗口集合未被生产入口意外打开。Validation中的WorkbenchProbeCommands/SessionProbeCommands/PersistenceProbeCommands及PersistenceProbeDocument仍依赖实验类型；保留原命令标识和原程序集/路径，不执行探针。WorkbenchProbeCommands也只读查询生产窗口，不是生产编辑链。
+- 隔离策略：保留9个Editor实验文件及2个专属Runtime模型文件，分别归Editor/Experiments/AssetWorkbench和Runtime/Experiments/AssetWorkbench，保持原namespace/public类型名、同一已有asmdef；没有删除、停编或兼容别名。Tests与Validation仍原位，报告须分清实验与生产覆盖。AutoSaveSchedule被App实际使用；TimelineTime被AutoSaveSchedule和两个生产播放头/标尺及Styles的帧计算使用，不能误随实验模型搬走，二者暂留Runtime/Model，独立工具不是生产引入double节点模型。
+
+#### RF16-C 精确受控移动清单与Unity身份
+
+以下每行是一个实际存在源码文件，路径相对`Assets/ActionEditor/`；目标是RF17受审核移动的输入，**本轮未执行**。原GUID来自只读.meta检查；RF17以AssetDatabase逐项保持它，移动前复核源字节/GUID、目标不存在、所属asmdef，移动后再核对。不得复制/手改meta或凭表格重造GUID。没有列出的文件不移动；目录本身不整包移动，原目录meta/空目录不擅删，新目录meta由Unity生成。
+
+| 原源码路径 | 目标源码路径 | 原GUID / 阶段 |
+|---|---|---|
+| `Editor/ActionEditorContext.cs` | `Editor/Core/Documents/ActionEditorContext.cs` | `a640ca322a3675c459435be002c15456` / RF17 |
+| `Editor/App.cs` | `Editor/Core/Documents/App.cs` | `388d9541706214b549412603b072872b` / RF17 |
+| `Editor/Def/PrefsConst.cs` | `Editor/Preferences/PrefsConst.cs` | `fd3fba45da7f428f925335ec345164f5` / RF17 |
+| `Editor/Def/Styles.cs` | `Editor/UI/Styles.cs` | `e001fc02d4424aaab245be5232f6eede` / RF17 |
+| `Editor/Events/Interfaces/IDragBeginHandler.cs` | `Editor/UI/IMGUI/Events/Interfaces/IDragBeginHandler.cs` | `251afc4d5d23422bb070ab91613db9e1` / RF17 |
+| `Editor/Events/Interfaces/IDragEndHandler.cs` | `Editor/UI/IMGUI/Events/Interfaces/IDragEndHandler.cs` | `b1285635d86e4a2889cf0b4d1ccecc43` / RF17 |
+| `Editor/Events/Interfaces/IPointerClickHandler.cs` | `Editor/UI/IMGUI/Events/Interfaces/IPointerClickHandler.cs` | `2b8aff9712d84e6797f3ebab73c17ecb` / RF17 |
+| `Editor/Events/Interfaces/IPointerDownHandler.cs` | `Editor/UI/IMGUI/Events/Interfaces/IPointerDownHandler.cs` | `9f9d78191bcd4c4cad6119d752c25784` / RF17 |
+| `Editor/Events/Interfaces/IPointerDragHandler.cs` | `Editor/UI/IMGUI/Events/Interfaces/IPointerDragHandler.cs` | `672622fbf2354c0597396c57cc3d84ce` / RF17 |
+| `Editor/Events/Interfaces/IPointerEnterHandler.cs` | `Editor/UI/IMGUI/Events/Interfaces/IPointerEnterHandler.cs` | `7a9293adafb84c1789f22a06c2c1ada5` / RF17 |
+| `Editor/Events/Interfaces/IPointerExitHandler.cs` | `Editor/UI/IMGUI/Events/Interfaces/IPointerExitHandler.cs` | `08484bba1373447aa8c58afb23028b48` / RF17 |
+| `Editor/Events/Interfaces/IPointerUpHandler.cs` | `Editor/UI/IMGUI/Events/Interfaces/IPointerUpHandler.cs` | `276bcb99d9484ab1ab4f1c09dd6a2374` / RF17 |
+| `Editor/Events/PointerEventData.cs` | `Editor/UI/IMGUI/Events/PointerEventData.cs` | `03cc65a8cf0245bcaeb2d9d2dd845015` / RF17 |
+| `Editor/GUIS/ActionEditor/ActionEditorWindow.cs` | `Editor/UI/IMGUI/ActionEditor/ActionEditorWindow.cs` | `7990bd1db6c440818370e6970f8d2878` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Base/ItemViewBase.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Base/ItemViewBase.cs` | `574d358ac3144790b070d3732da8b78d` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Base/ViewBase.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Base/ViewBase.cs` | `23c7bfac023a4db68e26fe4c87c0df7e` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/SplitterView.cs` | `Editor/UI/IMGUI/ActionEditor/Views/SplitterView.cs` | `30d605475588454cb4d9d8c27773ba32` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/ClipDragger.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/ClipDragger.cs` | `12bd2da2cc7a4f5d9878aedaa4300de5` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/ClipDraw/BasicClipDraw.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/ClipDraw/BasicClipDraw.cs` | `8b82fdb4c58e495d9a3a6702e6ccd00a` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/ClipDraw/ClipDrawer.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/ClipDraw/ClipDrawer.cs` | `0fee1b9f90e042da9c9d5eb06d858631` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/ClipDraw/SignalClipDraw.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/ClipDraw/SignalClipDraw.cs` | `ea343dc3a2ea4d06b50a8c143520ed2b` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/ClipDraw/SimpleClipDraw.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/ClipDraw/SimpleClipDraw.cs` | `778e6bed42084851bd36e57680ad3c92` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/TimelineBottomView.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelineBottomView.cs` | `676923ca299c41df89ec985cb81f4ed9` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/TimelineHeaderView.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelineHeaderView.cs` | `68ddb2a77a4943be95a315e2cf5e7f82` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/TimelineMiddleView.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelineMiddleView.cs` | `2e97c5bb04a34c51bb689aad70f74edd` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/TimelinePointerView.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelinePointerView.cs` | `c9762e7ccbdf47b8a46444b4688623dd` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/TimelineTrackItemView.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelineTrackItemView.cs` | `9740a024375b47daacb3040efc8ad96d` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/Timeline/TimelineView.cs` | `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelineView.cs` | `29fd0ea77ca6478d9ab79107c1fb2ebb` / RF17 |
+| `Editor/GUIS/ActionEditor/Views/WelcomeView.cs` | `Editor/UI/IMGUI/ActionEditor/Views/WelcomeView.cs` | `c029ce4cec81431a99240d6447a2259a` / RF17 |
+| `Editor/GUIS/CreateAssetWindow.cs` | `Editor/UI/IMGUI/CreateAssetWindow.cs` | `1a368b48e50f45e797eb364d1bff797f` / RF17 |
+| `Editor/GUIS/Customized/CustomizedDrawTools.cs` | `Editor/UI/IMGUI/Customized/CustomizedDrawTools.cs` | `e824e3e530dd49dd8dfe95b7e73af024` / RF17 |
+| `Editor/GUIS/Customized/EditorCustomFactory.cs` | `Editor/UI/Extensions/EditorCustomFactory.cs` | `5fbdd871215844508b90184a82e29cec` / RF17 |
+| `Editor/GUIS/Customized/Header/HeaderBase.cs` | `Editor/UI/Extensions/HeaderBase.cs` | `e2faf2ee3510498884548206b4aebbc3` / RF17 |
+| `Editor/GUIS/Customized/Header/HeaderGUI.cs` | `Editor/UI/IMGUI/Customized/Header/HeaderGUI.cs` | `44fe374f16874682881cb81e7e8ec16f` / RF17 |
+| `Editor/GUIS/Customized/ICustomized.cs` | `Editor/UI/IMGUI/Customized/ICustomized.cs` | `565b99ec09a74ec4aa2cba0241d3ce75` / RF17 |
+| `Editor/GUIS/Customized/Inspectors/Com/ActionClipInspector.cs` | `Editor/UI/IMGUI/Customized/Inspectors/Com/ActionClipInspector.cs` | `1d4a2bbcab364421fbac5f6dbe2fd18d` / RF17 |
+| `Editor/GUIS/Customized/Inspectors/Com/AssetInspector.cs` | `Editor/UI/IMGUI/Customized/Inspectors/Com/AssetInspector.cs` | `1d716975a9a545de861fefb88b2c17a6` / RF17 |
+| `Editor/GUIS/Customized/Inspectors/Com/GroupInspector.cs` | `Editor/UI/IMGUI/Customized/Inspectors/Com/GroupInspector.cs` | `8f1af75f4fa95496783a80d12b1c1f60` / RF17 |
+| `Editor/GUIS/Customized/Inspectors/Com/TrackInspector.cs` | `Editor/UI/IMGUI/Customized/Inspectors/Com/TrackInspector.cs` | `f20270083fd0145dd98d035c67165718` / RF17 |
+| `Editor/GUIS/Customized/Inspectors/InspectorPreviewAssetInspector.cs` | `Editor/UI/IMGUI/Customized/Inspectors/InspectorPreviewAssetInspector.cs` | `39e44d10f51f434b86781f9d221d81bc` / RF17 |
+| `Editor/GUIS/Customized/Inspectors/InspectorsBase.cs` | `Editor/UI/IMGUI/Customized/Inspectors/InspectorsBase.cs` | `736d8f5e613eb47f2b943824a35ea106` / RF17 |
+| `Editor/GUIS/ObjectSelectorWindow.cs` | `Editor/UI/IMGUI/ObjectSelectorWindow.cs` | `f7f5f91a03634e98ac7aff43da23fb15` / RF17 |
+| `Editor/GUIS/PreferencesWindow.cs` | `Editor/UI/IMGUI/PreferencesWindow.cs` | `f476c6fc2de944008b2cbae4c9b2c155` / RF17 |
+| `Editor/GUIS/RenameItemWindow.cs` | `Editor/UI/IMGUI/RenameItemWindow.cs` | `58a9ae359aabde84fac0ca5be5a4ffb9` / RF17 |
+| `Editor/Storage/DocumentSession.cs` | `Editor/Experiments/AssetWorkbench/DocumentSession.cs` | `04daf273971b0734896ac641876f1882` / RF17 |
+| `Editor/Storage/DocumentStore.cs` | `Editor/Experiments/AssetWorkbench/DocumentStore.cs` | `5d2f8a8751f12bf43bdf6ecc83f38dfc` / RF17 |
+| `Editor/Storage/DocumentTransaction.cs` | `Editor/Experiments/AssetWorkbench/DocumentTransaction.cs` | `6322d368ea8df1643b82a8879cb8d40b` / RF17 |
+| `Editor/Storage/JsonDocumentCodec.cs` | `Editor/Serialization/JsonDocumentCodec.cs` | `0a4c86a687eab9944a10be8e1631f77b` / RF17 |
+| `Editor/Storage/JsonDocumentSession.cs` | `Editor/Core/Documents/JsonDocumentSession.cs` | `c2f2193dab98b9541a50c6367710e2e3` / RF17 |
+| `Editor/Storage/JsonEditCommand.cs` | `Editor/Core/Editing/JsonEditCommand.cs` | `02fe688c43a45ac40ae01cd4c9815ecc` / RF17 |
+| `Editor/Storage/JsonEditCommands.cs` | `Editor/Core/Editing/JsonEditCommands.cs` | `198b1605b33fc5d41b997539cd37e14b` / RF17 |
+| `Editor/Storage/JsonPropertyEditing.cs` | `Editor/Core/Editing/JsonPropertyEditing.cs` | `5786662a108b0d5439fa0877d289123c` / RF17 |
+| `Editor/Tools/ActionEditorTypeCatalog.cs` | `Editor/Extensions/ActionEditorTypeCatalog.cs` | `eeafbed3a81157d4598cd1360d127537` / RF17 |
+| `Editor/Tools/DrawTools.cs` | `Editor/UI/IMGUI/Controls/DrawTools.cs` | `f980afac9e9644d7828b36a7f21bd55b` / RF17 |
+| `Editor/Tools/EditorTools.cs` | `Editor/UI/IMGUI/Controls/EditorTools.cs` | `d453b9693b504b378a526c45545e082f` / RF17 |
+| `Editor/Tools/Extensions/DirectableAssetExtensions.cs` | `Editor/Core/Timeline/DirectableAssetExtensions.cs` | `f14e07d86d9e4228a9b42d4b3e16f65e` / RF17 |
+| `Editor/Tools/Extensions/EditorWindowExtensions.cs` | `Editor/UI/IMGUI/Controls/Extensions/EditorWindowExtensions.cs` | `54cef818c40c4bad979d5c76bd29af01` / RF17 |
+| `Editor/Tools/Extensions/FieldInfoExtensions.cs` | `Editor/Core/Properties/FieldInfoExtensions.cs` | `0d41784df0c94c93b1726c7e86ef12b6` / RF17 |
+| `Editor/Tools/Extensions/RectExtensions.cs` | `Editor/UI/IMGUI/Controls/Extensions/RectExtensions.cs` | `a5198ce2f30c49d28840867988d3417d` / RF17 |
+| `Editor/Tools/Extensions/TrackExtends.cs` | `Editor/UI/DirectableAppearance.cs` | `5ec48bf41a864cefa3fb754b75a8ed6c` / RF17 |
+| `Editor/Tools/JsonFieldDescription.cs` | `Editor/Core/Properties/JsonFieldDescription.cs` | `24fa94a40f752a142bddcde4c236fd8e` / RF17 |
+| `Editor/Tools/NBLayout.cs` | `Editor/UI/IMGUI/Controls/NBLayout.cs` | `9ba2896878e543a78dacea8c16c523ea` / RF17 |
+| `Editor/Tools/PreviewResizer.cs` | `Editor/UI/IMGUI/Controls/PreviewResizer.cs` | `83b9fcb9b0d24298867fa65ca872b240` / RF17 |
+| `Editor/Tools/TimelineCandidates.cs` | `Editor/Core/Timeline/TimelineCandidates.cs` | `948cc05cf2351844d97181138af198b9` / RF17 |
+| `Editor/Tools/TimelineGeometry.cs` | `Editor/Core/Timeline/TimelineGeometry.cs` | `6e7624dde141b2c4ab8515fc6ce160dd` / RF17 |
+| `Editor/Tools/TimelineNavigation.cs` | `Editor/Core/Timeline/TimelineNavigation.cs` | `6102006f0f5b79c48a051c52dcd62c9a` / RF17 |
+| `Editor/Workbench/ActionWorkbench.cs` | `Editor/Experiments/AssetWorkbench/ActionWorkbench.cs` | `216a627fd6fd47041bf0f5f1937c7c18` / RF17 |
+| `Editor/Workbench/EventPropertyContext.cs` | `Editor/Experiments/AssetWorkbench/EventPropertyContext.cs` | `95a06179797c03d4a9d6c89aacc67c33` / RF17 |
+| `Editor/Workbench/EventRegistry.cs` | `Editor/Experiments/AssetWorkbench/EventRegistry.cs` | `2928be964e82ccc4c82d2a36e8b58e87` / RF17 |
+| `Editor/Workbench/JsonActionWorkbench.cs` | `Editor/UI/UIToolkit/JsonActionWorkbench.cs` | `bd2bd6eded8ebf14687952b313d079d9` / RF17 |
+| `Editor/Workbench/JsonPreferencesWindow.cs` | `Editor/UI/UIToolkit/JsonPreferencesWindow.cs` | `69c0eced166ee5a45ad033187ae1070e` / RF17 |
+| `Editor/Workbench/JsonPropertyView.cs` | `Editor/UI/UIToolkit/JsonPropertyView.cs` | `947256fa11135cc43b04ba402a1f03c9` / RF17 |
+| `Editor/Workbench/JsonTimelineCanvas.cs` | `Editor/UI/UIToolkit/JsonTimelineCanvas.cs` | `f7548d331bc116c4ba695eb4b55bdf0f` / RF17 |
+| `Editor/Workbench/TimelineCanvas.cs` | `Editor/Experiments/AssetWorkbench/TimelineCanvas.cs` | `77924aa4ff2b9af4285a05b9c60861cf` / RF17 |
+| `Editor/Workbench/TimelineInteraction.cs` | `Editor/Experiments/AssetWorkbench/TimelineInteraction.cs` | `2aa803c56ad9b514aa6d1abaf66f5d2b` / RF17 |
+| `Editor/Workbench/WorkbenchInspectorTarget.cs` | `Editor/Experiments/AssetWorkbench/WorkbenchInspectorTarget.cs` | `8f41182c50a1c024ea1f5829f012dfed` / RF17 |
+| `Runtime/Const/Prefs.cs` | `Editor/Preferences/Prefs.cs` | `d45e1464763294b70a06ff81bc069161` / RF17 |
+| `Runtime/Model/ActionDocument.cs` | `Runtime/Experiments/AssetWorkbench/ActionDocument.cs` | `0bcdb82417348fc4b8dc220708b24e5d` / RF17 |
+| `Runtime/Model/DocumentValidation.cs` | `Runtime/Experiments/AssetWorkbench/DocumentValidation.cs` | `4fbd81b2963b270468acaeb88ee9ac8b` / RF17 |
+| `Runtime/Utility/FullSerializerExtensions.cs` | `Runtime/Serialization/FullSerializerExtensions.cs` | `107863859ba94b9580581de9746adeef` / RF18 |
+
+- 标为“RF18”的Runtime序列化文件只定归属，RF17不提前改格式。其余列项RF17实施；App/Context/EditorTools/EditorCustomFactory的拆分在原GUID文件保持原主类型，新增上述3个源码与`Preview/ActionEditorPlayback.cs`由Unity生成meta，新增`Core/Documents/DocumentCreationService.cs`提取真实创建业务并由两窗创建弹窗调用，不造无人调用接口。创建服务先复用当前格式，RF19再切到统一新格式存储，不在RF17偷偷实现RF18。GUI扩展工厂留有一个公开真实实现，不为历史调用者保留平行别名层。
+
+其余42个Runtime/Editor源码**逐文件原位保留**，下表每个名称均为独立文件，不代表模糊的目录通配移动；连同上表覆盖当前全部122个Runtime/Editor源码。Tests/Editor的18个测试源码、四个asmdef及其meta也原位保留。
+
+| 原目录（每个列名均附.cs） | 原位文件 | 职责/原因 |
+|---|---|---|
+| Editor/Languages | ILanguages、Lan、LanCHS、LanEN | 现有中英语言机制，RF21接术语，不因目录任务复制本地化 |
+| Editor/Preview | ActionEditorPreviewSession、AssetPlayer、PreviewBase、TimePointers | 当前播放/预览与释放归属已在目标职责；Inst/default构造仍转App的同一Context，Core App去UI依赖后不会反向依赖窗口 |
+| Editor/Samples | LegacyExperiencePreview | 一个真实双UI Header与样例状态窗口适配，允许依赖UI/Preview，不伪称核心 |
+| Editor/Storage | JsonDocumentStore、ReliableFileCommit | 路径/revision/导入与可靠字节提交；实验Store仍复用ReliableFileCommit，不复制 |
+| Editor/Validation | ControlledQuitCommands、PersistenceProbeCommands、PersistenceProbeDocument、SessionProbeCommands、SharedJsonProbeCommands、WorkbenchProbeCommands | 原审核命令和专属asmdef保持身份；实验/生产探针分别标明，不默认执行 |
+| Runtime/Assets | Asset、Clip、Group、InspectorPreviewAsset、Track | 当前业务模型与Inspector代理，保留类型程序集；不改GUID/模型/API习惯 |
+| Runtime/Attributes；Runtime/Const | Attributes、PropertyAttributes；Enums | 现有扩展Attribute/枚举原位，不改业务身份 |
+| Runtime/Extensions；Runtime/Interfaces | IDirectableExtensions、StringExtensions；IData、IDirectable、IDirector、ISubClipContainable | 当前业务计算与接口，Runtime无Editor反向依赖 |
+| Runtime/Model；Runtime/Samples/LegacyExperience | AutoSaveSchedule、TimelineTime；LegacyExperienceAsset | 前两文件实际被生产调用；后者是现有完整非Combat样例，不误隔离为实验 |
+| Runtime/Utility | AttributesUtility、ClipTimingRules、ColorUtility、CreateUtilities、DirectableTypeInfo、Easing、RectUtility、ReflectionTools | 模型元数据/时间/值/反射等真实工具；CreateUtilities的条件Editor分支单独说明，不新增万能Common |
+- 精确路径影响：全部移动保持namespace/类名（唯TypeMetaInfo从UI嵌套类型转为共用类型，更新上述已知调用者）；不需要批量改业务扩展Attribute。已搜索项目Assets下引用，ActionEditor外未发现这些生产/实验服务调用者（Combat不修改，不把未追踪/忽略范围声称为全世界调用者）。Resources/nbc及图标/GUISkin、第三方DLL、样例README、测试/验证asmdef路径原位；SharedJsonTests读取`Runtime/Interfaces/IDirectable.cs`的两个路径不变。`.codex`固定命令、现有文档路径引用和真实生成项目应按移动后现状核对，csproj/sln只能Unity重新生成。
+- 身份影响：保持GUID且保持namespace/程序集的类移动不改变类型字符串；Prefs进入Editor程序集是明确例外，仅用于Editor偏好、不属于作者文档。InspectorPreviewAsset保留程序集。实验ScriptableObject ActionDocument保持Runtime程序集与namespace，不触碰现有.asset。完整场景/Prefab/跨域重载引用未由本轮读meta证明，RF17需真实导入与入口验证，不能直接编辑YAML。当前JSON类型字符串依赖类型而非源码路径。
+- 已核实阻塞：Pipeline注册了`asset move`，但`.codex/scripts/workflow_lib/unity.py` MUTATIONS未准入move/create_folder，当前不能通过工作流合法执行清单。RF17开始后须先审计包内实现、请求用户单独授权最小工作流审核契约及离线测试，再preview展示精确文件/新目录/保持GUID范围并取得真实确认；或请用户使用Unity手动移动。不能走原始CLI、shell搬运或任意代码求值绕过。本轮未扩大工作流策略，RF16定案本身不因尚未实施移动而失败。
+
+#### RF16-D 新契约、样本与入口接线
+
+- 唯一规格：`Docs/ActionEditor-Contracts.md`新增“RF16 定案”节，架构文档同步本次决策。定案`IActionDocumentFormat`最小读写/导出能力、`actioneditor.json`/JSON (.json)/.json、version=1封套、FullName+简单程序集名受控类型身份、GUID/localFileId引用、有限float逐位读回（含负零）、全图隔离快照与格式无关作者比较；无旧格式探测/回退、双写、转换器或用户数据迁移。
+- 两份新样本内嵌现有合同，不生成Assets/新格式资产或新状态表；完整空根及1组1轨1点样本覆盖构造器默认图、派生/基类字段、null、float、视域/范围，Signal有效Length=0与基类存储length=1明确区分，保留原位值。扩展校验预期使用现有3组7轨13片段及测试专用数组/Unity引用字段，失败变体明确未知类型/缺成员/未知字段/非有限值/无效图/失效引用均拒绝。样本仅离线规格检查，未谎称当前codec能解新封套。
+- 入口逐步接线见合同末节：新建→共用创建服务；选择打开→统一格式目录/受控解码；显式/自动/另存→Session+可靠Store；剪贴板→同一转换/快照服务；独立导出→隔离快照+格式目录+新目标可靠提交、拒绝活动手势。保存推进当前来源/基线，另存创建并切来源，导出不得改变任何当前会话状态。双UI布局/键位、样例类身份和float模型不改。
+
+#### RF16-E 本次实际验证、覆盖缺口与停止点
+
+- 环境：项目绝对路径`E:/Unity Projects/ActionEditor`，Unity2022.3.62f3，Pipeline0.10.0-exp.1，CLI1.0.0-beta.16，唯一匹配本工程Editor **PID30756** ready；其他工程实例没有用于兜底。doctor：`.codex/runs/20261111T143456Z-39ae7af9/report.json`；命令发现：`20261111T143525Z-112c4b50`。
+- 当次发现：`python .codex/scripts/workflow.py unity query "test list"`，`.codex/runs/20261111T143624Z-e9dbe649/report.json`，NBC.ActionEditor.Editor.Tests，EditMode **164项**，无Explicit；不是采用RF15历史计数。
+- 当次完整基线：`python .codex/scripts/workflow.py verify --profile unity --test-filter NBC.ActionEditor.Editor.Tests --filter-type assembly --test-mode editor --timeout 300`，`.codex/runs/20261111T143713Z-f58b4104/report.json`。编译终态up_to_date、failed=false、errors=[]、compilationFailed=false；测试**164/164通过，0失败/跳过/不确定**，身份与当次发现对应。包含生产SharedJson/ExtensionEndToEnd/PreviewOwnership及保留实验测试，不能把合计称为164项全是生产功能；没有新增产品C#，后续仅文档定案。
+- 当次离线：`python .codex/scripts/workflow.py verify --profile code`，`.codex/runs/20261111T143855Z-1140f2c4/report.md`：工作流unittest **42/42**，真实ActionEditor.sln **18项目/656源码，0错误/43既有警告，12.19秒**；完整code profile仍为blocked，缺yaml/markdown_it文档解析依赖，未安装。该项不是C#编译失败，也不把整profile写成passed。
+- 文档/映射检查：`python .codex/runs/rf16-contract-check/check.py`，证据`.codex/runs/rf16-contract-check/report.json`，**278检查通过**：80项源/目标/GUID与目标不存在、122源码完整覆盖/42原位、唯一跨程序集Prefs、9+2实验文件、18测试源码原位、两份独立新契约JSON样本语法/字段/浮点位、源码样例3组7轨13片段、文档本地链接/代码块配对、当次测试发现与终态全部身份一致。首轮检查发现本记录误把测试源码数写成19，按实际Glob与目录核实修正为18后重跑通过，未改产品或放宽数值预期。证据脚本/报告仅在runs中，不新增产品实现或第二份任务状态；后续最终版本重跑保留文档hash。完整文档解析仍为已知工具覆盖缺口，不以标准库针对性检查冒充完整解析器。`git diff --check`通过。
+- 修改文件与交付物：仅本任务清单、`Docs/ActionEditor-Contracts.md`、现有架构分析文档三份Markdown；原有任务清单未提交计划保留，没有移动源码/meta或改变产品序列化。源码和数据未改，基线之后无需因纯文档追加重复触发Unity。未执行本地提交，避免将开始前已有的任务清单改动与本次定案一起自动纳入；无推送。
+- 未运行/人工：没有资产移动、创建/覆盖/迁移用户JSON、新格式Unity读回、持久探针、真实PlayerBuild、实际域重载或真人布局/手感验收。完整资产验证明确skipped（无asset目标），不是通过。新契约全部边界数值/Unity引用/故障注入属于RF18–RF20后续实施验证，不能拿现有164项冒充；H01–H09保持待用户。
+- 下一任务：**RF17，等待用户指定后才启动**。先处理受审核移动能力与真实授权，再按上述清单归位与拆出真实职责；本会话到RF16为止，不自动推进RF17–RF23、Combat或循环。
+
+### RF17 执行记录（2026-11-11）
+
+- 状态：`complete`（本项工程范围），人工H01–H09未代签。用户RF16完成后的连续授权覆盖本系列执行；保留RF16历史停止记录，不把它误作最新指令。
+- 审核：审读Pipeline AssetCommands.Move及FolderCommands.CreateFolder，发现move缺少confirm且不存在目标父目录时dry-run拒绝，create_folder无dry-run。没有直接放开两项原始写命令，新增固定零参数`actioneditor.validation rf17_move`，79项来自RF16-C固化清单；禁止目标覆盖/元数据冲突、校验源GUID和字节，AssetDatabase建目录/批量Move，完成后逐项核对并由Unity当前IDE集成SyncAll生成真实项目。workflow预览/apply均拒绝参数覆盖，离线测试43/43通过。
+- 移动证据：doctor `20261111T145734Z-8f9a64aa`绑定本工程；预览`20261111T150516Z-cdc10733`逐项展示79源码、29目录、源码/meta SHA256与GUID；审批`20261111T150557Z-056f7ba4`引用本次真实用户授权；应用`20261111T150613Z-86dff14a`返回79项GUID及源码/meta字节全部保持。未移动RF18序列化文件，未删除旧空目录。
+- 职责：App移除Window/Width、Selection代理、切换弹窗和所有Editor生命周期钩子；ActionEditorHost唯一更新驱动/恢复/场景/Inspector适配。Selection通过InspectorRequested事件请求代理；播放类独立Preview。TypeMetaInfo与ExtensionResolver移出EditorTools/GUI工厂，两个UI及所有已知测试直接接共享目录/解析服务，无旧转发层。创建服务抽离事务/路径/导入，弹窗保留输入/确认/打开结果/返回来源UI，格式未提前改变。9个Editor及2个Runtime实验源码独立归类，原namespace/程序集不变。Prefs唯一跨程序集进入Editor，Runtime引用Editor程序集检查通过。
+- 验证：首次完整164/164通过`20261111T151133Z-95488ed6`；新增职责通知/无具体窗口字段/样例Header与Inspector/Resources皮肤及图标/Prefs程序集断言后，发现166项`20261111T151745Z-834d7af6`；最终完整`verify --profile unity --test-filter NBC.ActionEditor.Editor.Tests --filter-type assembly --test-mode editor --timeout 300`报告`20261111T151832Z-f7e11fba`：编译成功、166/166通过，0失败/跳过/不确定。覆盖真实双窗创建菜单/属性/Undo/手势/播放和窗口生命周期及保留实验套件。资源验证skipped无目标，不冒充全资产扫描。
+- 最终`verify --profile code`：`20261111T152129Z-cf44e2e1`，workflow43/43、真实ActionEditor.sln 18项目/662源码全覆盖、0错误/43既有警告、6.45秒；整个profile仍blocked于缺yaml/markdown_it，未安装，非编译失败。独立`rf17-identity-check/check.py`及report.json共369检查通过，核实79身份/meta字节、29目录meta、新源码meta及Core/Extensions无具体UI依赖；源码移动瞬间字节证据来自apply，之后职责编辑有意改变源码。不重跑RF16要求旧路径存在的历史脚本。git diff --check通过。
+- 边界：用户两份JSON、Jsons目录meta及WhootActionSequencer配置未读取内容/改动/纳入提交。无Combat/包/设置变更、无Player Build/推送、无原始资产迁移或持久探针。IDE项目实际生成，源码meta由Unity产生。RF16合同/计划等已知前置文档纳入本项本地交付，不丢弃既有改动。
+- 下一任务：按连续授权进入RF18唯一转换边界及精确float/引用/快照验证，不等待额外确认。
