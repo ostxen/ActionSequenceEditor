@@ -100,7 +100,11 @@ namespace NBC.ActionEditor
         public event Action Played;
         public event Action Stopped;
 
-        public ActionEditorPlayback(AssetPlayer player) => Player = player ?? throw new ArgumentNullException(nameof(player));
+        public ActionEditorPlayback(AssetPlayer player)
+        {
+            Player = player ?? throw new ArgumentNullException(nameof(player));
+            Player.Faulted += () => { IsPlaying = false; IsPaused = false; };
+        }
         public void Play(float now)
         {
             if (Player.Asset == null) return;
@@ -110,8 +114,9 @@ namespace NBC.ActionEditor
         public void Stop(bool notify = true)
         {
             Player.CurrentTime = 0;
-            if (notify) Stopped?.Invoke();
-            Player.Reset(); IsPlaying = false; IsPaused = false;
+            IsPlaying = false; IsPaused = false;
+            try { if (notify) Stopped?.Invoke(); }
+            finally { Player.Reset(); }
         }
         public void StepForward(float interval) => Player.Sample(Math.Abs(Player.CurrentTime - Player.Length) < .00001f ? 0 : Player.CurrentTime + interval);
         public void StepBackward(float interval) => Player.Sample(Player.CurrentTime == 0 ? Player.Length : Player.CurrentTime - interval);

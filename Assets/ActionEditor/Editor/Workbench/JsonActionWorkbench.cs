@@ -57,7 +57,6 @@ namespace NBC.ActionEditor.Workbench
         private void OnLostFocus() => Canvas?.Cancel();
         private void Tick()
         {
-            App.UpdateView(this);
             if (EditorApplication.timeSinceStartup - lastTick < 0.03) return;
             lastTick = EditorApplication.timeSinceStartup;
             Canvas?.MarkDirtyRepaint();

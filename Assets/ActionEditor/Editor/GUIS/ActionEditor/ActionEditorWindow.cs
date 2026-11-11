@@ -82,7 +82,6 @@ namespace NBC.ActionEditor
             {
                 this.Repaint();
             }
-            App.UpdateView(this);
         }
 
         private void OnDocumentChanged() { hasUnsavedChanges = Context.Session.IsDirty; Repaint(); }

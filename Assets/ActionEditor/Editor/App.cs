@@ -30,6 +30,7 @@ namespace NBC.ActionEditor
             };
             Context.Playback.Played += () => OnPlay?.Invoke();
             Context.Playback.Stopped += () => OnStop?.Invoke();
+            EditorApplication.update += UpdateSharedEditor;
             AssemblyReloadEvents.beforeAssemblyReload += () =>
             {
                 SessionState.SetString("ActionEditor.JsonRecovery", Session.CaptureRecovery());
@@ -123,9 +124,11 @@ namespace NBC.ActionEditor
             PlayerUpdate();
         }
 
-        public static void UpdateView(object owner)
+        private static void UpdateSharedEditor()
         {
-            if (Views.OwnsUpdate(owner)) OnUpdate();
+            if (Views.Count == 0) return;
+            try { OnUpdate(); }
+            catch (Exception error) { Stop(); Debug.LogException(error); }
         }
 
         #region AutoSave
