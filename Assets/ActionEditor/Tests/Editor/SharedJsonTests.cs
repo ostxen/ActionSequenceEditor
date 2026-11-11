@@ -370,6 +370,46 @@ namespace NBC.ActionEditor.Tests
             UnityEngine.Object.DestroyImmediate(fixture);
         }
 
+        [Test] public void ControlledQuitRejectsUnsavedDocumentAndCancelsWhenEditingStartsAfterAcceptance()
+        {
+            var flags = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+            var types = AppDomain.CurrentDomain.GetAssemblies();
+            var command = types.Select(a => a.GetType("NBC.ActionEditor.Validation.ControlledQuitCommands")).Single(t => t != null).GetMethod("ControlledQuit");
+            var lifecycle = types.Select(a => a.GetType("Unity.Pipeline.EditorQuit")).Single(t => t != null);
+            var cancel = lifecycle.GetMethod("CancelScheduledExit", flags);
+            var pending = lifecycle.GetProperty("IsExitScheduled", flags);
+            var exit = lifecycle.GetField("ExitAction", flags);
+            var update = typeof(EditorApplication).GetField("update", flags);
+            Assert.That(pending.GetValue(null), Is.False, "never interfere with an existing exit");
+            var previousExit = exit.GetValue(null); var exitAttempts = 0;
+            Action<int> trap = _ => exitAttempts++;
+            exit.SetValue(null, trap);
+            try
+            {
+                var preview = command.Invoke(null, new object[] { false, true });
+                var blockers = (string[])preview.GetType().GetProperty("blockers").GetValue(preview);
+                Assert.That(blockers.Any(b => b.Contains("no existing disk source")), Is.True);
+                Assert.Throws<System.Reflection.TargetInvocationException>(() => command.Invoke(null, new object[] { true, false }));
+                Assert.That(pending.GetValue(null), Is.False);
+                App.TextAsset = null;
+                var before = ((Delegate)update.GetValue(null)).GetInvocationList();
+                command.Invoke(null, new object[] { true, false });
+                Assert.That(pending.GetValue(null), Is.True);
+                var added = ((Delegate)update.GetValue(null)).GetInvocationList().Where(d => !before.Contains(d)).ToArray();
+                Assert.That(added.Length, Is.EqualTo(2), "our guard must precede Pipeline Tick");
+                App.TextAsset = fixture;
+                added[0].DynamicInvoke();
+                Assert.That(pending.GetValue(null), Is.False, "new unsaved document cancels scheduled exit");
+                added[0].DynamicInvoke();
+                Assert.That(exitAttempts, Is.Zero);
+            }
+            finally
+            {
+                cancel.Invoke(null, null);
+                exit.SetValue(null, previousExit);
+            }
+        }
+
         [Test] public void SharedContextOwnsStateAndServicesWithoutAnEditorWindow()
         {
             using (var context = new ActionEditorContext(new JsonDocumentSession()))
@@ -420,7 +460,7 @@ namespace NBC.ActionEditor.Tests
             finally { UnityEngine.Object.DestroyImmediate(invalid); }
         }
 
-        [Test] public void ViewRegistrationIsIdempotentAndTransfersUpdateOwnership()
+        [Test] public void ViewRegistrationIsIdempotentAndDetachesNotifications()
         {
             var views = new ActionEditorViews(); var first = new object(); var second = new object();
             var paints = 0; var changes = 0;
@@ -428,15 +468,15 @@ namespace NBC.ActionEditor.Tests
             views.Attach(first, () => paints++, () => changes++);
             views.Attach(second, () => paints++, () => changes++);
             Assert.That(views.Count, Is.EqualTo(2));
-            Assert.That(views.OwnsUpdate(first), Is.True);
-            Assert.That(views.OwnsUpdate(second), Is.False);
             views.Repaint(); views.NotifyChanged();
             Assert.That(paints, Is.EqualTo(2)); Assert.That(changes, Is.EqualTo(2));
             views.Detach(first); views.Detach(first);
-            Assert.That(views.OwnsUpdate(second), Is.True);
+            views.Repaint(); views.NotifyChanged();
+            Assert.That(paints, Is.EqualTo(3)); Assert.That(changes, Is.EqualTo(3));
             views.Detach(second);
             Assert.That(views.Count, Is.Zero);
-            Assert.That(views.OwnsUpdate(first) || views.OwnsUpdate(second), Is.False);
+            views.Repaint(); views.NotifyChanged();
+            Assert.That(paints, Is.EqualTo(3)); Assert.That(changes, Is.EqualTo(3));
         }
 
         [UnityTest] public IEnumerator BothWindowOpenOrdersShareContextAndRebuildWithoutRegistrationLeaks()
@@ -1273,9 +1313,9 @@ namespace NBC.ActionEditor.Tests
                 var root = window.rootVisualElement; var canvas = window.Canvas;
                 window.Seek(.5f);
                 Pointer(root, EventType.MouseDown, new Vector2(canvas.X(1), 30));
-                Assert.That((int)typeof(JsonTimelineCanvas).GetField("mode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas), Is.EqualTo(7), "ruler down mode");
+                Assert.That(typeof(JsonTimelineCanvas).GetField("mode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas).ToString(), Is.EqualTo("Seek"), "ruler down mode");
                 Pointer(root, EventType.MouseDrag, new Vector2(canvas.X(2), 30));
-                Assert.That((int)typeof(JsonTimelineCanvas).GetField("mode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas), Is.EqualTo(7), "ruler move mode");
+                Assert.That(typeof(JsonTimelineCanvas).GetField("mode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas).ToString(), Is.EqualTo("Seek"), "ruler move mode");
                 Assert.That((float)typeof(JsonTimelineCanvas).GetField("seekBefore", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas), Is.EqualTo(.5f), "ruler snapshot");
                 Assert.That(AssetPlayer.Inst.CurrentTime, Is.EqualTo(2).Within(.051));
                 var receivedKey = false;

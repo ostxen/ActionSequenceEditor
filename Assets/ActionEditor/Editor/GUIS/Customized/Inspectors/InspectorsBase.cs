@@ -335,25 +335,6 @@ namespace NBC.ActionEditor
             return fields.TryGetValue(field, out var expanded) ? expanded : GetFoldout(value);
         }
 
-        private int FieldsSort(FieldInfo f1, FieldInfo f2)
-        {
-            var sort1 = f1.GetCustomAttribute<OptionSortAttribute>();
-            var sort2 = f2.GetCustomAttribute<OptionSortAttribute>();
-            var i1 = 99;
-            var i2 = 99;
-            if (sort1 != null)
-            {
-                i1 = sort1.sort;
-            }
-
-            if (sort2 != null)
-            {
-                i2 = sort2.sort;
-            }
-
-            return i1 - i2;
-        }
-
         private bool GetFoldout(object obj)
         {
             if (obj == null) return false;

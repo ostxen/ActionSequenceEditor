@@ -25,7 +25,9 @@ namespace NBC.ActionEditor.Workbench
         private Vector2 down, last;
         private Clip hit;
         private Track movingTrack;
-        private int mode; // 1 move, 2 left, 3 right, 4 pan, 5 splitter, 6 marquee, 7 seek, 8 track
+        private enum GestureMode { None, Move, ResizeLeft, ResizeRight, Pan, Splitter, Marquee, Seek, Track }
+        private GestureMode mode;
+        private static bool EditsClips(GestureMode value) => value == GestureMode.Move || value == GestureMode.ResizeLeft || value == GestureMode.ResizeRight;
         private float seekBefore;
         private readonly Dictionary<Clip, Vector2> original = new Dictionary<Clip, Vector2>();
         private Rect? marquee;
@@ -106,16 +108,16 @@ namespace NBC.ActionEditor.Workbench
             if (Asset != null && e.button == 0 && p.y >= 20 && p.y < 40 && p.x >= Left)
             {
                 Focus();
-                seekBefore = AssetPlayer.Inst.CurrentTime; mode = 7; pointer = e.pointerId;
+                seekBefore = AssetPlayer.Inst.CurrentTime; mode = GestureMode.Seek; pointer = e.pointerId;
                 this.CapturePointer(pointer); owner.Seek(Snap(TimeAt(p.x))); e.PreventDefault(); e.StopPropagation();
             }
         }
         private void HeaderMove(PointerMoveEvent e)
         {
-            if (mode != 7 || pointer != e.pointerId) return;
+            if (mode != GestureMode.Seek || pointer != e.pointerId) return;
             var p = owner.rootVisualElement.WorldToLocal(e.position); owner.Seek(Snap(TimeAt(p.x))); e.StopPropagation();
         }
-        private void HeaderUp(PointerUpEvent e) { if (mode == 7) Up(e); }
+        private void HeaderUp(PointerUpEvent e) { if (mode == GestureMode.Seek) Up(e); }
         private static bool TextInputTarget(IEventHandler target)
         {
             for (var element = target as VisualElement; element != null; element = element.parent)
@@ -166,14 +168,14 @@ namespace NBC.ActionEditor.Workbench
         private void SyncDragGuides()
         {
             dragGuides.style.left = Left;
-            var visible = dragMoved && mode >= 1 && mode <= 3 && original.Count > 0;
+            var visible = dragMoved && EditsClips(mode) && original.Count > 0;
             dragGuides.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
             if (!visible) return;
             var start = original.Keys.Min(c => c.StartTime); var end = original.Keys.Max(c => c.EndTime);
             for (var i = 0; i < guideLines.Length; i++)
             {
                 var guide = guideLines[i]; var time = i == 0 ? start : end;
-                guide.style.display = (mode == 2 && i == 1 || mode == 3 && i == 0) ? DisplayStyle.None : DisplayStyle.Flex;
+                guide.style.display = (mode == GestureMode.ResizeLeft && i == 1 || mode == GestureMode.ResizeRight && i == 0) ? DisplayStyle.None : DisplayStyle.Flex;
                 guide.style.left = X(time) - Left;
                 guide.EnableInClassList("json-guide-solid", snapTimes.Any(t => Mathf.Abs(t - time) < .00001f));
                 var label = guide.Q<Label>(); label.text = time.ToString("0.00");
@@ -202,19 +204,19 @@ namespace NBC.ActionEditor.Workbench
             var step = Prefs.timeStepMode == Prefs.TimeStepMode.Frames ? 1f / Mathf.Max(1, Prefs.FrameRate) : Prefs.SnapInterval;
             return Mathf.Max(0, Prefs.MagnetSnapping && step > 0 ? Mathf.Round(time / step) * step : time);
         }
-        private int ResizeMode(Clip clip, Vector2 position)
+        private GestureMode ResizeMode(Clip clip, Vector2 position)
         {
-            if (clip == null || clip.IsLocked || !clip.CanScale()) return 0;
+            if (clip == null || clip.IsLocked || !clip.CanScale()) return GestureMode.None;
             var row = TimelineGeometry.RowAt(position.y, owner.ScrollY, 28);
             var rect = ClipRect(clip, row);
             var edge = TimelineGeometry.ResizeEdge(rect, position, Styles.ClipScaleRectWidth);
-            return edge < 0 ? 2 : edge > 0 ? 3 : 0;
+            return edge < 0 ? GestureMode.ResizeLeft : edge > 0 ? GestureMode.ResizeRight : GestureMode.None;
         }
         private void UpdateResizeCursor()
         {
-            var resizing = mode == 2 || mode == 3;
-            if (mode == 0 && hasHoverPosition && contentRect.Contains(hoverPosition))
-                resizing = ResizeMode(Hit(hoverPosition), hoverPosition) != 0;
+            var resizing = mode == GestureMode.ResizeLeft || mode == GestureMode.ResizeRight;
+            if (mode == GestureMode.None && hasHoverPosition && contentRect.Contains(hoverPosition))
+                resizing = ResizeMode(Hit(hoverPosition), hoverPosition) != GestureMode.None;
             EnableInClassList("json-resize-horizontal", resizing);
         }
         private void Down(PointerDownEvent e)
@@ -225,8 +227,8 @@ namespace NBC.ActionEditor.Workbench
             Focus(); down = last = e.localPosition;
             var rows = Rows(); var row = TimelineGeometry.RowAt(down.y, owner.ScrollY, 28);
             hit = Hit(down);
-            if (e.button == 2) mode = 4;
-            else if (Mathf.Abs(down.x - (Left - 7)) < 5) mode = 5;
+            if (e.button == 2) mode = GestureMode.Pan;
+            else if (Mathf.Abs(down.x - (Left - 7)) < 5) mode = GestureMode.Splitter;
             else if (down.x < Left)
             {
                 if (row >= 0 && row < rows.Count)
@@ -236,7 +238,7 @@ namespace NBC.ActionEditor.Workbench
                     {
                         owner.Select(rows[row]);
                         if (rows[row] is Track track && !track.IsLocked)
-                        { movingTrack = track; mode = 8; pointer = e.pointerId; this.CapturePointer(pointer); e.StopPropagation(); }
+                        { movingTrack = track; mode = GestureMode.Track; pointer = e.pointerId; this.CapturePointer(pointer); e.StopPropagation(); }
                     }
                 }
                 return;
@@ -245,46 +247,46 @@ namespace NBC.ActionEditor.Workbench
             {
                 if (!App.IsSelect(hit)) owner.Select(owner.Context.Selection.ClickCandidate(hit, e.ctrlKey, true));
                 if (hit.IsLocked) return;
-                mode = ResizeMode(hit, down); if (mode == 0) mode = 1;
+                mode = ResizeMode(hit, down); if (mode == GestureMode.None) mode = GestureMode.Move;
                 original.Clear(); foreach (var clip in App.SelectItems.OfType<Clip>().Where(c => !c.IsLocked)) original[clip] = new Vector2(clip.StartTime, clip.Length);
                 snapTimes = TimelineCandidates.References(Asset.groups.SelectMany(g => g.Tracks).SelectMany(t => t.Clips),
                     original.Keys, Asset.Length, AssetPlayer.Inst.CurrentTime, false);
                 dragMoved = false;
                 edit = owner.Context.Session.BeginEdit(this);
-                if (edit == null) { mode = 0; return; }
+                if (edit == null) { mode = GestureMode.None; return; }
             }
-            else { mode = 6; if (!e.ctrlKey) owner.Select(); }
+            else { mode = GestureMode.Marquee; if (!e.ctrlKey) owner.Select(); }
             pointer = e.pointerId; UpdateResizeCursor(); this.CapturePointer(pointer); e.StopPropagation();
         }
         private void Move(PointerMoveEvent e)
         {
             hoverPosition = this.WorldToLocal(e.position); hasHoverPosition = true; UpdateResizeCursor();
-            if (pointer != e.pointerId || mode == 0 || mode == 7 || Asset == null) return;
-            if (mode >= 1 && mode <= 3 && edit?.IsActive != true) { Cancel(); return; }
+            if (pointer != e.pointerId || mode == GestureMode.None || mode == GestureMode.Seek || Asset == null) return;
+            if (EditsClips(mode) && edit?.IsActive != true) { Cancel(); return; }
             var p = (Vector2)e.localPosition;
-            if (mode == 4)
+            if (mode == GestureMode.Pan)
             {
                 var range = TimelineNavigation.Pan(Asset.ViewTimeMin, Asset.ViewTimeMax, p.x - last.x, owner.rootVisualElement.contentRect.width - Left, true);
                 Asset.ViewTimeMax = range.y; Asset.ViewTimeMin = range.x;
             }
-            else if (mode == 5) { owner.LeftWidth = Mathf.Clamp(owner.LeftWidth + p.x - last.x, 120, Mathf.Max(120, contentRect.width - 120)); Styles.TimelineLeftWidth = owner.LeftWidth; }
-            else if (mode == 6) marquee = Rect.MinMaxRect(Mathf.Max(Left, Mathf.Min(down.x, p.x)), Mathf.Min(down.y, p.y), Mathf.Max(down.x, p.x), Mathf.Max(down.y, p.y));
+            else if (mode == GestureMode.Splitter) { owner.LeftWidth = Mathf.Clamp(owner.LeftWidth + p.x - last.x, 120, Mathf.Max(120, contentRect.width - 120)); Styles.TimelineLeftWidth = owner.LeftWidth; }
+            else if (mode == GestureMode.Marquee) marquee = Rect.MinMaxRect(Mathf.Max(Left, Mathf.Min(down.x, p.x)), Mathf.Min(down.y, p.y), Mathf.Max(down.x, p.x), Mathf.Max(down.y, p.y));
             else if (hit != null)
             {
                 dragMoved |= p != down;
                 var delta = (p.x - down.x) / Scale;
-                if (mode == 1)
+                if (mode == GestureMode.Move)
                 {
                     delta = Magnet(Snap(original[hit].x + delta), original[hit].y, e.shiftKey) - original[hit].x;
                     delta = TimelineCandidates.ClampMoveDelta(delta, original.Values.Select(v => v.x));
                     foreach (var pair in original) pair.Key.StartTime = pair.Value.x + delta;
                 }
-                else if (mode == 2)
+                else if (mode == GestureMode.ResizeLeft)
                 {
                     var candidate = TimelineCandidates.Resize(original[hit], true, Magnet(Snap(original[hit].x + delta), 0, e.shiftKey), .01f, 0, float.PositiveInfinity);
                     hit.StartTime = candidate.x; hit.Length = candidate.y;
                 }
-                else if (mode == 3) hit.Length = TimelineCandidates.Resize(original[hit], false, Magnet(Snap(original[hit].x + original[hit].y + delta), 0, e.shiftKey), .01f, 0, float.PositiveInfinity).y;
+                else if (mode == GestureMode.ResizeRight) hit.Length = TimelineCandidates.Resize(original[hit], false, Magnet(Snap(original[hit].x + original[hit].y + delta), 0, e.shiftKey), .01f, 0, float.PositiveInfinity).y;
             }
             last = p; owner.SyncView(); MarkDirtyRepaint(); ruler.MarkDirtyRepaint(); e.StopPropagation();
         }
@@ -296,8 +298,8 @@ namespace NBC.ActionEditor.Workbench
         private void Up(PointerUpEvent e)
         {
             if (pointer != e.pointerId) return;
-            if (e.button != (mode == 4 ? 2 : 0)) { e.PreventDefault(); e.StopImmediatePropagation(); return; }
-            if (mode == 8 && movingTrack != null)
+            if (e.button != (mode == GestureMode.Pan ? 2 : 0)) { e.PreventDefault(); e.StopImmediatePropagation(); return; }
+            if (mode == GestureMode.Track && movingTrack != null)
             {
                 var rows = Rows(); var row = Mathf.FloorToInt((this.WorldToLocal(e.position).y + owner.ScrollY) / 28);
                 if (row >= 0 && row < rows.Count)
@@ -307,11 +309,11 @@ namespace NBC.ActionEditor.Workbench
                     else if (destination is Track next && next != track) owner.Run(() => JsonEditCommands.MoveTrack(track, next.Group, next.Group.Tracks.IndexOf(next) + 1));
                 }
             }
-            if (mode == 6 && marquee.HasValue)
+            if (mode == GestureMode.Marquee && marquee.HasValue)
             {
                 var rows = Rows(); owner.Select(rows.SelectMany((r, i) => r is Track t ? t.Clips.Where(c => TimelineGeometry.Overlaps(ClipRect(c, i), marquee.Value)) : Enumerable.Empty<Clip>()).Cast<IDirectable>().ToArray());
             }
-            var captured = pointer; var wasEdit = mode >= 1 && mode <= 3; pointer = -1; mode = 0; marquee = null; movingTrack = null;
+            var captured = pointer; var wasEdit = EditsClips(mode); pointer = -1; mode = GestureMode.None; marquee = null; movingTrack = null;
             dragMoved = false; SyncDragGuides();
             hasHoverPosition = false; UpdateResizeCursor();
             var token = edit; edit = null;
@@ -324,9 +326,9 @@ namespace NBC.ActionEditor.Workbench
             dragMoved = false; SyncDragGuides();
             var token = edit; edit = null;
             if (pointer < 0) { token?.Cancel(); return; }
-            var captured = pointer; var previousMode = mode; pointer = -1; mode = 0; marquee = null; movingTrack = null;
-            if (previousMode >= 1 && previousMode <= 3) token?.Cancel();
-            if (previousMode == 7) owner.Seek(seekBefore);
+            var captured = pointer; var previousMode = mode; pointer = -1; mode = GestureMode.None; marquee = null; movingTrack = null;
+            if (EditsClips(previousMode)) token?.Cancel();
+            if (previousMode == GestureMode.Seek) owner.Seek(seekBefore);
             if (this.HasPointerCapture(captured)) this.ReleasePointer(captured); MarkDirtyRepaint();
         }
         private void Key(KeyDownEvent e)
@@ -421,7 +423,7 @@ namespace NBC.ActionEditor.Workbench
         }
         private void Menu(ContextualMenuPopulateEvent e)
         {
-            if (mode != 0 || edit?.IsActive == true) { e.PreventDefault(); e.StopImmediatePropagation(); return; }
+            if (mode != GestureMode.None || edit?.IsActive == true) { e.PreventDefault(); e.StopImmediatePropagation(); return; }
             if (Asset == null) return;
             var p = this.WorldToLocal(e.mousePosition); var rows = Rows(); var row = TimelineGeometry.RowAt(p.y, owner.ScrollY, 28);
             var clip = Hit(p); IDirectable item = clip ?? (row >= 0 && row < rows.Count ? rows[row] : null);

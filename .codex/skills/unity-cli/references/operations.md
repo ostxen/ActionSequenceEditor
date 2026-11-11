@@ -33,6 +33,8 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
+`actioneditor.validation controlled_quit` 是RF14受控重开的固定退出封装，不接受参数覆盖。用户于2026-11-11明确允许正常重开及最小workflow策略/测试扩展，禁止强杀，后续明确无关Shader等资源不必处理并可忽略。先preview/展示/approve/apply；发现活动或未保存JSON、无磁盘源文档、脏场景、打开的PrefabStage、未保存窗口或Assets/ActionEditor/下脏持久资源时拒绝退出。无关Combat/包/内建资源脏标记不作为任务阻塞，不保存、不清脏、不修改。无阻塞时仅调用已核实Pipeline正常退出方法，save=false/discard=false/exitCode=0，不保存、不放弃、不启动第二实例。退出回复只表示排程，必须观察旧PID正常退出后才启动同版本Editor。此命令不自动重开、不证明冷启动测量完成；未知结果先观察，不重放。
+
 `actioneditor.validation shared_json_probe` 为 R10 固定隔离 JSON 持久探针，不接受路径/代码参数。只新建不存在的 `Assets/ActionEditorValidationR10/Shared.json`，使用共用 JSON 会话修改、原子保存、Undo/Redo、导入重载及拒绝外部修改；finally 恢复原会话快照（含未保存内容）并清理本次目录。无窗口操作，不改既有 JSON/Combat/设置。必须 preview/approve/apply。R01–R10 最新用户明确无人值守授权涵盖该固定范围验证，审批原因应引用这条真实授权，不伪造新的确认。超时结果未知时先检查目标和报告，不重放。
 
 当前审计封装支持 `asset delete`、`settings.player set`、`build set_settings`、`build run`，以及项目专用 `actioneditor.validation persistence_probe`。其他写入需先核实包内实现并补充策略及离线测试，不直接运行原始 CLI 绕过封装。

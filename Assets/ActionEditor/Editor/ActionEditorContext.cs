@@ -146,21 +146,17 @@ namespace NBC.ActionEditor
             public Action Repaint, Changed;
         }
         private readonly Dictionary<object, View> views = new Dictionary<object, View>();
-        private object updateOwner;
         public int Count => views.Count;
         public void Attach(object owner, Action repaint, Action changed)
         {
             if (owner == null) throw new ArgumentNullException(nameof(owner));
             views[owner] = new View { Repaint = repaint, Changed = changed };
-            if (updateOwner == null) updateOwner = owner;
         }
         public void Detach(object owner)
         {
             if (owner == null) return;
             views.Remove(owner);
-            if (ReferenceEquals(updateOwner, owner)) updateOwner = views.Keys.FirstOrDefault();
         }
-        public bool OwnsUpdate(object owner) => owner != null && ReferenceEquals(updateOwner, owner);
         public void Repaint() { foreach (var view in views.Values.ToArray()) view.Repaint?.Invoke(); }
         public void NotifyChanged() { foreach (var view in views.Values.ToArray()) view.Changed?.Invoke(); }
     }

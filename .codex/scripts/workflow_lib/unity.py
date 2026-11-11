@@ -27,6 +27,7 @@ READ_ONLY = frozenset({
 
 # Explicit catalog, not a prefix heuristic. Only implemented return/poll contracts are admitted.
 MUTATIONS = {
+    "actioneditor.validation controlled_quit": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation shared_json_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation workbench_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation session_probe": {"dry_run": True, "confirm": True, "poll": None},
@@ -321,6 +322,8 @@ class Unity:
 
     def preview(self, command, parameters, inputs=()):
         validate_parameters(parameters)
+        if command == "actioneditor.validation controlled_quit" and parameters:
+            blocked("Controlled quit accepts no parameters; save/discard/targets cannot be overridden.")
         if command not in MUTATIONS:
             blocked(f"Mutation policy/return contract not implemented: {command}")
         self.ready()
@@ -333,6 +336,8 @@ class Unity:
         if plan.get("kind") != "unity" or plan.get("command") not in MUTATIONS:
             blocked("Unsupported Unity mutation plan.")
         validate_parameters(plan["parameters"])
+        if plan["command"] == "actioneditor.validation controlled_quit" and plan["parameters"]:
+            blocked("Controlled quit accepts no parameters.")
         self.ready()
         self.discover()
         command = plan["command"]

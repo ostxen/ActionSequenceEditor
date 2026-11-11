@@ -12,6 +12,19 @@ from workflow_lib.unity import Unity, READ_ONLY, MUTATIONS
 
 
 class ActionEditorValidationTests(unittest.TestCase):
+    def test_controlled_quit_requires_mutation_and_rejects_all_parameters(self):
+        command = "actioneditor.validation controlled_quit"
+        self.assertNotIn(command, READ_ONLY)
+        self.assertEqual(MUTATIONS[command], {"dry_run": True, "confirm": True, "poll": None})
+        unity = Unity(SimpleNamespace(context=Context()))
+        unity.ready = Mock()
+        unity.call = Mock()
+        for parameters in ({"save": True}, {"discard": True}, {"target": "other"}):
+            with self.assertRaises(WorkflowError):
+                unity.preview(command, parameters)
+        unity.ready.assert_not_called()
+        unity.call.assert_not_called()
+
     def test_json_status_is_fixed_read_only_query(self):
         self.assertIn("actioneditor.validation json_status", READ_ONLY)
         self.assertNotIn("actioneditor.validation json_status", MUTATIONS)
