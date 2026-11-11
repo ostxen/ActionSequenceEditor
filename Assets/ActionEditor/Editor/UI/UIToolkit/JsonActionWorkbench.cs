@@ -104,7 +104,8 @@ namespace NBC.ActionEditor.Workbench
                 var button = new ToolbarButton(() => Run(action)) { name = name, tooltip = hint }; button.style.width = 26;
                 button.style.flexShrink = 0; button.Add(new Image { image = texture, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore }); toolbar.Add(button); return button;
             }
-            IconButton("json-save", Styles.SaveIcon, Lan.Save, Save);
+            var saveButton = IconButton("json-save", Styles.SaveIcon, Lan.Save + "（右键：另存为）", Save);
+            saveButton.AddManipulator(new ContextualMenuManipulator(e => ActionEditorHost.PopulateSaveMenu((label, action) => e.menu.AppendAction(label, _ => Run(action)))));
             magnet = new ToolbarToggle { name = "json-magnet", value = Prefs.MagnetSnapping, tooltip = Lan.OpenMagnetSnappingTips };
             magnet.style.width = 26; magnet.style.flexShrink = 0; magnet.Add(new Image { image = Styles.MagnetIcon, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore });
             magnet.RegisterValueChangedCallback(e => Prefs.MagnetSnapping = e.newValue); toolbar.Add(magnet);
@@ -208,18 +209,11 @@ namespace NBC.ActionEditor.Workbench
         }
         private bool ConfirmSwitch()
         {
-            if (!App.Session.IsDirty) return true;
-            var result = EditorUtility.DisplayDialogComplex("未保存的修改", "切换前是否保存当前 JSON？", "保存", "取消", "放弃");
-            if (result == 1) return false; if (result == 0) { Save(); return !App.Session.IsDirty; } return true;
+            return ActionEditorHost.ConfirmDocumentSwitch();
         }
         private void Save()
         {
-            if (string.IsNullOrEmpty(App.Session.Path))
-            {
-                var path = EditorUtility.SaveFilePanelInProject("保存 JSON", "Action", "json", "选择新文件路径");
-                if (!string.IsNullOrEmpty(path)) App.Session.Save(path);
-            }
-            else App.SaveAsset();
+            App.SaveAsset();
         }
         public override void SaveChanges() { Save(); if (!App.Session.IsDirty) base.SaveChanges(); }
         public override void DiscardChanges()

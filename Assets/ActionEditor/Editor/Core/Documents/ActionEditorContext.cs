@@ -11,7 +11,8 @@ namespace NBC.ActionEditor
     {
         public JsonDocumentSession Session { get; }
         public Asset Document => Session.Document;
-        public TextAsset Source { get; private set; }
+        private TextAsset source;
+        public TextAsset Source => string.IsNullOrEmpty(Session.Path) ? source : Session.Source;
         public ActionEditorSelection Selection { get; } = new ActionEditorSelection();
         public ActionEditorClipboard Clipboard { get; } = new ActionEditorClipboard();
         public ActionEditorPlayback Playback { get; }
@@ -28,11 +29,11 @@ namespace NBC.ActionEditor
         public void Open(TextAsset source)
         {
             Session.Open(source);
-            Source = source;
+            this.source = source;
             Playback.Stop(false);
         }
 
-        internal void RestoreSource(TextAsset source) => Source = source;
+        internal void RestoreSource(TextAsset source) => this.source = source;
 
         private void OnDocumentChanged()
         {

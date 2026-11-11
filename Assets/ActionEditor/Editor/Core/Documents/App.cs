@@ -48,10 +48,19 @@ namespace NBC.ActionEditor
         public static long Frame;
 
         public static bool IsJsonDocumentPath(string path) => string.Equals(System.IO.Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase);
+        public static Func<string> SavePathRequested;
 
         public static void SaveAsset()
         {
-            Session.Save();
+            var path = Session.Path;
+            if (string.IsNullOrEmpty(path)) path = SavePathRequested?.Invoke();
+            if (string.IsNullOrEmpty(path)) return;
+            SaveAssetTo(path);
+        }
+
+        public static void SaveAssetTo(string path)
+        {
+            Session.Save(path);
             _lastSaveTime = DateTime.Now;
             _lastSaveClock = EditorApplication.timeSinceStartup;
         }
@@ -94,7 +103,7 @@ namespace NBC.ActionEditor
             if (NBC.ActionEditor.Model.AutoSaveSchedule.IsDue(_lastSaveClock, EditorApplication.timeSinceStartup, Prefs.autoSaveSeconds))
             {
                 _lastSaveClock = EditorApplication.timeSinceStartup;
-                try { SaveAsset(); } catch (Exception e) { Debug.LogError("ActionEditor 自动保存失败，内存内容已保留：" + e.Message); }
+                try { SaveAssetTo(Session.Path); } catch (Exception e) { Debug.LogError("ActionEditor 自动保存失败，内存内容已保留：" + e.Message); }
             }
         }
 

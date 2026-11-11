@@ -770,6 +770,30 @@ namespace NBC.ActionEditor.Tests
             Assert.That(App.Session.IsDirty, Is.False);
             Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1)); Assert.That(App.AssetData.ViewTimeMax, Is.EqualTo(10));
         }
+        [Test] public void BothSaveChangesEntrypointsUseTheSameCancelablePathRequest()
+        {
+            var previousRequest = App.SavePathRequested;
+            var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            var native = ScriptableObject.CreateInstance<NBC.ActionEditor.Workbench.JsonActionWorkbench>();
+            var requests = 0;
+            try
+            {
+                App.Session.Edit("change", () => ((LegacyExperienceAsset)App.AssetData).Version = 9);
+                var source = App.AssetData; var before = App.Session.CaptureRecovery();
+                App.SavePathRequested = () => { requests++; return null; };
+                original.SaveChanges(); native.SaveChanges();
+                Assert.That(requests, Is.EqualTo(2)); Assert.That(App.AssetData, Is.SameAs(source));
+                Assert.That(App.Session.CaptureRecovery(), Is.EqualTo(before)); Assert.That(App.Session.IsDirty, Is.True);
+                var entries = new System.Collections.Generic.List<string>(); ActionEditorHost.PopulateSaveMenu((label, action) => entries.Add(label));
+                Assert.That(entries, Is.EqualTo(new[] { "保存", "另存为…" }));
+            }
+            finally
+            {
+                App.SavePathRequested = previousRequest;
+                original.DiscardChanges(); native.DiscardChanges();
+                UnityEngine.Object.DestroyImmediate(original); UnityEngine.Object.DestroyImmediate(native);
+            }
+        }
         [Test] public void RecoveryPreservesUnsavedChangesAndBaseline()
         {
             App.Session.Edit("change", () => ((LegacyExperienceAsset)App.AssetData).Version = 9);

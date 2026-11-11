@@ -33,13 +33,14 @@ namespace NBC.ActionEditor.Storage
         private readonly ICommitFiles files;
         public ReliableFileCommit(ICommitFiles files = null) { this.files = files ?? new CommitFiles(); }
 
-        public void Save(string target, Func<byte[]> serialize, Action<byte[]> validate, byte[] expectedCurrent = null)
+        public void Save(string target, Func<byte[]> serialize, Action<byte[]> validate, byte[] expectedCurrent = null, bool createOnly = false)
         {
             if (string.IsNullOrWhiteSpace(target)) throw new ArgumentException("Missing target.", nameof(target));
             var bytes = serialize();
             if (bytes == null || bytes.Length == 0) throw new InvalidDataException("Empty serialization is not a valid document.");
             validate(bytes);
             var exists = files.Exists(target);
+            if (createOnly && exists) throw new IOException("Create target already exists.");
             if (expectedCurrent != null && (!exists || !Equal(files.Read(target), expectedCurrent)))
                 throw new IOException("Document changed on disk; refusing to overwrite external edits.");
             var staged = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -49,6 +50,7 @@ namespace NBC.ActionEditor.Storage
                 var written = files.Read(staged);
                 if (!Equal(bytes, written)) throw new IOException("Staged document differs from serialized bytes.");
                 validate(written);
+                if (createOnly && files.Exists(target)) throw new IOException("Create target appeared during save.");
                 if (expectedCurrent != null && (!files.Exists(target) || !Equal(files.Read(target), expectedCurrent)))
                     throw new IOException("Document changed during save.");
                 if (exists)

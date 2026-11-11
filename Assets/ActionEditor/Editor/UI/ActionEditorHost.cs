@@ -14,6 +14,7 @@ namespace NBC.ActionEditor
         private static InspectorPreviewAsset inspectorPreview;
         static ActionEditorHost()
         {
+            App.SavePathRequested = () => ChooseSavePath(false);
             App.Context.Selection.InspectorRequested += ShowInspector;
             App.RepaintRequested += () => { if (App.Views.Count == 0 && Window != null) Window.Repaint(); };
             EditorApplication.update += UpdateSharedEditor;
@@ -67,6 +68,22 @@ namespace NBC.ActionEditor
             if (choice == 1) return false;
             if (choice == 0) { App.SaveAsset(); return !App.Session.IsDirty; }
             return true;
+        }
+        private static string ChooseSavePath(bool saveAs) => EditorUtility.SaveFilePanelInProject(saveAs ? "另存为" : "保存", App.TextAsset != null ? App.TextAsset.name : "Action", "json", "选择新文件路径，不会覆盖已有资源。");
+        public static void SaveAs()
+        {
+            if (App.Session.IsEditing) throw new InvalidOperationException("请先完成或取消当前编辑，再另存为。");
+            var path = ChooseSavePath(true);
+            if (!string.IsNullOrEmpty(path))
+            {
+                path = DocumentCreationService.ValidateNewPath(path);
+                App.SaveAssetTo(path);
+            }
+        }
+        public static void PopulateSaveMenu(Action<string, Action> add)
+        {
+            add("保存", App.SaveAsset);
+            add("另存为…", SaveAs);
         }
     }
 }

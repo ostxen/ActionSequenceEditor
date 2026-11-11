@@ -27,6 +27,7 @@ READ_ONLY = frozenset({
 
 # Explicit catalog, not a prefix heuristic. Only implemented return/poll contracts are admitted.
 MUTATIONS = {
+    "actioneditor.validation cancel_save_dialog": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation rf18_move": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation rf18_reference_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation sync_projects": {"dry_run": True, "confirm": True, "poll": None},
@@ -326,6 +327,12 @@ class Unity:
 
     def preview(self, command, parameters, inputs=()):
         validate_parameters(parameters)
+        if command == "actioneditor.validation cancel_save_dialog":
+            if parameters:
+                blocked("Fixed dialog recovery accepts no parameters.")
+            from .modal import save_dialog
+            instance = parse_instances(self.raw(["pipeline", "editors"]), self.context.project)
+            return make_plan(self.run, "unity", command, {}, high_risk=True, inputs=inputs, preview=save_dialog(instance["pid"]))
         if command in {"actioneditor.validation controlled_quit", "actioneditor.validation rf17_move", "actioneditor.validation rf18_move", "actioneditor.validation rf18_reference_probe", "actioneditor.validation sync_projects"} and parameters:
             blocked("Fixed operation accepts no parameters; targets cannot be overridden.")
         if command not in MUTATIONS:
@@ -340,6 +347,16 @@ class Unity:
         if plan.get("kind") != "unity" or plan.get("command") not in MUTATIONS:
             blocked("Unsupported Unity mutation plan.")
         validate_parameters(plan["parameters"])
+        if plan["command"] == "actioneditor.validation cancel_save_dialog":
+            if plan["parameters"]:
+                blocked("Fixed dialog recovery accepts no parameters.")
+            from .modal import save_dialog, cancel_save_dialog
+            instance = parse_instances(self.raw(["pipeline", "editors"]), self.context.project)
+            current = save_dialog(instance["pid"])
+            if current != plan.get("preview"):
+                blocked("Native save dialog changed since preview.")
+            consume_approval(self.run, plan, approval_file)
+            return cancel_save_dialog(current)
         if plan["command"] in {"actioneditor.validation controlled_quit", "actioneditor.validation rf17_move", "actioneditor.validation rf18_move", "actioneditor.validation rf18_reference_probe", "actioneditor.validation sync_projects"} and plan["parameters"]:
             blocked("Fixed operation accepts no parameters.")
         self.ready()

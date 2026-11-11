@@ -33,8 +33,11 @@ namespace NBC.ActionEditor
             if (width < 80) width = 80;
             if (GUILayout.Button($"[{gName}]", EditorStyles.toolbarDropDown, GUILayout.Width(width)))
             {
-                App.AutoSave();
-                ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, ActionEditorHost.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath);
+                EditorApplication.delayCall += () =>
+                {
+                    if (ActionEditorHost.ConfirmDocumentSwitch())
+                        ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, ActionEditorHost.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath);
+                };
             }
         }
 
@@ -51,7 +54,13 @@ namespace NBC.ActionEditor
             if (GUILayout.Button(new GUIContent(Styles.SaveIcon, Lan.Save), EditorStyles.toolbarButton,
                     GUILayout.Width(26)))
             {
-                App.AutoSave(); //先保存当前的
+                EditorApplication.delayCall += App.SaveAsset;
+            }
+            if (Event.current.type == EventType.ContextClick && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+            {
+                var menu = new GenericMenu();
+                ActionEditorHost.PopulateSaveMenu((label, action) => menu.AddItem(new GUIContent(label), false, () => action()));
+                menu.ShowAsContext(); Event.current.Use();
             }
 
             Prefs.MagnetSnapping = GUILayout.Toggle(Prefs.MagnetSnapping,

@@ -14,10 +14,13 @@ namespace NBC.ActionEditor.Tests
     {
         private TextAsset previousText;
         private string previousRecovery;
+        private Func<string> previousSaveRequest;
         [SetUp] public void SetUp()
         {
             previousText = App.TextAsset;
             previousRecovery = App.Session.CaptureRecovery();
+            previousSaveRequest = App.SavePathRequested;
+            App.SavePathRequested = () => null;
             App.TextAsset = null;
         }
         [TearDown] public void TearDown()
@@ -25,6 +28,7 @@ namespace NBC.ActionEditor.Tests
             App.Session.CancelEdit();
             App.TextAsset = previousText;
             App.Session.RestoreRecovery(previousRecovery);
+            App.SavePathRequested = previousSaveRequest;
         }
         [UnityTest]
         public IEnumerator SelectingLegacyJsonDrawsOriginalTimelineWithoutOpeningWorkbench()
@@ -53,7 +57,8 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(middle.Position.height, Is.GreaterThan(200));
                 Assert.That(TimelineMiddleView.GetLastItem(), Is.Not.Null);
                 Assert.That(Resources.FindObjectsOfTypeAll<ActionWorkbench>(), Is.EquivalentTo(workbenches));
-                Assert.Throws<InvalidOperationException>(() => App.SaveAsset(), "In-memory fixture has no persistent save path.");
+                Assert.DoesNotThrow(() => App.SaveAsset(), "Canceling the save path leaves the in-memory fixture unchanged.");
+                Assert.That(App.TextAsset, Is.SameAs(json));
             }
             finally
             {
@@ -103,7 +108,8 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(App.AssetData, Is.SameAs(document));
                 Assert.That(App.TextAsset, Is.SameAs(target));
                 foreach (var window in Resources.FindObjectsOfTypeAll<JsonActionWorkbench>()) Assert.That(window.Document, Is.SameAs(document));
-                Assert.Throws<InvalidOperationException>(() => App.SaveAsset());
+                Assert.DoesNotThrow(() => App.SaveAsset());
+                Assert.That(App.AssetData, Is.SameAs(document));
             }
             finally
             {

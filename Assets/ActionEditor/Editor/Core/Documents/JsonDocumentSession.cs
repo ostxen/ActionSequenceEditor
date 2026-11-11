@@ -31,6 +31,7 @@ namespace NBC.ActionEditor.Storage
     {
         public Asset Document { get; private set; }
         public string Path { get; private set; }
+        public TextAsset Source => store.Load(Path);
         public bool IsDirty => Document != null && Content(Document) != saved;
         public event Action Changed;
         public bool IsEditing => pending != null;
@@ -50,7 +51,9 @@ namespace NBC.ActionEditor.Storage
             if (data == null || data.Version != 1 || data.FormatId != "actioneditor.json" || data.SavedJson == null || data.Saved == null)
                 throw new System.IO.InvalidDataException("Unsupported recovery contract.");
             var document = Decode(data.Json);
-            Decode(data.SavedJson);
+            var baseline = Decode(data.SavedJson);
+            if (Content(baseline) != data.Saved) throw new System.IO.InvalidDataException("Inconsistent recovery baseline.");
+            if (!string.IsNullOrEmpty(data.Path)) data.Path = ValidatePath(data.Path);
             var bytes = string.IsNullOrEmpty(data.Revision) ? null : Convert.FromBase64String(data.Revision);
             ReleaseState(); Document = document; Path = data.Path; saved = data.Saved; savedJson = data.SavedJson; revision = bytes; pending = null;
             state = ScriptableObject.CreateInstance<JsonUndoState>(); state.hideFlags = HideFlags.HideAndDontSave; state.Json = Encode(document);
@@ -60,11 +63,11 @@ namespace NBC.ActionEditor.Storage
         private string saved;
         private string savedJson;
         private byte[] revision;
-        private readonly JsonDocumentStore store = new JsonDocumentStore();
+        private readonly JsonDocumentStore store;
         private string pending;
         private JsonEditTransaction transaction;
         private readonly object legacyOwner = new object();
-        public JsonDocumentSession() { Undo.undoRedoPerformed += UndoRedo; }
+        public JsonDocumentSession(JsonDocumentStore store = null) { this.store = store ?? new JsonDocumentStore(); Undo.undoRedoPerformed += UndoRedo; }
 
         public static string Encode(Asset asset) => JsonDocumentCodec.Encode(asset);
         public static Asset Decode(string json) => JsonDocumentCodec.Decode(json);
@@ -157,13 +160,14 @@ namespace NBC.ActionEditor.Storage
         public void Save(string target = null)
         {
             if (Document == null) throw new InvalidOperationException("没有打开的文档。");
+            if (IsEditing) throw new InvalidOperationException("请先完成或取消当前编辑，再保存。");
             target = ValidatePath(target ?? Path);
             var same = string.Equals(target, Path, StringComparison.OrdinalIgnoreCase);
             var committed = store.Commit(target, Document, same ? revision : null);
             // Advance the baseline before import: committed bytes must stay known if import fails.
-            Path = target; revision = committed.Revision; saved = Content(Document); savedJson = committed.Json;
-            store.Import(target);
-            Changed?.Invoke();
+            Path = target; revision = committed.Revision; saved = JsonDocumentCodec.ContentOfSnapshot(committed.Json); savedJson = committed.Json;
+            try { store.Import(target); }
+            finally { Changed?.Invoke(); }
         }
         public string CreateSaveSnapshot() => JsonDocumentCodec.CreateSaveSnapshot(Document);
         public static string ValidatePath(string path) => JsonDocumentStore.ValidatePath(path);

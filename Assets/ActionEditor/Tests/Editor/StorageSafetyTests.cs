@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Samples.LegacyExperience;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace NBC.ActionEditor.Tests
 {
@@ -13,10 +15,12 @@ namespace NBC.ActionEditor.Tests
         {
             public readonly Dictionary<string, byte[]> Data = new();
             public string Failure;
+            public int Writes;
             public bool Exists(string path) => Data.ContainsKey(path);
             public byte[] Read(string path) => Data[path];
             public void Write(string path, byte[] bytes)
             {
+                Writes++;
                 if (Failure == "write") throw new UnauthorizedAccessException();
                 Data.Add(path, Failure == "corrupt" ? new byte[] { 0 } : bytes);
             }
@@ -89,6 +93,57 @@ namespace NBC.ActionEditor.Tests
                 if (File.Exists(target)) File.Delete(target);
                 Directory.Delete(root);
             }
+        }
+        [Test] public void CreateOnlyCommitRejectsExistingTargetWithoutReplacingIt()
+        {
+            var files = new Files(); files.Data["document"] = new byte[] { 1 };
+            Assert.Throws<IOException>(() => new ReliableFileCommit(files).Save("document", () => new byte[] { 2 }, _ => { }, createOnly: true));
+            Assert.That(files.Data["document"], Is.EqualTo(new byte[] { 1 })); Assert.That(files.Writes, Is.Zero);
+        }
+        [Test] public void ImportFailureKeepsCommittedPathBaselineAndExactRevisionWithoutReplaying()
+        {
+            const string path = "Assets/ActionEditor/RF19-Fake.json";
+            var files = new Files(); var imports = 0;
+            var store = new JsonDocumentStore(files, _ => { imports++; throw new InvalidOperationException("Injected import failure"); });
+            using var session = new JsonDocumentSession(store);
+            var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
+            try
+            {
+                session.Open(memory); session.Edit("change", () => ((LegacyExperienceAsset)session.Document).Version = 7);
+                var source = session.Document;
+                var failure = Assert.Throws<IOException>(() => session.Save(path));
+                Assert.That(failure.Message, Does.Contain("字节已提交")); Assert.That(imports, Is.EqualTo(1));
+                Assert.That(files.Writes, Is.EqualTo(1)); Assert.That(session.Path, Is.EqualTo(path));
+                Assert.That(session.Document, Is.SameAs(source)); Assert.That(session.IsDirty, Is.False);
+                var committed = files.Data[path].ToArray();
+                using var recovered = new JsonDocumentSession(store); recovered.RestoreRecovery(session.CaptureRecovery());
+                recovered.Edit("change", () => ((LegacyExperienceAsset)recovered.Document).Version = 8);
+                files.Data[path] = new byte[] { 42 };
+                Assert.Throws<IOException>(() => recovered.Save());
+                Assert.That(files.Data[path], Is.EqualTo(new byte[] { 42 })); Assert.That(files.Writes, Is.EqualTo(1));
+                files.Data[path] = committed;
+                Assert.Throws<IOException>(() => recovered.Save());
+                Assert.That(imports, Is.EqualTo(2)); Assert.That(files.Writes, Is.EqualTo(2)); Assert.That(recovered.IsDirty, Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(memory); }
+        }
+        [Test] public void StoreRejectsMetaAndDirectoryTargetsAndSaveDoesNotEndActiveGesture()
+        {
+            var files = new Files(); var store = new JsonDocumentStore(files, _ => { });
+            const string path = "Assets/ActionEditor/RF19-Fake.json";
+            files.Data[path + ".meta"] = new byte[] { 1 };
+            Assert.Throws<IOException>(() => store.Commit(path, new LegacyExperienceAsset(), null));
+            Assert.That(files.Writes, Is.Zero);
+            using var session = new JsonDocumentSession(store);
+            var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
+            try
+            {
+                session.Open(memory); var source = session.Document; using var token = session.BeginEdit(this);
+                ((LegacyExperienceAsset)source).Version = 9;
+                Assert.Throws<InvalidOperationException>(() => session.Save(path));
+                Assert.That(token.IsActive, Is.True); Assert.That(session.Document, Is.SameAs(source)); Assert.That(files.Writes, Is.Zero);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(memory); }
         }
     }
 }

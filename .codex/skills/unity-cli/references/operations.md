@@ -33,6 +33,8 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
+`actioneditor.validation cancel_save_dialog`是Windows固定模态恢复，不是Pipeline代码执行：只读CLI实例列表绑定本工程唯一PID，EnumWindows只筛该PID、#32770、保存/Save/Save As/另存为及IDCANCEL取消按钮；preview记录句柄与按钮，approve/apply复核PID/句柄/指纹后仅PostMessage WM_COMMAND IDCANCEL。无参数、不选文件、不保存/覆盖、不退出或强杀；其他模态/多个匹配拒绝。只用于本系列测试已明确触发的保存框；返回cancel_requested后重新查询实际状态，不冒充取消已完成。
+
 RF18增加三个固定零参数审核命令，均按独立preview/approve/apply并引用本系列真实连续授权：`actioneditor.validation rf18_move`只移动RF16-C指定的FullSerializerExtensions.cs至Runtime/Serialization，核对固定GUID、源码/meta哈希及目标不存在，再由Unity生成项目；`actioneditor.validation rf18_reference_probe`只新建不存在的Assets/ActionEditorValidationRF18，创建References.asset主/子Texture2D和Document.json，用唯一新格式写盘、卸载后按GUID/localFileId解析，验证类型不符/资源失效拒绝，finally仅删除本次目录，不接触当前会话或全工程SaveAssets；`actioneditor.validation sync_projects`只调用Unity当前IDE的SyncAll生成sln/csproj，不写源码/配置。禁止任意路径/代码/force覆盖。超时先检查目标，不重放。
 
 `actioneditor.validation rf17_move` 为RF17固定79个源码移动命令，只接受confirm/dry-run，不接受路径或代码。清单固化自任务记录RF16-C并与原GUID逐项复核；预览列出精确源/目标/GUID/源码与meta哈希、新目录及Unity项目重新生成。拒绝源身份变化、既有目标或未登记目录；apply通过AssetDatabase创建所需目录并批量移动，保留原空目录，逐项核对GUID及源码/meta字节后使用Unity当前IDE集成重新生成真实项目。不写JSON、Combat、包或设置、不删除/覆盖、不声称Unity Undo可恢复。部分失败不自动回滚或重放，先检查已完成清单。2026-11-11用户“各种授权我都允许了，在这个系列任务中，不要等我回复而中断操作”覆盖本系列最小审核扩展及该精确移动，但仍独立preview/approve/apply，审批引用真实授权。

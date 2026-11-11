@@ -22,9 +22,10 @@ namespace NBC.ActionEditor.Validation
             if (Directory.Exists(Root) || File.Exists(Root) || File.Exists(Root + ".meta")) throw new IOException("Fixture exists; refusing overwrite.");
             if (dryRun) return new
             {
-                schema = 1, root = Root, targets = new[] { Path },
+                schema = 1, root = Root, targets = new[] { Path, Root + "/Alternate.json" },
                 operations = new[] { "capture and finally restore current in-memory session including unsaved content",
-                    "create isolated Shared.json from the existing sample type", "edit through common JSON session",
+                    "create and open isolated Shared.json through DocumentCreationService", "edit through common JSON session",
+                    "save-as to new Alternate.json and verify current source switches, then reopen Shared.json",
                     "atomic save, Undo/Redo saved-state tracking and reload", "save public graph time edits with stale derived duration and reload",
                     "discard committed and pending edits to the last saved baseline without writing bytes or losing disk revision",
                     "eight fractional timeline edit/save/import/reload cycles with exact float preservation",
@@ -44,9 +45,10 @@ namespace NBC.ActionEditor.Validation
             {
                 ownsFolder = !string.IsNullOrEmpty(AssetDatabase.CreateFolder("Assets", "ActionEditorValidationR10"));
                 if (!ownsFolder) throw new IOException("Could not create fixture folder.");
+                var created = DocumentCreationService.Create(typeof(LegacyExperienceAsset), Path);
+                App.TextAsset = created;
+                Require(App.Session.Path == Path && App.TextAsset == created, "Create/open did not bind source.");
                 memory = new TextAsset(JsonDocumentSession.Encode(new LegacyExperienceAsset()));
-                App.TextAsset = memory;
-                App.Session.Save(Path);
                 Require(!App.Session.IsDirty, "New save is dirty.");
                 App.Session.Edit("R10 payload", () =>
                 {
@@ -73,8 +75,7 @@ namespace NBC.ActionEditor.Validation
                     Require(refused && string.IsNullOrEmpty(other.Path) && File.ReadAllBytes(Path).SequenceEqual(committed), "Save-as overwrote an existing fixture.");
                 }
                 var beforeOpen = App.AssetData;
-                var invalid = new LegacyExperienceAsset(); invalid.groups.Add(null);
-                var invalidText = new TextAsset(JsonDocumentSession.Encode(invalid));
+                var invalidText = new TextAsset("{\"format\":\"actioneditor.json\",\"version\":1,\"document\":null}");
                 try
                 {
                     var refused = false;
@@ -91,6 +92,10 @@ namespace NBC.ActionEditor.Validation
                     Require(!restored.IsDirty && restored.Path == Path && ((LegacyExperienceAsset)restored.Document).Version == 42, "Recovery lost saved baseline.");
                 }
                 App.Session.DiscardChanges();
+                var alternate = Root + "/Alternate.json";
+                App.Session.Save(alternate);
+                Require(App.Session.Path == alternate && AssetDatabase.GetAssetPath(App.TextAsset) == alternate && !App.Session.IsDirty, "Save-as did not switch source and baseline.");
+                App.TextAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Path);
                 App.Session.Edit("R10 locked payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 43);
                 using (var locked = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {

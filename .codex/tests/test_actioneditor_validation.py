@@ -12,6 +12,19 @@ from workflow_lib.unity import Unity, READ_ONLY, MUTATIONS
 
 
 class ActionEditorValidationTests(unittest.TestCase):
+    def test_native_save_cancel_is_fixed_mutation_and_rejects_all_parameters(self):
+        command = "actioneditor.validation cancel_save_dialog"
+        self.assertNotIn(command, READ_ONLY)
+        self.assertIn(command, MUTATIONS)
+        unity = Unity(SimpleNamespace(context=Context()))
+        unity.raw = Mock()
+        for parameters in ({"pid": 1}, {"handle": 1}, {"force": True}):
+            with self.assertRaises(WorkflowError):
+                unity.preview(command, parameters)
+            with self.assertRaises(WorkflowError):
+                unity.apply({"kind": "unity", "command": command, "parameters": parameters}, "unused")
+        unity.raw.assert_not_called()
+
     def test_rf18_operations_reject_target_or_code_overrides(self):
         for name in ("rf18_move", "rf18_reference_probe", "sync_projects"):
             command = "actioneditor.validation " + name
