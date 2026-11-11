@@ -182,8 +182,12 @@ namespace NBC.ActionEditor.Workbench
             foreach (var group in Asset.groups) { rows.Add(group); if (!group.IsCollapsed) rows.AddRange(group.Tracks); }
             return rows;
         }
-        public Rect ClipRect(Clip clip, int row) => new Rect(X(clip.StartTime) - (clip.Length == 0 ? 4 : 0), row * 28 - owner.ScrollY,
-            clip.Length == 0 ? 8 : Mathf.Max(4, clip.Length * Scale), 26);
+        public Rect ClipRect(Clip clip, int row)
+        {
+            var point = DirectableTypeInfo.For(clip.GetType()).IsSignal || clip.Length == 0;
+            return new Rect(X(clip.StartTime) - (point ? 4 : 0), row * 28 - owner.ScrollY,
+                point ? 8 : Mathf.Max(4, clip.Length * Scale), 26);
+        }
         public Clip Hit(Vector2 p)
         {
             if (p.x < Left) return null;

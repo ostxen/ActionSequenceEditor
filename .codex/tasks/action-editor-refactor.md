@@ -2,9 +2,9 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01–RF05工程验收 `complete`，人工体验待用户次日验收；RF06–RF15 `planned`。Combat 专属实施与验收暂缓。
+- 总体状态：RF01–RF06工程验收 `complete`，人工体验待用户次日验收；RF07–RF15 `planned`。Combat 专属实施与验收暂缓。
 - 当前执行任务：2026-11-10用户要求夜间继续、人工差异次日汇总验收；缩放步长明确采用新版。每项实现并通过工程验收后本地中文提交，连同ActionEditor专属文档，不推送。
-- 下一步：RF05工程验收通过，独立本地提交后进入RF06类型目录；持久样本继续遵守preview/真实授权/approve/apply。人工体验清单见文末。
+- 下一步：RF06工程验收通过，独立本地提交后进入RF07结构命令。2026-11-11用户明确要求一直继续直至本系列结束，不逐项等待继续指令；不扩大持久写入、包/设置、Combat、删除及人工验收授权。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -127,7 +127,7 @@
 | [x] | RF03 | complete（工程验收；人工待验） | 应用上下文、状态所有权与窗口适配 | RF02 | RF1 |
 | [x] | RF04 | complete（工程验收；人工待验） | 编辑事务令牌与取消生命周期 | RF03 | RF1 |
 | [x] | RF05 | complete（工程验收；人工待验） | 会话、编解码与存储边界 | RF04 | RF1 |
-| [ ] | RF06 | planned | 类型目录、能力与扩展解析 | RF05 | RF2 |
+| [x] | RF06 | complete（工程验收；人工待验） | 类型目录、能力与扩展解析 | RF05 | RF2 |
 | [ ] | RF07 | planned | 创建及结构编辑命令归一 | RF06 | RF2 |
 | [ ] | RF08 | planned | 可见布局、坐标与命中归一 | RF07 | RF3 |
 | [ ] | RF09 | planned | 移动、拉伸、吸附与拖动反馈归一 | RF08 | RF3 |
@@ -967,3 +967,14 @@
 - 最终离线 `.codex/runs/20261111T002423Z-c23ff66c/report.md`：工作流**41/41**，真实方案18projects/**639sources**、**0errors/43warnings**，两个新增源码纳入真实编译、meta由Unity生成。完整code profile仍缺yaml/markdown_it blocked，未安装。git diff --check提交前检查。
 - 保留策略与缺口：自动保存定时器已有IsEditing保护，实测App.AutoSave和活动事务时TryAutoSave，未篡改个人自动保存时长或时钟以冒充定时器到期端到端。显式保存不强制提交/取消当前事务，保留既有入口行为，本项不新增活动手势中的快捷键路由；焦点消费归RF10。另存成功使用内存文档Save(target)的真实新建路径，既有另存目标拒绝覆盖；未新增第二持久目标以越过固定授权范围。系统文件对话框、跨重启Unity对象引用、真实导入失败、完整域重载、PlayerBuild/Combat/性能/其他DPI未验，不据本样例声称用户原文件问题全部解决。
 - 修改范围：Session、Codec/Store及其Unity生成meta、SharedJsonTests、SharedJsonProbeCommands、唯一任务和两份专属设计文档。用户未跟踪JSON/Jsons.meta/个人配置不纳入；不推送。下一任务RF06。
+
+### RF06 执行与验收记录（2026-11-11）
+
+- 状态：`complete`（工程验收），用户本轮明确一直继续至系列结束；仍按编号串行、逐项中文本地提交，人工体验不代签。
+- DirectableTypeInfo缓存现有名称/菜单名/分类/颜色/Attachable/Unique和点事件、伸缩/渐入渐出属性能力。发现不实例化业务对象，不加载图标或预览；动态锁定/激活及Blend=-1仍逐实例判断。原CanScale声明类型语义保留，菜单名SplitCamelCase与显示名原始类型名分别保持。EditorTools与名称/颜色扩展和两UI能力调用消费缓存；菜单列表及Attachable数组返回副本，保持原名称→分类排序。
+- ActionEditorTypeCatalog缓存现有ReflectionTools已发现类型，不自行扫描所有程序集或执行构造器，排除未闭合泛型和Obsolete。EditorCustomFactory移除遍历所有IDirectable建立映射的路径，按目标缓存解析：精确优先，最近基类仅显式允许回退，绑定同目标的适配器子类保持覆盖父适配器；无继承关系冲突抛错列出双方AssemblyQualifiedName。CustomHeader保存原先丢弃的editorForChildClasses；Inspector不再无条件回退。默认Inspector仍存在；原生缺Header/自定义Inspector适配显式提示，未偷偷嵌入IMGUI。现有样例Header原生按钮与基础Clip属性回归通过。
+- 邻居真值表保持基线：两套属性编辑允许同类型CanCrossBlend的半长度交叉；拖动边缘不因此自动开放交叉。ClipTimingRules.NeighborBounds接收clip和真实邻居，两个属性面板共同调用；长度2、前片段[0,2]、后片段[4,8]，属性范围[1,5]、严格范围[2,4]，点事件[2,4]。本项不放松最短长度/拖动阈值；候选拖动统一归RF09。
+- 新增TypeCatalogTests五项：精确/显式继承/最近基类/派生适配器覆盖和冲突双方；菜单顺序独立重建比较及数组不污染缓存；点/区间、锁定不改变类型能力、Blend=-1；精确父级及Unique重复；属性/严格邻居真值表。已有SharedJson窗口/属性/指针回归同时运行。
+- Unitydoctor `20261111T004028Z-cb07f3c0` ready；完整回归先128/128、后129/129；最终 `.codex/runs/20261111T004858Z-5751791a/report.json` Unity编译passed，NBC.ActionEditor.Editor.Tests EditMode **130/130 passed**，0failed/skipped/inconclusive。没有磁盘JSON写入或系统菜单人工点击。
+- 离线 `20261111T004742Z-abaaa80d`工作流41/41、真实18projects/643sources、0errors/43warnings；之后仅补测试断言及一项测试，最后Unity完整编译/130项通过。完整code profile缺yaml/markdown_it仍blocked，未安装。四个新源码及meta由Unity生成，git diff --check提交前检查。
+- 未声称通过：第三方所有自定义绘制、动态加载程序集、其他DPI、人工菜单手感、Runtime实际PlayerBuild、完整预览工厂/异常资源释放（RF12）。元数据缓存不新增Runtime→Editor引用；不改Combat、包、设置、用户JSON。下一任务RF07。

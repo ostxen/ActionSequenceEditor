@@ -146,8 +146,10 @@ namespace NBC.ActionEditor.Workbench
                 if (headerType != Document?.GetType())
                 {
                     headerType = Document?.GetType(); customHeader.Clear();
-                    var header = Document == null ? null : EditorCustomFactory.GetHeader(Document)?.CreateGUI();
+                    var adapter = Document == null ? null : EditorCustomFactory.GetHeader(Document);
+                    var header = adapter?.CreateGUI();
                     if (header != null) customHeader.Add(header);
+                    else if (adapter != null) customHeader.Add(new Label("自定义Header尚未提供Toolkit适配") { tooltip = adapter.GetType().FullName });
                 }
                 Canvas.RefreshVisualState(); SyncView();
                 foreach (var view in inspectors.ToArray()) BuildProperties(view);

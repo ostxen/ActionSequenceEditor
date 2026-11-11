@@ -116,6 +116,7 @@ namespace NBC.ActionEditor
     [AttributeUsage(AttributeTargets.Class)]
     public class CustomHeader : Attribute
     {
+        public bool EditorForChildClasses { get; }
         public Type InspectedType;
 
         public CustomHeader(Type inspectedType)
@@ -125,6 +126,7 @@ namespace NBC.ActionEditor
 
         public CustomHeader(Type inspectedType, bool editorForChildClasses)
         {
+            EditorForChildClasses = editorForChildClasses;
             InspectedType = inspectedType;
         }
     }

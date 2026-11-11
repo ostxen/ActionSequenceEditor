@@ -27,6 +27,12 @@ namespace NBC.ActionEditor.Workbench
         public static void Populate(VisualElement root, object value, Action refresh)
         {
             if (value == null) return;
+            if (value is IData)
+            {
+                var adapter = EditorCustomFactory.GetInspectorType(value.GetType());
+                if (adapter != null && adapter != typeof(ActionClipInspector))
+                    root.Add(new HelpBox("自定义Inspector尚未提供Toolkit适配：" + adapter.FullName + "。以下仅显示通用字段。", HelpBoxMessageType.Warning));
+            }
             var title = new Label(value.GetType().RTGetAttribute<NameAttribute>(true)?.name ?? value.GetType().Name);
             title.style.fontSize = 18; title.style.unityFontStyleAndWeight = FontStyle.Bold; title.style.backgroundColor = new Color(0, 0, 0, .2f); root.Add(title);
             var description = value.GetType().RTGetAttribute<DescriptionAttribute>(true)?.description;
@@ -54,10 +60,8 @@ namespace NBC.ActionEditor.Workbench
         {
             if (!clip.IsValid) root.Add(new HelpBox("该剪辑无效。 请确保设置了所需的参数。", HelpBoxMessageType.Error));
             var previous = clip.GetPreviousSibling(); var next = clip.GetNextSibling();
-            var minimum = previous?.EndTime ?? clip.Parent.StartTime;
-            if (clip.CanCrossBlend(previous)) minimum -= Mathf.Min(clip.Length / 2, (previous.EndTime - previous.StartTime) / 2);
-            var maximum = next?.StartTime ?? clip.Parent.EndTime;
-            if (clip.CanCrossBlend(next)) maximum += Mathf.Min(clip.Length / 2, (next.EndTime - next.StartTime) / 2);
+            var bounds = ClipTimingRules.NeighborBounds(clip, previous, next, true);
+            var minimum = bounds.x; var maximum = bounds.y;
             void Apply(float start, float end)
             {
                 start = Mathf.Round(start / Prefs.SnapInterval) * Prefs.SnapInterval;

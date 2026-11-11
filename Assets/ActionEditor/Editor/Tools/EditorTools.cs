@@ -165,42 +165,7 @@ namespace NBC.ActionEditor
         /// <returns></returns>
         public static List<TypeMetaInfo> GetTypeMetaDerivedFrom(Type baseType)
         {
-            var infos = new List<TypeMetaInfo>();
-            foreach (var type in ReflectionTools.GetImplementationsOf(baseType))
-            {
-                if (type.GetCustomAttributes(typeof(System.ObsoleteAttribute), true).FirstOrDefault() != null)
-                {
-                    continue;
-                }
-
-                var info = new TypeMetaInfo
-                {
-                    type = type,
-                    name =
-                        type.GetCustomAttributes(typeof(NameAttribute), true).FirstOrDefault() is NameAttribute nameAtt
-                            ? nameAtt.name
-                            : type.Name.SplitCamelCase()
-                };
-
-                if (type.GetCustomAttributes(typeof(CategoryAttribute), true).FirstOrDefault() is CategoryAttribute
-                    catAtt)
-                {
-                    info.category = catAtt.category;
-                }
-
-                if (type.GetCustomAttributes(typeof(AttachableAttribute), true).FirstOrDefault() is AttachableAttribute
-                    attachAtt)
-                {
-                    info.attachableTypes = attachAtt.Types;
-                }
-
-                info.isUnique = type.IsDefined(typeof(UniqueAttribute), true);
-
-                infos.Add(info);
-            }
-
-            infos = infos.OrderBy(i => i.name).ThenBy(i => i.category).ToList();
-            return infos;
+            return ActionEditorTypeCatalog.DerivedFrom(baseType);
         }
 
 

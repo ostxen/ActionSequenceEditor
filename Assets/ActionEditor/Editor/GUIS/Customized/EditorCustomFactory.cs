@@ -6,155 +6,52 @@ namespace NBC.ActionEditor
 {
     public static class EditorCustomFactory
     {
-        #region Header
-
-        private static bool _initHeadersDic = false;
-        private static readonly Dictionary<Type, Type> _headerDic = new Dictionary<Type, Type>();
+        private static Type[] headers, inspectors;
+        private static readonly Dictionary<Type, Type> headerBindings = new Dictionary<Type, Type>();
+        private static readonly Dictionary<Type, Type> inspectorBindings = new Dictionary<Type, Type>();
+        public static void InitHeaderDic() { if (headers == null) headers = Discover(typeof(HeaderBase)); }
+        public static void InitInspectorDic() { if (inspectors == null) inspectors = Discover(typeof(InspectorsBase)); }
+        private static Type[] Discover(Type type) => ActionEditorTypeCatalog.DerivedFrom(type).Select(i => i.type).ToArray();
 
         public static HeaderBase GetHeader(Asset asset)
         {
+            if (asset == null) return null;
             InitHeaderDic();
-
-            var type = asset.GetType();
-            if (_headerDic.TryGetValue(type, out var t))
-            {
-                return Activator.CreateInstance(t) as HeaderBase;
-            }
-
-            return null;
+            if (!headerBindings.TryGetValue(asset.GetType(), out var type))
+                headerBindings[asset.GetType()] = type = ResolveExtension(headers, asset.GetType(), false);
+            return type == null ? null : (HeaderBase)Activator.CreateInstance(type);
         }
-
-        public static void InitHeaderDic()
+        public static InspectorsBase GetInspector(IData value)
         {
-            if (_initHeadersDic) return;
-
-            _initHeadersDic = true;
-
-            //先获取有绑定关系的所有对象和面板对象映射
-            Type type = typeof(HeaderBase);
-            var childs = EditorTools.GetTypeMetaDerivedFrom(type);
-            foreach (var t in childs)
-            {
-                var arrs = t.type.GetCustomAttributes(typeof(CustomHeader), true);
-                foreach (var arr in arrs)
-                {
-                    if (arr is CustomHeader c)
-                    {
-                        var bindT = c.InspectedType;
-                        var iT = t.type;
-                        if (!_headerDic.ContainsKey(bindT))
-                        {
-                            if (!iT.IsAbstract) _headerDic[bindT] = iT;
-                        }
-                        else
-                        {
-                            var old = _headerDic[bindT];
-                            if (!iT.IsAbstract && iT.IsSubclassOf(old))
-                            {
-                                _headerDic[bindT] = iT;
-                            }
-                        }
-                    }
-                }
-            }
+            var type = GetInspectorType(value.GetType());
+            var inspector = type == null ? new InspectorsBase() : (InspectorsBase)Activator.CreateInstance(type);
+            inspector.SetTarget(value); return inspector;
         }
 
-        #endregion
-
-        #region Inspectors
-
-        private static bool _initInspectorsDic = false;
-
-        private static readonly Dictionary<Type, Type> _inspectorsDic = new Dictionary<Type, Type>();
-
-        public static InspectorsBase GetInspector(IData directable)
+        public static Type GetInspectorType(Type target)
         {
             InitInspectorDic();
-
-            var type = directable.GetType();
-            InspectorsBase b = null;
-            // Debug.Log($"type={type}");
-            if (_inspectorsDic.ContainsKey(type))
-            {
-                var t = _inspectorsDic[type];
-                b = Activator.CreateInstance(t) as InspectorsBase;
-            }
-
-            if (b == null)
-            {
-                b = new InspectorsBase();
-            }
-
-            b.SetTarget(directable);
-            return b;
+            if (!inspectorBindings.TryGetValue(target, out var type))
+                inspectorBindings[target] = type = ResolveExtension(inspectors, target, true);
+            return type;
         }
 
-        public static void InitInspectorDic()
+        public static Type ResolveExtension(IEnumerable<Type> candidates, Type target, bool inspector)
         {
-            if (_initInspectorsDic) return;
-
-            _initInspectorsDic = true;
-
-            //先获取有绑定关系的所有对象和面板对象映射
-            Type type = typeof(InspectorsBase);
-            var childs = EditorTools.GetTypeMetaDerivedFrom(type);
-            foreach (var t in childs)
+            for (var current = target; current != null; current = current.BaseType)
             {
-                var arrs = t.type.GetCustomAttributes(typeof(CustomInspectors), true);
-                foreach (var arr in arrs)
-                {
-                    if (arr is CustomInspectors c)
-                    {
-                        var bindT = c.InspectedType;
-                        var iT = t.type;
-                        if (!_inspectorsDic.ContainsKey(bindT))
-                        {
-                            if (!iT.IsAbstract) _inspectorsDic[bindT] = iT;
-                        }
-                        else
-                        {
-                            var old = _inspectorsDic[bindT];
-                            //如果不是抽象类，且是子类就更新
-                            if (!iT.IsAbstract && iT.IsSubclassOf(old))
-                            {
-                                _inspectorsDic[bindT] = iT;
-                            }
-                        }
-                    }
-                }
+                var matches = candidates.Where(t => !t.IsAbstract && !t.ContainsGenericParameters &&
+                    (inspector ? t.GetCustomAttributes(typeof(CustomInspectors), true).Cast<CustomInspectors>()
+                        .Any(a => a.InspectedType == current && (current == target || a._editorForChildClasses))
+                    : t.GetCustomAttributes(typeof(CustomHeader), true).Cast<CustomHeader>()
+                        .Any(a => a.InspectedType == current && (current == target || a.EditorForChildClasses))))
+                    .Distinct().ToArray();
+                // Preserve the established more-derived adapter override, never assembly scan order.
+                var mostDerived = matches.Where(t => !matches.Any(other => other != t && t.IsAssignableFrom(other))).ToArray();
+                if (mostDerived.Length > 1) throw new InvalidOperationException("ActionEditor扩展冲突：" + current.AssemblyQualifiedName + " => "
+                    + string.Join("; ", mostDerived.OrderBy(t => t.AssemblyQualifiedName).Select(t => t.AssemblyQualifiedName)));
+                if (mostDerived.Length == 1) return mostDerived[0];
             }
-
-            //找出没有映射关系的对象，并绑定其最近父类的面板对象
-            var types = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes().Where(t => t.GetInterfaces().Contains(typeof(IDirectable))))
-                .ToArray();
-            foreach (var t in types)
-            {
-                if (!t.IsAbstract)
-                {
-                    var iT = TryAdd(_inspectorsDic, t);
-                    if (iT != null)
-                    {
-                        _inspectorsDic[t] = iT;
-                    }
-                }
-            }
-        }
-
-        #endregion
-
-        private static Type TryAdd(Dictionary<Type, Type> dictionary, Type type)
-        {
-            if (type != null && !dictionary.ContainsKey(type))
-            {
-                return TryAdd(dictionary, type.BaseType);
-            }
-
-            if (type != null && dictionary.ContainsKey(type))
-            {
-                return dictionary[type];
-            }
-
             return null;
         }
     }

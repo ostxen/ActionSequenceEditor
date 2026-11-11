@@ -41,18 +41,9 @@ namespace NBC.ActionEditor
         void ShowInOutControls()
         {
             var previousClip = action.GetPreviousSibling();
-            var previousTime = previousClip != null ? previousClip.EndTime : action.Parent.StartTime;
-            if (action.CanCrossBlend(previousClip))
-            {
-                previousTime -= Mathf.Min(action.Length / 2, (previousClip.EndTime - previousClip.StartTime) / 2);
-            }
-
             var nextClip = action.GetNextSibling();
-            var nextTime = nextClip != null ? nextClip.StartTime : action.Parent.EndTime;
-            if (action.CanCrossBlend(nextClip))
-            {
-                nextTime += Mathf.Min(action.Length / 2, (nextClip.EndTime - nextClip.StartTime) / 2);
-            }
+            var bounds = ClipTimingRules.NeighborBounds(action, previousClip, nextClip, true);
+            var previousTime = bounds.x; var nextTime = bounds.y;
 
             var canScale = action.CanScale();
             var doFrames = Prefs.timeStepMode == Prefs.TimeStepMode.Frames;

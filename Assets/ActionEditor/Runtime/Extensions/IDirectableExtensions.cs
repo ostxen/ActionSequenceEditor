@@ -49,24 +49,13 @@ namespace NBC.ActionEditor
 
         public static bool CanBlendIn(this IDirectable directable)
         {
-            var blendInProp = directable.GetType().GetProperty("BlendIn", BindingFlags.Instance | BindingFlags.Public);
-            return blendInProp != null && blendInProp.CanWrite && Math.Abs(directable.BlendIn - -1) > 0.0001f &&
-                   blendInProp.DeclaringType != typeof(Clip);
+            return DirectableTypeInfo.For(directable.GetType()).HasBlendIn && Math.Abs(directable.BlendIn - -1) > 0.0001f;
         }
 
-        public static bool CanBlendOut(this IDirectable directable)
-        {
-            var blendOutProp =
-                directable.GetType().GetProperty("BlendOut", BindingFlags.Instance | BindingFlags.Public);
-            return blendOutProp != null && blendOutProp.CanWrite && Math.Abs(directable.BlendOut - -1) > 0.0001f &&
-                   blendOutProp.DeclaringType != typeof(Clip);
-        }
+        public static bool CanBlendOut(this IDirectable directable) =>
+            DirectableTypeInfo.For(directable.GetType()).HasBlendOut && Math.Abs(directable.BlendOut - -1) > 0.0001f;
 
-        public static bool CanScale(this IDirectable directable)
-        {
-            var lengthProp = directable.GetType().GetProperty("Length", BindingFlags.Instance | BindingFlags.Public);
-            return lengthProp != null && lengthProp.CanWrite && lengthProp.DeclaringType != typeof(Clip);
-        }
+        public static bool CanScale(this IDirectable directable) => DirectableTypeInfo.For(directable.GetType()).CanScale;
 
         /// <summary>
         /// 当前开始时间是否可用
