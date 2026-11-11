@@ -34,93 +34,29 @@ namespace NBC.ActionEditor
             DrawDefaultInspector(target);
         }
 
-        public void DrawDefaultInspector(object obj)
+        public void DrawDefaultInspector(object obj, JsonPropertyPath rootPath = null)
         {
             if (obj == null) { EditorGUILayout.LabelField("null"); return; }
-            var t = obj.GetType();
-            //得到字段的值,只能得到public类型的字典的值
-            FieldInfo[] fieldInfos = t.GetFields(BindingFlags.Public | BindingFlags.Instance);
-            //排序一下，子类的字段在后，父类的在前
-            Array.Sort(fieldInfos, FieldsSprtBy);
-
-            //判断需要过滤不显示的字段
-            List<FieldInfo> needShowField = new List<FieldInfo>();
-            foreach (var field in fieldInfos)
-            {
-                var need = true;
-                var attributes = field.GetCustomAttributes();
-                foreach (var attribute in attributes)
-                {
-                    if (attribute is HideInInspector hide)
-                    {
-                        need = false;
-                        break;
-                    }
-
-                    if (attribute is OptionRelateParamAttribute option)
-                    {
-                        var relate = Array.Find(fieldInfos, f1 => f1.Name == option.argsName);
-                        if (relate != null)
-                        {
-                            var value = relate.GetValue(obj);
-                            var index = Array.FindIndex(option.argsValue, v1 => v1.Equals(value));
-                            if (index < 0)
-                            {
-                                need = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (need)
-                {
-                    needShowField.Add(field);
-                }
-            }
-
-            foreach (var field in needShowField)
-            {
-                FieldDefaultInspector(field, obj);
-            }
+            var descriptions = JsonFieldDescription.For(obj.GetType()).ToArray();
+            Array.Sort(descriptions, (first, second) => FieldsSprtBy(first.Field, second.Field));
+            foreach (var description in descriptions)
+                if (description.Visible(obj)) FieldDefaultInspector(description.Field, obj, rootPath);
         }
 
-        protected void FieldDefaultInspector(FieldInfo field, object obj)
+        protected void FieldDefaultInspector(FieldInfo field, object obj, JsonPropertyPath rootPath = null)
         {
+            var propertyPath = (rootPath ?? new JsonPropertyPath(obj)).Field(field);
             var fieldType = field.FieldType;
             var showType = field.FieldType;
             var value = field.GetValue(obj);
             var newValue = value;
 
-            var name = System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.ToTitleCase(field.Name);
-
+            var description = JsonFieldDescription.For(field);
+            var name = description.Label ?? System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.ToTitleCase(field.Name);
             List<object> args = new List<object>();
-
-            var attributes = field.GetCustomAttributes();
-            foreach (var attribute in attributes)
-            {
-                var t = attribute.GetType();
-                if (attribute is MenuNameAttribute menuNameAttribute)
-                {
-                    name = menuNameAttribute.showName;
-                }
-                else if (attribute is RangeAttribute rangeAttribute && fieldType == typeof(float))
-                {
-                    showType = t;
-                    args = new List<object> { rangeAttribute.min, rangeAttribute.max };
-                }
-                else if (attribute is OptionParamAttribute option)
-                {
-                    showType = t;
-                    args = new List<object> { option.classType };
-                }
-                else if (attribute is SelectObjectPathAttribute selectObjectPathAttribute)
-                {
-                    showType = t;
-                    args = new List<object> { selectObjectPathAttribute.type };
-                }
-            }
-
+            if (description.Range != null && fieldType == typeof(float)) { showType = typeof(RangeAttribute); args.Add(description.Range.min); args.Add(description.Range.max); }
+            if (description.Options != null) { showType = typeof(OptionParamAttribute); args = new List<object> { description.Options.classType }; }
+            if (description.ResourcePath != null) { showType = typeof(SelectObjectPathAttribute); args = new List<object> { description.ResourcePath.type }; }
 
             if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(List<>))
             {
@@ -141,7 +77,7 @@ namespace NBC.ActionEditor
                             if (DrawRemoveButton())
                             {
                                 EditorGUILayout.EndHorizontal();
-                                list.RemoveAt(i);
+                                propertyPath.Transform(current => Storage.JsonPropertyEditing.Remove(fieldType, (IList)current, i));
                                 i--;
                                 continue;
                             }
@@ -150,7 +86,8 @@ namespace NBC.ActionEditor
                             EditorGUILayout.BeginHorizontal();
                             GUILayout.Space(12);
                             EditorGUILayout.BeginVertical();
-                            list[i] = DrawElement(elementType, listItem);
+                            var updated = DrawElement(elementType, listItem, propertyPath.Element(i));
+                            if (!Equals(listItem, updated)) propertyPath.Element(i).Write(updated);
                             EditorGUILayout.EndVertical();
                             EditorGUILayout.EndHorizontal();
                             DrawDivider();
@@ -162,13 +99,9 @@ namespace NBC.ActionEditor
                     GUILayout.FlexibleSpace();
                     if (DrawAddButton())
                     {
-                        if (list == null)
-                        {
-                            list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType));
-                            field.SetValue(obj, list);
-                        }
-
-                        list.Add(CreateElement(elementType));
+                        var added = CreateElement(elementType);
+                        propertyPath.Transform(current => Storage.JsonPropertyEditing.Append(fieldType, (IList)current, added));
+                        list = (IList)propertyPath.Read();
                         SetFoldout(list, true);
                     }
 
@@ -203,19 +136,10 @@ namespace NBC.ActionEditor
                         if (DrawRemoveButton())
                         {
                             EditorGUILayout.EndHorizontal();
-                            Array newArray = Array.CreateInstance(elementType, array.Length - 1);
-                            for (int j = 0, k = 0; j < array.Length; j++)
-                            {
-                                if (j != i) // 跳过被移除的元素
-                                {
-                                    newArray.SetValue(array.GetValue(j), k);
-                                    k++;
-                                }
-                            }
-
+                            var newArray = (Array)Storage.JsonPropertyEditing.Remove(fieldType, array, i);
                             RemoveFoldout(value);
                             array = newArray;
-                            field.SetValue(obj, newArray);
+                            propertyPath.Write(newArray);
                             SetFoldout(newArray, true);
                             break; // 退出循环以避免数组长度更改引起的冲突
                         }
@@ -224,7 +148,8 @@ namespace NBC.ActionEditor
                         EditorGUILayout.BeginHorizontal();
                         GUILayout.Space(12);
                         EditorGUILayout.BeginVertical();
-                        array.SetValue(DrawElement(elementType, listItem), i);
+                        var updated = DrawElement(elementType, listItem, propertyPath.Element(i));
+                        if (!Equals(listItem, updated)) propertyPath.Element(i).Write(updated);
                         EditorGUILayout.EndVertical();
                         EditorGUILayout.EndHorizontal();
                         DrawDivider();
@@ -235,16 +160,10 @@ namespace NBC.ActionEditor
                     GUILayout.FlexibleSpace();
                     if (DrawAddButton())
                     {
-                        Array newArray = Array.CreateInstance(elementType, array != null ? array.Length + 1 : 1);
-                        if (array != null)
-                        {
-                            array.CopyTo(newArray, 0);
-                        }
-
-                        newArray.SetValue(CreateElement(elementType), newArray.Length - 1);
+                        var newArray = (Array)Storage.JsonPropertyEditing.Append(fieldType, array, CreateElement(elementType));
                         RemoveFoldout(value);
                         array = newArray;
-                        field.SetValue(obj, array);
+                        propertyPath.Write(array);
                         SetFoldout(newArray, true);
                     }
 
@@ -334,23 +253,15 @@ namespace NBC.ActionEditor
             }
             else if (showType == typeof(OptionParamAttribute))
             {
-                // LookAtType.None
-                var t = (Type)args[0];
-                var fields = t.GetFields();
-                //先对fields排序
-                Array.Sort(fields, FieldsSort);
-
-                var title = new List<string>();
-                var mask = 0;
-                foreach (var f in fields)
+                var constants = description.Constants;
+                var labels = constants.Select(f => f.GetCustomAttribute<MenuNameAttribute>()?.showName ?? f.Name).ToArray();
+                if (labels.Length > 0)
                 {
-                    var menuNameAttr = f.GetCustomAttribute<MenuNameAttribute>();
-                    title.Add(menuNameAttr != null ? menuNameAttr.showName : f.Name);
+                    var currentIndex = description.OptionIndex(value);
+                    EditorGUI.BeginChangeCheck();
+                    var selected = EditorGUILayout.Popup(name, Mathf.Max(0, currentIndex), labels);
+                    if (EditorGUI.EndChangeCheck()) newValue = constants[selected].GetRawConstantValue();
                 }
-
-                mask = (int)value;
-
-                newValue = EditorGUILayout.Popup(name, mask, title.ToArray());
             }
             else if (showType == typeof(SelectObjectPathAttribute))
             {
@@ -371,8 +282,8 @@ namespace NBC.ActionEditor
                 }
             }
 
-            if (value != newValue)
-                field.SetValue(obj, newValue);
+            if (!Equals(value, newValue))
+                propertyPath.Write(newValue);
         }
 
         private int FieldsSprtBy(FieldInfo f1, FieldInfo f2)
@@ -393,15 +304,9 @@ namespace NBC.ActionEditor
             return 0;
         }
 
-        public static object CreateElement(Type type)
-        {
-            if (type == typeof(string)) return "";
-            if (typeof(Object).IsAssignableFrom(type)) return null;
-            if (type.IsAbstract || type.IsInterface || !type.IsValueType && type.GetConstructor(Type.EmptyTypes) == null) return null;
-            return Activator.CreateInstance(type);
-        }
+        public static object CreateElement(Type type) => Storage.JsonPropertyEditing.CreateElement(type);
 
-        private object DrawElement(Type type, object value)
+        private object DrawElement(Type type, object value, JsonPropertyPath propertyPath)
         {
             if (type == typeof(string)) return EditorGUILayout.TextField(value as string ?? "");
             if (type == typeof(int)) return EditorGUILayout.IntField(value == null ? 0 : (int)value);
@@ -418,7 +323,7 @@ namespace NBC.ActionEditor
                 if (GUILayout.Button("创建元素")) return CreateElement(type);
                 return null;
             }
-            DrawDefaultInspector(value); return value;
+            DrawDefaultInspector(value, propertyPath); return value;
         }
 
         protected virtual bool DrawRemoveButton() => GUILayout.Button("X", GUILayout.Width(20));

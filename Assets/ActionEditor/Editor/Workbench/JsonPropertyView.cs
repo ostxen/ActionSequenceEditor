@@ -49,7 +49,7 @@ namespace NBC.ActionEditor.Workbench
             DrawFields(root, value, refresh, 0);
         }
 
-        private static void Change(Action change) => App.Session.Edit("Edit properties", change);
+        private static void Change(Action change) => JsonPropertyEditing.Change(change);
         private static VisualElement Box(VisualElement root)
         {
             var box = new VisualElement(); box.style.marginTop = box.style.marginBottom = 2;
@@ -125,31 +125,27 @@ namespace NBC.ActionEditor.Workbench
             field.RegisterValueChangedCallback(evt => changed(evt.newValue)); root.Add(field);
         }
 
-        public static void DrawFields(VisualElement root, object obj, Action refresh, int depth)
+        public static void DrawFields(VisualElement root, object obj, Action refresh, int depth, JsonPropertyPath propertyPath = null)
         {
             if (obj == null || depth > 6) return;
-            foreach (var field in obj.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance))
+            propertyPath ??= new JsonPropertyPath(obj);
+            foreach (var description in JsonFieldDescription.For(obj.GetType()))
             {
-                if (field.IsInitOnly || field.IsDefined(typeof(HideInInspector))) continue;
-                var condition = field.GetCustomAttribute<OptionRelateParamAttribute>();
-                if (condition != null)
-                {
-                    var related = obj.GetType().GetField(condition.argsName);
-                    if (related != null && !condition.argsValue.Any(v => Equals(v, related.GetValue(obj)))) continue;
-                }
-                var label = field.GetCustomAttribute<MenuNameAttribute>()?.showName ?? field.Name;
+                var field = description.Field;
+                if (field.IsInitOnly || !description.Visible(obj)) continue;
+                var label = description.Label ?? field.Name;
                 var current = field.GetValue(obj);
                 var type = field.FieldType;
-                void Set(object next) { Change(() => field.SetValue(obj, next)); refresh(); }
-                var options = field.GetCustomAttribute<OptionParamAttribute>();
-                var path = field.GetCustomAttribute<SelectObjectPathAttribute>();
-                var range = field.GetCustomAttribute<RangeAttribute>();
+                var pathToField = propertyPath.Field(field);
+                void Set(object next) { pathToField.Write(next); refresh(); }
+                var options = description.Options;
+                var path = description.ResourcePath;
+                var range = description.Range;
                 if (range != null && type == typeof(float)) Bind(root, new Slider(label, range.min, range.max) { showInputField = true }, current, Set);
                 else if (range != null && type == typeof(int)) Bind(root, new SliderInt(label, Mathf.CeilToInt(range.min), Mathf.FloorToInt(range.max)) { showInputField = true }, current, Set);
                 else if (options != null && type == typeof(int))
                 {
-                    var constants = options.classType.GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => f.IsLiteral && f.FieldType == typeof(int))
-                        .OrderBy(f => f.GetCustomAttribute<OptionSortAttribute>()?.sort ?? 99).ToArray();
+                    var constants = description.Constants.ToArray();
                     var labels = constants.Select(f => f.GetCustomAttribute<MenuNameAttribute>()?.showName ?? f.Name).ToList();
                     if (labels.Count == 0) continue;
                     var control = new PopupField<string>(label, labels, Math.Max(0, Array.FindIndex(constants, f => Equals(f.GetRawConstantValue(), current))));
@@ -160,7 +156,7 @@ namespace NBC.ActionEditor.Workbench
                     var control = new ObjectField(label) { objectType = path.type, allowSceneObjects = false, value = AssetDatabase.LoadAssetAtPath<Object>(current as string ?? "") };
                     control.RegisterValueChangedCallback(e => Set(AssetDatabase.GetAssetPath(e.newValue))); root.Add(control);
                 }
-                else DrawValue(root, label, type, current, Set, refresh, depth);
+                else DrawValue(root, label, type, current, Set, refresh, depth, pathToField);
             }
         }
 
@@ -170,7 +166,7 @@ namespace NBC.ActionEditor.Workbench
             control.RegisterValueChangedCallback(e => set(e.newValue)); root.Add(control);
         }
 
-        private static void DrawValue(VisualElement root, string label, Type type, object value, Action<object> set, Action refresh, int depth)
+        private static void DrawValue(VisualElement root, string label, Type type, object value, Action<object> set, Action refresh, int depth, JsonPropertyPath propertyPath)
         {
             if (type == typeof(string)) Bind(root, new TextField(label) { isDelayed = true }, value, set);
             else if (type == typeof(float)) Bind(root, new FloatField(label) { isDelayed = true }, value, set);
@@ -206,35 +202,23 @@ namespace NBC.ActionEditor.Workbench
                 {
                     var index = i;
                     var row = new VisualElement(); row.style.marginLeft = 10; fold.Add(row);
-                    DrawValue(row, "Element " + i, elementType, list[i], next => { Change(() => list[index] = next); refresh(); }, refresh, depth + 1);
+                    DrawValue(row, "Element " + i, elementType, list[i], next => { propertyPath.Element(index).Write(next); refresh(); }, refresh, depth + 1, propertyPath.Element(index));
                     row.Add(new Button(() =>
                     {
-                        if (type.IsArray)
-                        {
-                            var array = Array.CreateInstance(elementType, list.Count - 1);
-                            for (int source = 0, dest = 0; source < list.Count; source++) if (source != index) array.SetValue(list[source], dest++);
-                            set(array);
-                        }
-                        else { Change(() => list.RemoveAt(index)); refresh(); }
+                        propertyPath.Transform(current => JsonPropertyEditing.Remove(type, (IList)current, index)); refresh();
                     }) { text = "删除元素" });
                 }
                 fold.Add(new Button(() =>
                 {
-                    var item = InspectorsBase.CreateElement(elementType);
-                    if (type.IsArray)
-                    {
-                        var array = Array.CreateInstance(elementType, (list?.Count ?? 0) + 1);
-                        list?.CopyTo(array, 0); array.SetValue(item, array.Length - 1); set(array);
-                    }
-                    else if (list == null) { var created = (IList)Activator.CreateInstance(type); created.Add(item); set(created); }
-                    else { Change(() => list.Add(item)); refresh(); }
+                    var item = JsonPropertyEditing.CreateElement(elementType);
+                    propertyPath.Transform(current => JsonPropertyEditing.Append(type, (IList)current, item)); refresh();
                 }) { text = "+ 元素" });
             }
             else if (depth < 6)
             {
                 var fold = new Foldout { text = label, value = true }; root.Add(fold);
-                if (value == null) fold.Add(new Button(() => set(InspectorsBase.CreateElement(type))) { text = "创建 " + type.Name });
-                else DrawFields(fold, value, refresh, depth + 1);
+                if (value == null) fold.Add(new Button(() => set(JsonPropertyEditing.CreateElement(type))) { text = "创建 " + type.Name });
+                else DrawFields(fold, value, refresh, depth + 1, propertyPath);
             }
         }
     }
