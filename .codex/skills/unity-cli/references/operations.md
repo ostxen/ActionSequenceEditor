@@ -33,6 +33,8 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
+RF18增加三个固定零参数审核命令，均按独立preview/approve/apply并引用本系列真实连续授权：`actioneditor.validation rf18_move`只移动RF16-C指定的FullSerializerExtensions.cs至Runtime/Serialization，核对固定GUID、源码/meta哈希及目标不存在，再由Unity生成项目；`actioneditor.validation rf18_reference_probe`只新建不存在的Assets/ActionEditorValidationRF18，创建References.asset主/子Texture2D和Document.json，用唯一新格式写盘、卸载后按GUID/localFileId解析，验证类型不符/资源失效拒绝，finally仅删除本次目录，不接触当前会话或全工程SaveAssets；`actioneditor.validation sync_projects`只调用Unity当前IDE的SyncAll生成sln/csproj，不写源码/配置。禁止任意路径/代码/force覆盖。超时先检查目标，不重放。
+
 `actioneditor.validation rf17_move` 为RF17固定79个源码移动命令，只接受confirm/dry-run，不接受路径或代码。清单固化自任务记录RF16-C并与原GUID逐项复核；预览列出精确源/目标/GUID/源码与meta哈希、新目录及Unity项目重新生成。拒绝源身份变化、既有目标或未登记目录；apply通过AssetDatabase创建所需目录并批量移动，保留原空目录，逐项核对GUID及源码/meta字节后使用Unity当前IDE集成重新生成真实项目。不写JSON、Combat、包或设置、不删除/覆盖、不声称Unity Undo可恢复。部分失败不自动回滚或重放，先检查已完成清单。2026-11-11用户“各种授权我都允许了，在这个系列任务中，不要等我回复而中断操作”覆盖本系列最小审核扩展及该精确移动，但仍独立preview/approve/apply，审批引用真实授权。
 
 `actioneditor.validation controlled_quit` 是RF14受控重开的固定退出封装，不接受参数覆盖。用户于2026-11-11明确允许正常重开及最小workflow策略/测试扩展，禁止强杀，后续明确无关Shader等资源不必处理并可忽略。先preview/展示/approve/apply；发现活动或未保存JSON、无磁盘源文档、脏场景、打开的PrefabStage、未保存窗口或Assets/ActionEditor/下脏持久资源时拒绝退出。无关Combat/包/内建资源脏标记不作为任务阻塞，不保存、不清脏、不修改。无阻塞时仅调用已核实Pipeline正常退出方法，save=false/discard=false/exitCode=0，不保存、不放弃、不启动第二实例。退出回复只表示排程，必须观察旧PID正常退出后才启动同版本Editor。此命令不自动重开、不证明冷启动测量完成；未知结果先观察，不重放。

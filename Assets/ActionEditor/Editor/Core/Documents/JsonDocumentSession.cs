@@ -36,19 +36,23 @@ namespace NBC.ActionEditor.Storage
         public bool IsEditing => pending != null;
         [Serializable] private sealed class Recovery
         {
-            public string Json, Path, Saved, SavedJson, Revision;
+            public int Version;
+            public string FormatId, Json, Path, Saved, SavedJson, Revision;
         }
         public string CaptureRecovery() => Document == null ? "" : JsonUtility.ToJson(new Recovery
         {
-            Json = Encode(Document), Path = Path, Saved = saved, SavedJson = savedJson, Revision = revision == null ? null : Convert.ToBase64String(revision)
+            Version = 1, FormatId = "actioneditor.json", Json = Encode(Document), Path = Path, Saved = saved, SavedJson = savedJson, Revision = revision == null ? null : Convert.ToBase64String(revision)
         });
         public void RestoreRecovery(string json)
         {
             if (string.IsNullOrEmpty(json)) { Open(null); return; }
             var data = JsonUtility.FromJson<Recovery>(json);
+            if (data == null || data.Version != 1 || data.FormatId != "actioneditor.json" || data.SavedJson == null || data.Saved == null)
+                throw new System.IO.InvalidDataException("Unsupported recovery contract.");
             var document = Decode(data.Json);
+            Decode(data.SavedJson);
             var bytes = string.IsNullOrEmpty(data.Revision) ? null : Convert.FromBase64String(data.Revision);
-            ReleaseState(); Document = document; Path = data.Path; saved = data.Saved; savedJson = data.SavedJson ?? data.Saved; revision = bytes; pending = null;
+            ReleaseState(); Document = document; Path = data.Path; saved = data.Saved; savedJson = data.SavedJson; revision = bytes; pending = null;
             state = ScriptableObject.CreateInstance<JsonUndoState>(); state.hideFlags = HideFlags.HideAndDontSave; state.Json = Encode(document);
             Changed?.Invoke();
         }
@@ -72,7 +76,7 @@ namespace NBC.ActionEditor.Storage
             var path = store.GetPath(text);
             var bytes = store.ReadRevision(path);
             var encoded = candidate == null ? null : Encode(candidate);
-            var content = candidate == null ? null : JsonDocumentCodec.Normalize(encoded);
+            var content = candidate == null ? null : JsonDocumentCodec.Content(candidate);
             ReleaseState();
             Document = candidate; Path = path; revision = bytes; pending = null;
             if (candidate != null)
@@ -117,7 +121,7 @@ namespace NBC.ActionEditor.Storage
             try { RequireValid(Document); Document.Init(); after = Encode(Document); }
             catch { CancelEdit(token); throw; }
             pending = null; transaction = null;
-            if (JsonDocumentCodec.Normalize(before) == JsonDocumentCodec.Normalize(after)) return;
+            if (JsonDocumentCodec.ContentOfSnapshot(before) == JsonDocumentCodec.ContentOfSnapshot(after)) return;
             state.Json = before;
             Undo.IncrementCurrentGroup();
             var group = Undo.GetCurrentGroup();

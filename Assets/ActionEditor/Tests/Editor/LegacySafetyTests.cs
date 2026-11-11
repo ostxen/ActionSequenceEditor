@@ -32,11 +32,11 @@ namespace NBC.ActionEditor.Tests
             var previous = App.TextAsset;
             var previousWindow = ActionEditorHost.Window;
             var workbenches = Resources.FindObjectsOfTypeAll<ActionWorkbench>();
-            var sample = new LegacyBaselineTests.BaselineAsset();
-            var group = new Group { Name = "Reference" };
-            group.Tracks.Add(new LegacyBaselineTests.BaselineTrack { Name = "Events" });
-            sample.groups.Add(group); sample.Init();
-            var json = new TextAsset(Json.Serialize(sample));
+            var sample = new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceAsset();
+            var group = new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceGroup { Name = "Reference" };
+            group.Tracks.Add(new NBC.ActionEditor.Samples.LegacyExperience.LegacyIntervalTrack { Name = "Events" });
+            sample.groups.Clear(); sample.groups.Add(group); sample.Init();
+            var json = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentSession.Encode(sample));
             var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
             {
@@ -143,13 +143,12 @@ namespace NBC.ActionEditor.Tests
         public void FailedLegacyOpenDoesNotChangeDocumentOrTarget()
         {
             var previous = App.TextAsset;
-            var valid = new TextAsset(Json.Serialize(new LegacyBaselineTests.BaselineAsset()));
+            var valid = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentSession.Encode(new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceAsset()));
             var invalid = new TextAsset("not json");
             try
             {
                 App.TextAsset = valid;
                 var document = App.AssetData;
-                LogAssert.Expect(LogType.Error, new Regex(".*", RegexOptions.Singleline));
                 LogAssert.Expect(LogType.Error, new Regex("ActionEditor 打开失败，原文档已保留：.*", RegexOptions.Singleline));
                 App.TextAsset = invalid;
                 Assert.That(App.TextAsset, Is.SameAs(valid));

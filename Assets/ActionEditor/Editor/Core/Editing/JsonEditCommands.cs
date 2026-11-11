@@ -85,7 +85,7 @@ namespace NBC.ActionEditor.Storage
             new JsonEditCommand(cut ? "Cut" : "Copy", () => item == null || !Contains(item) || cut && item.IsLocked
                 ? "无法复制失效对象或剪切锁定对象。" : null, () =>
             {
-                var serialized = Json.Serialize(item);
+                var serialized = DocumentSnapshots.CaptureFragment(item);
                 clipboard = serialized; copiedType = item.GetType(); cutSource = cut ? item : null;
                 App.CopyAsset = item; App.IsCut = cut;
             }).Execute();
@@ -114,7 +114,7 @@ namespace NBC.ActionEditor.Storage
             IDirectable clone = null;
             new JsonEditCommand("Paste", () => PasteError(parent, time), () =>
             {
-                clone = Json.Deserialize(copiedType, clipboard) as IDirectable;
+                clone = DocumentSnapshots.RestoreFragment(copiedType, clipboard);
                 if (clone == null) throw new InvalidOperationException("剪贴板反序列化失败。");
                 if (cutSource != null && Contains(cutSource)) DeleteCore(cutSource);
                 if (parent is Group group && clone is Track track) group.Tracks.Add(track);

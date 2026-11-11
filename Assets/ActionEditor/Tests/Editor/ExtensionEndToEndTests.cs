@@ -229,7 +229,6 @@ namespace NBC.ActionEditor.Tests
                     var encoded = JsonDocumentCodec.CreateSaveSnapshot(App.AssetData);
                     var expected = JsonDocumentCodec.Content(JsonDocumentCodec.Decode(encoded));
                     var invalid = new TextAsset("not-json");
-                    LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("Error while parsing: Expected u"));
                     try { Assert.Throws<System.IO.InvalidDataException>(() => App.Context.Open(invalid)); }
                     finally { UnityEngine.Object.DestroyImmediate(invalid); }
                     Assert.That(JsonDocumentCodec.Content(App.AssetData), Is.EqualTo(expected));

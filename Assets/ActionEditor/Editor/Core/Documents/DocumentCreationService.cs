@@ -16,11 +16,11 @@ namespace NBC.ActionEditor
             if (type == null || !typeof(Asset).IsAssignableFrom(type) || type.IsAbstract || type.ContainsGenericParameters
                 || type.GetConstructor(Type.EmptyTypes) == null) throw new ArgumentException("无效的旧版 Asset 类型。");
             var asset = (Asset)Activator.CreateInstance(type);
-            asset.Init(); asset.OnBeforeSerialize();
-            var bytes = new UTF8Encoding(false).GetBytes(Json.Serialize(asset));
+            asset.Init();
+            var bytes = new UTF8Encoding(false).GetBytes(JsonDocumentCodec.CreateSaveSnapshot(asset));
             void Validate(byte[] data)
             {
-                var loaded = Json.Deserialize(typeof(Asset), Encoding.UTF8.GetString(data)) as Asset;
+                var loaded = JsonDocumentCodec.Decode(Encoding.UTF8.GetString(data));
                 if (loaded == null || loaded.GetType() != type) throw new InvalidDataException("旧版 JSON 读回校验失败，未创建资源。");
                 loaded.Init();
             }

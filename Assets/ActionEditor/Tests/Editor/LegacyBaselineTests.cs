@@ -63,9 +63,11 @@ namespace NBC.ActionEditor.Tests
         {
             var original = CreateSample();
             original.OnBeforeSerialize();
-            var json = Json.Serialize(original);
+            var context = Storage.DocumentFormats.CreateContext(typeof(BaselineAsset), typeof(BaselineTrack), typeof(BaselineClip), typeof(BaselineSignal));
+            var format = new Serialization.ActionDocumentJsonFormat();
+            var json = format.Serialize(original, default, context);
             Assert.That(json, Is.Not.Empty);
-            var loaded = Json.Deserialize(typeof(Asset), json) as BaselineAsset;
+            var loaded = format.Deserialize(json, context) as BaselineAsset;
             Assert.That(loaded, Is.Not.Null);
             loaded.Init();
             var clip = loaded.groups[0].Tracks[0].Clips[0] as BaselineClip;

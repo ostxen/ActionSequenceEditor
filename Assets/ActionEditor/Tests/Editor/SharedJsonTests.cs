@@ -444,7 +444,6 @@ namespace NBC.ActionEditor.Tests
             var invalid = new TextAsset("{}");
             try
             {
-                LogAssert.Expect(LogType.Error, new Regex("Cannot create an instance of an interface or abstract type"));
                 LogAssert.Expect(LogType.Error, new Regex("ActionEditor 打开失败"));
                 App.TextAsset = invalid;
                 Assert.That(context.Document, Is.SameAs(document));
@@ -623,10 +622,10 @@ namespace NBC.ActionEditor.Tests
             var clip = (LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0];
             clip.StartTime = 8; clip.Length = 3; clip.Count = 27;
             Assert.That(App.AssetData.Length, Is.EqualTo(6), "The public graph can contain a stale derived duration before commit.");
-            Assert.That(App.Session.InspectReadbackDifferences(), Does.Contain("$.length (value)"));
+            Assert.That(App.Session.InspectReadbackDifferences(), Is.Empty, "Readback validates an isolated derived snapshot.");
             var json = App.Session.CreateSaveSnapshot();
             var loaded = JsonDocumentSession.Decode(json);
-            Assert.That(App.AssetData.Length, Is.EqualTo(11));
+            Assert.That(App.AssetData.Length, Is.EqualTo(6), "Save snapshot must not mutate source duration.");
             Assert.That(loaded.Length, Is.EqualTo(11));
             Assert.That(((LegacyExperienceInterval)loaded.groups[0].Tracks[0].Clips[0]).Count, Is.EqualTo(27));
             Assert.That(App.Session.InspectReadbackDifferences(), Is.Empty);
@@ -640,7 +639,9 @@ namespace NBC.ActionEditor.Tests
             Assert.That(JsonDocumentCodec.ReadbackDifferences(json, decoded), Is.Empty);
             decoded.ViewTimeMin = 1; decoded.ViewTimeMax = 9;
             decoded.groups[0].IsCollapsed = !decoded.groups[0].IsCollapsed;
-            Assert.That(JsonDocumentCodec.ReadbackDifferences(json, decoded), Is.Empty, "Workspace-only changes remain excluded.");
+            Assert.That(JsonDocumentCodec.Content(decoded), Is.EqualTo(JsonDocumentCodec.Content(document)), "Workspace is excluded only from author content.");
+            Assert.That(JsonDocumentCodec.ReadbackDifferences(json, decoded), Is.Not.Empty, "Full readback must retain workspace.");
+            decoded = JsonDocumentCodec.Decode(json);
             ((LegacyExperienceInterval)decoded.groups[0].Tracks[0].Clips[0]).Count = 91;
             var differences = JsonDocumentCodec.ReadbackDifferences(json, decoded);
             Assert.That(differences, Has.Length.EqualTo(1));
@@ -670,7 +671,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(JsonDocumentSession.Decode(json).Length, Is.EqualTo(App.AssetData.Length));
             }
         }
-        [Test] public void FloatSerializationPreservesAuthoredBitsAndOldNumericJson()
+        [Test] public void FloatSerializationPreservesAuthoredBitsAndStandardJsonNumbers()
         {
             var values = new System.Collections.Generic.List<float> { float.Epsilon, -float.Epsilon, float.MaxValue, float.MinValue, .1f, 16.3388195f };
             var random = new System.Random(1937);
@@ -684,12 +685,15 @@ namespace NBC.ActionEditor.Tests
             {
                 foreach (var compressed in new[] { false, true })
                 {
-                    var loaded = (float)Json.Deserialize(typeof(float), Json.Serialize(value, compressed));
+                    var context = new NBC.ActionEditor.Serialization.DocumentFormatContext(Array.Empty<Type>());
+                    var tree = NBC.ActionEditor.Serialization.DocumentValueConverter.Capture(value, typeof(float), context);
+                    var text = NBC.ActionEditor.Serialization.DocumentJson.Print(tree, compressed);
+                    var loaded = (float)NBC.ActionEditor.Serialization.DocumentValueConverter.Restore(NBC.ActionEditor.Serialization.DocumentJson.Parse(text), typeof(float), context);
                     Assert.That(BitConverter.GetBytes(loaded), Is.EqualTo(BitConverter.GetBytes(value)));
                 }
             }
-            Assert.That(Json.Deserialize(typeof(float), "0.1"), Is.EqualTo(.1f));
-            Assert.That(Json.Deserialize(typeof(float), "3"), Is.EqualTo(3f));
+            Assert.That(NBC.ActionEditor.Serialization.DocumentValueConverter.Restore(NBC.ActionEditor.Serialization.DocumentJson.Parse("0.1"), typeof(float), new NBC.ActionEditor.Serialization.DocumentFormatContext(Array.Empty<Type>())), Is.EqualTo(.1f));
+            Assert.That(NBC.ActionEditor.Serialization.DocumentValueConverter.Restore(NBC.ActionEditor.Serialization.DocumentJson.Parse("3"), typeof(float), new NBC.ActionEditor.Serialization.DocumentFormatContext(Array.Empty<Type>())), Is.EqualTo(3f));
         }
         [Test] public void SharedEditsUndoRedoAndCancelKeepWholeJsonGraph()
         {

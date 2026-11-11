@@ -2,9 +2,9 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16 `complete`（职责/契约定案及本次基线，非产品硬切验收）；RF17–RF23仍 `planned`。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF17工程验收完成，进入RF18。RF16完成后用户追加“我要先休息了，你往后执行任务。各种授权我都允许了，在这个系列任务中，不要等我回复而中断操作。”此真实授权覆盖RF17–RF23串行实施、必要的最小受审核工作流扩展、精确清单移动、隔离探针与逐项中文本地提交；不伪造另一次人工确认。
-- 下一步：先完成RF17固定清单移动审核、职责归位与验证，再按依赖继续RF18–RF23。保留两个UI与共用状态，数据格式按开发期硬切、不建设旧格式兼容。人工验收仍待用户实际使用，不自动进入Combat，不重建已取消循环，不保存/清脏/修改无关资源，不推送。
+- 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF18 `complete`（限执行记录范围）；RF19 `implementing`，RF20–RF23 `planned`。Combat 专属实施与验收暂缓。
+- 当前执行任务：RF18工程验收完成，进入RF19。RF16完成后用户追加“我要先休息了，你往后执行任务。各种授权我都允许了，在这个系列任务中，不要等我回复而中断操作。”此真实授权覆盖RF17–RF23串行实施、必要的最小受审核工作流扩展、精确清单移动、隔离探针与逐项中文本地提交；不伪造另一次人工确认。
+- 下一步：统一创建/打开/保存/另存为存储链，再按依赖继续RF20–RF23。保留两个UI与共用状态，数据格式按开发期硬切、不建设旧格式兼容。人工验收仍待用户实际使用，不自动进入Combat，不重建已取消循环，不保存/清脏/修改无关资源，不推送。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -302,8 +302,8 @@ Assets/ActionEditor/
 |---|---|---|---|---|
 | [x] | RF16 | complete（定案及本次基线；非产品硬切） | 源码职责映射、依赖与硬切契约定案 | 新会话启动实施 |
 | [x] | RF17 | complete | 两套UI分目录与共用职责归位 | RF16 |
-| [ ] | RF18 | planned | 唯一序列化边界与JSON实现、浮点精度保障 | RF17 |
-| [ ] | RF19 | planned | 新建/打开/保存/另存为统一接入与重复路径清理 | RF18 |
+| [x] | RF18 | complete（工程范围） | 唯一序列化边界与JSON实现、浮点精度保障 | RF17 |
+| [ ] | RF19 | implementing | 新建/打开/保存/另存为统一接入与重复路径清理 | RF18 |
 | [ ] | RF20 | planned | 独立导出流程与已实现格式下拉框 | RF19 |
 | [ ] | RF21 | planned | 双界面产品文案、样例命名与术语统一 | RF20 |
 | [ ] | RF22 | planned | 最短使用教程与可重放样例操作链 | RF21 |
@@ -1374,3 +1374,15 @@ Assets/ActionEditor/
 - 最终`verify --profile code`：`20261111T152129Z-cf44e2e1`，workflow43/43、真实ActionEditor.sln 18项目/662源码全覆盖、0错误/43既有警告、6.45秒；整个profile仍blocked于缺yaml/markdown_it，未安装，非编译失败。独立`rf17-identity-check/check.py`及report.json共369检查通过，核实79身份/meta字节、29目录meta、新源码meta及Core/Extensions无具体UI依赖；源码移动瞬间字节证据来自apply，之后职责编辑有意改变源码。不重跑RF16要求旧路径存在的历史脚本。git diff --check通过。
 - 边界：用户两份JSON、Jsons目录meta及WhootActionSequencer配置未读取内容/改动/纳入提交。无Combat/包/设置变更、无Player Build/推送、无原始资产迁移或持久探针。IDE项目实际生成，源码meta由Unity产生。RF16合同/计划等已知前置文档纳入本项本地交付，不丢弃既有改动。
 - 下一任务：按连续授权进入RF18唯一转换边界及精确float/引用/快照验证，不等待额外确认。
+
+### RF18 执行记录（2026-11-11）
+
+- 状态：`complete`（转换/快照工程范围）。RF17本地提交为`7a1e177`。沿用真实连续授权，无Combat、用户JSON/配置、包/设置、Player Build或推送。
+- 实现：Runtime/Serialization定义IActionDocumentFormat与唯一actioneditor.json v1封套、严格JSON、完整受控字段/类型预检、值树和图校验；无Assembly.Load/短名回退/裸根兼容。Editor注入已加载生产类型与AssetDatabase引用，目录原子拒绝ID/扩展冲突，读写/导出能力独立。FullSerializerExtensions.cs按RF16-C经AssetDatabase移动，原GUID保持；原任意Json类移除，该原身份文件现在仅承担Single数字传输，不留第二序列化路径。
+- 隔离：快照先字段捕获/还原，再只在副本执行Init/OnBeforeSerialize和时长重建；Init若改写非派生length字段即拒绝。作者内容使用有类型/长度边界的字段值树，仅排除两项视域和组折叠，派生时长按激活片段重建且不运行源回调/构造器；完整读回直接比较原始快照与还原字段，新增测试防止两份规范化副本掩盖丢失。剪贴板走相同转换器，Recovery要求版本/来源格式且不回退旧快照。
+- 受控写入：移动preview `20261111T155420Z-e329198d`、approval `20261111T155503Z-9e7d227b`、apply `20261111T155520Z-02f56380`核对GUID与移动瞬间源码/meta字节并由Unity生成真实项目。前一次read-only discovery在60秒外层超时，无move请求；检查源在/目标不在、Python已退出后仅删除失效editor.lock并重新预览，无未知写入重放。
+- 引用探针：preview `20261111T155010Z-432fb470`、approval `20261111T155051Z-02681a5d`、apply `20261111T155107Z-c74b87a3`；仅本次新建Assets/ActionEditorValidationRF18主/子Texture2D与Document.json，真实写盘/卸载/按GUID+localFileId重载，验证错类型/删除后失效拒绝，finally清理本次目录。未碰当前会话或全工程SaveAssets。
+- 精度/契约：直接消费合同两份独立样本；3组7轨13片段全字段、Signal有效0但存储1、正负零、极值/次正规/4096固定种子随机位候选（剔除非有限）、压缩/美化无BOM、嵌套struct/多态/基类私有字段、null/empty、加权曲线及枚举、未知/重复/缺失/冲突/溢出/循环/共享/负时间、构造前类型失败均有断言。14项格式测试通过`20261111T160903Z-cd1799c9`。
+- 失败记录：初次格式9项中4项因生产类型筛选误排NBC.ActionEditor失败，修正后9/9；扩展12项时4项因测试context漏登记Nested struct失败`20261111T155945Z-5ed9c67c`，显式补齐受信任测试类型后12/12 `20261111T160202Z-be4b1c71`，未放宽生产目录/数值断言。曾有WrapMode名称碰撞及测试namespace编译失败，修正后编译通过；控制台历史错误不是当次编译结论。
+- 最终验证：doctor `20261111T160608Z-c3bf8433`唯一工程连接通过；发现180项`20261111T161053Z-03502751`；完整NBC.ActionEditor.Editor.Tests EditMode `20261111T161131Z-3a27f017`编译成功，180/180通过，0失败/跳过/不确定（中间175/175报告`20261111T154259Z-dcadb8cb`）。包含保留实验，不能全部称为生产新格式覆盖。`verify --profile code` `20261111T161113Z-2bf777bb`：workflow44/44，真实ActionEditor.sln 18项目/671源码，0错误/43既有警告，7.21秒；总profile仍blocked于缺yaml/markdown_it，未安装。git diff --check通过。
+- 未运行：未声称完整资源验证（无asset目标明确skipped）、真实Player Build、真人双窗布局/手感或任意第三方回调安全；H01–H09仍待用户。RF19继续创建/保存/另存/导入故障与真实入口验证，RF20才提供导出。

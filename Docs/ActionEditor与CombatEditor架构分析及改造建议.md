@@ -9,6 +9,8 @@
 
 ## RF17 后的实际源码定位（2026-11-11）
 
+RF18补充：当前生产转换已硬切至Runtime/Serialization的actioneditor.json v1封套。旧Json任意序列化类已移除；Editor/Serialization负责格式目录、受信任类型/持久引用注入与隔离快照，字段值树用于作者内容比较，完整读回不先规范化原始快照。Init只可重建派生根length，其他持久字段被回调改写时拒绝；保存前回调仅在独立副本执行。RF19继续统一创建/存储及UI保存入口，RF20才实现独立导出，下文早期格式描述保留历史范围。
+
 两套生产UI已分别归入`Editor/UI/IMGUI`与`Editor/UI/UIToolkit`，主类型命名空间和程序集不变。`Editor/Core/Documents/App.cs`仅保留共享状态/文档入口转发、自动保存和播放协调；Unity更新/场景/域重载、Inspector代理、对话框、窗口宽度和备用重绘由`Editor/UI/ActionEditorHost.cs`适配。选择服务通过事件请求Inspector，不反向引用宿主；共享Views仍只保存对象owner及Action回调。播放状态位于`Editor/Preview/ActionEditorPlayback.cs`。
 
 共享创建逻辑位于`Editor/Core/Documents/DocumentCreationService.cs`，创建弹窗只采集输入、确认、打开结果和返回原UI；本项尚不切换格式/可靠存储实现。`TypeMetaInfo`、`ActionEditorTypeCatalog`与`ExtensionResolver`在`Editor/Extensions`，两套UI直接调用目录/解析服务，已移除EditorTools中的转发和嵌套元数据。Header/Inspector实例化仍在`UI/Extensions/EditorCustomFactory.cs`，不把双绘制适配器当纯Core。Styles及Resources键不变。

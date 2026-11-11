@@ -27,6 +27,9 @@ READ_ONLY = frozenset({
 
 # Explicit catalog, not a prefix heuristic. Only implemented return/poll contracts are admitted.
 MUTATIONS = {
+    "actioneditor.validation rf18_move": {"dry_run": True, "confirm": True, "poll": None},
+    "actioneditor.validation rf18_reference_probe": {"dry_run": True, "confirm": True, "poll": None},
+    "actioneditor.validation sync_projects": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation rf17_move": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation controlled_quit": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation shared_json_probe": {"dry_run": True, "confirm": True, "poll": None},
@@ -323,7 +326,7 @@ class Unity:
 
     def preview(self, command, parameters, inputs=()):
         validate_parameters(parameters)
-        if command in {"actioneditor.validation controlled_quit", "actioneditor.validation rf17_move"} and parameters:
+        if command in {"actioneditor.validation controlled_quit", "actioneditor.validation rf17_move", "actioneditor.validation rf18_move", "actioneditor.validation rf18_reference_probe", "actioneditor.validation sync_projects"} and parameters:
             blocked("Fixed operation accepts no parameters; targets cannot be overridden.")
         if command not in MUTATIONS:
             blocked(f"Mutation policy/return contract not implemented: {command}")
@@ -337,7 +340,7 @@ class Unity:
         if plan.get("kind") != "unity" or plan.get("command") not in MUTATIONS:
             blocked("Unsupported Unity mutation plan.")
         validate_parameters(plan["parameters"])
-        if plan["command"] in {"actioneditor.validation controlled_quit", "actioneditor.validation rf17_move"} and plan["parameters"]:
+        if plan["command"] in {"actioneditor.validation controlled_quit", "actioneditor.validation rf17_move", "actioneditor.validation rf18_move", "actioneditor.validation rf18_reference_probe", "actioneditor.validation sync_projects"} and plan["parameters"]:
             blocked("Fixed operation accepts no parameters.")
         self.ready()
         self.discover()
