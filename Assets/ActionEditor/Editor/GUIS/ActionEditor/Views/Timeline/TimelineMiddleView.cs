@@ -149,19 +149,21 @@ namespace NBC.ActionEditor
                     foreach (var typeMetaInfo in list)
                     {
                         var info = typeMetaInfo;
-                        menu.AddItem(new GUIContent(info.name), false,
+                        var command = NBC.ActionEditor.Storage.JsonEditCommands.Creation(asset, info.type);
+                        if (command.CanExecute(out var reason)) menu.AddItem(new GUIContent(info.name), false,
                             () =>
                             {
-                                asset.AddGroup(typeMetaInfo.type);
+                                NBC.ActionEditor.Storage.JsonEditCommands.AddGroup(info.type);
                                 App.Refresh();
                             });
+                        else menu.AddDisabledItem(new GUIContent(info.name, reason));
                     }
 
                     menu.ShowAsContext();
                 }
                 else
                 {
-                    if (list.Count == 1) asset.AddGroup(list[0].type);
+                    if (list.Count == 1) NBC.ActionEditor.Storage.JsonEditCommands.AddGroup(list[0].type);
                     App.Refresh();
                 }
             }

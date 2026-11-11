@@ -577,6 +577,54 @@ namespace NBC.ActionEditor.Tests
             Assert.That(track.Clips.Count, Is.EqualTo(2)); Assert.That(pasted.Clips.Last().StartTime, Is.EqualTo(6));
             Assert.Throws<InvalidOperationException>(() => JsonEditCommands.Delete(App.AssetData.groups[2].Tracks[0]));
         }
+        private sealed class FailingCreationClip : Clip
+        {
+            public FailingCreationClip() { throw new InvalidOperationException("expected constructor failure"); }
+        }
+        [Test] public void StructuralCommandsRevalidateAndRollbackFailuresWithoutEmptyUndo()
+        {
+            var group = App.AssetData.groups[0]; var track = group.Tracks[0];
+            var command = JsonEditCommands.Creation(track, typeof(LegacyExperienceInterval), 8);
+            Assert.That(command.CanExecute(out var reason), Is.True, reason);
+            track.IsLocked = true;
+            Assert.That(command.CanExecute(out reason), Is.False); Assert.That(reason, Is.Not.Empty);
+            Assert.Throws<InvalidOperationException>(() => command.Execute());
+            Assert.That(track.Clips.Count, Is.EqualTo(3)); track.IsLocked = false;
+            var before = JsonDocumentSession.Encode(App.AssetData);
+            Assert.Catch(() => JsonEditCommands.AddClip(track, typeof(FailingCreationClip), 8));
+            Assert.That(JsonDocumentSession.Encode(App.AssetData), Is.EqualTo(before));
+            Assert.That(App.Session.IsEditing, Is.False);
+            group = App.AssetData.groups[0]; track = group.Tracks[0];
+            var created = JsonEditCommands.AddClip(track, typeof(LegacyExperienceInterval), 8);
+            Assert.That(created.StartTime, Is.EqualTo(8)); Assert.That(created.Parent, Is.SameAs(track));
+            Undo.PerformUndo(); Assert.That(App.AssetData.groups[0].Tracks[0].Clips.Count, Is.EqualTo(3));
+            Undo.PerformRedo(); Assert.That(App.AssetData.groups[0].Tracks[0].Clips.Count, Is.EqualTo(4));
+            Assert.That(command.CanExecute(out reason), Is.False, "Undo/Redo invalidates captured graph targets.");
+        }
+        [Test] public void BatchDeletionAndLockedCutDoNotPartiallyModifyGraphOrClipboard()
+        {
+            var track = App.AssetData.groups[0].Tracks[0]; var clip = track.Clips[0];
+            var locked = App.AssetData.groups[2].Tracks[0];
+            var batch = JsonEditCommands.Deletion(clip, locked);
+            Assert.That(batch.CanExecute(out var reason), Is.False, reason);
+            Assert.Throws<InvalidOperationException>(() => batch.Execute());
+            Assert.That(track.Clips.Count, Is.EqualTo(3));
+            JsonEditCommands.Copy(clip, true); track.IsLocked = true;
+            var target = App.AssetData.groups[0].Tracks[1];
+            Assert.That(JsonEditCommands.CanPaste(target), Is.False);
+            Assert.Throws<InvalidOperationException>(() => JsonEditCommands.Paste(target, 7));
+            Assert.That(App.IsCut, Is.True); Assert.That(track.Clips.Count, Is.EqualTo(3));
+            track.IsLocked = false;
+            JsonEditCommands.Paste(target, 7);
+            Assert.That(track.Clips.Count, Is.EqualTo(2)); Assert.That(target.Clips.Count, Is.EqualTo(3));
+            Undo.PerformUndo();
+            Assert.That(App.AssetData.groups[0].Tracks[0].Clips.Count, Is.EqualTo(3));
+            Assert.That(App.AssetData.groups[0].Tracks[1].Clips.Count, Is.EqualTo(2));
+            track = App.AssetData.groups[0].Tracks[0];
+            JsonEditCommands.Deletion(track.Clips[0], track.Clips[1]).Execute();
+            Assert.That(track.Clips.Count, Is.EqualTo(1));
+            Undo.PerformUndo(); Assert.That(App.AssetData.groups[0].Tracks[0].Clips.Count, Is.EqualTo(3));
+        }
         [Test] public void ZoomAndFoldDoNotDirtyAuthoringData()
         {
             App.AssetData.ViewTimeMin = 1; App.AssetData.ViewTimeMax = 10;

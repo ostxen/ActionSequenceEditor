@@ -2,7 +2,7 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01–RF06工程验收 `complete`，人工体验待用户次日验收；RF07–RF15 `planned`。Combat 专属实施与验收暂缓。
+- 总体状态：RF01–RF07工程验收 `complete`，人工体验待用户次日验收；RF08–RF15 `planned`。Combat 专属实施与验收暂缓。
 - 当前执行任务：2026-11-10用户要求夜间继续、人工差异次日汇总验收；缩放步长明确采用新版。每项实现并通过工程验收后本地中文提交，连同ActionEditor专属文档，不推送。
 - 下一步：RF06工程验收通过，独立本地提交后进入RF07结构命令。2026-11-11用户明确要求一直继续直至本系列结束，不逐项等待继续指令；不扩大持久写入、包/设置、Combat、删除及人工验收授权。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
@@ -128,7 +128,7 @@
 | [x] | RF04 | complete（工程验收；人工待验） | 编辑事务令牌与取消生命周期 | RF03 | RF1 |
 | [x] | RF05 | complete（工程验收；人工待验） | 会话、编解码与存储边界 | RF04 | RF1 |
 | [x] | RF06 | complete（工程验收；人工待验） | 类型目录、能力与扩展解析 | RF05 | RF2 |
-| [ ] | RF07 | planned | 创建及结构编辑命令归一 | RF06 | RF2 |
+| [x] | RF07 | complete（工程验收；人工待验） | 创建及结构编辑命令归一 | RF06 | RF2 |
 | [ ] | RF08 | planned | 可见布局、坐标与命中归一 | RF07 | RF3 |
 | [ ] | RF09 | planned | 移动、拉伸、吸附与拖动反馈归一 | RF08 | RF3 |
 | [ ] | RF10 | planned | 选择、导航、快捷键和工作区适配 | RF09 | RF3 |
@@ -978,3 +978,12 @@
 - Unitydoctor `20261111T004028Z-cb07f3c0` ready；完整回归先128/128、后129/129；最终 `.codex/runs/20261111T004858Z-5751791a/report.json` Unity编译passed，NBC.ActionEditor.Editor.Tests EditMode **130/130 passed**，0failed/skipped/inconclusive。没有磁盘JSON写入或系统菜单人工点击。
 - 离线 `20261111T004742Z-abaaa80d`工作流41/41、真实18projects/643sources、0errors/43warnings；之后仅补测试断言及一项测试，最后Unity完整编译/130项通过。完整code profile缺yaml/markdown_it仍blocked，未安装。四个新源码及meta由Unity生成，git diff --check提交前检查。
 - 未声称通过：第三方所有自定义绘制、动态加载程序集、其他DPI、人工菜单手感、Runtime实际PlayerBuild、完整预览工厂/异常资源释放（RF12）。元数据缓存不新增Runtime→Editor引用；不改Combat、包、设置、用户JSON。下一任务RF07。
+
+### RF07 执行与验收记录（2026-11-11）
+
+- 状态：`complete`（工程验收）。新增窄JsonEditCommand，仅持校验/执行委托与标签，CanExecute给原因，Execute进入现有Session.Edit并重验；不是通用总线。两UI分组/轨道/片段创建迁移JsonEditCommands，保留原创建名称、下一片段截长、光标时间及原版添加轨道后选择；不强制改变两UI原选择差异。新文档原本已共用CreateLegacyAsset真实函数，两欢迎入口保留，不为RF07复制第三套新建流程。
+- 创建重验当前图归属、锁定、具体类型/无参构造、有限时间、父级精确挂载、Unique及原菜单分类规则。创建描述、原版/原生菜单禁用与执行共用校验。移动轨道和批量/单个删除使用同一窄命令，批量预检所有项，构造/执行中失败由Session回滚整图。
+- 剪贴板：Copy/Cut共用命令边界，不创建空Undo；Paste执行前重验源/目标归属与锁定、挂载/Unique、有限时间，反序列化在事务内，成功后才清剪切标记和选择新对象。切片剪切后源被锁定原先未预检（仅轨道特例），现拒绝且保留图/剪贴板；Duplicate失败恢复原剪贴板。重复、删除和重排原菜单/快捷键已共用入口。粘贴保持原有时间与参数，不把创建时分类限制扩展为粘贴格式迁移。
+- 新增SharedJson两项：菜单校验后锁定再Execute拒绝；构造失败整图/编辑状态恢复；成功创建一次Undo/Redo；旧图目标过期；批量含锁定对象零修改；剪切后锁定拒绝且剪贴板保留，解锁粘贴一次Undo恢复两轨；批量删除一次Undo。已有复制轨道参数、跨组重排、双UI/快捷键/窗口回归同跑。
+- 最终 `.codex/runs/20261111T010120Z-1ed7bfc2/report.json` Unity编译passed，NBC.ActionEditor.Editor.Tests EditMode **132/132passed**、0failed/skipped/inconclusive。离线 `20261111T010317Z-d51459d7`工作流41/41，18projects/644sources、0errors/43warnings；code profile缺yaml/markdown_it仍blocked，未安装。新增JsonEditCommand.meta由Unity生成。git diff --check提交前检查。
+- 未验/保留：没有用菜单真正弹出并人工逐项点击替代逻辑测试，系统新建保存对话框仍H07；不改资源格式或系统对话框，新建磁盘路径验收沿RF05，不宣称此轮新执行了持久探针。旧全局App依赖逐渐收敛而非本项完全消除。用户JSON/个人配置、Combat、包/设置未动，不推送。下一任务RF08。

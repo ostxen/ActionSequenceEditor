@@ -362,7 +362,11 @@ namespace NBC.ActionEditor.Workbench
             if (Asset == null) return;
             var menu = new GenericMenu();
             foreach (var info in EditorTools.GetTypeMetaDerivedFrom(typeof(Group)).Where(t => !t.type.IsAbstract && (t.attachableTypes == null || t.attachableTypes.Contains(Asset.GetType()))))
-            { var type = info.type; menu.AddItem(new GUIContent(info.name), false, () => owner.Run(() => App.Session.Edit("Add group", () => Asset.AddGroup(type)))); }
+            {
+                var type = info.type; var command = JsonEditCommands.Creation(Asset, type);
+                if (command.CanExecute(out var reason)) menu.AddItem(new GUIContent(info.name), false, () => owner.Run(() => JsonEditCommands.AddGroup(type)));
+                else menu.AddDisabledItem(new GUIContent(info.name, reason));
+            }
             menu.ShowAsContext();
         }
         private void RebuildHeaders()
@@ -401,7 +405,7 @@ namespace NBC.ActionEditor.Workbench
             if (item is Group group)
             {
                 foreach (var info in EditorTools.GetTypeMetaDerivedFrom(typeof(Track)).Where(t => !t.type.IsAbstract && t.attachableTypes?.Contains(group.GetType()) == true))
-                { var type = info.type; Entry(Lan.MenuAddTrack + "/" + (string.IsNullOrEmpty(info.category) ? "" : info.category + "/") + info.name, () => App.Session.Edit("Add track", () => group.AddTrack(type)), !group.IsLocked && group.CanAddTrackOfType(type)); }
+                { var type = info.type; Entry(Lan.MenuAddTrack + "/" + (string.IsNullOrEmpty(info.category) ? "" : info.category + "/") + info.name, () => JsonEditCommands.AddTrack(group, type), JsonEditCommands.Creation(group, type).CanExecute(out _)); }
                 menu.AddSeparator("");
                 if (App.CopyAsset is Track) Entry(Lan.MenuPasteTrack, () => JsonEditCommands.Paste(group), JsonEditCommands.CanPaste(group));
                 Entry(Lan.GroupDisable, () => JsonEditCommands.ToggleActive(group), !group.IsLocked, !group.IsActive);
@@ -446,7 +450,7 @@ namespace NBC.ActionEditor.Workbench
             {
                 var category = track.Clips.FirstOrDefault()?.GetType().RTGetAttribute<CategoryAttribute>(true)?.category;
                 foreach (var info in EditorTools.GetTypeMetaDerivedFrom(typeof(Clip)).Where(t => !t.type.IsAbstract && (t.attachableTypes == null || t.attachableTypes.Contains(track.GetType())) && (category == null || category == t.category)))
-                { var type = info.type; Action((string.IsNullOrEmpty(info.category) ? "" : info.category + "/") + info.name, () => App.Session.Edit("Add clip", () => track.AddClip(type, Snap(TimeAt(p.x))))); }
+                { var type = info.type; Action((string.IsNullOrEmpty(info.category) ? "" : info.category + "/") + info.name, () => JsonEditCommands.AddClip(track, type, Snap(TimeAt(p.x))), JsonEditCommands.Creation(track, type, Snap(TimeAt(p.x))).CanExecute(out _)); }
                 if (App.CopyAsset is Clip copied && JsonEditCommands.CanPaste(track))
                 { e.menu.AppendSeparator(); Action(string.Format(Lan.ClipPaste, copied.GetType().Name), () => JsonEditCommands.Paste(track, Snap(TimeAt(p.x)))); }
             }

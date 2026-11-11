@@ -256,12 +256,7 @@ namespace NBC.ActionEditor
                     continue;
                 }
 
-                var canAdd = !info.isUnique ||
-                             (group.Tracks.Find(track => track.GetType() == info.type) == null);
-                if (group.IsLocked)
-                {
-                    canAdd = false;
-                }
+                var canAdd = JsonEditCommands.Creation(group, info.type).CanExecute(out _);
 
                 var finalPath = string.IsNullOrEmpty(info.category)
                     ? info.name
@@ -272,8 +267,7 @@ namespace NBC.ActionEditor
                 {
                     genericMenu.AddItem(new GUIContent(path), false, () =>
                     {
-                        Track track = null;
-                        App.Session.Edit("Add track", () => track = group.AddTrack(info.type));
+                        var track = JsonEditCommands.AddTrack(group, info.type);
                         App.Select(track);
                         App.Refresh();
                     });
@@ -578,8 +572,10 @@ namespace NBC.ActionEditor
                     var info = metaInfo;
                     var category = string.IsNullOrEmpty(info.category) ? string.Empty : (info.category + "/");
                     var tName = info.name;
-                    menu.AddItem(new GUIContent(category + tName), false,
-                        () => App.Session.Edit("Add clip", () => track.AddClip(info.type, cursorTime)));
+                    var command = JsonEditCommands.Creation(track, info.type, cursorTime);
+                    if (command.CanExecute(out var reason)) menu.AddItem(new GUIContent(category + tName), false,
+                        () => JsonEditCommands.AddClip(track, info.type, cursorTime));
+                    else menu.AddDisabledItem(new GUIContent(category + tName, reason));
                 }
 
                 if (App.CopyAsset != null && App.CopyAsset is Clip copyClip)

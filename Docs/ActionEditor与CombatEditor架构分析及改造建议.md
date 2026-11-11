@@ -66,6 +66,8 @@ RF05把JSON编解码/比较移入JsonDocumentCodec，把路径、revision读写�
 
 RF06已由DirectableTypeInfo缓存类型事实，ActionEditorTypeCatalog缓存现有发现及菜单描述，EditorCustomFactory按精确/明确允许的最近基类缓存解析并诊断无关冲突。未实例化预览或UI进行发现，不用类型描述存锁定状态。两UI属性邻居界限共用ClipTimingRules，保留与严格边缘拖动的原有差异；候选手势和预览工厂继续由RF09/RF12迁移。
 
+RF07用JsonEditCommand表达窄校验与事务执行，JsonEditCommands承载当前图归属、挂载/唯一性、锁定和批量预检；两UI菜单及现有快捷键消费它，不引入总线。新建文档继续现有共用创建函数。选择展示差异暂留UI适配，命令失败不推进剪贴板状态。
+
 **所有权规则：**
 
 - 文档内容和保存基线归 DocumentSession；不通过窗口脏标志推断是否保存。
