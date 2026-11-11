@@ -30,6 +30,14 @@ RF07结构编辑：两UI创建、批量删除和轨道移动经窄JsonEditComman
 
 RF08几何：两UI消费JsonTimelineTransform的float时间变换及TimelineGeometry可见行、矩形、折叠可见性、框选与手柄优先级；尺寸由各UI提供，各自绘制。Toolkit极短区间最少4px、点8px，原版点图标仍由原绘制器扩展，不强制统一外观。完整时间区宽不随垂直滚动条变化；几何计算不改作者数据，反向框选归一，短片段手柄相交左侧优先。
 
+## JSON 业务扩展示例（RF13）
+
+现有 `Runtime/Samples/LegacyExperience/LegacyExperienceAsset.cs` 是完整的非Combat扩展例子：`LegacyExperienceMarker : ClipSignal` 长度为零，`LegacyExperienceInterval : ClipCrossBlend` 有区间及混合；`Name/Category/Attachable/Color` 决定菜单名称、分类、允许父轨道和外观。公共字段及已有属性决定通用属性控件，首个片段分类仍限制轨道的创建菜单。新增此类业务类型不修改核心switch或分支。
+
+自定义绘制属于各UI适配：`Editor/Samples/LegacyExperiencePreview.cs` 的Header同时实现 `OnGUI()` 与原生 `CreateGUI()`，后者不嵌入前者；点/区间继承现有 `ActionClipInspector` 的共用属性编辑。可选预览没有绑定时不创建实例，样例状态窗口只读当前播放头，不触发游戏逻辑。Header/Inspector的精确、显式子类回退及冲突规则见RF06，预览的精确绑定/释放和异常规则见RF12。字段字符串资源路径不等同于Unity对象跨重启引用证明。
+
+`ExtensionEndToEndTests` 通过原版实际菜单构建产生的回调及Toolkit菜单事件，分别创建同样的点/区间；通过真实IMGUI文本输入及Toolkit延迟文本输入修改字段，并验证事务取消、共用路径提交、Undo/Redo、FullSerializer重开得到完全相同作者内容。菜单构建提取为私有方法供原版原入口调用，没有新增业务API；测试不声称自动操作系统弹出菜单。实际磁盘保存由固定授权Shared.json探针单独验证，不扩大到两个窗口的保存对话框或任意路径。
+
 ## 时间坐标和数据草案
 
 RF12播放：App只注册一个EditorApplication.update共享更新入口，有注册视图时驱动自动保存及播放；两窗口自己的update仅更新视图，不再调用共享播放。AssetPlayer只持有播放头/前帧与ActionEditorPreviewSession，后者独占预览实例和指针，重复释放幂等；初始化部分失败、求值回调异常都会释放已拥有资源并传播异常，播放故障停机，不再吞异常继续预览。类型目录缓存可选预览工厂，保持精确绑定及派生适配器覆盖，无关冲突报双方来源，无绑定无预览。停止回调异常也在finally释放；原版关闭仍停止全局播放，最后窗口退出同样释放。文档变化/Undo/放弃和重载钩子沿用Reset，不因缩放/重绘重建。没有引入Combat工厂或场景副作用；真实域重载和任意第三方预览资源仍非已验收范围。

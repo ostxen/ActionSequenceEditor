@@ -532,15 +532,21 @@ namespace NBC.ActionEditor
         private void OnTrackRightContextMenu(Track track, PointerEventData ev)
         {
             if (track.IsLocked) return;
+            var time = track.Root.PosToTime(ev.MousePosition.x - Position.x, Position.width);
+            var menu = BuildTrackContextMenu(track, track.Root.SnapTime(time));
+            if (menu.GetItemCount() > 0) menu.ShowAsContext();
+        }
+
+        private GenericMenu BuildTrackContextMenu(Track track, float cursorTime)
+        {
+            var menu = new GenericMenu();
+            if (track.IsLocked) return menu;
             var attachableTypeInfos = new List<EditorTools.TypeMetaInfo>();
 
             var existing = track.Clips.FirstOrDefault();
             var existingCatAtt =
                 existing?.GetType().GetCustomAttributes(typeof(CategoryAttribute), true).FirstOrDefault() as
                     CategoryAttribute;
-
-            var time = track.Root.PosToTime(ev.MousePosition.x - Position.x, Position.width);
-            var cursorTime = track.Root.SnapTime(time);
 
             foreach (var clip in EditorTools.GetTypeMetaDerivedFrom(typeof(Clip)))
             {
@@ -564,7 +570,6 @@ namespace NBC.ActionEditor
 
             if (attachableTypeInfos.Count > 0)
             {
-                var menu = new GenericMenu();
                 foreach (var metaInfo in attachableTypeInfos)
                 {
                     var info = metaInfo;
@@ -590,8 +595,8 @@ namespace NBC.ActionEditor
                     }
                 }
 
-                menu.ShowAsContext();
             }
+            return menu;
         }
 
         private void OnClipContextMenu(Clip clip)
