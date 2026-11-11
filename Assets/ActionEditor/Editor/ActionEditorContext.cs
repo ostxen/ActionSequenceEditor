@@ -57,6 +57,12 @@ namespace NBC.ActionEditor
         public IDirectable First => items.Count == 0 ? null : items[0];
         public bool CanMultipleSelect { get; set; }
         public bool Contains(IDirectable item) => items.Contains(item);
+        public IDirectable[] ClickCandidate(IDirectable item, bool add, bool retainSelected)
+        {
+            if (item == null) return Array.Empty<IDirectable>();
+            if (retainSelected && items.Contains(item)) return Items;
+            return add ? items.Concat(new[] { item }).Distinct().ToArray() : new[] { item };
+        }
 
         public bool Set(IDirectable[] selected, bool allowMultiple)
         {

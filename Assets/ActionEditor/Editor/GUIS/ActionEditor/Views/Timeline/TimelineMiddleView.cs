@@ -169,6 +169,7 @@ namespace NBC.ActionEditor
 
         private bool _pointerDown;
         private Vector2 _pointerDownPos;
+        public void CancelMarquee() { _pointerDown = false; _preMultipleResult = false; _multipleRect = default; }
 
         public void OnDragBegin(PointerEventData eventData)
         {

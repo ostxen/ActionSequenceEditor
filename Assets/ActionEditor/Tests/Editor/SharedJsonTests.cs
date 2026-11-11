@@ -273,6 +273,67 @@ namespace NBC.ActionEditor.Tests
             finally { window.DiscardChanges(); window.Close(); App.Window = previousWindow; }
         }
         private TextAsset previous, fixture;
+        [Test] public void SelectionCandidatesKeepExistingAddAndRetainScopesWithoutEditing()
+        {
+            var selection = App.Context.Selection;
+            var first = App.AssetData.groups[0].Tracks[0].Clips[0]; var second = App.AssetData.groups[0].Tracks[1].Clips[0];
+            selection.Set(new IDirectable[] { first }, false);
+            Assert.That(selection.ClickCandidate(second, true, true), Is.EqualTo(new IDirectable[] { first, second }));
+            Assert.That(selection.Items, Is.EqualTo(new IDirectable[] { first }));
+            selection.Set(new IDirectable[] { first, second }, false);
+            Assert.That(selection.ClickCandidate(first, false, true), Is.EqualTo(new IDirectable[] { first, second }));
+            Assert.That(selection.ClickCandidate(second, false, false), Is.EqualTo(new IDirectable[] { second }));
+            Assert.That(selection.ClickCandidate(null, false, false), Is.Empty);
+            Assert.That(App.Session.IsDirty || App.Session.IsEditing, Is.False);
+        }
+        [Test] public void OriginalMarqueeCancelCannotApplyThePreviousRectangleOnRelease()
+        {
+            var view = new TimelineMiddleView { Position = new Rect(0, 0, 1000, 500) };
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            typeof(TimelineMiddleView).GetField("_pointerDown", flags).SetValue(view, true);
+            typeof(TimelineMiddleView).GetField("_preMultipleResult", flags).SetValue(view, true);
+            typeof(TimelineMiddleView).GetField("_multipleRect", flags).SetValue(view, new Rect(250, 0, 500, 200));
+            var clip = App.AssetData.groups[0].Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
+            view.CancelMarquee();
+            Assert.That(App.FistSelect, Is.SameAs(clip));
+            Assert.That((bool)typeof(TimelineMiddleView).GetField("_pointerDown", flags).GetValue(view), Is.False);
+            Assert.That((bool)typeof(TimelineMiddleView).GetField("_preMultipleResult", flags).GetValue(view), Is.False);
+            Assert.That((Rect)typeof(TimelineMiddleView).GetField("_multipleRect", flags).GetValue(view), Is.EqualTo(default(Rect)));
+        }
+        [UnityTest] public IEnumerator NativeTextFocusDoesNotRunTimelineShortcutsAndWheelCancelsOwnedDrag()
+        {
+            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            try
+            {
+                window.Show(); window.position = new Rect(50, 50, 1000, 600); yield return null; yield return null;
+                var canvas = window.Canvas;
+                var clip = App.AssetData.groups[0].Tracks[0].Clips[0]; window.Select(clip);
+                var input = new TextField { value = "editable text" }; canvas.Add(input); input.Focus(); yield return null;
+                var before = JsonDocumentSession.Encode(App.AssetData);
+                var escapeReachedInput = false;
+                input.RegisterCallback<KeyDownEvent>(e => { if (e.keyCode == KeyCode.Escape) escapeReachedInput = true; });
+                foreach (var key in new[] { KeyCode.Delete, KeyCode.C, KeyCode.X, KeyCode.V, KeyCode.D, KeyCode.Z, KeyCode.Escape })
+                {
+                    using var e = KeyDownEvent.GetPooled(new Event { type = EventType.KeyDown, keyCode = key, control = key != KeyCode.Delete });
+                    e.target = input.Q("unity-text-input"); canvas.SendEvent(e);
+                }
+                Assert.That(JsonDocumentSession.Encode(App.AssetData), Is.EqualTo(before));
+                Assert.That(escapeReachedInput, Is.True, "The root timeline handler must not steal text-editor Escape.");
+                Assert.That(App.Session.IsDirty || App.Session.IsEditing, Is.False);
+                input.RemoveFromHierarchy(); canvas.Focus();
+                var center = canvas.ClipRect(clip, 1).center;
+                Pointer(canvas, EventType.MouseDown, center); Pointer(canvas, EventType.MouseDrag, center + new Vector2(canvas.Scale * .5f, 0), shift: true);
+                Assert.That(App.Session.IsEditing, Is.True);
+                using (var wheel = WheelEvent.GetPooled(new Event { type = EventType.ScrollWheel, mousePosition = canvas.LocalToWorld(center), delta = Vector2.up }))
+                { wheel.target = canvas; canvas.SendEvent(wheel); }
+                Assert.That(App.Session.IsEditing || App.Session.IsDirty, Is.False);
+                Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
+                Pointer(canvas, EventType.MouseUp, center);
+                Assert.That(App.Session.IsEditing, Is.False);
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally { window.DiscardChanges(); window.Close(); }
+        }
         [Test] public void OriginalWindowsOwnIndependentGestureSnapshotsAndReferences()
         {
             var previousWindow = App.Window;
@@ -825,7 +886,7 @@ namespace NBC.ActionEditor.Tests
                 var point = new Vector2(Styles.TimelineLeftTotalWidth + 100, 100);
                 originalWindow.SendEvent(new Event { type = EventType.ScrollWheel, mousePosition = point, delta = new Vector2(0, 120) });
                 baseline.OriginalWheelMax = App.AssetData.ViewTimeMax;
-                Assert.That(baseline.OriginalWheelMax, Is.EqualTo(8.525f).Within(.001f), "Original wheel keeps the left boundary and normalizes wheel magnitude.");
+                Assert.That(baseline.OriginalWheelMax, Is.EqualTo(9.575f).Within(.001f), "RF10 uses the user-selected Toolkit225 step, preserving the left boundary.");
                 Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1));
                 App.AssetData.ViewTimeMax = 8; App.AssetData.ViewTimeMin = 1;
                 originalWindow.SendEvent(new Event { type = EventType.MouseDown, mousePosition = point, button = 2 });
@@ -846,7 +907,7 @@ namespace NBC.ActionEditor.Tests
                     mousePosition = canvas.LocalToWorld(point), delta = new Vector2(0, 120) }))
                 { wheel.target = canvas; canvas.SendEvent(wheel); }
                 baseline.NativeWheelMax = App.AssetData.ViewTimeMax;
-                Assert.That(baseline.NativeWheelMax, Is.EqualTo(Prefs.scrollWheelZooms ? 9.575f : 8).Within(.001f), "Native wheel currently uses three times the original zoom increment.");
+                Assert.That(baseline.NativeWheelMax, Is.EqualTo(Prefs.scrollWheelZooms ? 9.575f : 8).Within(.001f), "Both views use the selected225 increment; native keeps its preference scope.");
                 Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1));
                 App.AssetData.ViewTimeMax = 8; App.AssetData.ViewTimeMin = 1;
                 baseline.NativeScale = canvas.Scale;

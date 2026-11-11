@@ -116,7 +116,13 @@ namespace NBC.ActionEditor.Workbench
             var p = owner.rootVisualElement.WorldToLocal(e.position); owner.Seek(Snap(TimeAt(p.x))); e.StopPropagation();
         }
         private void HeaderUp(PointerUpEvent e) { if (mode == 7) Up(e); }
-        private void RootKey(KeyDownEvent e) { if (e.keyCode == KeyCode.Escape) { Cancel(); e.StopPropagation(); } }
+        private static bool TextInputTarget(IEventHandler target)
+        {
+            for (var element = target as VisualElement; element != null; element = element.parent)
+                if (element.ClassListContains("unity-base-text-field")) return true;
+            return false;
+        }
+        private void RootKey(KeyDownEvent e) { if (!TextInputTarget(e.target) && e.keyCode == KeyCode.Escape) { Cancel(); e.StopPropagation(); } }
         public void Dispose()
         {
             Cancel(); owner.rootVisualElement.UnregisterCallback<PointerDownEvent>(HeaderDown);
@@ -237,7 +243,7 @@ namespace NBC.ActionEditor.Workbench
             }
             else if (hit != null)
             {
-                if (!App.IsSelect(hit)) owner.Select(e.ctrlKey ? App.SelectItems.Concat(new[] { hit }).ToArray() : new IDirectable[] { hit });
+                if (!App.IsSelect(hit)) owner.Select(owner.Context.Selection.ClickCandidate(hit, e.ctrlKey, true));
                 if (hit.IsLocked) return;
                 mode = ResizeMode(hit, down); if (mode == 0) mode = 1;
                 original.Clear(); foreach (var clip in App.SelectItems.OfType<Clip>().Where(c => !c.IsLocked)) original[clip] = new Vector2(clip.StartTime, clip.Length);
@@ -258,8 +264,8 @@ namespace NBC.ActionEditor.Workbench
             var p = (Vector2)e.localPosition;
             if (mode == 4)
             {
-                var span = Asset.ViewTime; var min = Mathf.Max(0, Asset.ViewTimeMin - (p.x - last.x) / Scale);
-                Asset.ViewTimeMax = min + span; Asset.ViewTimeMin = min;
+                var range = TimelineNavigation.Pan(Asset.ViewTimeMin, Asset.ViewTimeMax, p.x - last.x, owner.rootVisualElement.contentRect.width - Left, true);
+                Asset.ViewTimeMax = range.y; Asset.ViewTimeMin = range.x;
             }
             else if (mode == 5) { owner.LeftWidth = Mathf.Clamp(owner.LeftWidth + p.x - last.x, 120, Mathf.Max(120, contentRect.width - 120)); Styles.TimelineLeftWidth = owner.LeftWidth; }
             else if (mode == 6) marquee = Rect.MinMaxRect(Mathf.Max(Left, Mathf.Min(down.x, p.x)), Mathf.Min(down.y, p.y), Mathf.Max(down.x, p.x), Mathf.Max(down.y, p.y));
@@ -325,6 +331,7 @@ namespace NBC.ActionEditor.Workbench
         }
         private void Key(KeyDownEvent e)
         {
+            if (TextInputTarget(e.target)) return;
             if (e.keyCode == KeyCode.Escape) { Cancel(); e.StopPropagation(); }
             else if (e.keyCode == KeyCode.Delete) owner.Run(JsonEditCommands.DeleteSelection);
             else if (e.ctrlKey && e.keyCode == KeyCode.C) owner.Run(() => JsonEditCommands.Copy(App.FistSelect));
@@ -343,8 +350,7 @@ namespace NBC.ActionEditor.Workbench
         {
             if (Asset == null) return; Cancel();
             if (e.localMousePosition.x < Left) owner.ScrollY = Mathf.Max(0, owner.ScrollY + e.delta.y * 20);
-            else if (Prefs.scrollWheelZooms && !(e.delta.y > 0 && Asset.ViewTime > 240))
-                Asset.ViewTimeMax += Mathf.Sign(e.delta.y) * 3 * 75 / owner.rootVisualElement.contentRect.width * Asset.ViewTime;
+            else Asset.ViewTimeMax = TimelineNavigation.ZoomMaximum(Asset.ViewTimeMin, Asset.ViewTimeMax, e.delta.y, owner.rootVisualElement.contentRect.width, Prefs.scrollWheelZooms);
             owner.SyncView(); MarkDirtyRepaint(); ruler.MarkDirtyRepaint(); e.StopPropagation();
         }
         public void ShowGroupMenu()

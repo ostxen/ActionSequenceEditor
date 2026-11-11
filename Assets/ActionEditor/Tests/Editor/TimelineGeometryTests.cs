@@ -7,6 +7,19 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class TimelineGeometryTests
     {
+        [TestCase(120, 9.575f)]
+        [TestCase(1, 9.575f)]
+        [TestCase(-120, 6.425f)]
+        [TestCase(0, 8)]
+        public void NavigationUsesChosen225StepAndRetainsRangeAndPreferenceRules(float wheel, float expected)
+        {
+            Assert.That(TimelineNavigation.ZoomMaximum(1, 8, wheel, 1000, true), Is.EqualTo(expected).Within(.00001f));
+            Assert.That(TimelineNavigation.ZoomMaximum(1, 8, wheel, 1000, false), Is.EqualTo(8));
+            Assert.That(TimelineNavigation.ZoomMaximum(1, 242, 1, 1000, true), Is.EqualTo(242));
+            Assert.That(TimelineNavigation.Pan(1, 8, 200, 700, true), Is.EqualTo(new Vector2(0, 7)));
+            Assert.That(TimelineNavigation.Pan(1, 8, 200, 700, false), Is.EqualTo(new Vector2(0, 6)));
+            Assert.That(TimelineNavigation.Pan(0, 7, 200, 700, false), Is.EqualTo(new Vector2(0, 7)));
+        }
         [Test] public void GestureCandidatesPreserveSnapOrderingThresholdsAndSnapshotBounds()
         {
             Assert.That(TimelineCandidates.Magnet(1, 0, new[] { 1.25f }, .25f, true), Is.EqualTo(1.25f));

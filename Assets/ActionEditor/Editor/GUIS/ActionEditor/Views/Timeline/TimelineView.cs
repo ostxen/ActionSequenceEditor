@@ -86,7 +86,7 @@ namespace NBC.ActionEditor
         private bool _isMouseButton2Down;
         private float _lastZoomX;
 
-        public void CancelNavigation() => _isMouseButton2Down = false;
+        public void CancelNavigation() { _isMouseButton2Down = false; _middleView?.CancelMarquee(); }
 
         public void DoZoomAndPan()
         {
@@ -121,27 +121,7 @@ namespace NBC.ActionEditor
 
             if (e.type == EventType.ScrollWheel)
             {
-                var delta = e.delta.y;
-                if (delta > 0)
-                {
-                    delta = 3;
-                }
-                else if (delta < 0)
-                {
-                    delta = -3;
-                }
-
-                var t = Mathf.Abs(delta * 25) / Position.width * asset.ViewTime;
-
-                var maxAdd = delta > 0 ? t : -t;
-
-                if (maxAdd > 0 && asset.ViewTimeMax - asset.ViewTimeMin > 240)
-                {
-                    Debug.Log("Exceed maximum range!");
-                    return;
-                }
-
-                asset.ViewTimeMax += maxAdd;
+                asset.ViewTimeMax = TimelineNavigation.ZoomMaximum(asset.ViewTimeMin, asset.ViewTimeMax, e.delta.y, Position.width, true);
 
                 Window.Repaint();
 
@@ -158,22 +138,8 @@ namespace NBC.ActionEditor
                 if (e.button == 2 && (e.type == EventType.MouseDrag || e.type == EventType.MouseDown || e.type == EventType.MouseUp))
                 {
                     var offset = e.mousePosition.x - _lastZoomX;
-                    var t = Mathf.Abs(offset) / App.Width * asset.ViewTime;
-
-                    var min = asset.ViewTimeMin + (offset > 0 ? -t : t);
-                    var max = asset.ViewTimeMax + (offset > 0 ? -t : t);
-                    // var minTime = 0;
-                    // var minTime = asset.PosToTime(4, App.Width) * -1;
-                    if (min >= 0)
-                    {
-                        asset.ViewTimeMin = min;
-                        asset.ViewTimeMax = max;
-                    }
-                    else if (min < 0 && asset.ViewTimeMin > 0)
-                    {
-                        asset.ViewTimeMin = 0;
-                        asset.ViewTimeMax = max + 0;
-                    }
+                    var range = TimelineNavigation.Pan(asset.ViewTimeMin, asset.ViewTimeMax, offset, App.Width, false);
+                    asset.ViewTimeMin = range.x; asset.ViewTimeMax = range.y;
 
                     _lastZoomX = e.mousePosition.x;
 

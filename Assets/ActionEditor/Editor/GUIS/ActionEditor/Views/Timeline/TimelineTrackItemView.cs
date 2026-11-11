@@ -524,7 +524,7 @@ namespace NBC.ActionEditor
 
         private void ClickClip(Clip clip)
         {
-            App.Select(clip);
+            App.Select(App.Context.Selection.ClickCandidate(clip, false, false));
         }
 
         #region ContextMenu
