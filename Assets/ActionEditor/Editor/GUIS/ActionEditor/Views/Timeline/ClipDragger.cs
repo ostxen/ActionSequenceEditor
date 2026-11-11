@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NBC.ActionEditor.Events;
 using UnityEngine;
+using NBC.ActionEditor.Storage;
 
 namespace NBC.ActionEditor
 {
@@ -36,6 +37,8 @@ namespace NBC.ActionEditor
     public static class ItemDragger
     {
         private static ItemDragType _dragType = ItemDragType.None;
+        private static JsonEditTransaction edit;
+        private static readonly object editOwner = new object();
 
         public static ItemDragType DragType
         {
@@ -151,10 +154,9 @@ namespace NBC.ActionEditor
 
         #region Drag
 
-        public static void OnBeginDrag(PointerEventData eventData)
+        public static void OnBeginDrag(PointerEventData eventData, JsonEditTransaction transaction = null)
         {
             if (!eventData.IsLeft() || App.SelectItems.Any(i => i.IsLocked)) return;
-            App.Session.BeginEdit();
             var asset = App.AssetData;
             if (asset == null) return;
             Clip stretchClip = null;
@@ -192,6 +194,8 @@ namespace NBC.ActionEditor
                 if (!ClipDrawer.ClipContainsByRealRect(pos)) return;
             }
 
+            edit = transaction?.IsActive == true ? transaction : App.Session.BeginEdit(editOwner);
+            if (edit == null) return;
             if (dragType == ItemDragType.Pos)
             {
                 OnBeginDragPos(eventData);
@@ -207,6 +211,13 @@ namespace NBC.ActionEditor
         }
 
         public static void OnDrag(PointerEventData eventData)
+        {
+            if (edit?.IsActive != true) return;
+            try { edit.Update(() => UpdateDrag(eventData)); }
+            catch { Cancel(); throw; }
+        }
+
+        private static void UpdateDrag(PointerEventData eventData)
         {
             if (DragType == ItemDragType.Pos)
             {
@@ -224,21 +235,34 @@ namespace NBC.ActionEditor
 
         public static void OnEndDrag(PointerEventData eventData)
         {
+            if (edit?.IsActive != true) { Cancel(); return; }
+            try { EndDrag(eventData); }
+            catch { Cancel(); throw; }
+        }
+
+        private static void EndDrag(PointerEventData eventData)
+        {
             if (DragType == ItemDragType.Track)
             {
                 OnEndDragTrack(eventData);
             }
 
             DragType = ItemDragType.None;
-            App.Session.EndEdit("Drag timeline items");
+            edit.Commit("Drag timeline items"); edit = null;
             eventData.StopPropagation();
         }
 
         public static void Cancel()
         {
+            var token = edit; edit = null;
             _dragType = ItemDragType.None; DragItems.Clear(); _dragBeginStartTime.Clear();
             NowDragClips.Clear(); DragOffsetDictionary.Clear(); TimelineTrackItemView.MoveToItem = null;
-            App.Session.CancelEdit();
+            token?.Cancel();
+        }
+
+        internal static void Cancel(JsonEditTransaction owner)
+        {
+            if (ReferenceEquals(edit, owner)) Cancel();
         }
 
         #endregion

@@ -2,9 +2,9 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01–RF03工程验收 `complete`，人工体验待用户次日验收；RF04–RF15 `planned`。Combat 专属实施与验收暂缓。
+- 总体状态：RF01–RF04工程验收 `complete`，人工体验待用户次日验收；RF05–RF15 `planned`。Combat 专属实施与验收暂缓。
 - 当前执行任务：2026-11-10用户要求夜间继续、人工差异次日汇总验收；缩放步长明确采用新版。每项实现并通过工程验收后本地中文提交，连同ActionEditor专属文档，不推送。
-- 下一任务：RF04编辑事务令牌与取消生命周期；人工体验清单见文末，不以其延期阻塞已具备证据的安全迁移。
+- 下一步：RF04工程验收已恢复并通过，独立本地提交后进入RF05存储边界；持久样本继续遵守preview/真实授权/approve/apply。人工体验清单见文末。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -125,7 +125,7 @@
 | [x] | RF01 | complete（工程验收；人工待验） | 原版布局、操作与细节基线 | 当前用户计划请求及“开始吧” | RF0 |
 | [x] | RF02 | complete（工程验收；人工待验） | 六项源码候选复现与缺陷处置 | RF01 | RF0 |
 | [x] | RF03 | complete（工程验收；人工待验） | 应用上下文、状态所有权与窗口适配 | RF02 | RF1 |
-| [ ] | RF04 | planned | 编辑事务令牌与取消生命周期 | RF03 | RF1 |
+| [x] | RF04 | complete（工程验收；人工待验） | 编辑事务令牌与取消生命周期 | RF03 | RF1 |
 | [ ] | RF05 | planned | 会话、编解码与存储边界 | RF04 | RF1 |
 | [ ] | RF06 | planned | 类型目录、能力与扩展解析 | RF05 | RF2 |
 | [ ] | RF07 | planned | 创建及结构编辑命令归一 | RF06 | RF2 |
@@ -885,6 +885,7 @@
 | H06 | 在文本/数值框编辑后用复制、撤销、Delete，再聚焦时间轴重复 | 焦点、快捷键作用域与菜单结果，不能误删除时间轴对象 | 待验 |
 | H07 | 菜单创建/重排轨道、列表首项/删除、改属性后保存/取消/放弃 | 类型分类顺序、对话框与输入中间态，检查一次手势一步Undo | 待验 |
 | H08 | 查看当前1000×250左右编辑器窗是否为你正在用的窗口 | RF01后见Toolkit，RF02后只读见原版窗口；现场归属均未确定，不擅自关闭或放弃，窗口清理缺口保留 | 待确认 |
+| H09 | 左键拖动中释放右键，再Esc/切窗；从另一窗口放弃后继续移动鼠标 | RF04自动验证错误按钮不提交/弹菜单、自身失焦回滚、另一视图生命周期处理器不结束外窗令牌、放弃后旧手势不能复活；实际桌面焦点链及正常右键菜单待验 | 待验 |
 
 - 次日说明必须同时列出实际完成任务/提交、失败或阻塞、尚未统一差异，不把夜间工程验收称为用户已满意。冷启动性能、其他DPI和任意外部自定义控件仍无覆盖，不承诺整夜必然完成全部15项。
 
@@ -924,3 +925,26 @@
 - 首轮完整 `20261110T153843Z-893ea8e4` 118/119，失败是新增非法JSON测试漏声明FullSerializer预期Error日志，不是失败打开更改了状态；补精确预期日志后重跑，不禁用日志断言。**最终** `.codex/runs/20261110T154131Z-17fca87e/report.json` Unity编译passed，程序集 `NBC.ActionEditor.Editor.Tests` EditMode **119/119 passed**，0failed/skipped/inconclusive；SharedJsonTests41项，其余保留实验测试。
 - `verify --profile code` `.codex/runs/20261110T154338Z-8786a93a/report.md`：工作流 **41/41 passed**，真实方案18projects/**637sources**，新增Context已纳入真实编译，**0errors/43warnings**；完整文档结构仍因缺yaml/markdown_it blocked，未安装。新增源码meta由Unity生成，未手写GUID。git diff --check通过。
 - 人工补充：H01/H05观察双窗交替打开、关闭、重开后选择和播放状态仍共用，关闭原版不续播；H06/H07确认Inspector焦点与撤销体验未变。未运行域重载完整状态恢复、持久探针、实际PlayerBuild、Combat、性能测量或未知窗口清理。下一任务RF04；本任务工程通过不等于已完成用户人工体验验收。
+
+### RF04 进行中记录｜事务令牌，完整验证阻塞（2026-11-10）
+
+- 状态：`blocked`，**未完成、未提交**。RF03已独立提交 `3d203da refactor: 收拢RF03共用上下文与窗口状态归属`，11文件含Unity生成meta及专属文档。当前工作区RF04修改不能用RF03的119/119冒充验收。
+- 初始复现 `20261110T154851Z-ce0b3105`：42项SharedJsonTests，41pass/1fail，原生拖动进行中关闭原版后IsEditing变false。后续诊断发现实际EditorWindow.Close还会触发原生窗口自身OnLostFocus，其主动取消是既定正常行为，不能要求关闭导致失焦时仍保留拖动。`20261110T155517Z-91ba2285` 底层1total/0pass/1fail的调用栈证明Cancel来自JsonActionWorkbench.OnLostFocus，而非单凭原版OnDisable。这条失败不能直接称为跨窗误取消的完整根因证据。
+- 因此测试分开两个要求：用真实原生指针开始手势，再直接调用另一个原版窗口OnLostFocus/OnDisable验证其生命周期处理器不取消其他owner；另测原生自身失焦应取消回滚。完整Close仍由已有生命周期测试验证，不放松“自身失焦取消”的正常习惯。相关方法名改为InactiveOriginalLifecycleDoesNotCancelNativeOwnedDrag，不再宣称覆盖无失焦的完整Close链。
+- 已实施但未最终验收：JsonEditTransaction提供Begin(owner)/IsActive/Update/Commit/Cancel，只有当前token可结束编辑；重复/陈旧token无效，同owner可复用，其他owner起事务返回null。保留无参旧测试/探针入口但仅能结束legacyOwner事务。嵌套命令归活动外层，失败回滚。打开/放弃/Undo/释放状态使旧token失效。原版窗口/ItemDragger、原生Canvas及原版Inspector各持token，关闭/失焦只取消自己的token。补错误按钮释放、指针状态清理和手势异常回滚；未新增源文件/meta。
+- 中间专项 `.codex/runs/20261110T155903Z-81fb3775/report.json` Unity编译与SharedJsonTests **44/44 passed**，覆盖跨窗生命周期处理器、owner排他/幂等/陈旧令牌、一次Undo、嵌套失败和无变化不加Undo。但之后又增加Update失败回滚、错误按钮、双向owner及ViewBase指针复位等代码/测试，44/44不是当前最终源码验收。
+- 最新完整验证 `.codex/runs/20261110T160519Z-5e30bd24/report.json`：Unity编译passed，实际发现124项，test run已受理且test status曾running；随后本工程PID19104的editor status连续超时，包装器editor-tests blocked，**没有终态、没有124通过结果**。doctor `20261110T161016Z-30578d8d`仍blocked；只读进程显示存在且Responding=true，但不能据此证明Unity主线程或测试已恢复。
+- 只读Editor.log末段看到新124项Run started和触控初始化，未见该轮Run finished；之前44/44是上一轮结果，不混用。未读取Pipeline鉴权描述符、未清Console、未重放test run、未连接另一个工程、未杀进程或重启Editor。可能存在对话框/主线程等待，但未见可验证现场，不定性为已证实原因。
+- 最新离线 `verify --profile code` `.codex/runs/20261110T161235Z-9e4f8c61/report.md`：41/41工作流、18projects/637sources、0errors/43warnings；文档结构仍缺yaml/markdown_it blocked，未安装。git diff --check通过。编译通过不替代当前完整Unity回归。
+- 恢复步骤：用户次日先查看Unity是否有测试/未保存对话框或忙状态，不主动放弃已有用户内容；连接恢复后先查原124项终态，再决定是否需要重跑。RF04未验收前不提交、不推进RF05。当前未提交范围限ActionEditor代码/测试及本任务记录，用户JSON/Jsons.meta/个人配置均未纳入提交。新版缩放决策尚待RF10实现。
+
+### RF04 恢复与最终验收记录（2026-11-10）
+
+- 状态：`complete`（工程验收），上节blocked为历史现场，以下终态覆盖旧的未知结论。doctor `20261110T234219Z-cd30a527`通过后先只读查询旧测试，`20261110T234247Z-1b8ebd35`确认124total/123pass/1fail；未重放未知运行、未强关或重启Editor。唯一失败NativeWrongButtonReleaseAndLostFocusRespectGestureOwnership，耗时27226.50秒，不是124通过。
+- 失败路径与修复：Canvas.Up虽过滤错误按钮，却仍允许事件进入ContextualMenuManipulator；活动手势期间Menu也未阻断。现在错误释放PreventDefault并StopImmediatePropagation，活动手势不填充上下文菜单。相同真实Toolkit事件专项 `20261110T234443Z-31644498`通过，完整 `20261110T234619Z-3e604834`124/124通过。异常长耗时与该路径相关，但未捕获操作系统菜单现场，不声称已证明此前所有等待的唯一原因。UnityCsReference两个尝试地址404，未核实Unity内部转换实现，未升级或修改其代码。
+- 最终补充覆盖：全局放弃使旧token失效，后续鼠标移动/释放不改新图、选择不保留旧图引用、辅助线消失；非法公共集合插入null在Commit验证失败后恢复完整图；原版不同按钮释放不结束拖动，ResetPointerState后无按下不能续拖。补测首轮 `20261110T235236Z-d5d2d46a`因测试直接调用internal方法编译失败（测试程序集边界），改为反射且未扩大生产API；`20261110T235341Z-4f28e39a`123/124，NaN被现有属性setter提前拒绝，改用真实公共集合损坏验证Commit回滚，未削弱断言或校验。
+- **最终交付源码** `.codex/runs/20261110T235617Z-c747f83a/report.json`：Unity编译passed；程序集NBC.ActionEditor.Editor.Tests、EditMode，124total/**124passed**/0failed/skipped/inconclusive，SharedJsonTests46项，运行25.12秒；错误按钮测试0.407秒。现有原生Esc/捕获丢失、窗口关闭生命周期、原版区域外释放及Undo/Redo回归同时通过。
+- 离线 `.codex/runs/20261110T235811Z-dbf25bf3/report.md`：工作流41/41，真实方案18projects/637sources，0errors/43warnings；完整code profile仍因缺yaml/markdown_it blocked，未安装依赖。无新增源码/meta，保存/编解码格式未改。源码与调用差异检查覆盖会话、双UI、原版Inspector和指针适配。
+- 语义边界：Begin(owner)排他、同owner复用；Update异常回滚；Commit/Cancel重复或陈旧调用无效；无参legacy入口不能终止外窗token。Session.Edit保持原有环境式嵌套命令归外层事务，并非所有命令的多调用者隔离或安全沙箱。自动保存已有IsEditing保护；显式保存的事务策略及持久验证归RF05，本项不宣称已验证活动手势中的所有保存入口。
+- 跨窗测试精确范围：真实窗口与Toolkit事件起拖，直接调用另一窗生命周期处理器证明不误取消；实际Close可能使owner自身失焦，此时按既定习惯取消。未以反射测试冒充完整桌面焦点链；选择沿用换图后清理无效引用策略，不新增稳定ID映射。H09补充人工操作，两UI阈值、最短长度、缩放差异仍按H01–H08及RF09/RF10处理。
+- 提交范围：明确9个ActionEditor代码/测试文件及唯一任务、Contracts、架构文档；不包含用户JSON/Jsons.meta/个人设置、生成证据、Combat、包或项目设置。不推送。未运行持久写入、域重载完整恢复、PlayerBuild、冷启动性能或其他DPI。下一任务RF05。

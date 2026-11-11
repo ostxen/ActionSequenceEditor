@@ -13,6 +13,23 @@ namespace NBC.ActionEditor.Storage
         [TextArea] public string Json;
     }
 
+    public sealed class JsonEditTransaction : IDisposable
+    {
+        private readonly JsonDocumentSession session;
+        internal object Owner { get; }
+        internal JsonEditTransaction(JsonDocumentSession session, object owner) { this.session = session; Owner = owner; }
+        public bool IsActive => session.Owns(this);
+        public bool Update(Action action)
+        {
+            if (!IsActive) return false;
+            try { action(); return true; }
+            catch { Cancel(); throw; }
+        }
+        public void Commit(string label = "Edit ActionEditor document") => session.EndEdit(this, label);
+        public void Cancel() => session.CancelEdit(this);
+        public void Dispose() => Cancel();
+    }
+
     /// <summary>One document shared by both renderers. Undo owns serialized snapshots, not Inspector proxies.</summary>
     public sealed class JsonDocumentSession : IDisposable
     {
@@ -44,6 +61,8 @@ namespace NBC.ActionEditor.Storage
         private string savedJson;
         private byte[] revision;
         private string pending;
+        private JsonEditTransaction transaction;
+        private readonly object legacyOwner = new object();
         public JsonDocumentSession() { Undo.undoRedoPerformed += UndoRedo; }
 
         public static string Encode(Asset asset)
@@ -112,15 +131,28 @@ namespace NBC.ActionEditor.Storage
             Changed?.Invoke();
         }
 
-        public void BeginEdit() { if (Document != null && pending == null) pending = Encode(Document); }
+        public void BeginEdit() => BeginEdit(legacyOwner);
+        public JsonEditTransaction BeginEdit(object owner)
+        {
+            if (owner == null) throw new ArgumentNullException(nameof(owner));
+            if (Document == null) return null;
+            if (transaction != null) return ReferenceEquals(transaction.Owner, owner) ? transaction : null;
+            pending = Encode(Document);
+            return transaction = new JsonEditTransaction(this, owner);
+        }
+        internal bool Owns(JsonEditTransaction token) => token != null && ReferenceEquals(transaction, token) && pending != null;
         public void EndEdit(string label = "Edit ActionEditor document")
         {
-            if (pending == null || Document == null) return;
+            if (transaction != null && ReferenceEquals(transaction.Owner, legacyOwner)) EndEdit(transaction, label);
+        }
+        internal void EndEdit(JsonEditTransaction token, string label)
+        {
+            if (!Owns(token) || Document == null) return;
             var before = pending;
             string after;
             try { RequireValid(Document); Document.Init(); after = Encode(Document); }
-            catch { CancelEdit(); throw; }
-            pending = null;
+            catch { CancelEdit(token); throw; }
+            pending = null; transaction = null;
             if (Normalize(before) == Normalize(after)) return;
             state.Json = before;
             Undo.IncrementCurrentGroup();
@@ -134,19 +166,24 @@ namespace NBC.ActionEditor.Storage
         public void Edit(string label, Action action)
         {
             var ownsEdit = !IsEditing;
-            BeginEdit();
-            try { action(); if (ownsEdit) EndEdit(label); }
-            catch { CancelEdit(); throw; }
+            var token = ownsEdit ? BeginEdit(legacyOwner) : transaction;
+            try { action(); if (ownsEdit) token?.Commit(label); }
+            catch { token?.Cancel(); throw; }
         }
         public void CancelEdit()
         {
-            if (pending == null) return;
-            var before = pending; pending = null; Document = Decode(before); Changed?.Invoke();
+            if (transaction != null && ReferenceEquals(transaction.Owner, legacyOwner)) CancelEdit(transaction);
+        }
+        internal void CancelEdit(JsonEditTransaction token)
+        {
+            if (!Owns(token)) return;
+            var candidate = Decode(pending);
+            pending = null; transaction = null; Document = candidate; Changed?.Invoke();
         }
         private void UndoRedo()
         {
             if (state == null || string.IsNullOrEmpty(state.Json)) return;
-            Document = Decode(state.Json); pending = null; Changed?.Invoke();
+            Document = Decode(state.Json); pending = null; transaction = null; Changed?.Invoke();
         }
 
         public void Save(string target = null)
@@ -192,7 +229,7 @@ namespace NBC.ActionEditor.Storage
                 throw new ArgumentException("原始 Combat/ScriptableObjects 资源不在编辑范围内。");
             return path;
         }
-        private void ReleaseState() { if (state != null) { Undo.ClearUndo(state); UnityEngine.Object.DestroyImmediate(state); } state = null; }
+        private void ReleaseState() { transaction = null; pending = null; if (state != null) { Undo.ClearUndo(state); UnityEngine.Object.DestroyImmediate(state); } state = null; }
         private static string Content(Asset asset)
         {
             return Normalize(Json.Serialize(asset));

@@ -49,6 +49,7 @@ namespace NBC.ActionEditor
             catch (ExitGUIException) { throw; }
             catch (Exception e)
             {
+                (Window as ActionEditorWindow)?.CancelOwnEdit();
                 Debug.Log(e);
             }
         }
@@ -67,6 +68,9 @@ namespace NBC.ActionEditor
         private PointerEventData _eventData = new PointerEventData();
         private const float DragThreshold = 1f;
         private Vector2 _dragStartPos;
+        private int _pointerButton;
+
+        internal void ResetPointerState() { _havePointerDown = false; _isDragging = false; _isPointerOver = false; }
 
         protected void CheckPointerEvent()
         {
@@ -83,7 +87,7 @@ namespace NBC.ActionEditor
             // Children may consume the press for selection. Ancestors still need to remember
             // its origin so a later drag cannot start without a corresponding mouse-down.
             if (ev.type == EventType.Used && ev.rawType == EventType.MouseDown && hasRect)
-            { _havePointerDown = true; _dragStartPos = ev.mousePosition; _isDragging = false; }
+            { _havePointerDown = true; _pointerButton = ev.button; _dragStartPos = ev.mousePosition; _isDragging = false; }
 
             _eventData.HasRect = hasRect;
             if (ev.type == EventType.MouseDown)
@@ -91,6 +95,7 @@ namespace NBC.ActionEditor
                 if (hasRect)
                 {
                     _havePointerDown = true;
+                    _pointerButton = ev.button;
                     _dragStartPos = ev.mousePosition;
                     _isDragging = false;
                     if (this is IPointerDownHandler pointerDownHandler)
@@ -105,6 +110,7 @@ namespace NBC.ActionEditor
             }
             else if (ev.rawType == EventType.MouseUp)
             {
+                if (_havePointerDown && ev.button != _pointerButton) return;
                 var wasDragging = _isDragging;
                 if (_havePointerDown && this is IPointerUpHandler pointerUpHandler)
                 {
@@ -132,6 +138,7 @@ namespace NBC.ActionEditor
             }
             else if (ev.type == EventType.MouseDrag)
             {
+                if (_havePointerDown && ev.button != _pointerButton) return;
                 if (_havePointerDown)
                 {
                     if (!_isDragging && Vector2.Distance(_dragStartPos, ev.mousePosition) > DragThreshold)

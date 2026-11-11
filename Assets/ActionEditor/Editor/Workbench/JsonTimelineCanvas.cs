@@ -21,6 +21,7 @@ namespace NBC.ActionEditor.Workbench
         private readonly VisualElement clipLabels;
         private readonly Dictionary<Clip, Label> labels = new Dictionary<Clip, Label>();
         private int pointer = -1;
+        private JsonEditTransaction edit;
         private Vector2 down, last;
         private Clip hit;
         private Track movingTrack;
@@ -86,7 +87,7 @@ namespace NBC.ActionEditor.Workbench
             addGroup = new Button(ShowGroupMenu) { text = Lan.GroupAdd, name = "json-add-group" };
             addGroup.style.position = Position.Absolute; addGroup.style.left = 15; addGroup.style.height = 24; Add(addGroup);
             addGroup.style.marginLeft = addGroup.style.marginRight = addGroup.style.marginTop = addGroup.style.marginBottom = 0;
-            RegisterCallback<PointerDownEvent>(Down); RegisterCallback<PointerMoveEvent>(Move); RegisterCallback<PointerUpEvent>(Up);
+            RegisterCallback<PointerDownEvent>(Down); RegisterCallback<PointerMoveEvent>(MoveSafely); RegisterCallback<PointerUpEvent>(Up);
             RegisterCallback<PointerLeaveEvent>(_ => { hasHoverPosition = false; UpdateResizeCursor(); });
             RegisterCallback<PointerCaptureOutEvent>(_ => Cancel()); RegisterCallback<DetachFromPanelEvent>(_ => { Cancel(); ruler.RemoveFromHierarchy(); dragGuides.RemoveFromHierarchy(); });
             RegisterCallback<KeyDownEvent>(Key);
@@ -213,6 +214,7 @@ namespace NBC.ActionEditor.Workbench
         {
             if (e.target is VisualElement source && (welcome.Contains(source) || addGroup.Contains(source) || source is Button || source.parent is Button)) return;
             if (Asset == null || e.button == 1) return;
+            if (owner.Context.Session.IsEditing && edit?.IsActive != true) return;
             Focus(); down = last = e.localPosition;
             var rows = Rows(); var row = Mathf.FloorToInt((down.y + owner.ScrollY) / 28);
             hit = Hit(down);
@@ -241,7 +243,8 @@ namespace NBC.ActionEditor.Workbench
                 snapTimes = Asset.groups.SelectMany(g => g.Tracks).SelectMany(t => t.Clips).Where(c => !original.ContainsKey(c))
                     .SelectMany(c => new[] { c.StartTime, c.EndTime }).Concat(new[] { 0f, Asset.Length, AssetPlayer.Inst.CurrentTime }).Distinct().ToArray();
                 dragMoved = false;
-                App.Session.BeginEdit();
+                edit = owner.Context.Session.BeginEdit(this);
+                if (edit == null) { mode = 0; return; }
             }
             else { mode = 6; if (!e.ctrlKey) owner.Select(); }
             pointer = e.pointerId; UpdateResizeCursor(); this.CapturePointer(pointer); e.StopPropagation();
@@ -250,6 +253,7 @@ namespace NBC.ActionEditor.Workbench
         {
             hoverPosition = this.WorldToLocal(e.position); hasHoverPosition = true; UpdateResizeCursor();
             if (pointer != e.pointerId || mode == 0 || mode == 7 || Asset == null) return;
+            if (mode >= 1 && mode <= 3 && edit?.IsActive != true) { Cancel(); return; }
             var p = (Vector2)e.localPosition;
             if (mode == 4)
             {
@@ -277,9 +281,15 @@ namespace NBC.ActionEditor.Workbench
             }
             last = p; owner.SyncView(); MarkDirtyRepaint(); ruler.MarkDirtyRepaint(); e.StopPropagation();
         }
+        private void MoveSafely(PointerMoveEvent e)
+        {
+            try { Move(e); }
+            catch { Cancel(); throw; }
+        }
         private void Up(PointerUpEvent e)
         {
             if (pointer != e.pointerId) return;
+            if (e.button != (mode == 4 ? 2 : 0)) { e.PreventDefault(); e.StopImmediatePropagation(); return; }
             if (mode == 8 && movingTrack != null)
             {
                 var rows = Rows(); var row = Mathf.FloorToInt((this.WorldToLocal(e.position).y + owner.ScrollY) / 28);
@@ -297,16 +307,18 @@ namespace NBC.ActionEditor.Workbench
             var captured = pointer; var wasEdit = mode >= 1 && mode <= 3; pointer = -1; mode = 0; marquee = null; movingTrack = null;
             dragMoved = false; SyncDragGuides();
             hasHoverPosition = false; UpdateResizeCursor();
-            if (wasEdit) owner.Run(() => App.Session.EndEdit("Drag timeline items"));
+            var token = edit; edit = null;
+            if (wasEdit) owner.Run(() => token?.Commit("Drag timeline items"));
             if (this.HasPointerCapture(captured)) this.ReleasePointer(captured); MarkDirtyRepaint();
         }
         public void Cancel()
         {
             hasHoverPosition = false; RemoveFromClassList("json-resize-horizontal");
             dragMoved = false; SyncDragGuides();
-            if (pointer < 0) return;
+            var token = edit; edit = null;
+            if (pointer < 0) { token?.Cancel(); return; }
             var captured = pointer; var previousMode = mode; pointer = -1; mode = 0; marquee = null; movingTrack = null;
-            if (previousMode >= 1 && previousMode <= 3) App.Session.CancelEdit();
+            if (previousMode >= 1 && previousMode <= 3) token?.Cancel();
             if (previousMode == 7) owner.Seek(seekBefore);
             if (this.HasPointerCapture(captured)) this.ReleasePointer(captured); MarkDirtyRepaint();
         }
@@ -405,6 +417,7 @@ namespace NBC.ActionEditor.Workbench
         }
         private void Menu(ContextualMenuPopulateEvent e)
         {
+            if (mode != 0 || edit?.IsActive == true) { e.PreventDefault(); e.StopImmediatePropagation(); return; }
             if (Asset == null) return;
             var p = this.WorldToLocal(e.mousePosition); var rows = Rows(); var row = Mathf.FloorToInt((p.y + owner.ScrollY) / 28);
             var clip = Hit(p); IDirectable item = clip ?? (row >= 0 && row < rows.Count ? rows[row] : null);

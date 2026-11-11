@@ -813,6 +813,177 @@ namespace NBC.ActionEditor.Tests
             finally { window.DiscardChanges(); window.Close(); }
         }
 
+        [UnityTest] public IEnumerator InactiveOriginalLifecycleDoesNotCancelNativeOwnedDrag()
+        {
+            var previousWindow = App.Window;
+            ActionEditorWindow original = null; JsonActionWorkbench native = null;
+            try
+            {
+                original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
+                native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show();
+                native.position = new Rect(50, 50, 1000, 600); native.Focus();
+                yield return null; yield return null;
+                var item = App.AssetData.groups[0].Tracks[0].Clips[0];
+                var canvas = native.Canvas; var down = canvas.ClipRect(item, 1).center;
+                Pointer(canvas, EventType.MouseDown, down);
+                Pointer(canvas, EventType.MouseDrag, down + new Vector2(canvas.Scale, 0));
+                var moved = item.StartTime;
+                Assert.That(moved, Is.GreaterThan(.25f));
+                Assert.That(App.Session.IsEditing, Is.True);
+                const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                typeof(ActionEditorWindow).GetMethod("OnLostFocus", flags).Invoke(original, null);
+                typeof(ActionEditorWindow).GetMethod("OnDisable", flags).Invoke(original, null);
+                Assert.That(App.Session.IsEditing, Is.True, "An inactive view's disable handler must not roll back the native gesture.");
+                Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(moved));
+                Pointer(canvas, EventType.MouseUp, down + new Vector2(canvas.Scale, 0));
+                Assert.That(App.Session.IsEditing, Is.False);
+                Undo.PerformUndo();
+                Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
+            }
+            finally
+            {
+                if (native != null) { native.DiscardChanges(); native.Close(); }
+                if (original != null) { original.DiscardChanges(); original.Close(); }
+                App.Window = previousWindow;
+            }
+        }
+
+        [Test] public void TransactionTokensRejectOtherOwnersAndStaleTokensAndCommitOneUndo()
+        {
+            var session = App.Session; var first = new object(); var other = new object();
+            var token = session.BeginEdit(first);
+            Assert.That(token, Is.Not.Null);
+            Assert.That(session.BeginEdit(first), Is.SameAs(token));
+            Assert.That(session.BeginEdit(other), Is.Null);
+            ((LegacyExperienceAsset)App.AssetData).Version = 5;
+            session.EndEdit(); session.CancelEdit();
+            Assert.That(session.IsEditing, Is.True, "Legacy callers cannot finish another owner's transaction.");
+            JsonEditCommands.Rename(App.AssetData.groups[0].Tracks[0], "nested-owned");
+            Assert.That(token.IsActive, Is.True);
+            token.Commit("Owned gesture"); token.Commit(); token.Cancel();
+            Assert.That(session.IsEditing, Is.False);
+            Undo.PerformUndo();
+            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+            Assert.That(App.AssetData.groups[0].Tracks[0].Name, Is.Not.EqualTo("nested-owned"));
+            Undo.PerformRedo();
+            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(5));
+            var next = session.BeginEdit(other);
+            ((LegacyExperienceAsset)App.AssetData).Version = 6;
+            token.Cancel(); token.Commit();
+            Assert.That(next.IsActive, Is.True);
+            next.Cancel(); next.Cancel();
+            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(5));
+            Assert.That(next.IsActive, Is.False);
+            Assert.That(next.Update(() => Assert.Fail("A stale token must not execute a mutation.")), Is.False);
+        }
+
+        [UnityTest] public IEnumerator NativeWrongButtonReleaseAndLostFocusRespectGestureOwnership()
+        {
+            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            try
+            {
+                window.Show(); window.position = new Rect(50, 50, 1000, 600);
+                yield return null; yield return null;
+                var canvas = window.Canvas; var item = App.AssetData.groups[0].Tracks[0].Clips[0];
+                var down = canvas.ClipRect(item, 1).center;
+                Pointer(canvas, EventType.MouseDown, down);
+                Pointer(canvas, EventType.MouseDrag, down + new Vector2(canvas.Scale, 0));
+                Assert.That(App.Session.IsEditing, Is.True, "The left drag must be active before the unrelated release.");
+                Pointer(canvas, EventType.MouseUp, down, button: 1);
+                Assert.That(App.Session.IsEditing, Is.True, "A right-button release cannot commit a left-button drag.");
+                typeof(JsonActionWorkbench).GetMethod("OnLostFocus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(window, null);
+                Assert.That(App.Session.IsEditing, Is.False);
+                Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
+                item = App.AssetData.groups[0].Tracks[0].Clips[0]; down = canvas.ClipRect(item, 1).center;
+                Pointer(canvas, EventType.MouseDown, down);
+                Pointer(canvas, EventType.MouseDrag, down + new Vector2(canvas.Scale, 0));
+                Pointer(canvas, EventType.MouseUp, down + new Vector2(canvas.Scale, 0));
+                Assert.That(App.Session.IsDirty, Is.True);
+                Undo.PerformUndo(); Assert.That(App.Session.IsDirty, Is.False);
+                item = App.AssetData.groups[0].Tracks[0].Clips[0]; down = canvas.ClipRect(item, 1).center;
+                window.Select(item);
+                Pointer(canvas, EventType.MouseDown, down);
+                Pointer(canvas, EventType.MouseDrag, down + new Vector2(canvas.Scale, 0));
+                App.Session.DiscardChanges();
+                Assert.That(App.Session.IsEditing, Is.False);
+                Assert.That(App.SelectItems, Is.Empty, "Rollback must not retain references into the discarded graph.");
+                Pointer(canvas, EventType.MouseDrag, down + new Vector2(canvas.Scale * 2, 0));
+                Pointer(canvas, EventType.MouseUp, down + new Vector2(canvas.Scale * 2, 0));
+                Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
+                Assert.That(App.Session.IsDirty, Is.False);
+                yield return null; yield return null;
+                Assert.That(window.rootVisualElement.Q("json-drag-guides").resolvedStyle.display, Is.EqualTo(DisplayStyle.None));
+            }
+            finally { window.DiscardChanges(); window.Close(); }
+        }
+
+        [UnityTest] public IEnumerator InactiveNativeCancellationDoesNotTouchOriginalWindowToken()
+        {
+            var previousWindow = App.Window;
+            ActionEditorWindow original = null; JsonActionWorkbench native = null;
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            try
+            {
+                original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
+                native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show();
+                yield return null; yield return null;
+                var token = App.Session.BeginEdit(original);
+                typeof(ActionEditorWindow).GetField("guiEdit", flags).SetValue(original, token);
+                ((LegacyExperienceAsset)App.AssetData).Version = 17;
+                native.Canvas.Cancel();
+                typeof(JsonActionWorkbench).GetMethod("OnLostFocus", flags).Invoke(native, null);
+                Assert.That(token.IsActive, Is.True);
+                Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(17));
+                typeof(ActionEditorWindow).GetMethod("OnLostFocus", flags).Invoke(original, null);
+                Assert.That(token.IsActive, Is.False);
+                Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+            }
+            finally
+            {
+                if (native != null) { native.DiscardChanges(); native.Close(); }
+                if (original != null) { original.DiscardChanges(); original.Close(); }
+                App.Window = previousWindow;
+            }
+        }
+
+        [Test] public void OwnedTransactionsRollbackNestedFailuresAndDoNotAddEmptyUndoSteps()
+        {
+            var token = App.Session.BeginEdit(this);
+            ((LegacyExperienceAsset)App.AssetData).Version = 5;
+            Assert.Throws<InvalidOperationException>(() => App.Session.Edit("Nested failure", () =>
+            {
+                ((LegacyExperienceAsset)App.AssetData).Version = 9;
+                throw new InvalidOperationException("expected failure");
+            }));
+            Assert.That(token.IsActive, Is.False);
+            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+            App.Session.Edit("Real change", () => ((LegacyExperienceAsset)App.AssetData).Version = 2);
+            App.Session.BeginEdit(this).Commit("No change");
+            Undo.PerformUndo();
+            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+            var stale = App.Session.BeginEdit(this);
+            App.TextAsset = fixture;
+            Assert.That(stale.IsActive, Is.False);
+            var active = App.Session.BeginEdit(this);
+            stale.Cancel(); Assert.That(active.IsActive, Is.True);
+            App.Session.DiscardChanges();
+            Assert.That(active.IsActive, Is.False);
+            var partial = App.Session.BeginEdit(this);
+            Assert.Throws<InvalidOperationException>(() => partial.Update(() =>
+            {
+                ((LegacyExperienceAsset)App.AssetData).Version = 99;
+                throw new InvalidOperationException("partial update");
+            }));
+            Assert.That(partial.IsActive, Is.False);
+            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+            var invalid = App.Session.BeginEdit(this);
+            App.AssetData.groups[0].Tracks[0].Clips.Add(null);
+            Assert.Throws<System.IO.InvalidDataException>(() => invalid.Commit());
+            Assert.That(invalid.IsActive, Is.False);
+            Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
+            Assert.That(App.Session.IsDirty, Is.False);
+        }
+
         [UnityTest] public IEnumerator NativeMultiClipDragGuidesMatchBoundsSnappingAndGestureLifetime()
         {
             var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
@@ -1107,7 +1278,11 @@ namespace NBC.ActionEditor.Tests
                 view.Send(new Event { type = EventType.MouseDown, mousePosition = new Vector2(20, 20), button = 0 });
                 view.Send(new Event { type = EventType.MouseDrag, mousePosition = new Vector2(21, 20), button = 0 }); Assert.That(view.Started, Is.Zero, "One pixel is not yet a drag.");
                 view.Send(new Event { type = EventType.MouseDrag, mousePosition = new Vector2(150, 20), button = 0 }); Assert.That(view.Started, Is.EqualTo(1));
+                view.Send(new Event { type = EventType.MouseUp, mousePosition = new Vector2(150, 20), button = 1 }); Assert.That(view.Ended, Is.Zero);
                 view.Send(new Event { type = EventType.MouseUp, mousePosition = new Vector2(150, 20), button = 0 }); Assert.That(view.Ended, Is.EqualTo(1));
+                view.Send(new Event { type = EventType.MouseDown, mousePosition = new Vector2(20, 20), button = 0 });
+                typeof(ViewBase).GetMethod("ResetPointerState", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(view, null);
+                view.Send(new Event { type = EventType.MouseDrag, mousePosition = new Vector2(150, 20), button = 0 }); Assert.That(view.Started, Is.EqualTo(1));
             }
             finally { Event.current = old; }
         }

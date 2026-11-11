@@ -20,6 +20,8 @@ RF02明确的纠错边界：文档选择只列`.json`（扩展名不区分大小
 
 RF03所有权：`App.Context`为产品内唯一`ActionEditorContext`，拥有JsonDocumentSession、源TextAsset、选择、剪贴板和播放状态/AssetPlayer。App原有入口与AssetPlayer.Inst均转发同一状态，不另存副本。上下文服务不持有具体窗口或GUI事件；Unity Selection、对话框和域重载恢复属于宿主适配。两窗口注册至`App.Views`，重复注册替换原回调，关闭解除注册且更新资格转交下一注册窗口；原版关闭仍停止共用播放。视图尺寸/焦点/原生捕获仍各UI持有，旧App.Window/Width和静态手势留待后续迁移，当前不声称跨窗口事务令牌或完整预览资源重构已完成。
 
+RF04当前JSON编辑生命周期：BeginEdit(owner)返回发起者令牌，同owner复用、其他owner返回null。Update异常、Commit校验失败回滚整图，取消/重复提交/陈旧令牌不能结束新事务；无参legacy入口只结束自身legacy事务。两窗口、原版Inspector和拖动器持有自己的令牌，失焦/关闭只取消本方；全局放弃、打开、Undo/Redo使旧令牌失效。嵌套Session.Edit仍归活动外层，不是安全隔离。错误鼠标按钮释放不提交，活动Toolkit手势不弹上下文菜单。自身失焦仍按原习惯回滚；关闭另一窗口若导致owner自身失焦，也属于该规则。换图后清理旧选择引用，不承诺恢复对象身份。显式保存的活动事务策略与持久验证归RF05。
+
 ## 时间坐标和数据草案
 
 平台时间存储为有限、非负的 double 秒。文档长度必须大于 0；点事件 duration=0，区间 duration>0，start+duration 不得超出文档长度。所有非法数值在提交前拒绝，不在绘制时修正。界面帧吸附是显式编辑操作，不反向量化已有数据。

@@ -1,6 +1,7 @@
 ﻿using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using NBC.ActionEditor.Storage;
 
 namespace NBC.ActionEditor
 {
@@ -15,7 +16,8 @@ namespace NBC.ActionEditor
 
         private WelcomeView _welcomeView;
         private TimelineView _timelineView;
-        private bool ownsGuiEdit;
+        private JsonEditTransaction guiEdit;
+        internal JsonEditTransaction CurrentEdit => guiEdit;
 
         #region Init
 
@@ -61,7 +63,7 @@ namespace NBC.ActionEditor
 
         void OnDisable()
         {
-            ItemDragger.Cancel();
+            CancelOwnEdit();
             App.Views.Detach(this);
             if (App.Window == this) App.Window = null;
             this.ReleaseViews();
@@ -89,18 +91,19 @@ namespace NBC.ActionEditor
             if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
             {
                 _timelineView?.CancelNavigation();
-                ItemDragger.Cancel(); Event.current.Use();
+                CancelOwnEdit(); Event.current.Use();
             }
             if (App.AssetData != null && Event.current.type != EventType.Layout && Event.current.type != EventType.Repaint)
             {
-                if (!App.Session.IsEditing) ownsGuiEdit = true;
-                App.Session.BeginEdit();
+                if (guiEdit?.IsActive != true) guiEdit = Context.Session.BeginEdit(this);
+                if (guiEdit == null) Event.current.Use();
             }
             try { DrawEditor(); }
+            catch { CancelOwnEdit(); throw; }
             finally
             {
-                if (ownsGuiEdit && Event.current.rawType != EventType.MouseDrag && ItemDragger.DragType == ItemDragType.None)
-                { ownsGuiEdit = false; App.Session.EndEdit(); }
+                if (guiEdit?.IsActive == true && Event.current.rawType != EventType.MouseDrag && ItemDragger.DragType == ItemDragType.None)
+                { guiEdit.Commit(); guiEdit = null; }
                 hasUnsavedChanges = App.Session.IsDirty;
             }
         }
@@ -126,7 +129,7 @@ namespace NBC.ActionEditor
         public override void SaveChanges() { App.SaveAsset(); if (!App.Session.IsDirty) base.SaveChanges(); }
         public override void DiscardChanges()
         {
-            ItemDragger.Cancel(); ownsGuiEdit = false;
+            CancelOwnEdit();
             Context.Session.DiscardChanges();
             base.DiscardChanges();
         }
@@ -134,7 +137,14 @@ namespace NBC.ActionEditor
         void OnLostFocus()
         {
             _timelineView?.CancelNavigation();
-            if (ItemDragger.DragType != ItemDragType.None) ItemDragger.Cancel();
+            CancelOwnEdit();
+        }
+
+        internal void CancelOwnEdit()
+        {
+            this.ResetPointerStates();
+            if (guiEdit == null) return;
+            ItemDragger.Cancel(guiEdit); guiEdit.Cancel(); guiEdit = null;
         }
 
         void OnWillSaveScene(UnityEngine.SceneManagement.Scene scene, string path)
