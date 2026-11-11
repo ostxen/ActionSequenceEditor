@@ -37,7 +37,6 @@ namespace NBC.ActionEditor
 
             App.Width = Styles.TimelineRightWidth;
             DoZoomAndPan();
-            ItemDragger.OnCheck();
 
             var middleRect = new Rect(0, Styles.PlayControlHeight, Position.width,
                 Position.height - Styles.PlayControlHeight - Styles.BottomHeight);

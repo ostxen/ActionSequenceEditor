@@ -241,8 +241,8 @@ namespace NBC.ActionEditor.Workbench
                 if (hit.IsLocked) return;
                 mode = ResizeMode(hit, down); if (mode == 0) mode = 1;
                 original.Clear(); foreach (var clip in App.SelectItems.OfType<Clip>().Where(c => !c.IsLocked)) original[clip] = new Vector2(clip.StartTime, clip.Length);
-                snapTimes = Asset.groups.SelectMany(g => g.Tracks).SelectMany(t => t.Clips).Where(c => !original.ContainsKey(c))
-                    .SelectMany(c => new[] { c.StartTime, c.EndTime }).Concat(new[] { 0f, Asset.Length, AssetPlayer.Inst.CurrentTime }).Distinct().ToArray();
+                snapTimes = TimelineCandidates.References(Asset.groups.SelectMany(g => g.Tracks).SelectMany(t => t.Clips),
+                    original.Keys, Asset.Length, AssetPlayer.Inst.CurrentTime, false);
                 dragMoved = false;
                 edit = owner.Context.Session.BeginEdit(this);
                 if (edit == null) { mode = 0; return; }
@@ -270,15 +270,15 @@ namespace NBC.ActionEditor.Workbench
                 if (mode == 1)
                 {
                     delta = Magnet(Snap(original[hit].x + delta), original[hit].y, e.shiftKey) - original[hit].x;
-                    delta = Mathf.Max(delta, -original.Values.Min(v => v.x));
+                    delta = TimelineCandidates.ClampMoveDelta(delta, original.Values.Select(v => v.x));
                     foreach (var pair in original) pair.Key.StartTime = pair.Value.x + delta;
                 }
                 else if (mode == 2)
                 {
-                    var end = original[hit].x + original[hit].y;
-                    hit.StartTime = Mathf.Min(end - .01f, Magnet(Snap(original[hit].x + delta), 0, e.shiftKey)); hit.Length = end - hit.StartTime;
+                    var candidate = TimelineCandidates.Resize(original[hit], true, Magnet(Snap(original[hit].x + delta), 0, e.shiftKey), .01f, 0, float.PositiveInfinity);
+                    hit.StartTime = candidate.x; hit.Length = candidate.y;
                 }
-                else if (mode == 3) hit.Length = Mathf.Max(.01f, Magnet(Snap(original[hit].x + original[hit].y + delta), 0, e.shiftKey) - hit.StartTime);
+                else if (mode == 3) hit.Length = TimelineCandidates.Resize(original[hit], false, Magnet(Snap(original[hit].x + original[hit].y + delta), 0, e.shiftKey), .01f, 0, float.PositiveInfinity).y;
             }
             last = p; owner.SyncView(); MarkDirtyRepaint(); ruler.MarkDirtyRepaint(); e.StopPropagation();
         }
@@ -337,14 +337,7 @@ namespace NBC.ActionEditor.Workbench
         private float Magnet(float start, float length, bool bypass)
         {
             if (!Prefs.MagnetSnapping || bypass) return start;
-            var distance = Asset.ViewTime * .01f; var result = start;
-            foreach (var time in snapTimes)
-            {
-                var a = Mathf.Abs(time - start); var b = Mathf.Abs(time - start - length);
-                if (a < distance) { distance = a; result = time; }
-                if (b < distance) { distance = b; result = time - length; }
-            }
-            return Mathf.Max(0, result);
+            return TimelineCandidates.Magnet(start, length, snapTimes, Asset.ViewTime * .01f, false);
         }
         private void Wheel(WheelEvent e)
         {

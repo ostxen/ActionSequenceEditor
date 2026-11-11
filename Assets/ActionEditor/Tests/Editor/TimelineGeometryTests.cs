@@ -7,6 +7,30 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class TimelineGeometryTests
     {
+        [Test] public void GestureCandidatesPreserveSnapOrderingThresholdsAndSnapshotBounds()
+        {
+            Assert.That(TimelineCandidates.Magnet(1, 0, new[] { 1.25f }, .25f, true), Is.EqualTo(1.25f));
+            Assert.That(TimelineCandidates.Magnet(1, 0, new[] { 1.25f }, .25f, false), Is.EqualTo(1));
+            // Equal start/end distances: original favors the start, native keeps the first reference.
+            Assert.That(TimelineCandidates.Magnet(1, 2, new[] { 3.25f, .75f }, .5f, true), Is.EqualTo(.75f));
+            Assert.That(TimelineCandidates.Magnet(1, 2, new[] { 3.25f, .75f }, .5f, false), Is.EqualTo(1.25f));
+            Assert.That(TimelineCandidates.ClampMoveDelta(-4, new[] { 1f, 3f }), Is.EqualTo(-1));
+            var initial = new Vector2(1, 2);
+            Assert.That(TimelineCandidates.Resize(initial, true, -5, .1f, .5f, 2.9f, value => value), Is.EqualTo(new Vector2(.5f, 2.5f)));
+            Assert.That(TimelineCandidates.Resize(initial, false, 8, .1f, 1.1f, 4, value => value), Is.EqualTo(new Vector2(1, 3)));
+            Assert.That(TimelineCandidates.Resize(initial, true, 4, .01f, 0, float.PositiveInfinity).y, Is.EqualTo(.01f).Within(.00001f));
+            // A short original clip has inverted limits; keep the original upper-bound-first rule.
+            Assert.That(TimelineCandidates.Resize(new Vector2(0, .01f), true, 0, .1f, 0, -.09f, value => value).x, Is.EqualTo(-.09f));
+        }
+        [Test] public void SnapReferencesExcludeSelectedAndRebuildWithoutChangingInput()
+        {
+            var first = new LegacyExperienceInterval { StartTime = 1, Length = 2 };
+            var second = new LegacyExperienceMarker { StartTime = 4 };
+            Assert.That(TimelineCandidates.References(new Clip[] { first, second }, new[] { first }, 7, 2, true), Is.EqualTo(new[] { 0f, 7, 2, 4 }));
+            second.StartTime = 5;
+            Assert.That(TimelineCandidates.References(new Clip[] { first, second }, new[] { first }, 7, 2, false), Is.EqualTo(new[] { 5f, 0, 7, 2 }));
+            Assert.That(first.StartTime, Is.EqualTo(1));
+        }
         [TestCase(500, 232, 0, 7)]
         [TestCase(1000, 320, 1, 8)]
         [TestCase(1400, 220, 12, 240)]

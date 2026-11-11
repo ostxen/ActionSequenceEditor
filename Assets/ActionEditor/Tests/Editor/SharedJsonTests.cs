@@ -16,6 +16,7 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class SharedJsonTests
     {
+        private static readonly OriginalTimelineGesture ItemDragger = new OriginalTimelineGesture();
         private sealed class CollectionFixture
         {
             public System.Collections.Generic.List<string> Values = new System.Collections.Generic.List<string> { "one", "two" };
@@ -174,6 +175,17 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(second.StartTime, Is.EqualTo(4).Within(.0001f));
                 ItemDragger.Cancel();
                 Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(1).Within(.0001f));
+                first = App.AssetData.groups[0].Tracks[0].Clips[0]; second = App.AssetData.groups[0].Tracks[1].Clips[0];
+                App.SelectWithoutInspector(first, second); ClipDrawer.Reset();
+                ClipDrawer.GetDraw(first).ClipRealRect = new Rect(100, 20, 150, 26);
+                window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = down, shift = true });
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down + new Vector2(50, 0), shift = true });
+                window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = down + new Vector2(50, 0), shift = true });
+                Assert.That(first.StartTime, Is.EqualTo(1.5f).Within(.0001f));
+                Assert.That(second.StartTime, Is.EqualTo(3.5f).Within(.0001f));
+                Undo.PerformUndo(); yield return null;
+                Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(1).Within(.0001f));
+                Assert.That(App.AssetData.groups[0].Tracks[1].Clips[0].StartTime, Is.EqualTo(3).Within(.0001f));
             }
             finally { ItemDragger.Cancel(); window.Close(); App.Width = previousWidth; }
         }
@@ -224,7 +236,7 @@ namespace NBC.ActionEditor.Tests
             {
                 App.Width = 700;
                 var clip = App.AssetData.groups[0].Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
-                typeof(ItemDragger).GetField("magnetSnapTimesCache", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).SetValue(null, new[] { 12345f });
+                typeof(OriginalTimelineGesture).GetField("magnetSnapTimesCache", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(ItemDragger, new[] { 12345f });
                 var source = new Event { type = EventType.MouseDrag, button = 0,
                     mousePosition = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(clip.EndTime, App.Width) - 2, 30) };
                 Event.current = source;
@@ -261,6 +273,27 @@ namespace NBC.ActionEditor.Tests
             finally { window.DiscardChanges(); window.Close(); App.Window = previousWindow; }
         }
         private TextAsset previous, fixture;
+        [Test] public void OriginalWindowsOwnIndependentGestureSnapshotsAndReferences()
+        {
+            var previousWindow = App.Window;
+            var first = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            var second = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            try
+            {
+                Assert.That(first.Gesture, Is.Not.SameAs(second.Gesture));
+                var clip = App.AssetData.groups[0].Tracks[0].Clips[0];
+                App.SelectWithoutInspector(clip);
+                first.Gesture.DragType = ItemDragType.Pos;
+                second.Gesture.Cancel();
+                Assert.That(first.Gesture.DragItems, Is.EqualTo(new[] { clip }));
+                Assert.That(first.Gesture.DragType, Is.EqualTo(ItemDragType.Pos));
+                Assert.That(second.Gesture.DragItems, Is.Empty);
+                first.Gesture.Cancel();
+                Assert.That(first.Gesture.DragItems, Is.Empty);
+                Assert.That(first.Gesture.MoveToItem, Is.Null);
+            }
+            finally { first.Gesture.Cancel(); second.Gesture.Cancel(); first.DiscardChanges(); second.DiscardChanges(); UnityEngine.Object.DestroyImmediate(first); UnityEngine.Object.DestroyImmediate(second); App.Window = previousWindow; }
+        }
         private string recovery;
         [SetUp] public void Setup()
         {

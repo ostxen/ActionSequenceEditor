@@ -2,9 +2,9 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01–RF08工程验收 `complete`，人工体验待用户次日验收；RF09–RF15 `planned`。Combat 专属实施与验收暂缓。
+- 总体状态：RF01–RF09工程验收 `complete`，人工体验待用户验收；RF10–RF15 `planned`。Combat 专属实施与验收暂缓。
 - 当前执行任务：2026-11-10用户要求夜间继续、人工差异次日汇总验收；缩放步长明确采用新版。每项实现并通过工程验收后本地中文提交，连同ActionEditor专属文档，不推送。
-- 下一步：RF06工程验收通过，独立本地提交后进入RF07结构命令。2026-11-11用户明确要求一直继续直至本系列结束，不逐项等待继续指令；不扩大持久写入、包/设置、Combat、删除及人工验收授权。
+- 下一步：RF09工程验收通过，独立本地提交后进入RF10选择及导航适配。2026-11-11用户明确要求一直继续直至本系列结束，不逐项等待继续指令；不扩大持久写入、包/设置、Combat、删除及人工验收授权。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -130,7 +130,7 @@
 | [x] | RF06 | complete（工程验收；人工待验） | 类型目录、能力与扩展解析 | RF05 | RF2 |
 | [x] | RF07 | complete（工程验收；人工待验） | 创建及结构编辑命令归一 | RF06 | RF2 |
 | [x] | RF08 | complete（工程验收；人工待验） | 可见布局、坐标与命中归一 | RF07 | RF3 |
-| [ ] | RF09 | planned | 移动、拉伸、吸附与拖动反馈归一 | RF08 | RF3 |
+| [x] | RF09 | complete（工程验收；人工待验） | 移动、拉伸、吸附与拖动反馈归一 | RF08 | RF3 |
 | [ ] | RF10 | planned | 选择、导航、快捷键和工作区适配 | RF09 | RF3 |
 | [ ] | RF11 | planned | 属性描述、集合与双 UI 属性编辑 | RF10 | RF4 |
 | [ ] | RF12 | planned | 唯一播放调度与预览资源所有权 | RF11 | RF5 |
@@ -995,3 +995,15 @@
 - 新增TimelineGeometryTests五项（含3参数场景）：500/1000/1400窗口和不同分栏/视域对原公式独立预期及往返；8行样例/折叠后5行及编码不变；点8px/短片段4px、滚动行、反向框选、重叠手柄。既有真实双UI不同窗口宽、滚动、折叠、属性/指针/多选/辅助线测试同时通过，不据公式测试声称所有DPI已人工验收。
 - 首轮 `20261111T010827Z-c592dd1f`编译失败：名称撞保留实验工作台TimelineTransform，改名JsonTimelineTransform，不改实验double模型或格式。随后完整137/137；最终 `.codex/runs/20261111T011200Z-48290c02/report.json` Unity编译passed，NBC.ActionEditor.Editor.Tests EditMode **137/137passed**、0failed/skipped/inconclusive。
 - 离线 `.codex/runs/20261111T011410Z-081f7214/report.md`工作流41/41、18projects/646sources、0errors/43warnings；完整code profile缺yaml/markdown_it仍blocked，未安装。新增两源码meta由Unity生成，git diff --check通过。未运行JSON持久写入、PlayerBuild、Combat或其他DPI现场；布局/极短片段外观与操作手感仍H01–H04人工待验。下一任务RF09。
+
+### RF09 执行记录
+- 状态 / 日期：complete（工程验收；人工待验），2026-11-11。
+- 授权：继续本系列、逐项本地提交，不推送；未扩展持久样本或用户窗口权限。
+- 实现：原版静态ItemDragger迁移OriginalTimelineGesture每窗口实例；原版事件、辅助线及轨道落点消费所属实例。Toolkit保留每canvas捕获。提取TimelineCandidates快照位移/拉伸/磁吸/参考构造，保留策略差异。
+- 语义：原版0.1秒/严格邻居/提交整体恢复，Toolkit0.01秒/原有重叠容许；原版磁吸含阈值、起点优先，Toolkit不含阈值、参考顺序优先；短于最小长度的原版倒置界限仍按原上界优先，未暗改。两UI阈值与锁定选择差异保留待人工决定。
+- 新增验证：吸附精确阈值与平局、快照界限及短片段倒置界限、非选中参考刷新、两个原版窗口手势隔离。原版真实事件多选过零/反向/取消后重拖与一次Undo；既有Toolkit真实移动/双边拉伸/辅助线/光标/Esc/捕获丢失/陈旧令牌回归。
+- 最终Unity：verify --profile unity --test-filter NBC.ActionEditor.Editor.Tests --filter-type assembly --test-mode editor --timeout 300，.codex/runs/20261111T013838Z-56a008e7，140/140通过，0失败/跳过/不确定。
+- 中间问题：013219连接暂不可达，doctor恢复且test status确认仍为旧139终态后才重跑；013503新隔离测试清理未Show窗口误用Close触发Unity异常，改DestroyImmediate后最终通过，不算产品失败已通过。
+- 离线：.codex/runs/20261111T014146Z-5ecfcd89，工作流41/41，18项目647源码解决方案0错误43既有警告；文档解析仍缺yaml/markdown_it，未擅自安装，整个code profile为blocked而非全通过。
+- 未验：人工H02/H03/H09及其他DPI；未新增持久写入；两UI重叠/最短长度/网格策略差异显式保留，不宣称已等价。
+- 下一任务：RF10，缩放采用用户已选择的Toolkit225步进。

@@ -9,8 +9,6 @@ namespace NBC.ActionEditor
 {
     public class TimelineTrackItemView : ViewBase, IPointerClickHandler, IPointerDownHandler
     {
-        public static IDirectable MoveToItem;
-
         private Rect _leftRect;
 
         public IDirectable Data;
@@ -42,7 +40,7 @@ namespace NBC.ActionEditor
             _rightView.OnGUI(rightRect);
             GUI.EndClip();
 
-            if (Data == MoveToItem)
+            if (Data == ((ActionEditorWindow)Window).Gesture.MoveToItem)
             {
                 GUI.color = Color.white.WithAlpha(0.5f);
                 GUI.DrawTexture(new Rect(Position.x, Position.y + Position.height - 2, Styles.TimelineLeftWidth, 2),

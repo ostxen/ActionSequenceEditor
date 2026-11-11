@@ -16,6 +16,7 @@ namespace NBC.ActionEditor
 
         private WelcomeView _welcomeView;
         private TimelineView _timelineView;
+        public OriginalTimelineGesture Gesture { get; } = new OriginalTimelineGesture();
         private JsonEditTransaction guiEdit;
         internal JsonEditTransaction CurrentEdit => guiEdit;
 
@@ -102,7 +103,7 @@ namespace NBC.ActionEditor
             catch { CancelOwnEdit(); throw; }
             finally
             {
-                if (guiEdit?.IsActive == true && Event.current.rawType != EventType.MouseDrag && ItemDragger.DragType == ItemDragType.None)
+                if (guiEdit?.IsActive == true && Event.current.rawType != EventType.MouseDrag && Gesture.DragType == ItemDragType.None)
                 { guiEdit.Commit(); guiEdit = null; }
                 hasUnsavedChanges = App.Session.IsDirty;
             }
@@ -144,7 +145,7 @@ namespace NBC.ActionEditor
         {
             this.ResetPointerStates();
             if (guiEdit == null) return;
-            ItemDragger.Cancel(guiEdit); guiEdit.Cancel(); guiEdit = null;
+            Gesture.Cancel(guiEdit); guiEdit.Cancel(); guiEdit = null;
         }
 
         void OnWillSaveScene(UnityEngine.SceneManagement.Scene scene, string path)

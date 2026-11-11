@@ -32,6 +32,8 @@ RF08几何：两UI消费JsonTimelineTransform的float时间变换及TimelineGeom
 
 ## 时间坐标和数据草案
 
+RF09手势：原版OriginalTimelineGesture由每个ActionEditorWindow独立持有快照、事务、磁吸参考及轨道落点，不再以ItemDragger静态状态跨窗口共享。Toolkit仍由每个canvas持有PointerCapture。TimelineCandidates共用快照位移零点约束、拉伸候选、非选中磁吸参考构造及吸附计算；调用者显式保留原策略。原版最短0.1秒、Toolkit0.01秒；原版阈值含边界且起点优先，Toolkit严格小于阈值且参考顺序优先。原版提交时用CanValidTime整体恢复不合法候选，Toolkit原有重叠容许及锁定集合过滤不在此次重构中暗改。原版网格始终量化，Toolkit网格跟随磁吸偏好；Shift只绕过磁吸，保留网格策略。上述差异需人工体验决策，不能把共用计算理解为已统一操作语义。
+
 平台时间存储为有限、非负的 double 秒。文档长度必须大于 0；点事件 duration=0，区间 duration>0，start+duration 不得超出文档长度。所有非法数值在提交前拒绝，不在绘制时修正。界面帧吸附是显式编辑操作，不反向量化已有数据。
 
 正式模型为 `ActionDocument : ScriptableObject`，包含 `FormatVersion`、`Id`、`Duration`、Group 列表；Group 拥有 Track 列表，Track 拥有 `[SerializeReference]` Event 列表。每一层有稳定 ID。Event 具有 start、duration、kind、role 与显式排序值，业务定义继承 Event 保存自己的参数。工作区（折叠/缩放/滚动/分栏）、选择、脏状态和播放实例不属于此定义。

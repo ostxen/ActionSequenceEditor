@@ -147,9 +147,9 @@ namespace NBC.ActionEditor
         private void DrawDragLine()
         {
             if (App.CanMultipleSelect) return;
-            if (ItemDragger.DragType > ItemDragType.None)
+            if (((ActionEditorWindow)Window).Gesture.DragType > ItemDragType.None)
             {
-                var items = ItemDragger.DragItems;
+                var items = ((ActionEditorWindow)Window).Gesture.DragItems;
                 var startTime = float.MaxValue;
                 var endTime = 0f;
                 foreach (var item in items)
@@ -165,11 +165,11 @@ namespace NBC.ActionEditor
                     }
                 }
 
-                if (ItemDragger.DragType == ItemDragType.StretchStart)
+                if (((ActionEditorWindow)Window).Gesture.DragType == ItemDragType.StretchStart)
                 {
                     DrawDragLine(startTime);
                 }
-                else if (ItemDragger.DragType == ItemDragType.StretchEnd)
+                else if (((ActionEditorWindow)Window).Gesture.DragType == ItemDragType.StretchEnd)
                 {
                     DrawDragLine(endTime);
                 }
@@ -184,7 +184,7 @@ namespace NBC.ActionEditor
         private void DrawDragLine(float time)
         {
             var x = asset.TimeToPos(time, App.Width);
-            var magnet = ItemDragger.HasMagnetSnapTime(time);
+            var magnet = ((ActionEditorWindow)Window).Gesture.HasMagnetSnapTime(time);
             if (magnet)
             {
                 GUI.DrawTexture(new Rect(x, Position.y, 1, Position.height), Styles.WhiteTexture);

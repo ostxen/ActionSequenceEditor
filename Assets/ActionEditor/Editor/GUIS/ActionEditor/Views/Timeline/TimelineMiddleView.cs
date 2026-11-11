@@ -172,17 +172,17 @@ namespace NBC.ActionEditor
 
         public void OnDragBegin(PointerEventData eventData)
         {
-            ItemDragger.OnBeginDrag(eventData, (Window as ActionEditorWindow)?.CurrentEdit);
+            ((ActionEditorWindow)Window).Gesture.OnBeginDrag(eventData, (Window as ActionEditorWindow)?.CurrentEdit);
         }
 
         public void OnPointerDrag(PointerEventData eventData)
         {
-            ItemDragger.OnDrag(eventData);
+            ((ActionEditorWindow)Window).Gesture.OnDrag(eventData);
         }
 
         public void OnDragEnd(PointerEventData eventData)
         {
-            ItemDragger.OnEndDrag(eventData);
+            ((ActionEditorWindow)Window).Gesture.OnEndDrag(eventData);
         }
 
         public void OnPointerDown(PointerEventData ev)

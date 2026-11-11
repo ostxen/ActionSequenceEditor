@@ -34,13 +34,14 @@ namespace NBC.ActionEditor
         }
     }
 
-    public static class ItemDragger
+    public sealed class OriginalTimelineGesture
     {
-        private static ItemDragType _dragType = ItemDragType.None;
-        private static JsonEditTransaction edit;
-        private static readonly object editOwner = new object();
+        private ItemDragType _dragType = ItemDragType.None;
+        private JsonEditTransaction edit;
+        private readonly object editOwner = new object();
+        public IDirectable MoveToItem { get; private set; }
 
-        public static ItemDragType DragType
+        public ItemDragType DragType
         {
             get => _dragType;
             set
@@ -57,18 +58,12 @@ namespace NBC.ActionEditor
             }
         }
 
-        public static void OnCheck()
-        {
-        }
-
 
         #region Tracks
 
-        private static readonly List<IDirectable> _tracks = new List<IDirectable>();
-        private static Vector2 _lastSize;
-        private static float _lastScrollbarValue;
+        private readonly List<IDirectable> _tracks = new List<IDirectable>();
 
-        public static void TryResetTracks()
+        public void TryResetTracks()
         {
             _tracks.Clear();
             var assets = App.AssetData;
@@ -90,12 +85,12 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 开始拖动时的位置
         /// </summary>
-        private static readonly Dictionary<Clip, DragBeginInfo> _dragBeginStartTime =
+        private readonly Dictionary<Clip, DragBeginInfo> _dragBeginStartTime =
             new Dictionary<Clip, DragBeginInfo>();
 
-        public static readonly List<Clip> DragItems = new List<Clip>();
+        public readonly List<Clip> DragItems = new List<Clip>();
 
-        private static void CacheDragClipInfo()
+        private void CacheDragClipInfo()
         {
             DragItems.Clear();
             _dragBeginStartTime.Clear();
@@ -112,20 +107,10 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 拖动完毕，检查数据合法性
         /// </summary>
-        private static void CheckDragEndInfo()
+        private void CheckDragEndInfo()
         {
             if (DragItems == null) return;
-            bool canValidTime = true;
-            foreach (var clip in DragItems)
-            {
-                if (clip == null) continue;
-                var can = clip.CanValidTime();
-                if (can) continue;
-                canValidTime = false;
-                break;
-            }
-
-            if (!canValidTime)
+            if (!TimelineCandidates.Valid(DragItems))
             {
                 foreach (var clip in DragItems)
                 {
@@ -154,7 +139,7 @@ namespace NBC.ActionEditor
 
         #region Drag
 
-        public static void OnBeginDrag(PointerEventData eventData, JsonEditTransaction transaction = null)
+        public void OnBeginDrag(PointerEventData eventData, JsonEditTransaction transaction = null)
         {
             if (!eventData.IsLeft() || App.SelectItems.Any(i => i.IsLocked)) return;
             var asset = App.AssetData;
@@ -210,14 +195,14 @@ namespace NBC.ActionEditor
             }
         }
 
-        public static void OnDrag(PointerEventData eventData)
+        public void OnDrag(PointerEventData eventData)
         {
             if (edit?.IsActive != true) return;
             try { edit.Update(() => UpdateDrag(eventData)); }
             catch { Cancel(); throw; }
         }
 
-        private static void UpdateDrag(PointerEventData eventData)
+        private void UpdateDrag(PointerEventData eventData)
         {
             if (DragType == ItemDragType.Pos)
             {
@@ -233,14 +218,14 @@ namespace NBC.ActionEditor
             }
         }
 
-        public static void OnEndDrag(PointerEventData eventData)
+        public void OnEndDrag(PointerEventData eventData)
         {
             if (edit?.IsActive != true) { Cancel(); return; }
             try { EndDrag(eventData); }
             catch { Cancel(); throw; }
         }
 
-        private static void EndDrag(PointerEventData eventData)
+        private void EndDrag(PointerEventData eventData)
         {
             if (DragType == ItemDragType.Track)
             {
@@ -252,15 +237,15 @@ namespace NBC.ActionEditor
             eventData.StopPropagation();
         }
 
-        public static void Cancel()
+        public void Cancel()
         {
             var token = edit; edit = null;
             _dragType = ItemDragType.None; DragItems.Clear(); _dragBeginStartTime.Clear();
-            NowDragClips.Clear(); DragOffsetDictionary.Clear(); TimelineTrackItemView.MoveToItem = null;
+            NowDragClips.Clear(); DragOffsetDictionary.Clear(); MoveToItem = null;
             token?.Cancel();
         }
 
-        internal static void Cancel(JsonEditTransaction owner)
+        internal void Cancel(JsonEditTransaction owner)
         {
             if (ReferenceEquals(edit, owner)) Cancel();
         }
@@ -269,12 +254,12 @@ namespace NBC.ActionEditor
 
         #region Drag position
 
-        private static readonly List<Clip> NowDragClips = new List<Clip>();
+        private readonly List<Clip> NowDragClips = new List<Clip>();
 
-        private static readonly Dictionary<Clip, float> DragOffsetDictionary =
+        private readonly Dictionary<Clip, float> DragOffsetDictionary =
             new Dictionary<Clip, float>();
 
-        private static void ReloadClipItems(IDirectable[] selectItems)
+        private void ReloadClipItems(IDirectable[] selectItems)
         {
             TryResetTracks();
             NowDragClips.Clear();
@@ -292,7 +277,7 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 计算按下时的偏移量 Calculates the offset when pressed
         /// </summary>
-        private static void CacheDragOffset(Vector2 vector2)
+        private void CacheDragOffset(Vector2 vector2)
         {
             var asset = App.AssetData;
             var dragX = asset.PosToTime(vector2.x, App.Width);
@@ -303,14 +288,14 @@ namespace NBC.ActionEditor
             }
         }
 
-        private static void OnBeginDragPos(PointerEventData eventData)
+        private void OnBeginDragPos(PointerEventData eventData)
         {
             DragType = ItemDragType.Pos;
             ReloadClipItems(App.SelectItems);
             CacheDragOffset(eventData.MousePosition);
         }
 
-        private static void OnDragPos(PointerEventData eventData)
+        private void OnDragPos(PointerEventData eventData)
         {
             if (DragType != ItemDragType.Pos) return;
             if (NowDragClips.Count < 1) return;
@@ -329,7 +314,7 @@ namespace NBC.ActionEditor
                 }
             }
 
-            var max = Mathf.Max(subTimes.Max(), -NowDragClips.Min(clip => _dragBeginStartTime[clip].StartTime));
+            var max = TimelineCandidates.ClampMoveDelta(subTimes.Max(), NowDragClips.Select(clip => _dragBeginStartTime[clip].StartTime));
             foreach (var clipItem in NowDragClips)
             {
                 var newTime = _dragBeginStartTime[clipItem].StartTime + max;
@@ -351,20 +336,20 @@ namespace NBC.ActionEditor
 
         #region Drag Lenght
 
-        private static float _dragStretchOffset;
-        private static float _limitMinTime;
-        private static float _limitMaxTime;
-        private static float _dragStretchTime;
-        private static float _dragStretchLength;
+        private float _dragStretchOffset;
+        private float _limitMinTime;
+        private float _limitMaxTime;
+        private float _dragStretchTime;
+        private float _dragStretchLength;
 
-        private static void CacheDragStretchOffset(Clip clip, Vector2 vector2)
+        private void CacheDragStretchOffset(Clip clip, Vector2 vector2)
         {
             _dragStretchOffset = vector2.x;
             _dragStretchTime = clip.StartTime;
             _dragStretchLength = clip.Length;
         }
 
-        private static void OnBeginDragLength(PointerEventData eventData, Clip clip, bool isStart)
+        private void OnBeginDragLength(PointerEventData eventData, Clip clip, bool isStart)
         {
             DragType = isStart ? ItemDragType.StretchStart : ItemDragType.StretchEnd;
             TryResetTracks();
@@ -393,7 +378,7 @@ namespace NBC.ActionEditor
             }
         }
 
-        private static void OnDragLength(PointerEventData eventData)
+        private void OnDragLength(PointerEventData eventData)
         {
             if (DragType < ItemDragType.StretchStart) return;
 
@@ -413,25 +398,10 @@ namespace NBC.ActionEditor
 
             newTime = CheckMagnetSnapTime(newTime, 0);
             newTime = asset.SnapTime(newTime);
-            if (newTime > _limitMaxTime)
-            {
-                newTime = _limitMaxTime;
-            }
-            else if (newTime < _limitMinTime)
-            {
-                newTime = _limitMinTime;
-            }
-
-            if (DragType == ItemDragType.StretchStart)
-            {
-                var subTime = asset.SnapTime(_dragStretchTime - newTime);
-                clipData.StartTime = newTime;
-                clipData.Length = _dragStretchLength + subTime;
-            }
-            else
-            {
-                clipData.EndTime = newTime;
-            }
+            var candidate = TimelineCandidates.Resize(new Vector2(_dragStretchTime, _dragStretchLength),
+                DragType == ItemDragType.StretchStart, newTime, .1f, _limitMinTime, _limitMaxTime, value => asset.SnapTime(value));
+            if (DragType == ItemDragType.StretchStart) { clipData.StartTime = candidate.x; clipData.Length = candidate.y; }
+            else clipData.EndTime = candidate.x + candidate.y;
 
             App.Refresh();
         }
@@ -440,22 +410,22 @@ namespace NBC.ActionEditor
 
         #region Drag Track
 
-        private static void OnBeginDragTrack(PointerEventData eventData)
+        private void OnBeginDragTrack(PointerEventData eventData)
         {
             DragType = ItemDragType.Track;
         }
 
-        private static void OnDragTrack(PointerEventData eventData)
+        private void OnDragTrack(PointerEventData eventData)
         {
             CheckMoveToTrack(eventData);
         }
 
-        private static void OnEndDragTrack(PointerEventData eventData)
+        private void OnEndDragTrack(PointerEventData eventData)
         {
             CheckMoveToTrack(eventData, true);
         }
 
-        private static void CheckMoveToTrack(PointerEventData eventDat, bool confirm = false)
+        private void CheckMoveToTrack(PointerEventData eventDat, bool confirm = false)
         {
             if (App.FistSelect is not Track targetTrack) return;
             var trackItem = TimelineMiddleView.GetItem(eventDat.MousePosition);
@@ -484,8 +454,8 @@ namespace NBC.ActionEditor
             {
                 if (targetTrack == trackItem.Data) return;
                 // if(trackItem.Data == )
-                var old = TimelineTrackItemView.MoveToItem;
-                TimelineTrackItemView.MoveToItem = trackItem.Data;
+                var old = MoveToItem;
+                MoveToItem = trackItem.Data;
                 if (old != trackItem.Data)
                 {
                     App.Repaint();
@@ -529,7 +499,7 @@ namespace NBC.ActionEditor
 
             if (confirm)
             {
-                TimelineTrackItemView.MoveToItem = null;
+                MoveToItem = null;
             }
         }
 
@@ -537,11 +507,11 @@ namespace NBC.ActionEditor
 
         #region Magnet Snap
 
-        private static float[] magnetSnapTimesCache;
-        private static float magnetSnapInterval;
+        private float[] magnetSnapTimesCache;
+        private float magnetSnapInterval;
 
 
-        public static bool HasMagnetSnapTime(float time)
+        public bool HasMagnetSnapTime(float time)
         {
             if (magnetSnapTimesCache == null) return false;
             foreach (var t in magnetSnapTimesCache)
@@ -555,105 +525,25 @@ namespace NBC.ActionEditor
             return false;
         }
 
-        private static void CacheMagnetSnapInfo(IDirectable[] selectItems)
+        private void CacheMagnetSnapInfo(IDirectable[] selectItems)
         {
-            var result = new List<float>
-            {
-                0,
-                AssetPlayer.Inst.Length,
-                AssetPlayer.Inst.CurrentTime
-            };
-
-            if (selectItems.Length > 0)
-            {
-                foreach (var directable in _tracks)
-                {
-                    if (directable is not Track track) continue;
-                    foreach (var clip in track.Clips)
-                    {
-                        if (selectItems.Contains(clip)) continue;
-                        result.Add(clip.StartTime);
-                        result.Add(clip.EndTime);
-                    }
-                }
-            }
-
             magnetSnapInterval = App.AssetData.ViewTime * 0.01f;
-            magnetSnapTimesCache = result.Distinct().ToArray();
-            // Debug.LogError($"缓存磁吸结果={magnetSnapTimesCache.Length}");
+            magnetSnapTimesCache = TimelineCandidates.References(_tracks.OfType<Track>().SelectMany(track => track.Clips),
+                selectItems.OfType<Clip>(), AssetPlayer.Inst.Length, AssetPlayer.Inst.CurrentTime, true);
         }
 
 
-        private static float MagnetSnapTime(float time)
+        private float CheckMagnetSnapTime(float startTime, float length)
         {
-            if (magnetSnapTimesCache == null)
-            {
-                return -1;
-            }
-
-            var bestDistance = float.PositiveInfinity;
-            var bestTime = float.PositiveInfinity;
-
-            foreach (var snapTime in magnetSnapTimesCache)
-            {
-                var distance = Mathf.Abs(snapTime - time);
-                if (!(distance < bestDistance)) continue;
-                bestDistance = distance;
-                bestTime = snapTime;
-            }
-
-            if (Mathf.Abs(bestTime - time) <= magnetSnapInterval)
-            {
-                return bestTime;
-            }
-
-
-            return -1;
-        }
-
-
-        private static float CheckMagnetSnapTime(float startTime, float length)
-        {
-            if (!Prefs.MagnetSnapping)
-            {
-                return startTime;
-            }
-
-            if (Event.current.shift)
-            {
-                //shift held down,ignore magnet
-                return startTime;
-            }
-
-            var snapStart = MagnetSnapTime(startTime);
-            var snapEnd = MagnetSnapTime(startTime + length);
-
-            if (snapStart >= 0 || snapEnd >= 0)
-            {
-                if (snapStart >= 0 && snapEnd > 0)
-                {
-                    var distStart = Mathf.Abs(snapStart - startTime);
-                    var distEnd = Mathf.Abs(snapEnd - (startTime + length));
-                    return distEnd < distStart ? snapEnd - length : snapStart;
-                }
-
-                if (snapStart >= 0)
-                {
-                    return snapStart;
-                }
-
-                return snapEnd - length;
-            }
-
-
-            return startTime;
+            if (!Prefs.MagnetSnapping || Event.current.shift || magnetSnapTimesCache == null) return startTime;
+            return TimelineCandidates.Magnet(startTime, length, magnetSnapTimesCache, magnetSnapInterval, true);
         }
 
         #endregion
 
         #region 融合检测
 
-        public static void CheckBlendInOut(Clip clip)
+        public void CheckBlendInOut(Clip clip)
         {
             // if (!clip.CanCrossBlend) return;
 
@@ -749,7 +639,7 @@ namespace NBC.ActionEditor
             // }
         }
 
-        private static void GetPreviousCrossBlends(Clip clip, List<Clip> list)
+        private void GetPreviousCrossBlends(Clip clip, List<Clip> list)
         {
             var previous = clip.GetPreviousSibling<Clip>();
             if (previous == null)
@@ -765,7 +655,7 @@ namespace NBC.ActionEditor
             }
         }
 
-        private static void GetNextCrossBlends(Clip clip, List<Clip> list)
+        private void GetNextCrossBlends(Clip clip, List<Clip> list)
         {
             var nextSibling = clip.GetNextSibling<Clip>();
             if (nextSibling == null) return;
@@ -776,7 +666,7 @@ namespace NBC.ActionEditor
             }
         }
 
-        private static void GetCoincideCrossBlends(Clip clip, List<Clip> list)
+        private void GetCoincideCrossBlends(Clip clip, List<Clip> list)
         {
             var pick = clip.GetCoincideSibling();
             if (pick != null && pick.Length > 0)
