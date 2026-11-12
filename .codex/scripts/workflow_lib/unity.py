@@ -27,6 +27,7 @@ READ_ONLY = frozenset({
 
 # Explicit catalog, not a prefix heuristic. Only implemented return/poll contracts are admitted.
 MUTATIONS = {
+    "actioneditor.validation rf22_tutorial_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation rf20_export_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation cancel_save_dialog": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation rf18_move": {"dry_run": True, "confirm": True, "poll": None},
@@ -334,7 +335,7 @@ class Unity:
             from .modal import save_dialog
             instance = parse_instances(self.raw(["pipeline", "editors"]), self.context.project)
             return make_plan(self.run, "unity", command, {}, high_risk=True, inputs=inputs, preview=save_dialog(instance["pid"]))
-        if command in {"actioneditor.validation controlled_quit", "actioneditor.validation rf17_move", "actioneditor.validation rf18_move", "actioneditor.validation rf18_reference_probe", "actioneditor.validation sync_projects", "actioneditor.validation rf20_export_probe"} and parameters:
+        if command in {"actioneditor.validation controlled_quit", "actioneditor.validation rf17_move", "actioneditor.validation rf18_move", "actioneditor.validation rf18_reference_probe", "actioneditor.validation sync_projects", "actioneditor.validation rf20_export_probe", "actioneditor.validation rf22_tutorial_probe"} and parameters:
             blocked("Fixed operation accepts no parameters; targets cannot be overridden.")
         if command not in MUTATIONS:
             blocked(f"Mutation policy/return contract not implemented: {command}")
@@ -358,7 +359,7 @@ class Unity:
                 blocked("Native save dialog changed since preview.")
             consume_approval(self.run, plan, approval_file)
             return cancel_save_dialog(current)
-        if plan["command"] in {"actioneditor.validation controlled_quit", "actioneditor.validation rf17_move", "actioneditor.validation rf18_move", "actioneditor.validation rf18_reference_probe", "actioneditor.validation sync_projects", "actioneditor.validation rf20_export_probe"} and plan["parameters"]:
+        if plan["command"] in {"actioneditor.validation controlled_quit", "actioneditor.validation rf17_move", "actioneditor.validation rf18_move", "actioneditor.validation rf18_reference_probe", "actioneditor.validation sync_projects", "actioneditor.validation rf20_export_probe", "actioneditor.validation rf22_tutorial_probe"} and plan["parameters"]:
             blocked("Fixed operation accepts no parameters.")
         self.ready()
         self.discover()

@@ -250,6 +250,24 @@ namespace NBC.ActionEditor.Tests
             finally { ItemDragger.Cancel(); Event.current = oldEvent; ActionEditorHost.Width = oldWidth; }
         }
 
+        [Test] public void OriginalGestureReadsShiftFromReceivedPointerWithoutGlobalGuiEvent()
+        {
+            var width = ActionEditorHost.Width; var gesture = new OriginalTimelineGesture();
+            try
+            {
+                ActionEditorHost.Width = 700;
+                var clip = App.AssetData.groups[0].Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
+                var down = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(.75f, 700), 30);
+                gesture.OnBeginDrag(new NBC.ActionEditor.Events.PointerEventData(new Event { type = EventType.MouseDown, button = 0, shift = true, mousePosition = down }));
+                gesture.OnDrag(new NBC.ActionEditor.Events.PointerEventData(new Event { type = EventType.MouseDrag, button = 0, shift = true, mousePosition = down + new Vector2(25, 0) }));
+                gesture.OnEndDrag(new NBC.ActionEditor.Events.PointerEventData(new Event { type = EventType.MouseUp, button = 0, shift = true, mousePosition = down + new Vector2(25, 0) }));
+                Assert.That(clip.StartTime, Is.EqualTo(.5f).Within(.00001f));
+                Assert.That(App.Session.IsEditing, Is.False);
+                Assert.That(new NBC.ActionEditor.Events.PointerEventData(new Event { shift = false }).Shift, Is.False);
+            }
+            finally { gesture.Cancel(); ActionEditorHost.Width = width; }
+        }
+
         [UnityTest] public IEnumerator OriginalMiddlePanReleaseOutsideDoesNotConsumeLaterLeftDrag()
         {
             var previousWindow = ActionEditorHost.Window;

@@ -9,6 +9,7 @@ namespace NBC.ActionEditor.Events
         public bool HasRect;
 
         public Vector2 MousePosition => _event != null ? _event.mousePosition : Vector2.zero;
+        public bool Shift => _event != null && _event.shift;
 
         public PointerEventData()
         {

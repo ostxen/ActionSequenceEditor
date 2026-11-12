@@ -2,6 +2,10 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
+using UnityEngine.UIElements;
+using NBC.ActionEditor.Workbench;
+using NBC.ActionEditor.Samples.LegacyExperience;
 using NBC.ActionEditor.Serialization;
 using NBC.ActionEditor.Storage;
 using Unity.Pipeline.Commands;
@@ -150,6 +154,140 @@ namespace NBC.ActionEditor.Validation
                 try { App.Stop(); App.TextAsset = previous; App.Session.RestoreRecovery(recovery); }
                 finally { if (owns && !AssetDatabase.DeleteAsset(root)) throw new IOException("Owned fixture cleanup failed."); }
             }
+        }
+        [CliGroupCommand("actioneditor.validation", "RF22 fixed tutorial replay in both real window entrypoints. New isolated sources and exports only; restore prior session and remove owned fixtures. No native OS file-dialog automation.")]
+        public static async Task<object> Rf22TutorialProbe([CliArg("confirm", "Apply isolated tutorial replay.")] bool confirm = false,
+            [CliArg("dry-run", "Read-only preview.")] bool dryRun = false)
+        {
+            Ready();
+            const string root = "Assets/ActionEditorValidationRF22";
+            if (Directory.Exists(root) || File.Exists(root) || File.Exists(root + ".meta")) throw new IOException("Fixture exists, refusing overwrite.");
+            if (App.Session.IsEditing || App.IsPlay || Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Length != 0
+                || Resources.FindObjectsOfTypeAll<JsonActionWorkbench>().Length != 0 || Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Length != 0
+                || Resources.FindObjectsOfTypeAll<Samples.LegacyExperiencePreview>().Length != 0)
+                throw new InvalidOperationException("Requires no active edit/playback or existing product/preview/export windows; never reuse user windows.");
+            if (dryRun) return new { root, targets = new[] { root + "/IMGUI.json", root + "/IMGUI-Export.json", root + "/Toolkit.json", root + "/Toolkit-Export.json" },
+                operations = new[] { "open both real menu methods in turn", "create preset via creation popup's shared confirmed action", "select and edit properties, move and resize using each window's gesture adapter", "Undo/Redo", "sample state preview and playback", "save via each window SaveChanges", "close/reopen same source", "open shared export menu and export independent copy", "restore prior session and delete only owned fixture folder" },
+                nativeFileDialogs = "not automated; fixed new paths replace OS path input only" };
+            if (!confirm) throw new InvalidOperationException("Preview and explicit approval required.");
+            var recovery = App.Session.CaptureRecovery(); var previous = App.TextAsset; var previousHost = ActionEditorHost.Window;
+            var previousWidth = ActionEditorHost.Width; var owns = false;
+            ActionEditorWindow original = null; JsonActionWorkbench native = null; Samples.LegacyExperiencePreview preview = null; DocumentExportWindow export = null;
+            var results = new System.Collections.Generic.List<object>();
+            try
+            {
+                owns = !string.IsNullOrEmpty(AssetDatabase.CreateFolder("Assets", "ActionEditorValidationRF22"));
+                if (!owns) throw new IOException("Fixture folder creation failed.");
+                foreach (var toolkit in new[] { false, true })
+                {
+                    App.TextAsset = null;
+                    if (toolkit) { JsonActionWorkbench.Open(); native = Resources.FindObjectsOfTypeAll<JsonActionWorkbench>().Single(); native.position = new Rect(60, 60, 1000, 600); }
+                    else { ActionEditorWindow.OpenDirectorWindow(); original = Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Single(); original.position = new Rect(60, 60, 1000, 600); }
+                    await TutorialFrames();
+                    var path = root + (toolkit ? "/Toolkit.json" : "/IMGUI.json");
+                    CreateAssetWindow.CreateAndOpen(typeof(LegacyExperienceAsset), path, toolkit);
+                    await TutorialFrames();
+                    if (App.Session.Path != path || App.AssetData.groups.Count != 3 || App.AssetData.groups.Sum(g => g.Tracks.Count) != 7
+                        || App.AssetData.groups.SelectMany(g => g.Tracks).Sum(t => t.Clips.Count) != 13 || App.Session.IsDirty
+                        || (toolkit ? Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Length != 0 : Resources.FindObjectsOfTypeAll<JsonActionWorkbench>().Length != 0))
+                        throw new InvalidOperationException("Preset graph or originating view differs.");
+                    var clip = App.AssetData.groups[0].Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
+                    if (toolkit)
+                    {
+                        native.Select(clip); var properties = native.CreatePropertyView(); native.rootVisualElement.Add(properties);
+                        properties.Query<TextField>().ToList().Single(f => f.label == "标题").value = "Tutorial";
+                        properties.RemoveFromHierarchy();
+                    }
+                    else App.Session.Edit("Tutorial property", () => new JsonPropertyPath(clip).Field(typeof(LegacyExperienceInterval).GetField("Caption")).Write("Tutorial"));
+                    if (((LegacyExperienceInterval)clip).Caption != "Tutorial") throw new InvalidOperationException("Property edit failed.");
+                    await TutorialFrames();
+                    for (var resize = 0; resize < 2; resize++)
+                    {
+                        clip = App.AssetData.groups[0].Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
+                        if (toolkit)
+                        {
+                            var rect = native.Canvas.ClipRect(clip, 1);
+                            var down = resize == 0 ? rect.center : new Vector2(rect.xMax - 2, rect.center.y);
+                            var up = down + new Vector2(native.Canvas.Scale * (resize == 0 ? .25f : -.25f), 0);
+                            TutorialPointer(native.Canvas, EventType.MouseDown, down); TutorialPointer(native.Canvas, EventType.MouseDrag, up); TutorialPointer(native.Canvas, EventType.MouseUp, up);
+                        }
+                        else
+                        {
+                            var down = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(resize == 0 ? clip.StartTime + .5f : clip.EndTime, ActionEditorHost.Width) - (resize == 0 ? 0 : 2), 30);
+                            var up = down + new Vector2(ActionEditorHost.Width * (resize == 0 ? .25f : -.25f) / App.AssetData.ViewTime, 0);
+                            TutorialOriginalPointer(original.Gesture, EventType.MouseDown, down);
+                            TutorialOriginalPointer(original.Gesture, EventType.MouseDrag, up);
+                            TutorialOriginalPointer(original.Gesture, EventType.MouseUp, up);
+                        }
+                        clip = App.AssetData.groups[0].Tracks[0].Clips[0];
+                        if (Mathf.Abs(clip.StartTime - .5f) > .0001f || Mathf.Abs(clip.Length - (resize == 0 ? 1.5f : 1.25f)) > .0001f)
+                            throw new InvalidOperationException("Tutorial move/resize differs: " + (toolkit ? "Toolkit" : "IMGUI") + ", step=" + resize + ", start=" + clip.StartTime + ", length=" + clip.Length);
+                        await TutorialFrames();
+                    }
+                    var editedLength = App.AssetData.groups[0].Tracks[0].Clips[0].Length;
+                    Undo.PerformUndo(); if (App.AssetData.groups[0].Tracks[0].Clips[0].Length != 1.5f) throw new InvalidOperationException("Undo failed.");
+                    Undo.PerformRedo(); if (App.AssetData.groups[0].Tracks[0].Clips[0].Length != editedLength) throw new InvalidOperationException("Redo failed.");
+                    preview = ScriptableObject.CreateInstance<Samples.LegacyExperiencePreview>(); preview.Show(); preview.Repaint();
+                    var now = (float)EditorApplication.timeSinceStartup; App.Context.Playback.Play(now); App.Context.Playback.Update(now + .1f, 1);
+                    if (!App.IsPlay || App.Context.Player.CurrentTime <= 0) throw new InvalidOperationException("Playback failed.");
+                    App.Pause(); App.Context.Player.Sample(.75f); await TutorialFrames(); App.Stop(); preview.Close(); preview = null;
+                    if (toolkit) native.SaveChanges(); else original.SaveChanges();
+                    if (App.Session.IsDirty) throw new InvalidOperationException("Real window save failed.");
+                    var expected = JsonDocumentCodec.Content(App.AssetData); var bytes = File.ReadAllBytes(path);
+                    if (toolkit) { native.Close(); native = null; } else { original.Close(); original = null; }
+                    App.TextAsset = null;
+                    if (toolkit) { JsonActionWorkbench.Open(); native = Resources.FindObjectsOfTypeAll<JsonActionWorkbench>().Single(); }
+                    else { ActionEditorWindow.OpenDirectorWindow(); original = Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Single(); }
+                    ActionEditorHost.OnObjectPickerConfig(AssetDatabase.LoadAssetAtPath<TextAsset>(path)); await TutorialFrames();
+                    if (App.Session.Path != path || App.Session.IsDirty || JsonDocumentCodec.Content(App.AssetData) != expected) throw new InvalidOperationException("Reopened source differs.");
+                    var before = App.Session.CaptureRecovery(); var graph = App.AssetData;
+                    Action openExport = null; ActionEditorHost.PopulateSaveMenu((label, action) => { if (label == Lan.Export) openExport = action; });
+                    openExport(); export = Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Single(); await TutorialFrames();
+                    var target = path.Replace(".json", "-Export.json"); DocumentExportWindow.ExportTo("actioneditor.json", target); export.Close(); export = null;
+                    if (!ReferenceEquals(graph, App.AssetData) || App.Session.CaptureRecovery() != before || !File.ReadAllBytes(path).SequenceEqual(bytes)
+                        || JsonDocumentCodec.Content(JsonDocumentCodec.Decode(File.ReadAllText(target))) != expected) throw new InvalidOperationException("Export not independent or readback differs.");
+                    results.Add(new { ui = toolkit ? "UI Toolkit" : "IMGUI", source = path, exported = target, groups = 3, tracks = 7, clips = 13, start = .5f, length = 1.25f,
+                        checks = "create origin/property/move/resize/Undo/Redo/playback/save/close/reopen/export readback", sourceBytes = bytes.Length });
+                    if (toolkit) { native.Close(); native = null; } else { original.Close(); original = null; }
+                }
+                return new { status = "passed", results, limitations = "OS path/confirmation input replaced by fixed approved paths; IMGUI property uses shared path and gesture uses actual window adapter; not human acceptance." };
+            }
+            catch (Exception error)
+            {
+                throw new InvalidOperationException("RF22 fixed replay failed: " + error.Message + "\n" + error.StackTrace, error);
+            }
+            finally
+            {
+                App.Session.CancelEdit(); App.Stop();
+                if (preview != null) preview.Close(); if (export != null) export.Close();
+                if (original != null) { original.DiscardChanges(); original.Close(); } if (native != null) { native.DiscardChanges(); native.Close(); }
+                try { App.TextAsset = previous; App.Session.RestoreRecovery(recovery); ActionEditorHost.Window = previousHost; ActionEditorHost.Width = previousWidth; }
+                finally { if (owns && !AssetDatabase.DeleteAsset(root)) throw new IOException("Owned tutorial fixture cleanup failed."); }
+            }
+        }
+        private static async Task TutorialFrames()
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                var done = new TaskCompletionSource<bool>(); EditorApplication.CallbackFunction tick = null;
+                tick = () => { EditorApplication.update -= tick; done.TrySetResult(true); };
+                EditorApplication.update += tick;
+                try { await done.Task; } finally { EditorApplication.update -= tick; }
+            }
+        }
+        private static void TutorialOriginalPointer(OriginalTimelineGesture gesture, EventType type, Vector2 point)
+        {
+            var pointer = new Events.PointerEventData(new Event { type = type, button = 0, shift = true, mousePosition = point });
+            if (type == EventType.MouseDown) gesture.OnBeginDrag(pointer);
+            else if (type == EventType.MouseDrag) gesture.OnDrag(pointer);
+            else gesture.OnEndDrag(pointer);
+        }
+        private static void TutorialPointer(VisualElement target, EventType type, Vector2 point)
+        {
+            var source = new Event { type = type, button = 0, shift = true, mousePosition = target.LocalToWorld(point) };
+            if (type == EventType.MouseDown) { using var e = PointerDownEvent.GetPooled(source); e.target = target; target.SendEvent(e); }
+            else if (type == EventType.MouseDrag) { using var e = PointerMoveEvent.GetPooled(source); e.target = target; target.SendEvent(e); }
+            else { using var e = PointerUpEvent.GetPooled(source); e.target = target; target.SendEvent(e); }
         }
         private static string Hash(string path)
         { using (var hash = SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(File.ReadAllBytes(path))).Replace("-", "").ToLowerInvariant(); }

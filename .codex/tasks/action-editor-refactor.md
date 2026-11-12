@@ -2,9 +2,9 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF21 `complete`（限执行记录范围）；RF22 `implementing`，RF23 `planned`。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF21工程验收完成，进入RF22。RF16完成后用户追加“我要先休息了，你往后执行任务。各种授权我都允许了，在这个系列任务中，不要等我回复而中断操作。”此真实授权覆盖RF17–RF23串行实施、必要的最小受审核工作流扩展、精确清单移动、隔离探针与逐项中文本地提交；不伪造另一次人工确认。
-- 下一步：补齐唯一入门教程与隔离样例连续操作链，再执行RF23。保留两个UI与共用状态，数据格式按开发期硬切、不建设旧格式兼容。人工验收仍待用户实际使用，不自动进入Combat，不重建已取消循环，不保存/清脏/修改无关资源，不推送。
+- 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF22 `complete`（限执行记录范围）；RF23 `implementing`。Combat 专属实施与验收暂缓。
+- 当前执行任务：RF22工程验收完成，进入RF23。RF16完成后用户追加“我要先休息了，你往后执行任务。各种授权我都允许了，在这个系列任务中，不要等我回复而中断操作。”此真实授权覆盖RF17–RF23串行实施、必要的最小受审核工作流扩展、精确清单移动、隔离探针与逐项中文本地提交；不伪造另一次人工确认。
+- 下一步：完成RF23最终回归、现行文档说明与本地交付。保留两个UI与共用状态，数据格式按开发期硬切、不建设旧格式兼容。人工验收仍待用户实际使用，不自动进入Combat，不重建已取消循环，不保存/清脏/修改无关资源，不推送。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -306,8 +306,8 @@ Assets/ActionEditor/
 | [x] | RF19 | complete（工程范围） | 新建/打开/保存/另存为统一接入与重复路径清理 | RF18 |
 | [x] | RF20 | complete（工程范围） | 独立导出流程与已实现格式下拉框 | RF19 |
 | [x] | RF21 | complete | 双界面产品文案、样例命名与术语统一 | RF20 |
-| [ ] | RF22 | implementing | 最短使用教程与可重放样例操作链 | RF21 |
-| [ ] | RF23 | planned | 双UI/存储/精度完整回归及新会话交付 | RF22 |
+| [x] | RF22 | complete | 最短使用教程与可重放样例操作链 | RF21 |
+| [ ] | RF23 | implementing | 双UI/存储/精度完整回归及新会话交付 | RF22 |
 
 ### 4.2.4 每项实施与验收
 
@@ -1417,3 +1417,15 @@ Assets/ActionEditor/
 - 验证：doctor `.codex/runs/20261111T230552Z-62a111b3`确认本工程唯一Editor；发现190项 `230600Z-1b68d09f`。新场景初次失败为既有语言缺键，再次失败暴露标题加载顺序，均修复；定向 `231344Z-8521a653`通过。最终 `verify --profile unity --test-filter NBC.ActionEditor.Editor.Tests --filter-type assembly --test-mode editor --timeout 600`，`.codex/runs/20261111T231559Z-e76b94fd`编译通过，190/190，0失败/跳过/不确定。
 - 方案检查 `.codex/runs/20261111T231913Z-62b807de`：工作流测试与实际方案构建通过；文档解析仍因缺yaml/markdown_it阻塞，未安装。首次GUIContent重载及Lan访问级别编译失败已修正，最终代码验证通过。当前生产UI相关旧版/新版/原版/创建JSON欢迎文案扫描无结果，历史证据不清洗。
 - 未运行：Player Build、全资源验证、H01–H09人工体验；用户JSON/个人配置不读取修改提交。下一任务RF22。
+
+
+### RF22 执行记录
+
+- 状态 / 日期：complete（下列工程重放范围），2026-11-12。使用用户RF17–RF23真实连续授权，不代签H01–H09。
+- 唯一入门正文：`Assets/ActionEditor/Samples/LegacyExperience/README.md`。实际菜单、欢迎/文档图标、新建预置资源、属性、移动/拉伸、Undo/Redo、状态播放、保存、关闭重开与独立导出均列初态/可观察结果；补充共用文档、取消/放弃、保存/另存/导出、自动保存、格式硬切、最小业务接入与非Combat限制。模块README只链接该正文，上游历史保留。
+- 最小审核扩展：固定零参数`actioneditor.validation rf22_tutorial_probe`，仅创建不存在的`Assets/ActionEditorValidationRF22/{IMGUI,Toolkit}.json`及各自`-Export.json`。拒绝已有产品/预览/导出窗口或活动编辑/播放，finally恢复之前会话并关闭本次窗口、删除本次目录。workflow白名单/preview与apply禁止参数覆盖，离线测试与operations同步。创建弹窗确认后动作抽为同一`CreateAndOpen`，探针替代OS路径输入而非新增创建管线。
+- 实际重放：preview `.codex/runs/20261111T235614Z-09ad7f67` → approve `235647Z-2b0f7b04`（引用真实连续授权）→ apply **`235702Z-3f460099` passed**。逐一调用OpenDirectorWindow/JsonActionWorkbench.Open；每UI创建3组7轨13片段，属性标题Tutorial，中部移动0.25秒，右边缘缩短0.25秒，Undo恢复原长度，Redo精确恢复实际编辑值；播放/暂停/状态窗口，调用各自SaveChanges写盘，关闭/重开/对象选择入口恢复，导出完整内容读回及源字节/图/Recovery不变。每份源文件22340 bytes。清理后Glob无目录/meta残留。
+- 覆盖边界：系统新建路径/确认与导出文件框由固定新路径替代；IMGUI属性用共用字段路径，手势用实际窗口Gesture；Toolkit属性用真实控件ChangeEvent，手势用真实Pointer事件。不是OS逐步点击、全桌面命中或人工视觉认证。其他已有测试继续覆盖IMGUI文本控件与原生延迟输入。
+- 失败与修正：早期隔离尝试分别暴露IMGUI适配器隐式依赖Event.current、专用输入窗未收到事件、教程延长碰到既有下一片段2秒边界，以及以十进制常量直接比较像素计算浮点值。全部先检查终态/清理，再修改、重新preview/approve/apply，未复用审批、未放宽生产邻居规则。将Shift从传入PointerEventData取得，保留正常手势；教程改为缩短。移动/长度仍核对独立样例数值，Redo精确比较编辑后的真实值，保存/导出完整值树读回不丢精度。增加`OriginalGestureReadsShiftFromReceivedPointerWithoutGlobalGuiEvent`回归。
+- 验证：编译`20261111T235829Z-3d5c7b7b`通过；发现`235917Z-a2d3013b`实际191项；完整`verify --profile unity --test-filter NBC.ActionEditor.Editor.Tests --filter-type assembly --test-mode editor --timeout 600`，**`235952Z-a7d82e0a` 191/191**，0失败/跳过/不确定。`20261112T000352Z-768e37e7`工作流45/45，实际18项目674源码构建0错误43既有警告，6.41秒；code整体仍仅因yaml/markdown_it缺失blocked，未安装。
+- 未运行：Player Build、全资源验证、OS文件框成功输入与H01–H09。用户JSON/个人偏好未编辑/提交。下一任务RF23最终交付。

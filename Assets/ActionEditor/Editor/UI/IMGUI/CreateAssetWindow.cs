@@ -71,11 +71,16 @@ namespace NBC.ActionEditor
             path = DocumentCreationService.ValidateNewPath(path);
             var type = types[selectedType];
             if (!EditorUtility.DisplayDialog(Lan.CreateAsset, string.Format(Lan.CreateConfirmation, Prefs.GetAssetTypeName(type), path), Lan.CreateAssetConfirm, Lan.TipsCancel)) return;
+            CreateAndOpen(type, path, nativeOwner);
+            editorWindow?.Close();
+        }
+
+        public static void CreateAndOpen(Type type, string path, bool nativeOwner)
+        {
             var created = DocumentCreationService.Create(type, path);
             ActionEditorHost.OnObjectPickerConfig(created);
             if (!nativeOwner) ActionEditorWindow.OpenDirectorWindow();
             App.Refresh(); App.Repaint();
-            editorWindow?.Close();
         }
 
     }

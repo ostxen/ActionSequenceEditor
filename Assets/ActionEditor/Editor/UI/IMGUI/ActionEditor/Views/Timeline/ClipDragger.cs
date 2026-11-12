@@ -39,6 +39,7 @@ namespace NBC.ActionEditor
         private ItemDragType _dragType = ItemDragType.None;
         private JsonEditTransaction edit;
         private readonly object editOwner = new object();
+        private bool bypassMagnet;
         public IDirectable MoveToItem { get; private set; }
 
         public ItemDragType DragType
@@ -141,6 +142,7 @@ namespace NBC.ActionEditor
 
         public void OnBeginDrag(PointerEventData eventData, JsonEditTransaction transaction = null)
         {
+            bypassMagnet = eventData.Shift;
             if (!eventData.IsLeft() || App.SelectItems.Any(i => i.IsLocked)) return;
             var asset = App.AssetData;
             if (asset == null) return;
@@ -197,6 +199,7 @@ namespace NBC.ActionEditor
 
         public void OnDrag(PointerEventData eventData)
         {
+            bypassMagnet = eventData.Shift;
             if (edit?.IsActive != true) return;
             try { edit.Update(() => UpdateDrag(eventData)); }
             catch { Cancel(); throw; }
@@ -535,7 +538,7 @@ namespace NBC.ActionEditor
 
         private float CheckMagnetSnapTime(float startTime, float length)
         {
-            if (!Prefs.MagnetSnapping || Event.current.shift || magnetSnapTimesCache == null) return startTime;
+            if (!Prefs.MagnetSnapping || bypassMagnet || magnetSnapTimesCache == null) return startTime;
             return TimelineCandidates.Magnet(startTime, length, magnetSnapTimesCache, magnetSnapInterval, true);
         }
 

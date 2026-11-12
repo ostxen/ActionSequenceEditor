@@ -33,6 +33,8 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
+`actioneditor.validation rf22_tutorial_probe`为固定零参数双UI教程连续重放，只创建不存在的Assets/ActionEditorValidationRF22下IMGUI.json、Toolkit.json及各自-Export.json；开始前拒绝已有产品/预览/导出窗口及活动编辑/播放，逐一调用真实菜单方法打开本次窗口，经创建弹窗共用确认动作创建预置样例，验证属性、各UI手势适配器移动/拉伸、Undo/Redo、播放状态窗口、窗口SaveChanges保存、关闭重开和独立导出读回。原生属性与指针事件走真实控件，IMGUI属性使用共享字段路径，手势调用实际窗口适配器；OS保存框/确认输入仅用固定批准新路径替代，不宣称全桌面点击。finally恢复原会话，仅关闭本次窗口并删除本次目录，不写个人偏好。独立preview/approve/apply，不接受路径/代码/force参数；超时先检查，不自动重放。
+
 `actioneditor.validation rf20_export_probe`为固定零参数新格式导出验证，只创建不存在的Assets/ActionEditorValidationRF20中的Source/Clean/Dirty.json，从共享保存菜单打开导出窗口，验证干净/脏文档输出、取消/目标存在/源别名/活动手势拒绝及源对象/来源/基线/Undo/选择/暂停播放不变；finally关闭本次导出窗口、恢复原会话、仅删本次目录。不修改已有数据，活动编辑/播放时拒绝开始；必须独立preview/approve/apply。
 
 `actioneditor.validation cancel_save_dialog`是Windows固定模态恢复，不是Pipeline代码执行：只读CLI实例列表绑定本工程唯一PID，EnumWindows只筛该PID、#32770、保存/Save/Save As/另存为及IDCANCEL取消按钮；preview记录句柄与按钮，approve/apply复核PID/句柄/指纹后仅PostMessage WM_COMMAND IDCANCEL。无参数、不选文件、不保存/覆盖、不退出或强杀；其他模态/多个匹配拒绝。只用于本系列测试已明确触发的保存框；返回cancel_requested后重新查询实际状态，不冒充取消已完成。
