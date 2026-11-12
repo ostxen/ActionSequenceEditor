@@ -9,6 +9,14 @@
 
 ## RF17 后的实际源码定位（2026-11-11）
 
+### 当前产品补充（2026-11-12）
+
+使用入口与操作链只在[功能体验样例教程](../Assets/ActionEditor/Samples/LegacyExperience/README.md)维护。`Open Action Editor`是IMGUI，`Open Workbench`是原生UI Toolkit，两者仍共用单文档/选择/播放头/Undo。产品动作词由现有中文/英文Lan目录统一；业务类型完整身份不随显示名称改变。
+
+RF19–RF22后的实际接线：`DocumentCreationService.Create`与`JsonDocumentSession.Save`共用`JsonDocumentStore.Commit`及`ReliableFileCommit`，严格校验/隔离快照/完整读回后提交，先推进基线再导入；UI创建弹窗仅采集、确认及调用`CreateAndOpen`返回发起界面。两UI保存图标、Ctrl+S/SaveChanges及自动保存经App同一入口；保存图标右键的导出打开共享`DocumentExportWindow`，`DocumentExportService`只写独立新目标，格式目录只注册真实JSON实现。无旧格式回退、第二套创建/导出序列化管线或多文档层。
+
+RF22固定隔离教程探针连续覆盖两个真实窗口方法、同一创建动作、各UI手势、Undo/Redo、状态预览、窗口保存、关闭重开和独立导出读回；系统路径/确认输入由固定批准新路径替代，IMGUI属性/手势适配器调用不冒充整窗OS点击。当前普通测试另覆盖真实文本控件和原生Pointer输入。工程证据只在唯一任务清单，人工体验和性能泛化仍不由这些结果代签。后续旧章节保留其日期、原路径和“建议/待做”的历史语境，不当成当前缺陷或格式事实。
+
 RF18补充：当前生产转换已硬切至Runtime/Serialization的actioneditor.json v1封套。旧Json任意序列化类已移除；Editor/Serialization负责格式目录、受信任类型/持久引用注入与隔离快照，字段值树用于作者内容比较，完整读回不先规范化原始快照。Init只可重建派生根length，其他持久字段被回调改写时拒绝；保存前回调仅在独立副本执行。RF19继续统一创建/存储及UI保存入口，RF20才实现独立导出，下文早期格式描述保留历史范围。
 
 两套生产UI已分别归入`Editor/UI/IMGUI`与`Editor/UI/UIToolkit`，主类型命名空间和程序集不变。`Editor/Core/Documents/App.cs`仅保留共享状态/文档入口转发、自动保存和播放协调；Unity更新/场景/域重载、Inspector代理、对话框、窗口宽度和备用重绘由`Editor/UI/ActionEditorHost.cs`适配。选择服务通过事件请求Inspector，不反向引用宿主；共享Views仍只保存对象owner及Action回调。播放状态位于`Editor/Preview/ActionEditorPlayback.cs`。

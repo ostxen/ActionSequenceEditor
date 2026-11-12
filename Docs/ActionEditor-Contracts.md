@@ -2,6 +2,14 @@
 
 A02 定案，2026-11-09。实施进度仅记录在[唯一任务清单](../.codex/tasks/action-editor-refactor.md)。
 
+## 当前产品入口与阅读范围（2026-11-12）
+
+`NBC > Action Editor > Open Action Editor`（IMGUI）和`Open Workbench`（UI Toolkit）共用唯一会话及float业务图。入门只看[功能体验样例教程](../Assets/ActionEditor/Samples/LegacyExperience/README.md)，不按下方历史实验方案创建`.asset`文档。当前生产格式为本文件RF16节的`actioneditor.json` v1封套，Runtime严格转换器已替代旧任意Json入口，无旧裸根回退、迁移或双写；FullSerializer仅保留相关忽略标记等依赖，不再决定生产读写规则。
+
+创建、两UI保存/SaveChanges、自动保存、另存均由`DocumentCreationService`/`JsonDocumentSession`进入同一个`JsonDocumentStore.Commit → ReliableFileCommit`，字节提交后推进来源与基线，再导入。独立导出由`DocumentExportService`使用同一格式目录与隔离快照，仅写新目标，不切来源、不清脏。新建/另存/导出拒绝已有目标及meta，保存检查外部磁盘版本；导入失败明确字节已提交，不重放。保存图标右键提供保存、另存为、导出；实际格式选项只有`JSON (.json)`。
+
+下面“RF16定案”保留规格形成日期，其中未来时态不是当前任务状态；“R01–R10”及“A02”是对应日期的历史合同，旧格式/旧路径/未验证引用等描述不覆盖本节与RF16唯一契约。当前GUID/localFileId验证覆盖工程持久主/子资产的写盘、卸载、重新解析及失效/错类型拒绝，不宣称跨进程重启或任意外部引用已验。具体最终命令、数量、失败过程和人工待验仅见唯一任务清单，H01–H09不由自动化代签。
+
 ## RF16 定案：目录与唯一序列化契约（2026-11-11）
 
 本节是 RF18–RF20 的实现规格。RF18 已将 `JsonDocumentSession` 的转换与快照接入唯一新格式，旧裸根不再读取；创建/保存入口归一与导出分别按 RF19/RF20 验收，不因转换实现存在而宣称完整工作流已通过。开发期硬切覆盖旧 JSON 兼容要求；下文 R01–R10/A02 保留历史范围，`.asset`、稳定对象 ID、double 时间和独立窗口会话仍只是保留实验，不能套到当前产品。职责、逐文件移动清单及实际验证只记唯一任务清单。

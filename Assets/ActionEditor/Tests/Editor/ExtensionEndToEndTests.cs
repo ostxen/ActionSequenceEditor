@@ -28,10 +28,12 @@ namespace NBC.ActionEditor.Tests
             public string Field;
             public Rect Input;
             public Vector2 ContentOffset;
+            public string InputTrace;
             public OriginalTimelineGesture Gesture;
             private readonly FieldInspector inspector = new FieldInspector();
             private void OnGUI()
             {
+                if (Event.current.type == EventType.MouseDown || Event.current.type == EventType.KeyDown) InputTrace += Event.current.type + ":" + Event.current.keyCode + ":" + Event.current.mousePosition + ";";
                 if (Gesture != null)
                 {
                     ContentOffset = GUIUtility.GUIToScreenPoint(Vector2.zero) - position.position;
@@ -131,7 +133,7 @@ namespace NBC.ActionEditor.Tests
                             Key(input, KeyCode.A, control: true); Key(input, KeyCode.Alpha7, '7'); Key(input, KeyCode.Return, '\n');
                             window.Canvas.Focus(); yield return null; root.RemoveFromHierarchy();
                         }
-                        Assert.That(field.GetValue(clip), Is.EqualTo("7"), "Real property control must change the authored field: UI=" + ui + ", track=" + track);
+                        Assert.That(field.GetValue(clip), Is.EqualTo("7"), "Real property control must change the authored field: UI=" + ui + ", track=" + track + ", input=" + original.Input + ", offset=" + original.ContentOffset + ", focus=" + EditorWindow.focusedWindow?.GetType().Name + ", hot=" + GUIUtility.hotControl + ", trace=" + original.InputTrace);
                         token.Cancel(); clip = Last(track); Assert.That(field.GetValue(clip), Is.EqualTo(initial));
                         token = App.Session.BeginEdit(this); new JsonPropertyPath(clip).Field(field).Write("7"); token.Commit();
                         Undo.PerformUndo(); Assert.That(field.GetValue(Last(track)), Is.EqualTo(initial));
