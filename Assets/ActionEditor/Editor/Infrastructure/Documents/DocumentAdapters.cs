@@ -25,6 +25,7 @@ namespace NBC.ActionEditor.Infrastructure.Documents
     public sealed class UnityUndoHistory : IUndoHistory
     {
         private DocumentUndoState state;
+        private string observedSnapshot;
         private bool disposed;
         public event Action<string> Restored;
         public UnityUndoHistory() { Undo.undoRedoPerformed += OnUndoRedo; }
@@ -35,6 +36,7 @@ namespace NBC.ActionEditor.Infrastructure.Documents
             if (next != null) { next.hideFlags = HideFlags.HideAndDontSave; next.Snapshot = snapshot; }
             Release();
             state = next;
+            observedSnapshot = snapshot;
         }
         public void Record(string before, string after, string label)
         {
@@ -43,8 +45,15 @@ namespace NBC.ActionEditor.Infrastructure.Documents
             Undo.IncrementCurrentGroup(); var group = Undo.GetCurrentGroup();
             Undo.RegisterCompleteObjectUndo(state, label);
             state.Snapshot = after; EditorUtility.SetDirty(state); Undo.CollapseUndoOperations(group);
+            observedSnapshot = after;
         }
-        private void OnUndoRedo() { if (state != null) Restored?.Invoke(state.Snapshot); }
+        // Unity通知所有会话；只替换实际被撤销的图，不能清除另一窗口的事务和选择。
+        private void OnUndoRedo()
+        {
+            if (state == null || state.Snapshot == observedSnapshot) return;
+            observedSnapshot = state.Snapshot;
+            Restored?.Invoke(observedSnapshot);
+        }
         private void Release()
         {
             if (state == null) return;

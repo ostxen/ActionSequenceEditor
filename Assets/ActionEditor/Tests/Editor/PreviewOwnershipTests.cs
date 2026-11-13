@@ -48,7 +48,70 @@ namespace NBC.ActionEditor.Tests
             public override void Update(float time, float previousTime) { Updates++; if (ThrowUpdate) throw new InvalidOperationException("preview failure"); }
             public override void Dispose() { Disposals++; }
         }
+        private sealed class ReentrantProbe : Probe
+        {
+            public Action OnEnter, OnDispose;
+            public override void Enter() => OnEnter?.Invoke();
+            public override void Dispose() { base.Dispose(); OnDispose?.Invoke(); }
+        }
+
+        [Test] public void PreviewCallbackCanReleaseSessionWithoutEvaluatingDisposedPointers()
+        {
+            var document = new FeatureSampleDocument();
+            var probes = new List<ReentrantProbe>();
+            ActionEditorPreviewSession session = null;
+            session = new ActionEditorPreviewSession(type =>
+            {
+                var probe = new ReentrantProbe { OnEnter = () => session.Dispose(), OnDispose = () => session.Dispose() };
+                probes.Add(probe); return probe;
+            });
+            session.Initialize(document);
+            session.Sample(1, 0, true);
+            Assert.That(session.IsInitialized, Is.False);
+            Assert.That(probes.All(p => p.Disposals == 1 && p.Updates == 0), Is.True);
+            session.Sample(2, 1, true); session.Dispose();
+            Assert.That(probes.All(p => p.Disposals == 1), Is.True);
+        }
+        [TestCase(false)] [TestCase(true)] public void PreviewFactoryCancellationReleasesReturnedButUnownedInstance(bool returnsNull)
+        {
+            var probe = new Probe();
+            ActionEditorPreviewSession session = null;
+            session = new ActionEditorPreviewSession(_ => { session.Dispose(); return returnsNull ? null : probe; });
+            Assert.Throws<OperationCanceledException>(() => session.Initialize(new FeatureSampleDocument()));
+            Assert.That(session.IsInitialized, Is.False);
+            Assert.That(probe.Disposals, Is.EqualTo(returnsNull ? 0 : 1));
+            session.Dispose();
+            Assert.That(probe.Disposals, Is.EqualTo(returnsNull ? 0 : 1));
+        }
         private class Target : TimelineClip { }
+        [Test] public void PlaybackStoppedDuringLoopBoundaryCannotRecreatePreviewOrAdvancePreviousTime()
+        {
+            var asset = new FeatureSampleDocument();
+            var probes = new List<ReentrantProbe>();
+            ActionEditorPlayback playback = null;
+            var player = new AssetPlayer(() => asset, _ =>
+            {
+                var probe = new ReentrantProbe { OnEnter = () => playback.Stop() };
+                probes.Add(probe); return probe;
+            });
+            playback = new ActionEditorPlayback(player);
+            playback.Play(0);
+            playback.Update(asset.Length + 1, 1);
+            Assert.That(playback.IsPlaying || player.IsInitialized, Is.False);
+            Assert.That(player.CurrentTime, Is.Zero);
+            Assert.That(player.previousTime, Is.Zero);
+            Assert.That(probes.Count, Is.GreaterThan(0));
+            Assert.That(probes.All(p => p.Disposals == 1 && p.Updates == 0), Is.True);
+        }
+
+        [Test] public void PlayedCallbackCanStopWithoutPlayOverwritingItsDecision()
+        {
+            var playback = new ActionEditorPlayback(new AssetPlayer(() => new FeatureSampleDocument()));
+            playback.Played += () => playback.Stop();
+            playback.Play(0);
+            Assert.That(playback.IsPlaying || playback.IsPaused, Is.False);
+        }
+
         private class DerivedTarget : Target { }
         [CustomPreview(typeof(Target))] private class First : Probe { }
         [CustomPreview(typeof(Target))] private class Override : First { }
@@ -131,6 +194,7 @@ namespace NBC.ActionEditor.Tests
             {
                 original.Show(); native.Show(); yield return null; yield return null;
                 Assert.That(EditorApplication.update.GetInvocationList().Count(callback => callback.Method.DeclaringType == typeof(ActionEditorHost) && callback.Method.Name == "UpdateSharedEditor"), Is.EqualTo(1));
+                Assert.That(EditorApplication.update.GetInvocationList().Any(callback => callback.Target is ActionEditorWindow || callback.Target is Workbench.UIToolkitActionEditorWindow), Is.False);
                 App.Context.Playback.Play((float)EditorApplication.timeSinceStartup);
                 App.Context.Playback.Pause(true);
                 native.Close();
@@ -146,11 +210,47 @@ namespace NBC.ActionEditor.Tests
             }
         }
 
+        [Test] public void SharedDriverSkipsDetachedViewsAndIsolatesTickFailures()
+        {
+            var views = new ActionEditorViews();
+            var first = new object(); var second = new object(); var third = new object();
+            var calls = new List<string>(); var errors = new List<Exception>();
+            foreach (var owner in new[] { first, second, third }) views.Attach(owner, () => { }, () => { });
+            views.SetTick(first, () => { calls.Add("first"); views.Detach(second); throw new InvalidOperationException("tick"); });
+            views.SetTick(second, () => calls.Add("detached"));
+            views.SetTick(third, () => calls.Add("third"));
+            views.Tick(errors.Add);
+            Assert.That(calls, Is.EqualTo(new[] { "first", "third" }));
+            Assert.That(errors.Count, Is.EqualTo(1));
+            Assert.Throws<InvalidOperationException>(() => views.SetTick(second, () => { }));
+            views.Detach(first); views.Detach(third); calls.Clear();
+            views.Tick(errors.Add); Assert.That(calls, Is.Empty);
+        }
+
         private sealed class Preferences : NBC.ActionEditor.Application.Settings.IPreferencesStore
         {
             public NBC.ActionEditor.Application.Settings.EditorSettings Read() => new NBC.ActionEditor.Application.Settings.EditorSettings(
                 NBC.ActionEditor.Application.Settings.TimeStepMode.Seconds, .1f, 30, true, true, 0, "Assets/");
             public void Write(NBC.ActionEditor.Application.Settings.EditorSettings value) => throw new AssertionException("Closing a window must not write preferences.");
+        }
+
+        [Test] public void SharedUpdateDriverStillTicksViewsWhenPlaybackAndStopCallbacksFail()
+        {
+            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            context.Session.Open(new NBC.ActionEditor.Application.Documents.DocumentOpenData(new FeatureSampleDocument()));
+            var views = new ActionEditorViews(); var owner = new object(); var ticks = 0;
+            views.Attach(owner, () => throw new InvalidOperationException("repaint"), () => { });
+            views.SetTick(owner, () => ticks++);
+            var errors = new List<Exception>();
+            var driver = new Composition.EditorUpdateDriver(context, views,
+                new NBC.ActionEditor.Application.Settings.SettingsSession(new Preferences()), errors.Add);
+            context.Playback.Play(context.Clock.PlaybackTime);
+            context.Playback.Stopped += () => throw new InvalidOperationException("stop");
+            driver.Tick();
+            Assert.That(ticks, Is.EqualTo(1));
+            Assert.That(errors.Select(e => e.Message), Is.EquivalentTo(new[] { "repaint", "stop" }));
+            Assert.That(context.Playback.IsPlaying || context.Player.IsInitialized, Is.False);
+            views.Detach(owner); driver.Tick(); Assert.That(ticks, Is.EqualTo(1));
         }
 
         [Test] public void IsolatedBindingsReleaseLastPlaybackAndSubscriptionsExactlyOnce()

@@ -25,6 +25,16 @@ namespace NBC.ActionEditor
         private double lastTick;
         internal Vector2 ContentOffset { get; private set; }
 
+        // 独立宿主显式提供会话，复用同一窗口入口而不替换全局作者图。
+        public void BindContext(ActionEditorContext context, ActionEditorViews views, Application.Settings.SettingsSession settings)
+        {
+            Timeline?.Dispose(); Timeline = null;
+            Binding?.Dispose();
+            Binding = new Composition.WindowBinding(this, Repaint, OnDocumentChanged, context, views, settings, () => context.AutoSave.LastSaved);
+            try { InitializeWindow(); }
+            catch { OnDisable(); throw; }
+        }
+
         #region Init
 
         void InitializeAll()
@@ -46,11 +56,17 @@ namespace NBC.ActionEditor
         {
             Binding?.Dispose();
             Binding = new Composition.WindowBinding(this, Repaint, OnDocumentChanged);
+            try { InitializeWindow(); }
+            catch { OnDisable(); throw; }
+        }
+
+        // 初始化失败也走同一释放路径，不能遗留逐窗更新或属性订阅。
+        private void InitializeWindow()
+        {
             Workspace.Bind(Context.Document);
             ActionEditorHost.Window = this;
 
-            EditorApplication.update -= OnEditorUpdate;
-            EditorApplication.update += OnEditorUpdate;
+            Binding.SetTick(OnEditorUpdate);
             
             minSize = new Vector2(500, 250);
             
@@ -61,12 +77,17 @@ namespace NBC.ActionEditor
 
         void OnDisable()
         {
-            CancelOwnEdit();
-            Timeline?.Dispose(); Timeline = null;
-            Binding?.Dispose();
-            if (ActionEditorHost.Window == this) ActionEditorHost.Window = null;
-            this.ReleaseViews();
-            EditorApplication.update -= OnEditorUpdate;
+            var surface = Timeline; Timeline = null;
+            try { surface?.Dispose(); }
+            finally
+            {
+                try { Binding?.Dispose(); }
+                finally
+                {
+                    if (ActionEditorHost.Window == this) ActionEditorHost.Window = null;
+                    this.ReleaseViews();
+                }
+            }
         }
 
         void OnEditorUpdate()

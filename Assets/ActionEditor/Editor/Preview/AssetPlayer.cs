@@ -6,12 +6,14 @@ namespace NBC.ActionEditor
 {
     public enum EditorPlaybackState { Stoped, PlayingForwards, PlayingBackwards }
 
+    // 持有当前采样时间及唯一预览会话，重入Reset使旧采样结果失效。
     public class AssetPlayer
     {
         public static AssetPlayer Inst => App.Context.Player;
         private readonly Func<ActionDocument> document;
         private readonly ActionEditorPreviewSession preview;
         private float currentTime;
+        private long generation;
         public event Action Faulted;
         public float previousTime { get; private set; }
         public bool IsInitialized => preview.IsInitialized;
@@ -24,20 +26,21 @@ namespace NBC.ActionEditor
         public ActionDocument Asset => document();
         public float CurrentTime { get => currentTime; set => currentTime = Mathf.Clamp(value, 0, Length); }
         public float Length => Asset?.Length ?? 0;
-        public void Reset() { preview.Dispose(); previousTime = 0; }
+        public void Reset() { generation++; previousTime = 0; preview.Dispose(); }
         public void Sample() => Sample(currentTime);
         public void Sample(float time)
         {
             if (Asset == null) { Reset(); return; }
             CurrentTime = time;
             if (IsInitialized && (currentTime == 0 || currentTime == Length) && previousTime == currentTime) return;
+            var version = generation;
             try
             {
                 if (!IsInitialized) InitializePreviewPointers();
                 preview.Sample(currentTime, previousTime, UnityEngine.Application.isPlaying);
-                previousTime = currentTime;
+                if (generation == version) previousTime = currentTime;
             }
-            catch { Reset(); Faulted?.Invoke(); throw; }
+            catch { if (generation == version) { Reset(); Faulted?.Invoke(); } throw; }
         }
         public void InitializePreviewPointers() { previousTime = 0; preview.Initialize(Asset); }
     }

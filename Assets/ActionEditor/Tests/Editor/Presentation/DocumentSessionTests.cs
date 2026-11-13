@@ -11,6 +11,29 @@ namespace NBC.ActionEditor.Tests.Application
 {
     public sealed class DocumentSessionTests
     {
+        [Test] public void UnityUndoInOtherSessionPreservesUnchangedGraphAndActiveTransaction()
+        {
+            using var first = NBC.ActionEditor.Composition.DocumentComposition.Create();
+            using var second = NBC.ActionEditor.Composition.DocumentComposition.Create();
+            first.Open(new DocumentOpenData(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument()));
+            second.Open(new DocumentOpenData(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument()));
+            var original = first.Document;
+            var notifications = 0;
+            first.Changed += () => notifications++;
+            using var token = first.BeginEdit(this);
+            token.Update(() => ((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument)original).Version = 8);
+            second.Edit("Other document", () => ((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument)second.Document).Version = 4);
+            UnityEditor.Undo.PerformUndo();
+            Assert.That(((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument)second.Document).Version, Is.EqualTo(1));
+            Assert.That(first.Document, Is.SameAs(original));
+            Assert.That(token.IsActive, Is.True);
+            Assert.That(notifications, Is.Zero);
+            UnityEditor.Undo.PerformRedo();
+            Assert.That(((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument)second.Document).Version, Is.EqualTo(4));
+            Assert.That(token.IsActive, Is.True);
+            Assert.That(first.Document, Is.SameAs(original));
+        }
+
         private sealed class Document : ActionDocument { public int Value; }
         private sealed class Snapshots : IDocumentSnapshot
         {
@@ -86,6 +109,49 @@ namespace NBC.ActionEditor.Tests.Application
             }
             public void Dispose() => Session.Dispose();
         }
+        private sealed class Clock : IEditorClock
+        {
+            public double Now { get; set; }
+            public float PlaybackTime => (float)Now;
+            public float TimeScale => 1;
+            public DateTime LocalTime => new DateTime(2026, 1, 1).AddSeconds(Now);
+        }
+
+        [Test] public void AutoSaveUsesExactDeadlineSkipsGesturesAndThrottlesFailures()
+        {
+            using var h = new Harness();
+            var clock = new Clock();
+            var save = new DocumentAutoSave(h.Session, h.Lifecycle, clock);
+            h.Session.Edit("dirty", () => h.Current.Value = 4);
+            clock.Now = 9.999;
+            Assert.That(save.Tick(10), Is.Null);
+            clock.Now = 10;
+            using (var token = h.Session.BeginEdit(this))
+            {
+                Assert.That(save.Tick(10), Is.Null);
+                Assert.That(token.IsActive, Is.True);
+                token.Commit();
+            }
+            h.Repository.FailCommit = true;
+            var failed = save.Tick(10);
+            Assert.That(failed.Value.Succeeded || failed.Value.BytesCommitted, Is.False);
+            Assert.That(h.Session.IsDirty, Is.True);
+            Assert.That(save.LastSaved, Is.EqualTo(new DateTime(2026, 1, 1)));
+            Assert.That(save.Tick(10), Is.Null);
+            h.Repository.FailCommit = false; h.Repository.FailImport = true; clock.Now = 20;
+            var imported = save.Tick(10);
+            Assert.That(imported.Value.Succeeded, Is.False);
+            Assert.That(imported.Value.BytesCommitted, Is.True);
+            Assert.That(h.Session.IsDirty, Is.False);
+            clock.Now = 40; Assert.That(save.Tick(10), Is.Null);
+            h.Repository.FailImport = false;
+            h.Session.Edit("again", () => h.Current.Value = 5);
+            Assert.That(save.Tick(0), Is.Null);
+            Assert.That(save.Tick(10).Value.Succeeded, Is.True);
+            Assert.That(save.LastSaved, Is.EqualTo(clock.LocalTime));
+            Assert.That(h.Repository.Commits, Is.EqualTo(2));
+        }
+
         private sealed class Interaction : NBC.ActionEditor.Presentation.Contracts.IDocumentInteraction
         {
             public bool Confirm;

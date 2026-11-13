@@ -12,8 +12,10 @@ namespace NBC.ActionEditor
         public static EditorWindow Window;
         public static float Width;
         private static InspectorPreviewAsset inspectorPreview;
+        private static readonly Composition.EditorUpdateDriver driver;
         static ActionEditorHost()
         {
+            driver = new Composition.EditorUpdateDriver(App.Context, App.Views, Prefs.Session, Debug.LogException);
             App.SavePathRequested = () => ChooseSavePath(false);
             App.Context.Selection.InspectorRequested += ShowInspector;
             App.RepaintRequested += () => { if (App.Views.Count == 0 && Window != null) Window.Repaint(); };
@@ -45,9 +47,7 @@ namespace NBC.ActionEditor
         }
         private static void UpdateSharedEditor()
         {
-            if (App.Views.Count == 0) return;
-            try { App.OnUpdate(); }
-            catch (Exception error) { App.Stop(); Debug.LogException(error); }
+            driver.Tick();
         }
         public static void OnObjectPickerConfig(Object obj)
         {

@@ -40,25 +40,44 @@ namespace NBC.ActionEditor.Workbench
         public ActionDocument Document => Context.Document;
         public TimelineWorkspace Workspace { get; } = new TimelineWorkspace();
 
+        // 显式独立宿主与主入口共用控件和SaveChanges，不通过全局会话中转。
+        public void BindContext(ActionEditorContext context, ActionEditorViews views, NBC.ActionEditor.Application.Settings.SettingsSession settings)
+        {
+            Canvas?.Dispose(); Canvas = null; binding?.Dispose();
+            binding = new Composition.WindowBinding(this, Repaint, Refresh, context, views, settings, () => context.AutoSave.LastSaved);
+            try { InitializeWindow(); CreateGUI(); }
+            catch { OnDisable(); throw; }
+        }
+
         [MenuItem("NBC/Action Editor/Open Workbench", false, -10)]
         public static void Open() => GetWindow<UIToolkitActionEditorWindow>().Show();
         private void OnEnable()
         {
             binding?.Dispose(); binding = new Composition.WindowBinding(this, Repaint, Refresh);
+            try { InitializeWindow(); }
+            catch { OnDisable(); throw; }
+        }
+        // 创建Inspector代理失败时仍释放本窗口已经取得的绑定。
+        private void InitializeWindow()
+        {
             Lan.Load();
             Styles.Load();
             LeftWidth = Styles.TimelineLeftWidth;
             titleContent = new GUIContent(Lan.Title + " · UI Toolkit"); minSize = new Vector2(500, 250);
             if (target != null) DestroyImmediate(target);
             target = CreateInstance<UIToolkitInspectorTarget>(); target.hideFlags = HideFlags.HideAndDontSave; target.Owner = this;
-            EditorApplication.update -= Tick;
-            EditorApplication.update += Tick;
+            binding.SetTick(Tick);
             lastTick = EditorApplication.timeSinceStartup;
         }
         private void OnDisable()
         {
-            Canvas?.Dispose(); Canvas = null; binding?.Dispose(); EditorApplication.update -= Tick;
-            if (target != null) DestroyImmediate(target);
+            var canvas = Canvas; Canvas = null;
+            try { canvas?.Dispose(); }
+            finally
+            {
+                try { binding?.Dispose(); }
+                finally { if (target != null) DestroyImmediate(target); target = null; }
+            }
         }
         private void OnLostFocus() => Canvas?.Cancel();
         private void Tick()

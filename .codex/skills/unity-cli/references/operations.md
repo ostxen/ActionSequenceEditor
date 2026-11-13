@@ -33,6 +33,8 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
+`actioneditor.validation document_lifecycle_probe`固定零参数隔离持久探针，只新建不存在的Assets/ActionEditorLifecycleVerification目录及IMGUI/Toolkit两组Source、Copy、Export JSON（实际来源名IMGUI.json/Toolkit.json）。两个真实窗口显式注入独立会话，验证属性、根混排、SaveChanges、Undo/Redo、磁盘重开、另存、Recovery、定时自动保存、导出读回及锁文件/导入失败/外部冲突。保留既有窗口和全局作者图，不写个人偏好；finally只关闭本次窗口并通过AssetDatabase删除本次目录。拒绝活动编辑/播放、路径/代码/force覆盖；独立preview展示六个目标、approve引用RF24–RF37连续授权、apply，超时先查证而非重放。
+
 `actioneditor.validation arrange_feature_layout`固定移动四项：Runtime/Samples/LegacyExperience/LegacyExperienceAsset.cs→Runtime/Samples/FeatureSample/FeatureSampleDocument.cs、Editor/Samples/LegacyExperiencePreview.cs→FeatureSamplePreview.cs、Samples/LegacyExperience/README.md→Samples/FeatureSample/README.md、Editor/Core/Properties/JsonFieldDescription.cs→Runtime/Metadata/PropertyDescription.cs。固定GUID和源码/meta哈希，拒绝覆盖，AssetDatabase移动后复核身份/字节并SyncAll；无用户数据写入、无删除、无参数覆盖。独立preview/展示/approve/apply，引用RF24–RF37连续授权。
 
 `actioneditor.validation retire_imgui_timeline_sources`固定删除十一份已替代的IMGUI时间轴源码及meta：TimelineView/Middle/Pointer/TrackItem/Bottom、ClipDragger、ClipDrawer/Basic/Simple/Signal与SplitterView。保留Toolbar、资源及用户数据；固定GUID和源码/meta哈希、拒绝参数覆盖，AssetDatabase批量删除并SyncAll。调用者迁移后独立preview/展示/approve/apply，引用RF24–RF37连续授权。

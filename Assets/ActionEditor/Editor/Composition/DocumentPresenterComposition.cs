@@ -33,7 +33,7 @@ namespace NBC.ActionEditor.Composition
                 return choice == 2 || !context.Session.IsDirty;
             }
             public void ShowExport() => DocumentExportWindow.ShowFor(context);
-            public void Saved() { if (ReferenceEquals(context, App.Context)) App.RecordSaved(); }
+            public void Saved() => context.AutoSave.RecordSaved();
             public void Undo(bool redo) { if (redo) UnityEditor.Undo.PerformRedo(); else UnityEditor.Undo.PerformUndo(); }
         }
         public static DocumentPresenter Create(ActionEditorContext context) => new DocumentPresenter(context.Session, context.Lifecycle, new Interaction(context));

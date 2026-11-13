@@ -26,7 +26,7 @@ namespace NBC.ActionEditor
         {
             Context.Changed += () =>
             {
-                Refresh(); Views.NotifyChanged(); Repaint(); DocumentChanged?.Invoke();
+                Refresh(); Repaint(); DocumentChanged?.Invoke();
             };
             Context.Playback.Played += () => OnPlay?.Invoke();
             Context.Playback.Stopped += () => OnStop?.Invoke();
@@ -64,8 +64,7 @@ namespace NBC.ActionEditor
 
         internal static void RecordSaved()
         {
-            _lastSaveTime = Context.Clock.LocalTime;
-            _lastSaveClock = Context.Clock.Now;
+            Context.AutoSave.RecordSaved();
         }
 
         public static void OnGUIEnd()
@@ -91,23 +90,16 @@ namespace NBC.ActionEditor
 
         #region AutoSave
 
-        public static DateTime LastSaveTime => _lastSaveTime;
-
-        private static DateTime _lastSaveTime = Context.Clock.LocalTime;
-        private static double _lastSaveClock = Context.Clock.Now;
+        public static DateTime LastSaveTime => Context.AutoSave.LastSaved;
 
         /// <summary>
         /// 尝试自动保存
         /// </summary>
         public static void TryAutoSave()
         {
-            if (Session.IsEditing) return;
-            if (AssetData == null || string.IsNullOrEmpty(Session.Path) || !Session.IsDirty) return;
-            if (NBC.ActionEditor.Model.AutoSaveSchedule.IsDue(_lastSaveClock, Context.Clock.Now, Prefs.autoSaveSeconds))
-            {
-                _lastSaveClock = Context.Clock.Now;
-                try { SaveAssetTo(Session.Path); } catch (Exception e) { Debug.LogError("ActionEditor 自动保存失败，内存内容已保留：" + e.Message); }
-            }
+            var result = Context.AutoSave.Tick(Prefs.autoSaveSeconds);
+            if (result.HasValue && !result.Value.Succeeded)
+                Debug.LogError("ActionEditor 自动保存失败，内存内容已保留：" + result.Value.Error);
         }
 
         public static void AutoSave()

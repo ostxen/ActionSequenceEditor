@@ -10,6 +10,7 @@ namespace NBC.ActionEditor.Composition
     {
         private readonly object owner;
         private readonly Action repaint;
+        private readonly Action changed;
         private readonly ActionEditorViews views;
         private readonly Func<DateTime> lastSave;
         private bool disposed;
@@ -32,6 +33,7 @@ namespace NBC.ActionEditor.Composition
         {
             this.owner = owner ?? throw new ArgumentNullException(nameof(owner));
             this.repaint = repaint ?? throw new ArgumentNullException(nameof(repaint));
+            this.changed = changed ?? throw new ArgumentNullException(nameof(changed));
             this.views = views ?? throw new ArgumentNullException(nameof(views));
             this.lastSave = lastSave ?? throw new ArgumentNullException(nameof(lastSave));
             if (settings == null) throw new ArgumentNullException(nameof(settings));
@@ -41,10 +43,13 @@ namespace NBC.ActionEditor.Composition
             Properties = new PropertyPresenter(context.Properties, context.Structure, context.Clips, () => settings.Current, context.Selection);
             Settings = SettingsComposition.Create(this, settings);
             views.Attach(owner, repaint, changed);
+            Context.Changed += OnChanged;
         }
+        private void OnChanged() { if (!disposed) { changed(); repaint(); } }
         public void Render(EditorSettings value) { Preferences = value; repaint(); }
         public void ShowError(string message) { SettingsError = message; repaint(); }
         public void Select(params IDirectable[] items) { Context.Selection.Set(items, false); views.Repaint(); }
+        public void SetTick(Action tick) => views.SetTick(owner, tick);
         public void PopulateSaveMenu(Action<string, Action> add)
         {
             add(Lan.Save, () => Documents.Invoke(DocumentIntent.Save));
@@ -54,7 +59,8 @@ namespace NBC.ActionEditor.Composition
         public void Dispose()
         {
             if (disposed) return;
-            disposed = true; Properties.CancelDraft(); Settings.Dispose(); views.Detach(owner);
+            disposed = true; Context.Changed -= OnChanged;
+            Properties.CancelDraft(); Settings.Dispose(); views.Detach(owner);
             // 共享播放只有最后一个视图离开时才停止，不能中断仍打开的另一窗口。
             if (views.Count == 0) Context.Playback.Stop();
         }

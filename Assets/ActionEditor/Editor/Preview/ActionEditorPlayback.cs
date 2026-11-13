@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace NBC.ActionEditor
 {
+    // 播放状态拥有一次运行代次，业务回调停止后不得继续循环采样。
     public sealed class ActionEditorPlayback
     {
         public AssetPlayer Player { get; }
@@ -10,6 +11,7 @@ namespace NBC.ActionEditor
         public bool IsPaused { get; private set; }
         public bool IsRange { get; set; }
         private float previousTime;
+        private long generation;
         public event Action Played;
         public event Action Stopped;
 
@@ -21,11 +23,15 @@ namespace NBC.ActionEditor
         public void Play(float now)
         {
             if (Player.Asset == null) return;
-            Played?.Invoke(); previousTime = now; IsPaused = false; IsPlaying = true;
+            var version = ++generation;
+            previousTime = now; IsPaused = false; IsPlaying = true;
+            try { Played?.Invoke(); }
+            catch { if (generation == version) Stop(false); throw; }
         }
         public void Pause(bool paused) => IsPaused = paused;
         public void Stop(bool notify = true)
         {
+            generation++;
             Player.CurrentTime = 0;
             IsPlaying = false; IsPaused = false;
             try { if (notify) Stopped?.Invoke(); }
@@ -36,6 +42,7 @@ namespace NBC.ActionEditor
         public bool Update(float now, float timeScale)
         {
             var delta = (now - previousTime) * timeScale;
+            var version = generation;
             previousTime = now;
             var document = Player.Asset;
             if (document == null || !IsPlaying || IsPaused) return false;
@@ -45,7 +52,11 @@ namespace NBC.ActionEditor
             if (Player.CurrentTime + delta >= max)
             {
                 var next = min + Mathf.Repeat(Player.CurrentTime + delta - max, max - min);
-                Player.Sample(max); Player.Reset(); Player.Sample(next);
+                Player.Sample(max);
+                if (generation != version || !IsPlaying || IsPaused) return true;
+                Player.Reset();
+                if (generation != version || !IsPlaying || IsPaused) return true;
+                Player.Sample(next);
             }
             else Player.Sample(Player.CurrentTime + delta);
             return true;
