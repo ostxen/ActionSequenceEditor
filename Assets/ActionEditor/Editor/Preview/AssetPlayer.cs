@@ -33,7 +33,7 @@ namespace NBC.ActionEditor
             try
             {
                 if (!IsInitialized) InitializePreviewPointers();
-                preview.Sample(currentTime, previousTime, Application.isPlaying);
+                preview.Sample(currentTime, previousTime, UnityEngine.Application.isPlaying);
                 previousTime = currentTime;
             }
             catch { Reset(); Faulted?.Invoke(); throw; }

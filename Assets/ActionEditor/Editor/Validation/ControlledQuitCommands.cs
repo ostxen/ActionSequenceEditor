@@ -47,7 +47,7 @@ namespace NBC.ActionEditor.Validation
             var cancel = lifecycle?.GetMethod("CancelScheduledExit", BindingFlags.Static | BindingFlags.NonPublic);
             var pending = lifecycle?.GetProperty("IsExitScheduled", BindingFlags.Static | BindingFlags.NonPublic);
             if (cancel == null || pending == null) blockers.Add("audited Pipeline cancellation contract missing");
-            if (dryRun) return new { schema = 1, project = Application.dataPath, processId = System.Diagnostics.Process.GetCurrentProcess().Id,
+            if (dryRun) return new { schema = 1, project = UnityEngine.Application.dataPath, processId = System.Diagnostics.Process.GetCurrentProcess().Id,
                 blockers = blockers.Distinct().OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 operations = new[] { "recheck ActionEditor and unsaved scene/prefab/window state", "ignore unrelated asset dirty flags without saving or clearing them", "Pipeline normal quit with save=false discard=false exitCode=0" },
                 savesAssets = false, discardsChanges = false, forceKills = false };

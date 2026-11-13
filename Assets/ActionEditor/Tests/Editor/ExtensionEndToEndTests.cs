@@ -349,7 +349,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(drop.IsValid, Is.True);
                 window.Repaint(); yield return null; yield return null;
                 image = ReadWindowPixels(window);
-                System.IO.File.WriteAllBytes(System.IO.Path.Combine(Application.dataPath, "../Temp/structure-insertion-baseline.png"), image.EncodeToPNG());
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/structure-insertion-baseline.png"), image.EncodeToPNG());
                 Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", Instance).GetValue(canvas).ToString(), Is.EqualTo("Track"));
                 var scale = EditorGUIUtility.pixelsPerPoint;
                 bool BlueAt(float x)
@@ -396,7 +396,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(window.Gesture.TrackDrop.IsValid, Is.True);
                 window.Repaint(); yield return null; yield return null;
                 image = ReadWindowPixels(window);
-                System.IO.File.WriteAllBytes(System.IO.Path.Combine(Application.dataPath, "../Temp/structure-insertion-imgui-baseline.png"), image.EncodeToPNG());
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/structure-insertion-imgui-baseline.png"), image.EncodeToPNG());
                 var scale = EditorGUIUtility.pixelsPerPoint;
                 var y = Mathf.RoundToInt((Styles.PlayControlHeight + window.Gesture.TrackDrop.Y) * scale);
                 bool BlueAt(float x)
@@ -584,7 +584,7 @@ namespace NBC.ActionEditor.Tests
             var first = App.AssetData.groups[0].Tracks[0]; var second = App.AssetData.groups[0].Tracks[1];
             JsonEditCommands.MoveTrack(first, null, 0); JsonEditCommands.MoveTrack(second, null, 0);
             var expected = JsonDocumentCodec.Content(App.AssetData);
-            var directory = System.IO.Path.Combine(Application.dataPath, "../Temp/RootTrack-" + Guid.NewGuid().ToString("N"));
+            var directory = System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/RootTrack-" + Guid.NewGuid().ToString("N"));
             System.IO.Directory.CreateDirectory(directory);
             var path = System.IO.Path.Combine(directory, "Document.json"); TextAsset reopened = null;
             try

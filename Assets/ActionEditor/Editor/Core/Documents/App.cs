@@ -176,7 +176,7 @@ namespace NBC.ActionEditor
 
         public static void Play(Action callback = null)
         {
-            if (Application.isPlaying || AssetData == null)
+            if (UnityEngine.Application.isPlaying || AssetData == null)
             {
                 return;
             }

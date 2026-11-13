@@ -114,7 +114,7 @@ namespace NBC.ActionEditor
         /// 完全文件夹路径
         /// </summary>
         private string folderFullPath =>
-            Path.Combine(Application.dataPath, _folderPath.Length > 6 ? _folderPath.Substring(7) : string.Empty);
+            Path.Combine(UnityEngine.Application.dataPath, _folderPath.Length > 6 ? _folderPath.Substring(7) : string.Empty);
 
         /// <summary>
         /// 显示的列表项数量

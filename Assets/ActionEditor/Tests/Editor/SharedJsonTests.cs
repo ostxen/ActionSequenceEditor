@@ -997,7 +997,7 @@ namespace NBC.ActionEditor.Tests
             UIToolkitActionEditorWindow nativeWindow = null;
             var baseline = new InteractionBaseline
             {
-                CapturedUtc = DateTime.UtcNow.ToString("O"), UnityVersion = Application.unityVersion,
+                CapturedUtc = DateTime.UtcNow.ToString("O"), UnityVersion = UnityEngine.Application.unityVersion,
                 PixelsPerPoint = EditorGUIUtility.pixelsPerPoint, SnapInterval = Prefs.SnapInterval,
                 FrameRate = Prefs.FrameRate, TimeStepMode = (int)Prefs.timeStepMode, AutoSaveSeconds = Prefs.autoSaveSeconds,
                 MagnetSnapping = Prefs.MagnetSnapping, ScrollWheelZooms = Prefs.scrollWheelZooms,
@@ -1058,7 +1058,7 @@ namespace NBC.ActionEditor.Tests
                     Assert.That(nativeWindow.rootVisualElement.Query<IMGUIContainer>().ToList(), Is.Empty);
                 }
                 Assert.That(App.Session.IsDirty || App.Session.IsEditing, Is.False);
-                File.WriteAllText(System.IO.Path.Combine(Application.dataPath, "../Temp/rf01-interaction-baseline.json"), JsonUtility.ToJson(baseline, true));
+                File.WriteAllText(System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/rf01-interaction-baseline.json"), JsonUtility.ToJson(baseline, true));
                 LogAssert.NoUnexpectedReceived();
             }
             finally
@@ -1531,7 +1531,7 @@ namespace NBC.ActionEditor.Tests
                     .Invoke(host, new object[] { raw, new Rect(0, 0, raw.width, raw.height) });
                 Graphics.Blit(raw, upright, EditorGUIUtility.Load("SceneView/BlitSceneViewCapture.mat") as Material);
                 RenderTexture.active = upright; snapshot.ReadPixels(new Rect(0, 0, upright.width, upright.height), 0, 0); snapshot.Apply();
-                File.WriteAllBytes(System.IO.Path.Combine(Application.dataPath, "../Temp/" + name), snapshot.EncodeToPNG());
+                File.WriteAllBytes(System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/" + name), snapshot.EncodeToPNG());
             }
             finally { UnityEngine.Object.DestroyImmediate(snapshot); RenderTexture.active = previous; RenderTexture.ReleaseTemporary(upright); RenderTexture.ReleaseTemporary(raw); }
         }

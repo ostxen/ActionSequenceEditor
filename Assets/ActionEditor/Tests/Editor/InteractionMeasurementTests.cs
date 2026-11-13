@@ -102,7 +102,7 @@ namespace NBC.ActionEditor.Tests
         }
         [UnityTest] public IEnumerator RecordCurrentSampleEntryPointsWithoutInventingPerformanceBudgets()
         {
-            var report = new Report { CapturedUtc = DateTime.UtcNow.ToString("O"), UnityVersion = Application.unityVersion,
+            var report = new Report { CapturedUtc = DateTime.UtcNow.ToString("O"), UnityVersion = UnityEngine.Application.unityVersion,
                 ProcessId = Process.GetCurrentProcess().Id, PixelsPerPoint = EditorGUIUtility.pixelsPerPoint,
                 FrameRate = Prefs.FrameRate, LeftWidth = Styles.TimelineLeftWidth, SnapInterval = Prefs.SnapInterval,
                 Magnet = Prefs.MagnetSnapping, WheelZoom = Prefs.scrollWheelZooms,
@@ -140,8 +140,8 @@ namespace NBC.ActionEditor.Tests
                 yield return Measure(report, "shared-playback-600-updates-including-open", repetition, Playback());
             }
             Assert.That(report.Measurements.Count, Is.EqualTo(21));
-            Directory.CreateDirectory(Path.Combine(Application.dataPath, "../Temp"));
-            File.WriteAllText(Path.Combine(Application.dataPath, "../Temp/rf14-current-editor-measurements.json"), JsonUtility.ToJson(report, true));
+            Directory.CreateDirectory(Path.Combine(UnityEngine.Application.dataPath, "../Temp"));
+            File.WriteAllText(Path.Combine(UnityEngine.Application.dataPath, "../Temp/rf14-current-editor-measurements.json"), JsonUtility.ToJson(report, true));
         }
     }
 }

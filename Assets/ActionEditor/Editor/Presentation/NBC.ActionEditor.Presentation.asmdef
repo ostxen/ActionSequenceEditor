@@ -1,0 +1,8 @@
+{
+    "name": "NBC.ActionEditor.Presentation",
+    "references": ["NBC.ActionEditor.Application"],
+    "overrideReferences": true,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "noEngineReferences": true
+}

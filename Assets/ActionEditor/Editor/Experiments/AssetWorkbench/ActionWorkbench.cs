@@ -326,7 +326,7 @@ namespace NBC.ActionEditor.Workbench
 
         private void OpenDialog()
         {
-            var path = EditorUtility.OpenFilePanel("Open ActionEditor document", Application.dataPath, "asset");
+            var path = EditorUtility.OpenFilePanel("Open ActionEditor document", UnityEngine.Application.dataPath, "asset");
             if (string.IsNullOrEmpty(path)) return;
             var relative = FileUtil.GetProjectRelativePath(path);
             OpenDocument(relative);

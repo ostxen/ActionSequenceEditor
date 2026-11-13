@@ -33,7 +33,7 @@ namespace NBC.ActionEditor
             //停止播放
             if (App.AssetData != null)
             {
-                if (!Application.isPlaying)
+                if (!UnityEngine.Application.isPlaying)
                 {
                     // App.Stop(true);
                 }

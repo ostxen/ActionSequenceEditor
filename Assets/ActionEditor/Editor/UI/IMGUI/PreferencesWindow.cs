@@ -93,7 +93,7 @@ namespace NBC.ActionEditor
         {
             if (GUILayout.Button(Lan.PreferencesHelpDoc))
             {
-                Application.OpenURL("https://nobug.cn/book/414447506088261");
+                UnityEngine.Application.OpenURL("https://nobug.cn/book/414447506088261");
             }
         }
     }

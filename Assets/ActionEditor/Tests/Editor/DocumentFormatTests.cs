@@ -55,7 +55,7 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void IndependentContractFixturesReplaceConstructorDefaultsAndPreserveSignalStorage()
         {
-            var contract = File.ReadAllText(Path.Combine(Application.dataPath, "../Docs/ActionEditor-Contracts.md"));
+            var contract = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "../Docs/ActionEditor-Contracts.md"));
             var fixtures = System.Text.RegularExpressions.Regex.Matches(contract, "```json\\s*([\\s\\S]*?)```").Cast<System.Text.RegularExpressions.Match>().Take(2).Select(m => m.Groups[1].Value).ToArray();
             Assert.That(fixtures.Length, Is.EqualTo(2));
             var empty = (LegacyExperienceAsset)Read(fixtures[0]);

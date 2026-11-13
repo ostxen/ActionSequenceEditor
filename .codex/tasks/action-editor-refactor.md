@@ -3,7 +3,7 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF23 `complete`（限执行记录范围，RF23记录GUI输入重放间歇性风险）。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF24基线及取消项清理完成，真实双UI症状复现通过，最终205/205；准备精确本地提交并进入RF25。具体规格以第4.3节及最新执行记录为准。
+- 当前执行任务：RF24已本地提交`0acd13d`；RF25职责设计及可运行最小链通过213/213完整回归，准备提交后进入RF26。偏好最小链尚未接入两个产品视图，视图按RF30–RF32实施。具体规格以第4.3节及最新执行记录为准。
 - 下一步：按RF25实现具体职责契约及可运行最小用例，再顺序实施RF26–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
@@ -511,7 +511,7 @@ RF36对最终源码全量复核上述要求，并抽查结构编辑、属性编�
 | 状态 | 编号 | 交付 | 前置 |
 |---|---|---|---|
 | complete | RF24 | 清理取消项、可执行基线、逐文件归属及退役清单 | 最终205/205；下方执行记录 |
-| planned | RF25 | 具体职责设计、状态/调用链、契约与命名规范、验证依赖规则 | RF24 |
+| complete | RF25 | 具体职责设计、状态/调用链、契约与命名规范、验证依赖规则 | 最终213/213；下方执行记录 |
 | planned | RF26 | 新领域模型、有序根结构与version 2序列化硬切 | RF25 |
 | planned | RF27 | Application会话、事务、用例及基础设施端口 | RF26 |
 | planned | RF28 | 共享时间轴Presenter、输入状态机、几何与工作区 | RF27 |
@@ -682,6 +682,62 @@ RF36对最终源码全量复核上述要求，并抽查结构编辑、属性编�
 - 所有163份源码/程序集/样式均有GUID，142份非测试处置表、20份测试能力迁移表和31项资源身份已列。对仍未证明无用途的资源与工具统一明确保留，RF34删除前必须再次核实真实调用者/序列化绑定，不把保留候选当成可删除清单；因此当前没有“待判定后随意搬入Common”的生产文件。记录中的词法图不冒充语义闭包。
 - 提交范围分离：先前根轨/缩放、四UI改名与15目录meta删除全部保留，RF24只提交本项症状复现、拒绝取消入口的回归及任务证据；交叠文件通过精确index补丁分离，不自动打包其余既有变化。用户场景、JSON、Timeline及ProjectSettings均排除；没有修改前哈希，仍不宣称完整逐字节前后证明。取消命令未复活。
 - 先前产品差异已独立提交`48a1881`（57文件），RF24新增症状复现和取消入口回归未混入；该提交不代表MVP完成。当前RF24提交仅三文件：本记录、ExtensionEndToEndTests.cs的三项复现及像素读取、test_actioneditor_validation.py的取消命令拒绝回归。
+
+### RF25 具体职责设计及实施记录（2026-11-13）
+
+以下是具体实施约束，不是已经存在的完整架构。namespace与路径按职责一致：`NBC.ActionEditor.Domain`对应Runtime/Domain；`NBC.ActionEditor.Serialization`对应Runtime/Serialization；`NBC.ActionEditor.Application`对应Editor/Application；`NBC.ActionEditor.Presentation`对应Editor/Presentation；Unity具体实现分别在`NBC.ActionEditor.Infrastructure`、`NBC.ActionEditor.Composition`和`NBC.ActionEditor.Views.IMGUI/UIToolkit`。程序集以第4.3.2节为准，样例业务单独namespace `NBC.ActionEditor.Samples.FeatureSample`，仍由Domain程序集收纳无Editor依赖的样例数据。
+
+| 文件/类型 | 输入、输出及职责 | 状态、失败与释放 |
+|---|---|---|
+| Runtime/Domain/ActionDocument.cs | `IReadOnlyList<TimelineRootItem> RootItems`；根事实、作者播放范围、业务参数和有序遍历 | 不存视域/折叠/播放头；Root/Parent派生；不吞初始化异常 |
+| Runtime/Domain/TimelineRootItem.cs、TimelineGroup.cs、TimelineTrack.cs、TimelineClip.cs | 根项仅Group/Track；组持Tracks、轨持Clips；clip时间/混合与能力元数据 | 领域自身拒绝非法值；结构所有权校验不由View复制 |
+| Runtime/Domain/Rules/StructureRules.cs | `ValidateMove(document, source, owner, boundary)`返回拒绝原因/无操作/允许；菜单和提交重验共用 | 同列表先移除再校正插入边界；锁定/Unique/Attachable同一实现 |
+| Runtime/Domain/Rules/ClipTimingRules.cs | `Move/Resize`产生合法时间候选，最短0.01、非负开始、邻接/重叠规则 | 不接受像素、事件或Undo；数值有限性及float位不因UI改变 |
+| Runtime/Serialization/ActionDocumentJsonFormat.cs、DocumentValueConverter.cs、DocumentNumber.cs | 唯一v2封套与值树、明确字段策略、严格类型目录及GUID/localFileId解析端口 | 解析计划先完整验证再构造；原始float位及null/曲线；不读v1；快照回调仅在隔离图 |
+| Editor/Application/Documents/DocumentSession.cs、DocumentEditTransaction.cs | `BeginEdit(owner)`；`Commit(label)`/`Cancel()`；会话事实、版本与作者变更通知 | 会话共享；owner/token一次有效；异常/失效回滚；Undo替换图递增版本 |
+| Editor/Application/Documents/DocumentLifecycle.cs | `Create(type)/Open(source)/Save()/SaveAs(target)/Export(target,format)`返回明确操作结果 | 通过仓储/快照/恢复端口；提交前失败不切源不清脏；字节提交后导入失败保留revision |
+| Editor/Application/Editing/StructureEditing.cs、ClipEditing.cs、ClipboardEditing.cs | 明确用例参数（源、目标所有者、边界/时间），事务中调用领域规则 | 预检与提交重验；无操作不开空Undo；复制隔离；不接触控件 |
+| Editor/Application/Properties/PropertySchema.cs、PropertyPath.cs、PropertyEditing.cs、CollectionEditing.cs | 元数据字段描述；路径包含文档版本/根/成员；`Set(path,value)`及集合操作 | 失效路径拒绝，不追着旧引用写；struct逐层回写；锁定/取消共用事务 |
+| Editor/Application/Playback/PlaybackSession.cs | Play/Pause/Stop/Seek/Step与时钟步进，单预览资源所有者 | 初始化部分失败及回调异常都释放，重复Stop/Dispose幂等；不持Window |
+| Editor/Application/Settings/EditorSettings.cs、SettingsSession.cs | 不可变偏好、`IPreferencesStore.Read/Write`、`Commit(candidate)` | 持久化成功才通知；通知失败仅警告且不阻断其他订阅；无操作不写 |
+| Editor/Application/Ports/IDocumentRepository.cs、IDocumentSnapshot.cs、IUndoHistory.cs、IEditorClock.cs、IRecoveryStore.cs、IPreviewFactory.cs | 接口由用例拥有；仓储返回来源/revision/字节提交与导入结果；快照提供独立图及内容键 | 仓储不决定选择/播放；Undo记录快照；实现对象生命周期归Composition；无未使用接口占位 |
+| Editor/Presentation/Timeline/TimelineWorkspace.cs、TimeTransform.cs、VisibleTimelineLayout.cs | 每窗视域/滚动/分栏/折叠集合；中性尺寸产生可见行、组块边界与时间变换 | Workspace不进入作者存储；文档替换清理失效折叠项/引用；几何不改图 |
+| Editor/Presentation/Timeline/TimelineInteraction.cs、ClipGesture.cs、StructureGesture.cs、ViewportNavigation.cs | `Pointer(PointerInput)`、`Key(KeyInput)`、`Wheel(WheelInput)`、`Tick(seconds)` | 状态Idle→Pressed→Captured→Commit/Cancel；捕获归owner；错误按钮不结束；24px边缘滚动每帧重算 |
+| Editor/Presentation/Timeline/TimelineRenderState.cs | 只读Row/Clip外观、选中标记、时间刻度、`InsertionIndicator(visible,valid,y,width,color)` | 不暴露可写图/集合；指示只含线无提示文字；绘制宽排除滚动条 |
+| Editor/Presentation/Contracts/ITimelineView.cs、IDocumentView.cs、IPropertyView.cs、IPlaybackView.cs、ISettingsView.cs | `Render(state)`、`ShowError(message)`及必要捕获请求 | 视图实例逐窗；不将Event/VisualElement/EditorWindow穿透契约 |
+| Editor/Presentation/Presenters/TimelinePresenter.cs | 协调布局/交互/编辑用例并生成显示状态，处理Click/ToggleFold/Pointer/Wheel意图 | 每窗实例，订阅同一会话；Dispose解除订阅并只取消自己的手势 |
+| 同目录DocumentPresenter.cs、PropertyPresenter.cs、PlaybackPresenter.cs、SettingsPresenter.cs | 各自协调文档动作、属性路径、播放意图、偏好草稿 | 属性与偏好文本保留中间值，显式提交/取消；跨窗陈旧草稿冲突拒绝 |
+| Editor/Infrastructure/Documents/JsonDocumentRepository.cs、AtomicFileCommit.cs、DocumentSnapshot.cs | 序列化/可靠文件提交/Unity导入适配 | 同目录暂存、读回验证、revision保护；字节提交与导入分开结果 |
+| Editor/Infrastructure/UnityUndoHistory.cs、EditorClock.cs、PreferencesStore.cs、RecoveryStore.cs、AssetReferenceResolver.cs | Unity Undo/时钟/偏好/SessionState/资源引用的窄适配 | Undo桥接隐藏Object归一个会话；订阅显式释放；不读其他工程或全局服务定位 |
+| Editor/Views/IMGUI及UIToolkit/ActionEditorWindow.cs、TimelineRenderer.cs、HeaderControls.cs、TimelineInputAdapter.cs、PropertyControls.cs | 被动绘制、原生布局/捕获/焦点及坐标转换，发送意图 | 无序列化/集合修改/规则；UIToolkit无IMGUIContainer；overlay在行绘制之后独立全宽 |
+| Editor/Composition/ActionEditorComposition.cs、WindowBinding.cs、ActionEditorMenus.cs、InspectorBridge.cs | 唯一共享会话及逐窗Presenter绑定，显式构造/解除所有端口与订阅 | 一个Editor update驱动；窗口关闭不取消另一owner；无可被View随意查询的静态服务表 |
+
+关键合同签名（RF26–RF33随使用方落地，不提前建立空接口）：
+
+```csharp
+DocumentEditTransaction DocumentSession.BeginEdit(object owner);
+MoveResult StructureEditing.Move(TimelineRootItem source, TimelineGroup owner, int boundary);
+OperationResult DocumentLifecycle.Save();
+OperationResult PropertyEditing.Set(PropertyPath path, object candidate);
+void TimelinePresenter.Pointer(PointerInput input);
+void TimelinePresenter.Resize(ViewportSize size);
+void TimelinePresenter.Tick(double seconds);
+void ITimelineView.Render(TimelineRenderState state);
+void ITimelineView.SetCapture(bool requested);
+```
+
+- `PointerInput`含动作/主次中键/局部x,y/Ctrl/Shift；`WheelInput`含局部坐标/滚动方向；`KeyInput`含键/Ctrl/Shift及文本输入已消费标记。原生捕获丢失独立Cancel意图，无共享Event.current。`RowState`含不透明行键、标题、深度、是否组/是否可折叠/折叠、锁定/激活；`ClipState`含不透明键、Rect、颜色、标题/选中/点片段；这些状态无领域可写引用。
+- 结构链：原生Pointer→InputAdapter局部坐标→TimelinePresenter→StructureGesture阈值及StructureDropGeometry组块落点→StructureEditing事务及StructureRules释放重验→DocumentSession.Changed→各窗TimelinePresenter生成TimelineRenderState→各TimelineRenderer全宽overlay。自动滚动经IEditorClock步进Workspace再重算几何，不逐帧改作者图。
+- 属性链：原生字段中间文本→PropertyPresenter草稿→显式提交→PropertyEditing/CollectionEditing解析PropertyPath及统一领域时间规则→事务/Undo→会话通知→PropertyPresenter字段状态→各原生控件；Esc仅取消本窗口草稿/owned事务。
+- 保存链：按钮/Ctrl+S/SaveChanges/自动保存意图→DocumentPresenter→DocumentLifecycle.Save→IDocumentSnapshot隔离回调及严格校验→IDocumentRepository原子提交/外部revision保护→会话推进来源/基线/revision→导入结果→DocumentPresenter显示成功或“字节已提交但导入失败”。导出不切源/选择/捕获/播放。
+- 播放链：原生按钮/定位→PlaybackPresenter→PlaybackSession→IEditorClock与IPreviewFactory→预览资源采样→共享播放头通知→PlaybackPresenter/TimelinePresenter显示；Composition唯一update，Dispose/失败统一释放。
+- 已实现的代表最小链是`SettingsPresenter.Preview/Apply→SettingsSession.Commit→IPreferencesStore.Write→Changed→另一SettingsPresenter→ISettingsView.Render`，真实可执行无窗口测试覆盖双实例共享提交、独立草稿/取消、无操作、陈旧冲突、持久化失败重试与Dispose。当前尚未接入偏好窗口，不能据此称双UI已被动化。
+- 新Application/Presentation asmdef使用noEngineReferences=true，门禁反射验证真实程序集无UnityEditor/UnityEngine/Editor引用，源码检查无App/File/AssetDatabase/Event.current依赖。Domain最终允许UnityEngine值类型，后续相应门禁限定Editor/控件依赖，不误禁合法值类型。
+- 中间编译`20261113T005713Z-c883ac2e`暴露Application namespace遮蔽UnityEngine.Application；已将实际Unity调用显式限定，未加旧名代理。`20261113T010028Z-9896e64d`真实编译通过；发现212项`20261113T010205Z-e70a406b`；初版新Presentation用例7/7通过`20261113T010237Z-50f27d3a`。审阅发现通知异常会歪曲已持久提交结果，已修正为成功附警告、继续通知并新增用例，待最终重跑。
+- 离线`20261113T010430Z-a3cb9c25`：46工作流通过，真实方案20项目680源码，0错误51警告（比原43多8，待查明），11.48秒；文档解析仍缺yaml/markdown_it blocked，不安装。RF25未验收、未提交。
+- 最终审阅：偏好值不可变、Session单一持久化协调、Presenter逐实例草稿且Dispose解除订阅，接口只在存储和View真实替换边界；字段验证在值对象唯一实现。通知失败不撤销已落盘状态、不阻断其他视图；加入独立断言后专项`20261113T010714Z-5ca5008b`8/8通过。无全局服务表、无旧接口转发壳、没有把未来空接口作为实际实现。
+- 新增8项警告查明为两个asmdef默认引用全部预编译插件导致的System.Memory/Net.Http/Cryptography/Buffers冲突；设置overrideReferences=true及空precompiledReferences后由Unity重生成项目，未手改csproj。最终离线`20261113T011124Z-0831e81f`：46/46、20项目680源码、0错误43既有警告、6.59秒；整个code profile仍仅因文档解析器缺失blocked。
+- 最终Unity完整`20261113T011026Z-855c1b4e`：编译通过，**213执行/213通过，0失败/跳过/不确定**。包含8个新能力/架构用例；无资产目标，资源验证skipped。git diff --check通过。RF25完成范围为具体职责设计、实际独立程序集门禁和可运行共享偏好最小链，不冒称RF26后领域/双UI实现已经完成。
 
 #### RF24 静态职责清点补充
 

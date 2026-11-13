@@ -156,7 +156,7 @@ namespace NBC.ActionEditor.Tests
                     Graphics.Blit(raw, upright, blit);
                     RenderTexture.active = upright;
                     snapshot.ReadPixels(new Rect(0, 0, upright.width, upright.height), 0, 0); snapshot.Apply();
-                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(Application.dataPath, "../Temp/workbench-layout.png"), snapshot.EncodeToPNG());
+                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/workbench-layout.png"), snapshot.EncodeToPNG());
                 }
                 finally { Object.DestroyImmediate(snapshot); RenderTexture.active = previous; RenderTexture.ReleaseTemporary(upright); RenderTexture.ReleaseTemporary(raw); }
                 window.Session.DiscardAndClose();

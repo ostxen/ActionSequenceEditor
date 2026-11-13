@@ -12,7 +12,7 @@ namespace NBC.ActionEditor
     public static class Prefs
     {
         public static readonly string CONFIG_PATH =
-            $"{Application.dataPath}/../ProjectSettings/WhootActionSequencer.txt";
+            $"{UnityEngine.Application.dataPath}/../ProjectSettings/WhootActionSequencer.txt";
 
         [Serializable]
         public enum TimeStepMode

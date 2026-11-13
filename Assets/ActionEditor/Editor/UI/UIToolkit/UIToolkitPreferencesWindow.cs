@@ -52,7 +52,7 @@ namespace NBC.ActionEditor.Workbench
             }) { text = "…" });
             var interval = new SliderInt(Lan.PreferencesAutoSaveTime, 5, 120) { value = Prefs.autoSaveSeconds, showInputField = true };
             interval.RegisterValueChangedCallback(e => Prefs.autoSaveSeconds = e.newValue); save.Add(interval);
-            root.Add(new Button(() => Application.OpenURL("https://nobug.cn/book/414447506088261")) { text = Lan.PreferencesHelpDoc });
+            root.Add(new Button(() => UnityEngine.Application.OpenURL("https://nobug.cn/book/414447506088261")) { text = Lan.PreferencesHelpDoc });
         }
     }
 }
