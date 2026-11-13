@@ -98,12 +98,12 @@ namespace NBC.ActionEditor.Tests
         {
             var asset = new LegacyExperienceAsset();
             workspace.Bind(asset); workspace.SetCollapsed(asset.RootItems.OfType<TimelineGroup>().ElementAt(2), true);
-            var json = Storage.JsonDocumentSession.Encode(asset);
+            var json = NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(asset);
             var rows = TimelineGeometry.VisibleRows(asset, workspace);
             Assert.That(rows.Count, Is.EqualTo(8));
             Assert.That(rows.Take(4), Is.EqualTo(new IDirectable[] { asset.RootItems.OfType<TimelineGroup>().ElementAt(0), asset.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], asset.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1], asset.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[2] }));
             Assert.That(TimelineGeometry.IsVisible(asset.RootItems.OfType<TimelineGroup>().ElementAt(2).Tracks[0].Clips[0], workspace), Is.False);
-            Assert.That(Storage.JsonDocumentSession.Encode(asset), Is.EqualTo(json));
+            Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(asset), Is.EqualTo(json));
             workspace.SetCollapsed(asset.RootItems.OfType<TimelineGroup>().ElementAt(0), true);
             Assert.That(TimelineGeometry.VisibleRows(asset, workspace).Count, Is.EqualTo(5));
         }

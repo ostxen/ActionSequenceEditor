@@ -1,3 +1,6 @@
+using NBC.ActionEditor.Application.Ports;
+using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Storage;
 using NBC.ActionEditor.Domain;
 using System;
 using System.IO;
@@ -7,17 +10,32 @@ using NBC.ActionEditor.Serialization;
 using UnityEditor;
 using UnityEngine;
 
-namespace NBC.ActionEditor.Storage
+namespace NBC.ActionEditor.Infrastructure.Documents
 {
     /// <summary>One path, byte commit and import boundary for editable documents.</summary>
-    public sealed class JsonDocumentStore
+    public sealed class JsonDocumentRepository : IDocumentRepository
     {
         private readonly ICommitFiles files;
         private readonly Action<string> import;
-        public JsonDocumentStore(ICommitFiles files = null, Action<string> import = null)
+        public JsonDocumentRepository(ICommitFiles files = null, Action<string> import = null)
         {
             this.files = files ?? new CommitFiles();
             this.import = import ?? (path => AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate));
+        }
+        string IDocumentRepository.ValidatePath(string path) => ValidatePath(path);
+        // 来源图与版本必须由同一批字节产生，不能将缓存资源配上较新的版本。
+        public DocumentOpenData Read(string path)
+        {
+            path = ValidatePath(path);
+            var bytes = files.Read(path);
+            var candidate = JsonDocumentCodec.Decode(new UTF8Encoding(false, true).GetString(bytes));
+            return new DocumentOpenData(candidate, path, bytes);
+        }
+        public DocumentOpenData ReadSource(TextAsset text)
+        {
+            if (text == null) return null;
+            var path = GetPath(text);
+            return string.IsNullOrEmpty(path) ? new DocumentOpenData(JsonDocumentCodec.Decode(text.text)) : Read(path);
         }
         public string GetPath(TextAsset text)
         {
@@ -25,14 +43,13 @@ namespace NBC.ActionEditor.Storage
             return string.IsNullOrEmpty(path) ? null : ValidatePath(path);
         }
         public TextAsset Load(string path) => string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<TextAsset>(path);
-        public byte[] ReadRevision(string path) => !string.IsNullOrEmpty(path) && files.Exists(path) ? files.Read(path) : null;
 
-        public (string Json, byte[] Revision) Commit(string path, ActionDocument document, byte[] expectedCurrent)
+        public DocumentCommit Commit(string path, ActionDocument document, byte[] expectedCurrent)
         {
             path = ValidatePath(path);
             if (expectedCurrent == null) ValidateNewPath(path);
             var serialized = JsonDocumentCodec.CreateSaveSnapshot(document);
-            new ReliableFileCommit(files).Save(path, () => new UTF8Encoding(false).GetBytes(serialized), data =>
+            new AtomicFileCommit(files).Save(path, () => new UTF8Encoding(false).GetBytes(serialized), data =>
             {
                 var decoded = JsonDocumentCodec.Decode(new UTF8Encoding(false, true).GetString(data));
                 if (decoded.GetType() != document.GetType()) throw new InvalidDataException("文档类型读回不一致。");
@@ -41,7 +58,7 @@ namespace NBC.ActionEditor.Storage
                 if (expectedCurrent == null) ValidateNewPath(path);
             }, expectedCurrent, createOnly: expectedCurrent == null);
             // The exact bytes just committed are the revision. Do not read a later external edit as our baseline.
-            return (serialized, new UTF8Encoding(false).GetBytes(serialized));
+            return new DocumentCommit(serialized, JsonDocumentCodec.ContentOfSnapshot(serialized), new UTF8Encoding(false).GetBytes(serialized));
         }
         public void Import(string path)
         {

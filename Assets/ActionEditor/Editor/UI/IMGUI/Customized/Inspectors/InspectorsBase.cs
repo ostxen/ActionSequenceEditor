@@ -34,7 +34,7 @@ namespace NBC.ActionEditor
             DrawDefaultInspector(target);
         }
 
-        public void DrawDefaultInspector(object obj, JsonPropertyPath rootPath = null)
+        public void DrawDefaultInspector(object obj, NBC.ActionEditor.Application.Editing.PropertyPath rootPath = null)
         {
             if (obj == null) { EditorGUILayout.LabelField("null"); return; }
             var descriptions = JsonFieldDescription.For(obj.GetType()).ToArray();
@@ -43,9 +43,9 @@ namespace NBC.ActionEditor
                 if (description.Visible(obj)) FieldDefaultInspector(description.Field, obj, rootPath);
         }
 
-        protected void FieldDefaultInspector(FieldInfo field, object obj, JsonPropertyPath rootPath = null)
+        protected void FieldDefaultInspector(FieldInfo field, object obj, NBC.ActionEditor.Application.Editing.PropertyPath rootPath = null)
         {
-            var propertyPath = (rootPath ?? new JsonPropertyPath(obj)).Field(field);
+            var propertyPath = (rootPath ?? new NBC.ActionEditor.Application.Editing.PropertyPath(App.Context.Properties, obj)).Field(field);
             var fieldType = field.FieldType;
             var showType = field.FieldType;
             var value = field.GetValue(obj);
@@ -77,7 +77,7 @@ namespace NBC.ActionEditor
                             if (DrawRemoveButton())
                             {
                                 EditorGUILayout.EndHorizontal();
-                                propertyPath.Transform(current => Storage.JsonPropertyEditing.Remove(fieldType, (IList)current, i));
+                                propertyPath.Transform(current => NBC.ActionEditor.Application.Editing.CollectionEditing.Remove(fieldType, (IList)current, i));
                                 i--;
                                 continue;
                             }
@@ -100,7 +100,7 @@ namespace NBC.ActionEditor
                     if (DrawAddButton())
                     {
                         var added = CreateElement(elementType);
-                        propertyPath.Transform(current => Storage.JsonPropertyEditing.Append(fieldType, (IList)current, added));
+                        propertyPath.Transform(current => NBC.ActionEditor.Application.Editing.CollectionEditing.Append(fieldType, (IList)current, added));
                         list = (IList)propertyPath.Read();
                         SetFoldout(list, true);
                     }
@@ -136,7 +136,7 @@ namespace NBC.ActionEditor
                         if (DrawRemoveButton())
                         {
                             EditorGUILayout.EndHorizontal();
-                            var newArray = (Array)Storage.JsonPropertyEditing.Remove(fieldType, array, i);
+                            var newArray = (Array)NBC.ActionEditor.Application.Editing.CollectionEditing.Remove(fieldType, array, i);
                             RemoveFoldout(value);
                             array = newArray;
                             propertyPath.Write(newArray);
@@ -160,7 +160,7 @@ namespace NBC.ActionEditor
                     GUILayout.FlexibleSpace();
                     if (DrawAddButton())
                     {
-                        var newArray = (Array)Storage.JsonPropertyEditing.Append(fieldType, array, CreateElement(elementType));
+                        var newArray = (Array)NBC.ActionEditor.Application.Editing.CollectionEditing.Append(fieldType, array, CreateElement(elementType));
                         RemoveFoldout(value);
                         array = newArray;
                         propertyPath.Write(array);
@@ -304,9 +304,9 @@ namespace NBC.ActionEditor
             return 0;
         }
 
-        public static object CreateElement(Type type) => Storage.JsonPropertyEditing.CreateElement(type);
+        public static object CreateElement(Type type) => App.Context.Properties.CreateElement(type);
 
-        private object DrawElement(Type type, object value, JsonPropertyPath propertyPath)
+        private object DrawElement(Type type, object value, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath)
         {
             if (type == typeof(string)) return EditorGUILayout.TextField(value as string ?? "");
             if (type == typeof(int)) return EditorGUILayout.IntField(value == null ? 0 : (int)value);

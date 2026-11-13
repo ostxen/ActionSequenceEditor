@@ -41,7 +41,7 @@ namespace NBC.ActionEditor.Tests
             var group = new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceGroup { Name = "Reference" };
             group.Tracks.Add(new NBC.ActionEditor.Samples.LegacyExperience.LegacyIntervalTrack { Name = "Events" });
             sample.ClearRoots(); sample.AddRoot(group); sample.Init();
-            var json = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentSession.Encode(sample));
+            var json = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(sample));
             var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
             {
@@ -122,7 +122,7 @@ namespace NBC.ActionEditor.Tests
         [Test]
         public void JsonSaveWithoutDocumentIsRejected()
         {
-            using var session = new NBC.ActionEditor.Storage.JsonDocumentSession();
+            using var session = NBC.ActionEditor.Composition.DocumentComposition.Create();
             Assert.Throws<InvalidOperationException>(() => session.Save());
         }
 
@@ -150,14 +150,13 @@ namespace NBC.ActionEditor.Tests
         public void FailedLegacyOpenDoesNotChangeDocumentOrTarget()
         {
             var previous = App.TextAsset;
-            var valid = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentSession.Encode(new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceAsset()));
+            var valid = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceAsset()));
             var invalid = new TextAsset("not json");
             try
             {
                 App.TextAsset = valid;
                 var document = App.AssetData;
-                LogAssert.Expect(LogType.Error, new Regex("ActionEditor 打开失败，原文档已保留：.*", RegexOptions.Singleline));
-                App.TextAsset = invalid;
+                Assert.Throws<System.IO.InvalidDataException>(() => App.TextAsset = invalid);
                 Assert.That(App.TextAsset, Is.SameAs(valid));
                 Assert.That(App.AssetData, Is.SameAs(document));
             }

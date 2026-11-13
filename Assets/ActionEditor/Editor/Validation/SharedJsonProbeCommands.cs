@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Infrastructure.Documents;
 using NBC.ActionEditor.Domain;
 using System;
 using System.IO;
@@ -49,7 +50,7 @@ namespace NBC.ActionEditor.Validation
                 var created = DocumentCreationService.Create(typeof(LegacyExperienceAsset), Path);
                 App.TextAsset = created;
                 Require(App.Session.Path == Path && App.TextAsset == created, "Create/open did not bind source.");
-                memory = new TextAsset(JsonDocumentSession.Encode(new LegacyExperienceAsset()));
+                memory = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
                 Require(!App.Session.IsDirty, "New save is dirty.");
                 App.Session.Edit("R10 payload", () =>
                 {
@@ -68,9 +69,9 @@ namespace NBC.ActionEditor.Validation
                     && File.ReadAllBytes(Path).SequenceEqual(committed), "Discard did not restore saved baseline without writes.");
                 Undo.PerformUndo(); Undo.PerformRedo();
                 Require(((LegacyExperienceAsset)App.AssetData).Version == 42, "Discarded edits returned through Undo/Redo.");
-                using (var other = new JsonDocumentSession())
+                using (var other = NBC.ActionEditor.Composition.DocumentComposition.Create())
                 {
-                    other.Open(memory);
+                    other.Open(new JsonDocumentRepository().ReadSource(memory));
                     var refused = false;
                     try { other.Save(Path); } catch (IOException) { refused = true; }
                     Require(refused && string.IsNullOrEmpty(other.Path) && File.ReadAllBytes(Path).SequenceEqual(committed), "Save-as overwrote an existing fixture.");
@@ -80,12 +81,12 @@ namespace NBC.ActionEditor.Validation
                 try
                 {
                     var refused = false;
-                    try { App.Session.Open(invalidText); } catch (InvalidDataException) { refused = true; }
+                    try { App.Session.Open(new JsonDocumentRepository().ReadSource(invalidText)); } catch (InvalidDataException) { refused = true; }
                     Require(refused && ReferenceEquals(App.AssetData, beforeOpen), "Failed open replaced the current graph.");
                 }
                 finally { UnityEngine.Object.DestroyImmediate(invalidText); }
                 App.Session.Edit("R10 recovery payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 88);
-                using (var restored = new JsonDocumentSession())
+                using (var restored = NBC.ActionEditor.Composition.DocumentComposition.Create())
                 {
                     restored.RestoreRecovery(App.Session.CaptureRecovery());
                     Require(restored.IsDirty && ((LegacyExperienceAsset)restored.Document).Version == 88, "Recovery lost unsaved content.");

@@ -58,7 +58,7 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void PathsWriteNestedStructsAndReResolveCollectionIndices()
         {
-            var value = new Fields(); var root = new JsonPropertyPath(value);
+            var value = new Fields(); var root = new NBC.ActionEditor.Application.Editing.PropertyPath(App.Context.Properties, value);
             var field = typeof(NestedValue).GetField("Count");
             root.Field(typeof(Fields).GetField("Value")).Field(field).Set(8);
             Assert.That(value.Value.Count, Is.EqualTo(8));
@@ -72,20 +72,20 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void SharedCollectionOperationsCoverNullFirstArrayRemovalReorderAndBounds()
         {
-            var array = (int[])JsonPropertyEditing.Append(typeof(int[]), null, 7);
-            array = (int[])JsonPropertyEditing.Append(typeof(int[]), array, 20);
-            JsonPropertyEditing.Move(array, 0, 1); Assert.That(array, Is.EqualTo(new[] { 20, 7 }));
-            array = (int[])JsonPropertyEditing.Remove(typeof(int[]), array, 0); Assert.That(array, Is.EqualTo(new[] { 7 }));
-            Assert.Throws<ArgumentOutOfRangeException>(() => JsonPropertyEditing.Remove(typeof(int[]), array, 1));
-            var list = JsonPropertyEditing.Append(typeof(List<string>), null, "first");
-            Assert.That(list.Count, Is.EqualTo(1)); JsonPropertyEditing.Remove(typeof(List<string>), list, 0); Assert.That(list.Count, Is.Zero);
-            Assert.That(JsonPropertyEditing.CreateElement(typeof(string)), Is.EqualTo(""));
-            Assert.That(JsonPropertyEditing.CreateElement(typeof(UnityEngine.Object)), Is.Null);
+            var array = (int[])NBC.ActionEditor.Application.Editing.CollectionEditing.Append(typeof(int[]), null, 7);
+            array = (int[])NBC.ActionEditor.Application.Editing.CollectionEditing.Append(typeof(int[]), array, 20);
+            NBC.ActionEditor.Application.Editing.CollectionEditing.Move(array, 0, 1); Assert.That(array, Is.EqualTo(new[] { 20, 7 }));
+            array = (int[])NBC.ActionEditor.Application.Editing.CollectionEditing.Remove(typeof(int[]), array, 0); Assert.That(array, Is.EqualTo(new[] { 7 }));
+            Assert.Throws<ArgumentOutOfRangeException>(() => NBC.ActionEditor.Application.Editing.CollectionEditing.Remove(typeof(int[]), array, 1));
+            var list = NBC.ActionEditor.Application.Editing.CollectionEditing.Append(typeof(List<string>), null, "first");
+            Assert.That(list.Count, Is.EqualTo(1)); NBC.ActionEditor.Application.Editing.CollectionEditing.Remove(typeof(List<string>), list, 0); Assert.That(list.Count, Is.Zero);
+            Assert.That(App.Context.Properties.CreateElement(typeof(string)), Is.EqualTo(""));
+            Assert.That(App.Context.Properties.CreateElement(typeof(UnityEngine.Object)), Is.Null);
         }
         [Test] public void AuthoredPathsUseOneUndoCancelAndRejectStaleOrLockedRoots()
         {
             LegacyExperienceInterval Clip() => (LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
-            JsonPropertyPath Path(LegacyExperienceInterval clip) => new JsonPropertyPath(clip).Field(typeof(LegacyExperienceInterval).GetField("Parameters")).Element(0).Field(typeof(LegacyExperienceParameter).GetField("Value"));
+            NBC.ActionEditor.Application.Editing.PropertyPath Path(LegacyExperienceInterval clip) => new NBC.ActionEditor.Application.Editing.PropertyPath(App.Context.Properties, clip).Field(typeof(LegacyExperienceInterval).GetField("Parameters")).Element(0).Field(typeof(LegacyExperienceParameter).GetField("Value"));
             var path = Path(Clip()); var token = App.Session.BeginEdit(this);
             path.Write(4f); path.Write(6f); token.Commit();
             Assert.That(Clip().Parameters[0].Value, Is.EqualTo(6));

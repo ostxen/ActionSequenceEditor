@@ -199,7 +199,7 @@ namespace NBC.ActionEditor.Validation
                         properties.Query<TextField>().ToList().Single(f => f.label == "标题").value = "Tutorial";
                         properties.RemoveFromHierarchy();
                     }
-                    else App.Session.Edit("Tutorial property", () => new JsonPropertyPath(clip).Field(typeof(LegacyExperienceInterval).GetField("Caption")).Write("Tutorial"));
+                    else App.Session.Edit("Tutorial property", () => new NBC.ActionEditor.Application.Editing.PropertyPath(App.Context.Properties, clip).Field(typeof(LegacyExperienceInterval).GetField("Caption")).Write("Tutorial"));
                     if (((LegacyExperienceInterval)clip).Caption != "Tutorial") throw new InvalidOperationException("Property edit failed.");
                     await TutorialFrames();
                     for (var resize = 0; resize < 2; resize++)

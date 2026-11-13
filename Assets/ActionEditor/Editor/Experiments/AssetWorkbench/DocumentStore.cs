@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Infrastructure.Documents;
 using System;
 using System.IO;
 using NBC.ActionEditor.Model;
@@ -44,7 +45,7 @@ namespace NBC.ActionEditor.Storage
                 throw new InvalidDataException("Missing event types; saving would lose data.");
             var existed = File.Exists(path);
             if (existed && expectedCurrent == null) throw new IOException("Existing documents require a matching revision.");
-            new ReliableFileCommit().Save(path, () => Encode(document), ValidateEncoded, expectedCurrent);
+            new AtomicFileCommit().Save(path, () => Encode(document), ValidateEncoded, expectedCurrent);
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
             var saved = AssetDatabase.LoadAssetAtPath<ActionDocument>(path);
             if (saved == null) throw new IOException("Document bytes committed, but Unity import failed; inspect target before retrying.");

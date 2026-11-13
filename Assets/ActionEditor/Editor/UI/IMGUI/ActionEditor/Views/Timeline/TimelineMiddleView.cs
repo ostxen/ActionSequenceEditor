@@ -160,11 +160,11 @@ namespace NBC.ActionEditor
                     foreach (var typeMetaInfo in list)
                     {
                         var info = typeMetaInfo;
-                        var command = NBC.ActionEditor.Storage.JsonEditCommands.Creation(asset, info.type);
+                        var command = App.Context.Structure.Creation(asset, info.type);
                         if (command.CanExecute(out var reason)) menu.AddItem(new GUIContent(info.name), false,
                             () =>
                             {
-                                NBC.ActionEditor.Storage.JsonEditCommands.AddGroup(info.type);
+                                App.Context.Structure.AddGroup(info.type);
                                 App.Refresh();
                             });
                         else menu.AddDisabledItem(new GUIContent(info.name, reason));
@@ -174,7 +174,7 @@ namespace NBC.ActionEditor
                 }
                 else
                 {
-                    if (list.Count == 1) NBC.ActionEditor.Storage.JsonEditCommands.AddGroup(list[0].type);
+                    if (list.Count == 1) App.Context.Structure.AddGroup(list[0].type);
                     App.Refresh();
                 }
             }

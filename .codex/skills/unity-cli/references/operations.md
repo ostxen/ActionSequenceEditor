@@ -33,6 +33,10 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
+`actioneditor.validation retire_editing_sources`固定删除Core/Editing中的JsonEditCommand、JsonEditCommands、JsonPropertyEditing三份源码及meta。调用者已直接接入Application用例后才允许执行；固定GUID与源码/meta哈希，preview列清单，apply经AssetDatabase删除并核实不存在、SyncAll。不接受参数/任意路径，不触及用户文档；按RF24–RF37连续授权独立preview/approve/apply。
+
+`actioneditor.validation arrange_application_layout`为固定零参数四项源码移动：Core/Documents/JsonDocumentSession→Application/Documents/DocumentSession，Storage/JsonDocumentStore→Infrastructure/Documents/JsonDocumentRepository，Storage/ReliableFileCommit→Infrastructure/Documents/AtomicFileCommit，Serialization/DocumentExportService→Infrastructure/Documents/DocumentExportService。固定GUID、目标不存在、源码/meta哈希、移动后身份与字节复核并SyncAll；无删除/覆盖/用户文档写入，拒绝参数覆盖。必须独立preview/approve/apply，引用本系列连续授权。
+
 `actioneditor.validation arrange_domain_layout`为固定零参数领域归位命令：只移动Runtime/Assets的Asset、Group、Track、Clip至Runtime/Domain的ActionDocument、TimelineGroup、TimelineTrack、TimelineClip；Runtime根asmdef改名NBC.ActionEditor.Domain；CreateUtilities移入Editor/Infrastructure/Assets、InspectorPreviewAsset移入Editor/Composition；Serialization/FullSerializerExtensions改名DocumentNumber。八项固定GUID，拒绝目标存在及未登记目录；preview列源码/meta哈希和缺失目录，AssetDatabase移动后复核身份与字节并SyncAll。无删除/覆盖/用户文档写入，不接受任意路径或代码；独立preview/approve/apply，引用第4.3节连续授权，超时先核查。
 
 `actioneditor.validation rename_toolkit_ui`是本轮UI命名整理的固定零参数命令：只将UI/UIToolkit中的JsonActionWorkbench、JsonTimelineCanvas、JsonPropertyView、JsonPreferencesWindow四个cs依次改为UIToolkitActionEditorWindow、UIToolkitTimelineCanvas、UIToolkitPropertyView、UIToolkitPreferencesWindow。核对固定GUID、目标不存在，preview绑定源码/meta哈希；AssetDatabase批量移动后验证GUID和字节保留，并SyncAll生成真实项目。不接受路径/代码覆盖，不写用户文档，不移动样式资源；独立preview/approve/apply，超时先检查。

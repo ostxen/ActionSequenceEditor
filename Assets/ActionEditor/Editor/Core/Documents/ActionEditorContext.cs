@@ -10,26 +10,46 @@ namespace NBC.ActionEditor
     /// <summary>The one shared document and authoring state. Window adapters own GUI and focus.</summary>
     public sealed class ActionEditorContext : IDisposable
     {
-        public JsonDocumentSession Session { get; }
+        public NBC.ActionEditor.Application.Documents.DocumentSession Session { get; }
         public ActionDocument Document => Session.Document;
         private TextAsset source;
-        public TextAsset Source => string.IsNullOrEmpty(Session.Path) ? source : Session.Source;
+        private readonly NBC.ActionEditor.Infrastructure.Documents.JsonDocumentRepository repository;
+        public NBC.ActionEditor.Application.Documents.DocumentLifecycle Lifecycle { get; }
+        public TextAsset Source => string.IsNullOrEmpty(Session.Path) ? source : repository.Load(Session.Path);
         public ActionEditorSelection Selection { get; } = new ActionEditorSelection();
-        public ActionEditorClipboard Clipboard { get; } = new ActionEditorClipboard();
+        public NBC.ActionEditor.Application.Editing.ClipboardState Clipboard { get; } = new NBC.ActionEditor.Application.Editing.ClipboardState();
+        public NBC.ActionEditor.Application.Editing.StructureEditing Structure { get; }
+        public NBC.ActionEditor.Application.Editing.ClipboardEditing ClipboardEditing { get; }
+        public NBC.ActionEditor.Application.Editing.PropertyEditing Properties { get; }
+        public NBC.ActionEditor.Application.Editing.ClipEditing Clips { get; }
+        public NBC.ActionEditor.Application.Ports.IEditorClock Clock { get; }
+        public NBC.ActionEditor.Application.Ports.IRecoveryStore Recovery { get; }
         public ActionEditorPlayback Playback { get; }
         public AssetPlayer Player => Playback.Player;
         public event Action Changed;
 
-        public ActionEditorContext(JsonDocumentSession session)
+        public ActionEditorContext(NBC.ActionEditor.Application.Documents.DocumentSession session,
+            NBC.ActionEditor.Infrastructure.Documents.JsonDocumentRepository repository = null)
         {
             Session = session ?? throw new ArgumentNullException(nameof(session));
+            Clock = new NBC.ActionEditor.Infrastructure.EditorClock();
+            Recovery = new NBC.ActionEditor.Infrastructure.RecoveryStore();
+            this.repository = repository ?? new NBC.ActionEditor.Infrastructure.Documents.JsonDocumentRepository();
+            Lifecycle = NBC.ActionEditor.Composition.DocumentComposition.Lifecycle(session, this.repository);
+            Structure = new NBC.ActionEditor.Application.Editing.StructureEditing(session, () => Selection.Items);
+            ClipboardEditing = new NBC.ActionEditor.Application.Editing.ClipboardEditing(session, Structure, Clipboard,
+                new NBC.ActionEditor.Infrastructure.Documents.FragmentCodec(), item => Selection.Set(new[] { item }, true));
+            Properties = new NBC.ActionEditor.Application.Editing.PropertyEditing(session, new NBC.ActionEditor.Infrastructure.Documents.PropertyValueFactory());
+            Clips = new NBC.ActionEditor.Application.Editing.ClipEditing(session);
             Playback = new ActionEditorPlayback(new AssetPlayer(() => Document));
-            Session.Changed += OnDocumentChanged;
+            Session.ContentChanged += OnDocumentChanged;
+            Session.Changed += OnSessionChanged;
         }
 
         public void Open(TextAsset source)
         {
-            Session.Open(source);
+            var result = Lifecycle.Open(repository.ReadSource(source));
+            if (!result.Succeeded) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(result.Exception).Throw();
             this.source = source;
             Playback.Stop(false);
         }
@@ -40,12 +60,13 @@ namespace NBC.ActionEditor
         {
             Player.Reset();
             Selection.Retain(Document);
-            Changed?.Invoke();
         }
+        private void OnSessionChanged() => Changed?.Invoke();
 
         public void Dispose()
         {
-            Session.Changed -= OnDocumentChanged;
+            Session.ContentChanged -= OnDocumentChanged;
+            Session.Changed -= OnSessionChanged;
             Playback.Stop(false);
             Session.Dispose();
         }
@@ -84,15 +105,6 @@ namespace NBC.ActionEditor
             items.RemoveAll(item => document == null || !document.directables.Contains(item));
             if (items.Count != 1 || items[0] is TimelineClip) CanMultipleSelect = false;
         }
-    }
-
-    public sealed class ActionEditorClipboard
-    {
-        public string Json { get; internal set; }
-        public Type Type { get; internal set; }
-        public IDirectable Item { get; set; }
-        public IDirectable CutSource { get; internal set; }
-        public bool IsCut { get; set; }
     }
 
     public sealed class ActionEditorViews

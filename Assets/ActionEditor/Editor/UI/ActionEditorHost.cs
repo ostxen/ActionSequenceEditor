@@ -20,11 +20,11 @@ namespace NBC.ActionEditor
             EditorApplication.update += UpdateSharedEditor;
             AssemblyReloadEvents.beforeAssemblyReload += () =>
             {
-                SessionState.SetString("ActionEditor.JsonRecovery", App.Session.CaptureRecovery());
+                App.Context.Recovery.Write(App.Session.CaptureRecovery());
                 App.Context.Player.Reset();
                 if (inspectorPreview != null) Object.DestroyImmediate(inspectorPreview);
             };
-            var recovery = SessionState.GetString("ActionEditor.JsonRecovery", "");
+            var recovery = App.Context.Recovery.Read();
             if (!string.IsNullOrEmpty(recovery))
             {
                 try

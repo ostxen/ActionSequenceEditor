@@ -22,7 +22,7 @@ namespace NBC.ActionEditor.Workbench
         private readonly VisualElement clipLabels;
         private readonly Dictionary<TimelineClip, Label> labels = new Dictionary<TimelineClip, Label>();
         private int pointer = -1;
-        private JsonEditTransaction edit;
+        private NBC.ActionEditor.Application.Documents.DocumentEditTransaction edit;
         private Vector2 down, last;
         private TimelineClip hit;
         private TimelineTrack movingTrack;
@@ -288,14 +288,18 @@ namespace NBC.ActionEditor.Workbench
                 {
                     delta = Magnet(Snap(original[hit].x + delta), original[hit].y, e.shiftKey) - original[hit].x;
                     delta = TimelineCandidates.ClampMoveDelta(delta, original.Values.Select(v => v.x));
-                    foreach (var pair in original) pair.Key.StartTime = pair.Value.x + delta;
+                    owner.Context.Clips.Move(edit, original.ToDictionary(pair => pair.Key, pair => pair.Value.x), delta);
                 }
                 else if (mode == GestureMode.ResizeLeft)
                 {
                     var candidate = TimelineCandidates.Resize(original[hit], true, Magnet(Snap(original[hit].x + delta), 0, e.shiftKey), .01f, 0, float.PositiveInfinity);
-                    hit.StartTime = candidate.x; hit.Length = candidate.y;
+                    owner.Context.Clips.Resize(edit, hit, candidate.x, candidate.y);
                 }
-                else if (mode == GestureMode.ResizeRight) hit.Length = TimelineCandidates.Resize(original[hit], false, Magnet(Snap(original[hit].x + original[hit].y + delta), 0, e.shiftKey), .01f, 0, float.PositiveInfinity).y;
+                else if (mode == GestureMode.ResizeRight)
+                {
+                    var candidate = TimelineCandidates.Resize(original[hit], false, Magnet(Snap(original[hit].x + original[hit].y + delta), 0, e.shiftKey), .01f, 0, float.PositiveInfinity);
+                    owner.Context.Clips.Resize(edit, hit, candidate.x, candidate.y);
+                }
             }
             last = p; owner.SyncView(); MarkDirtyRepaint(); ruler.MarkDirtyRepaint(); e.StopPropagation();
         }
@@ -311,7 +315,7 @@ namespace NBC.ActionEditor.Workbench
             if (mode == GestureMode.Track && movingTrack != null && dragMoved)
             {
                 trackDrop = TimelineGeometry.TrackDrop(Asset, movingTrack, this.WorldToLocal(e.position), owner.ScrollY, contentRect.width, contentRect.height, 28, owner.Workspace);
-                if (trackDrop.IsValid) owner.Run(() => JsonEditCommands.MoveTrack(movingTrack, trackDrop.Group, trackDrop.Index));
+                if (trackDrop.IsValid) owner.Run(() => App.Context.Structure.MoveTrack(movingTrack, trackDrop.Group, trackDrop.Index));
             }
             if (mode == GestureMode.Marquee && marquee.HasValue)
             {
@@ -340,11 +344,11 @@ namespace NBC.ActionEditor.Workbench
         {
             if (TextInputTarget(e.target)) return;
             if (e.keyCode == KeyCode.Escape) { Cancel(); e.StopPropagation(); }
-            else if (e.keyCode == KeyCode.Delete) owner.Run(JsonEditCommands.DeleteSelection);
-            else if (e.ctrlKey && e.keyCode == KeyCode.C) owner.Run(() => JsonEditCommands.Copy(App.FistSelect));
-            else if (e.ctrlKey && e.keyCode == KeyCode.X) owner.Run(() => JsonEditCommands.Copy(App.FistSelect, true));
-            else if (e.ctrlKey && e.keyCode == KeyCode.D) owner.Run(() => JsonEditCommands.Duplicate(App.FistSelect));
-            else if (e.ctrlKey && e.keyCode == KeyCode.V) owner.Run(() => JsonEditCommands.Paste(App.FistSelect is TimelineClip c ? c.Parent : App.FistSelect, AssetPlayer.Inst.CurrentTime));
+            else if (e.keyCode == KeyCode.Delete) owner.Run(App.Context.Structure.DeleteSelection);
+            else if (e.ctrlKey && e.keyCode == KeyCode.C) owner.Run(() => App.Context.ClipboardEditing.Copy(App.FistSelect));
+            else if (e.ctrlKey && e.keyCode == KeyCode.X) owner.Run(() => App.Context.ClipboardEditing.Copy(App.FistSelect, true));
+            else if (e.ctrlKey && e.keyCode == KeyCode.D) owner.Run(() => App.Context.ClipboardEditing.Duplicate(App.FistSelect));
+            else if (e.ctrlKey && e.keyCode == KeyCode.V) owner.Run(() => App.Context.ClipboardEditing.Paste(App.FistSelect is TimelineClip c ? c.Parent : App.FistSelect, AssetPlayer.Inst.CurrentTime));
             else if (e.ctrlKey && e.keyCode == KeyCode.S) owner.Run(App.SaveAsset);
             else if (e.ctrlKey && e.keyCode == KeyCode.Z) { if (e.shiftKey) Undo.PerformRedo(); else Undo.PerformUndo(); e.StopPropagation(); }
         }
@@ -377,8 +381,8 @@ namespace NBC.ActionEditor.Workbench
             var menu = new GenericMenu();
             foreach (var info in ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineGroup)).Where(t => !t.type.IsAbstract && (t.attachableTypes == null || t.attachableTypes.Contains(Asset.GetType()))))
             {
-                var type = info.type; var command = JsonEditCommands.Creation(Asset, type);
-                if (command.CanExecute(out var reason)) menu.AddItem(new GUIContent(info.name), false, () => owner.Run(() => JsonEditCommands.AddGroup(type)));
+                var type = info.type; var command = App.Context.Structure.Creation(Asset, type);
+                if (command.CanExecute(out var reason)) menu.AddItem(new GUIContent(info.name), false, () => owner.Run(() => App.Context.Structure.AddGroup(type)));
                 else menu.AddDisabledItem(new GUIContent(info.name, reason));
             }
             menu.ShowAsContext();
@@ -406,8 +410,8 @@ namespace NBC.ActionEditor.Workbench
                 else if (item is TimelineTrack track) Icon(track.GetIcon(), 28);
                 if (item is TimelineGroup) Icon(Styles.MenuIcon, -.001f, () => ShowHeaderMenu(item), .5f);
                 var right = item is TimelineGroup ? 34 : 18;
-                if (item.IsLocked) { Icon(Styles.LockIcon, -(right - 16), () => JsonEditCommands.ToggleLock(item), .5f); right += 18; }
-                if (!item.IsActive) Icon(Styles.EyeIcon, -(right - 16), () => JsonEditCommands.ToggleActive(item), .5f);
+                if (item.IsLocked) { Icon(Styles.LockIcon, -(right - 16), () => App.Context.Structure.ToggleLock(item), .5f); right += 18; }
+                if (!item.IsActive) Icon(Styles.EyeIcon, -(right - 16), () => App.Context.Structure.ToggleActive(item), .5f);
             }
             SyncAddGroup();
         }
@@ -419,21 +423,21 @@ namespace NBC.ActionEditor.Workbench
             if (item is TimelineGroup group)
             {
                 foreach (var info in ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineTrack)).Where(t => !t.type.IsAbstract && t.attachableTypes?.Contains(group.GetType()) == true))
-                { var type = info.type; Entry(Lan.MenuAddTrack + "/" + (string.IsNullOrEmpty(info.category) ? "" : info.category + "/") + info.name, () => JsonEditCommands.AddTrack(group, type), JsonEditCommands.Creation(group, type).CanExecute(out _)); }
+                { var type = info.type; Entry(Lan.MenuAddTrack + "/" + (string.IsNullOrEmpty(info.category) ? "" : info.category + "/") + info.name, () => App.Context.Structure.AddTrack(group, type), App.Context.Structure.Creation(group, type).CanExecute(out _)); }
                 menu.AddSeparator("");
-                if (App.CopyAsset is TimelineTrack) Entry(Lan.MenuPasteTrack, () => JsonEditCommands.Paste(group), JsonEditCommands.CanPaste(group));
-                Entry(Lan.GroupDisable, () => JsonEditCommands.ToggleActive(group), !group.IsLocked, !group.IsActive);
-                Entry(Lan.GroupLocked, () => JsonEditCommands.ToggleLock(group), item.Parent?.IsLocked != true, group.IsLocked);
+                if (App.CopyAsset is TimelineTrack) Entry(Lan.MenuPasteTrack, () => App.Context.ClipboardEditing.Paste(group), App.Context.ClipboardEditing.CanPaste(group));
+                Entry(Lan.GroupDisable, () => App.Context.Structure.ToggleActive(group), !group.IsLocked, !group.IsActive);
+                Entry(Lan.GroupLocked, () => App.Context.Structure.ToggleLock(group), item.Parent?.IsLocked != true, group.IsLocked);
                 Entry(Lan.Rename, () => RenameItemWindow.Show(group), !group.IsLocked); menu.AddSeparator("");
-                Entry(Lan.GroupDelete, () => { if (EditorUtility.DisplayDialog(Lan.GroupDelete, Lan.GroupDeleteTips, Lan.TipsConfirm, Lan.TipsCancel)) JsonEditCommands.Delete(group); }, !group.IsLocked);
+                Entry(Lan.GroupDelete, () => { if (EditorUtility.DisplayDialog(Lan.GroupDelete, Lan.GroupDeleteTips, Lan.TipsConfirm, Lan.TipsCancel)) App.Context.Structure.Delete(group); }, !group.IsLocked);
             }
             else if (item is TimelineTrack track)
             {
-                Entry(Lan.TrackDisable, () => JsonEditCommands.ToggleActive(track), !track.IsLocked, !track.IsActive);
-                Entry(Lan.TrackLocked, () => JsonEditCommands.ToggleLock(track), track.Parent?.IsLocked != true, track.IsLocked); menu.AddSeparator("");
-                Entry(Lan.TrackCopy, () => JsonEditCommands.Copy(track));
-                Entry(Lan.TrackReplica, () => JsonEditCommands.Duplicate(track), !track.IsLocked && track.GetType().RTGetAttribute<UniqueAttribute>(true) == null); menu.AddSeparator("");
-                Entry(Lan.TrackDelete, () => { if (EditorUtility.DisplayDialog(Lan.TrackDelete, Lan.TrackDeleteTips, Lan.TipsConfirm, Lan.TipsCancel)) JsonEditCommands.Delete(track); }, !track.IsLocked);
+                Entry(Lan.TrackDisable, () => App.Context.Structure.ToggleActive(track), !track.IsLocked, !track.IsActive);
+                Entry(Lan.TrackLocked, () => App.Context.Structure.ToggleLock(track), track.Parent?.IsLocked != true, track.IsLocked); menu.AddSeparator("");
+                Entry(Lan.TrackCopy, () => App.Context.ClipboardEditing.Copy(track));
+                Entry(Lan.TrackReplica, () => App.Context.ClipboardEditing.Duplicate(track), !track.IsLocked && track.GetType().RTGetAttribute<UniqueAttribute>(true) == null); menu.AddSeparator("");
+                Entry(Lan.TrackDelete, () => { if (EditorUtility.DisplayDialog(Lan.TrackDelete, Lan.TrackDeleteTips, Lan.TipsConfirm, Lan.TipsCancel)) App.Context.Structure.Delete(track); }, !track.IsLocked);
             }
             menu.ShowAsContext();
         }
@@ -450,7 +454,7 @@ namespace NBC.ActionEditor.Workbench
             {
                 owner.Select(clip);
                 if (clip.IsLocked) { Action("片段已锁定，请先解锁轨道", () => { }, false); return; }
-                Action(Lan.ClipCopy, () => JsonEditCommands.Copy(clip)); Action(Lan.ClipCut, () => JsonEditCommands.Copy(clip, true));
+                Action(Lan.ClipCopy, () => App.Context.ClipboardEditing.Copy(clip)); Action(Lan.ClipCut, () => App.Context.ClipboardEditing.Copy(clip, true));
                 if (clip is ISubClipContainable source && source.SubClipLength > 0)
                 {
                     e.menu.AppendSeparator();
@@ -458,15 +462,15 @@ namespace NBC.ActionEditor.Workbench
                     Action(Lan.MatchClipLength, () => App.Session.Edit("Match source", clip.TryMatchSubClipLength));
                     Action(Lan.MatchNextLoop, () => App.Session.Edit("Match next loop", clip.TryMatchNexSubClipLoop));
                 }
-                e.menu.AppendSeparator(); Action(Lan.ClipDelete, () => JsonEditCommands.Delete(clip)); return;
+                e.menu.AppendSeparator(); Action(Lan.ClipDelete, () => App.Context.Structure.Delete(clip)); return;
             }
             if (item is TimelineTrack track && !track.IsLocked)
             {
                 var category = track.Clips.FirstOrDefault()?.GetType().RTGetAttribute<CategoryAttribute>(true)?.category;
                 foreach (var info in ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineClip)).Where(t => !t.type.IsAbstract && (t.attachableTypes == null || t.attachableTypes.Contains(track.GetType())) && (category == null || category == t.category)))
-                { var type = info.type; Action((string.IsNullOrEmpty(info.category) ? "" : info.category + "/") + info.name, () => JsonEditCommands.AddClip(track, type, Snap(TimeAt(p.x))), JsonEditCommands.Creation(track, type, Snap(TimeAt(p.x))).CanExecute(out _)); }
-                if (App.CopyAsset is TimelineClip copied && JsonEditCommands.CanPaste(track))
-                { e.menu.AppendSeparator(); Action(string.Format(Lan.ClipPaste, copied.GetType().Name), () => JsonEditCommands.Paste(track, Snap(TimeAt(p.x)))); }
+                { var type = info.type; Action((string.IsNullOrEmpty(info.category) ? "" : info.category + "/") + info.name, () => App.Context.Structure.AddClip(track, type, Snap(TimeAt(p.x))), App.Context.Structure.Creation(track, type, Snap(TimeAt(p.x))).CanExecute(out _)); }
+                if (App.CopyAsset is TimelineClip copied && App.Context.ClipboardEditing.CanPaste(track))
+                { e.menu.AppendSeparator(); Action(string.Format(Lan.ClipPaste, copied.GetType().Name), () => App.Context.ClipboardEditing.Paste(track, Snap(TimeAt(p.x)))); }
             }
         }
         private void Draw(MeshGenerationContext c)
@@ -526,7 +530,7 @@ namespace NBC.ActionEditor.Workbench
             if (marquee.HasValue) Fill(p, marquee.Value, new Color(.3f, .6f, 1, .25f));
             if (mode == GestureMode.Track && dragMoved && trackDrop.IsValid)
             {
-                var allowed = JsonEditCommands.Reorder(movingTrack, trackDrop.Group, trackDrop.Index).CanExecute(out _);
+                var allowed = App.Context.Structure.Reorder(movingTrack, trackDrop.Group, trackDrop.Index).CanExecute(out _);
                 var color = allowed ? new Color(.3f, .75f, 1) : Color.red;
                 Line(p, new Vector2(trackDrop.Group == null ? 0 : 22, trackDrop.Y), new Vector2(owner.LeftWidth, trackDrop.Y), color);
                 c.DrawText(allowed ? (trackDrop.Group == null ? "移到根级" : "加入组：" + trackDrop.Group.Name) : "不能放置", new Vector2(24, Mathf.Max(0, trackDrop.Y - 18)), 12, color);

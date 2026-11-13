@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace NBC.ActionEditor.Storage
+namespace NBC.ActionEditor.Infrastructure.Documents
 {
     public interface ICommitFiles
     {
@@ -28,10 +28,10 @@ namespace NBC.ActionEditor.Storage
         public void Delete(string path) => File.Delete(path);
     }
 
-    public sealed class ReliableFileCommit
+    public sealed class AtomicFileCommit
     {
         private readonly ICommitFiles files;
-        public ReliableFileCommit(ICommitFiles files = null) { this.files = files ?? new CommitFiles(); }
+        public AtomicFileCommit(ICommitFiles files = null) { this.files = files ?? new CommitFiles(); }
 
         public void Save(string target, Func<byte[]> serialize, Action<byte[]> validate, byte[] expectedCurrent = null, bool createOnly = false)
         {

@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Infrastructure.Documents;
 using NBC.ActionEditor.Domain;
 using System;
 using NBC.ActionEditor.Storage;
@@ -9,16 +10,12 @@ namespace NBC.ActionEditor
     {
         public static TextAsset Create(Type type, string path)
         {
-            var store = new JsonDocumentStore();
+            var store = new JsonDocumentRepository();
             path = store.ValidateNewPath(path);
-            if (type == null || !typeof(ActionDocument).IsAssignableFrom(type) || type.IsAbstract || type.ContainsGenericParameters
-                || type.GetConstructor(Type.EmptyTypes) == null) throw new ArgumentException("无效的资源类型。");
-            DocumentFormats.Context.RequireType(type, "$.document");
-            var asset = (ActionDocument)Activator.CreateInstance(type);
-            store.Commit(path, asset, null);
-            store.Import(path);
+            var result = App.Context.Lifecycle.Create(type, path);
+            if (!result.Succeeded) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(result.Exception).Throw();
             return store.Load(path);
         }
-        public static string ValidateNewPath(string path) => new JsonDocumentStore().ValidateNewPath(path);
+        public static string ValidateNewPath(string path) => new JsonDocumentRepository().ValidateNewPath(path);
     }
 }

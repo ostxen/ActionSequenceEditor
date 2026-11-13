@@ -37,6 +37,11 @@ namespace NBC.ActionEditor
                 catch (Exception exception) { error = exception.Message; }
             }
         }
-        public static bool ExportTo(string formatId, string target) => new DocumentExportService().Export(App.Session, formatId, target);
+        public static bool ExportTo(string formatId, string target)
+        {
+            var result = App.Context.Lifecycle.Export(target, formatId);
+            if (!result.Succeeded && !result.Cancelled) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(result.Exception).Throw();
+            return result.Succeeded;
+        }
     }
 }

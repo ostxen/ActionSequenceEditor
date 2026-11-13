@@ -1,3 +1,5 @@
+using NBC.ActionEditor.Infrastructure.Documents;
+using NBC.ActionEditor.Application.Documents;
 using NBC.ActionEditor.Presentation.Timeline;
 using System.Linq;
 using NBC.ActionEditor.Domain;
@@ -37,13 +39,13 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void WriteOnlyFormatDoesNotNeedReadbackOrEnterProductionRegistry()
         {
-            using var session = new JsonDocumentSession(); var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
+            using var session = NBC.ActionEditor.Composition.DocumentComposition.Create(); var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
             try
             {
-                session.Open(memory); var files = new Files();
+                session.Open(new JsonDocumentRepository().ReadSource(memory)); var files = new Files();
                 var registry = new DocumentFormatRegistry(new IActionDocumentFormat[] { new WriteOnly() });
                 Assert.That(registry.Editable, Is.Empty);
-                Assert.That(new DocumentExportService(files, registry).Export(session, "tests.export-only", "Assets/ActionEditor/RF20-Fake.test"), Is.True);
+                Assert.That(new DocumentLifecycle(session, new JsonDocumentRepository(files), new DocumentExportService(files, registry), new DocumentFactory()).Export("Assets/ActionEditor/RF20-Fake.test", "tests.export-only").Succeeded, Is.True);
                 Assert.That(files.Data["Assets/ActionEditor/RF20-Fake.test"], Is.EqualTo(new byte[] { 1, 2, 3 }));
                 Assert.That(DocumentFormats.Registry.Exportable.Count, Is.EqualTo(1));
                 Assert.That(DocumentFormats.Registry.Exportable[0].Id, Is.EqualTo("actioneditor.json"));
@@ -52,15 +54,15 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void CanonicalCaseAndDotSourceAliasesAreRejectedBeforeWriting()
         {
-            var files = new Files(); using var session = new JsonDocumentSession(new JsonDocumentStore(files, _ => throw new IOException("Injected import failure")));
+            var files = new Files(); using var session = NBC.ActionEditor.Composition.DocumentComposition.Create(new JsonDocumentRepository(files, _ => throw new IOException("Injected import failure")));
             var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
             try
             {
-                session.Open(memory);
+                session.Open(new JsonDocumentRepository().ReadSource(memory));
                 Assert.Throws<IOException>(() => session.Save("Assets/ActionEditor/RF20-Fake.json"));
                 var before = session.CaptureRecovery();
                 foreach (var alias in new[] { "Assets/actioneditor/./RF20-fake.JSON", "Assets/ActionEditor/./RF20-Fake.json" })
-                    Assert.Throws<IOException>(() => new DocumentExportService(files).Export(session, "actioneditor.json", alias));
+                    Assert.Throws<IOException>(() => new DocumentExportService(files).Export(session.Document, session.Path, alias, "actioneditor.json"));
                 Assert.That(files.Data.Count, Is.EqualTo(1)); Assert.That(session.CaptureRecovery(), Is.EqualTo(before));
             }
             finally { UnityEngine.Object.DestroyImmediate(memory); }
@@ -68,25 +70,25 @@ namespace NBC.ActionEditor.Tests
         [TestCase(false)] [TestCase(true)]
         public void CleanAndDirtyExportPreserveGraphBaselineUndoAndWorkspace(bool dirty)
         {
-            using var session = new JsonDocumentSession();
+            using var session = NBC.ActionEditor.Composition.DocumentComposition.Create();
             var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
             try
             {
-                session.Open(memory);
+                session.Open(new JsonDocumentRepository().ReadSource(memory));
                 var workspace = new TimelineWorkspace(); workspace.Bind(session.Document); workspace.ViewTimeMax = 12; workspace.SetCollapsed(session.Document.RootItems.OfType<TimelineGroup>().ElementAt(0), true);
                 if (dirty) session.Edit("business", () => ((LegacyExperienceAsset)session.Document).Version = 9);
                 var source = session.Document; var before = session.CaptureRecovery();
-                var files = new Files(); var service = new DocumentExportService(files);
+                var files = new Files(); var service = new DocumentLifecycle(session, new JsonDocumentRepository(files), new DocumentExportService(files), new DocumentFactory());
                 const string path = "Assets/ActionEditor/RF20-Fake.json";
-                Assert.That(service.Export(session, "actioneditor.json", null), Is.False);
-                Assert.That(service.Export(session, "actioneditor.json", path), Is.True);
+                Assert.That(service.Export(null, "actioneditor.json").Cancelled, Is.True);
+                Assert.That(service.Export(path, "actioneditor.json").Succeeded, Is.True);
                 Assert.That(session.Document, Is.SameAs(source)); Assert.That(session.CaptureRecovery(), Is.EqualTo(before));
                 Assert.That(session.IsDirty, Is.EqualTo(dirty));
                 var loaded = JsonDocumentCodec.Decode(System.Text.Encoding.UTF8.GetString(files.Data[path]));
                 Assert.That(workspace.ViewTimeMax, Is.EqualTo(12)); Assert.That(workspace.IsCollapsed(session.Document.RootItems.OfType<TimelineGroup>().ElementAt(0)), Is.True);
                 Assert.That(System.Text.Encoding.UTF8.GetString(files.Data[path]), Does.Not.Contain("viewTime").And.Not.Contain("isCollapsed"));
                 Assert.That(((LegacyExperienceAsset)loaded).Version, Is.EqualTo(dirty ? 9 : 1));
-                Assert.Throws<IOException>(() => service.Export(session, "actioneditor.json", path));
+                Assert.That(service.Export(path, "actioneditor.json").Succeeded, Is.False);
                 Assert.That(files.Data.Count, Is.EqualTo(1)); Assert.That(session.CaptureRecovery(), Is.EqualTo(before));
                 if (dirty)
                 {
@@ -98,16 +100,18 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void ActiveGestureAndWriteFailuresDoNotChangeSessionOrLeaveFiles()
         {
-            using var session = new JsonDocumentSession(); var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
+            using var session = NBC.ActionEditor.Composition.DocumentComposition.Create(); var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
             try
             {
-                session.Open(memory); var files = new Files { FailWrite = true }; var service = new DocumentExportService(files);
+                session.Open(new JsonDocumentRepository().ReadSource(memory)); var files = new Files { FailWrite = true }; var service = new DocumentLifecycle(session, new JsonDocumentRepository(files), new DocumentExportService(files), new DocumentFactory());
                 const string path = "Assets/ActionEditor/RF20-Fake.json";
                 var before = session.CaptureRecovery(); var source = session.Document;
-                Assert.Throws<IOException>(() => service.Export(session, "actioneditor.json", path));
+                var failed = service.Export(path, "actioneditor.json");
+                Assert.That(failed.Succeeded || failed.BytesCommitted, Is.False);
+                Assert.That(failed.Exception, Is.TypeOf<IOException>());
                 Assert.That(files.Data, Is.Empty); Assert.That(session.Document, Is.SameAs(source)); Assert.That(session.CaptureRecovery(), Is.EqualTo(before));
                 using var token = session.BeginEdit(this); ((LegacyExperienceAsset)session.Document).Version = 7;
-                Assert.Throws<InvalidOperationException>(() => service.Export(session, "actioneditor.json", path));
+                Assert.That(service.Export(path, "actioneditor.json").Succeeded, Is.False);
                 Assert.That(token.IsActive, Is.True); Assert.That(((LegacyExperienceAsset)session.Document).Version, Is.EqualTo(7)); Assert.That(files.Data, Is.Empty);
             }
             finally { UnityEngine.Object.DestroyImmediate(memory); }

@@ -1,19 +1,11 @@
 using System;
 using System.Collections;
-using UnityEngine;
 
-namespace NBC.ActionEditor.Storage
+namespace NBC.ActionEditor.Application.Editing
 {
-    public static class JsonPropertyEditing
+    // 对数组和列表提供一致的集合语义，由属性事务负责原子提交。
+    public static class CollectionEditing
     {
-        public static void Change(Action change) => App.Session.Edit("Edit properties", change);
-        public static object CreateElement(Type type)
-        {
-            if (type == typeof(string)) return "";
-            if (typeof(UnityEngine.Object).IsAssignableFrom(type)) return null;
-            if (type.IsAbstract || type.IsInterface || !type.IsValueType && type.GetConstructor(Type.EmptyTypes) == null) return null;
-            return Activator.CreateInstance(type);
-        }
         public static IList Append(Type type, IList list, object value)
         {
             if (!type.IsArray) { var result = list ?? (IList)Activator.CreateInstance(type); result.Add(value); return result; }

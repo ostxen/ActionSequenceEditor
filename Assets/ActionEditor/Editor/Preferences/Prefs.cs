@@ -22,161 +22,40 @@ namespace NBC.ActionEditor
             Frames
         }
 
-        [Serializable]
-        class SerializedData
+        private static readonly Infrastructure.PreferencesStore store = new Infrastructure.PreferencesStore(CONFIG_PATH);
+        private static Application.Settings.SettingsSession session;
+        public static Application.Settings.SettingsSession Session => session ??= new Application.Settings.SettingsSession(store);
+        private static Application.Settings.EditorSettings Current => Session.Current;
+
+        // 设置入口提交共享不可变值，写入失败不改变当前偏好。
+        private static void Change(TimeStepMode? mode = null, float? snap = null, int? fps = null,
+            int? autoSave = null, string path = null, bool? wheel = null, bool? magnet = null)
         {
-            public TimeStepMode TimeStepMode = TimeStepMode.Seconds;
-            public float SnapInterval = 0.1f;
-            public int FrameRate = 30;
-
-            public int AutoSaveSeconds;
-            public string SavePath = "Assets/";
-            public bool ScrollWheelZooms = true;
-
-            public bool MagnetSnapping = true;
-            public float TrackListLeftMargin = 180f;
+            var value = Current;
+            var candidate = new Application.Settings.EditorSettings((Application.Settings.TimeStepMode)(mode ?? timeStepMode),
+                snap ?? value.SnapInterval, fps ?? value.FrameRate, magnet ?? value.MagnetSnapping,
+                wheel ?? value.ScrollWheelZooms, autoSave ?? value.AutoSaveSeconds, path ?? value.SavePath);
+            var result = Session.Commit(candidate);
+            if (!result.Succeeded) throw new IOException(result.Error);
         }
-
-
-        private static SerializedData _data;
-
-        private static SerializedData data
-        {
-            get
-            {
-                if (_data == null)
-                {
-                    if (File.Exists(CONFIG_PATH))
-                    {
-                        var json = File.ReadAllText(CONFIG_PATH);
-                        _data = JsonUtility.FromJson<SerializedData>(json);
-                    }
-
-                    if (_data == null)
-                    {
-                        _data = new SerializedData();
-                    }
-                }
-
-                return _data;
-            }
-        }
-
-        public static readonly float[] snapIntervals = new float[] { 0.001f, 0.01f, 0.1f };
-        public static readonly int[] frameRates = new int[] { 24, 25, 30, 60 };
-
-        public static bool scrollWheelZooms
-        {
-            get => data.ScrollWheelZooms;
-            set
-            {
-                if (data.ScrollWheelZooms != value)
-                {
-                    data.ScrollWheelZooms = value;
-                    Save();
-                }
-            }
-        }
-        
-        public static int autoSaveSeconds
-        {
-            get => data.AutoSaveSeconds;
-            set
-            {
-                if (data.AutoSaveSeconds != value)
-                {
-                    data.AutoSaveSeconds = value;
-                    Save();
-                }
-            }
-        }
-
-        public static string savePath
-        {
-            get => data.SavePath;
-            set
-            {
-                if (data.SavePath != value)
-                {
-                    data.SavePath = value;
-                    Save();
-                }
-            }
-        }
-
-
-        public static bool MagnetSnapping
-        {
-            get => data.MagnetSnapping;
-            set
-            {
-                if (data.MagnetSnapping != value)
-                {
-                    data.MagnetSnapping = value;
-                    Save();
-                }
-            }
-        }
-
+        public static readonly float[] snapIntervals = { .001f, .01f, .1f };
+        public static readonly int[] frameRates = { 24, 25, 30, 60 };
+        public static bool scrollWheelZooms { get => Current.ScrollWheelZooms; set => Change(wheel: value); }
+        public static int autoSaveSeconds { get => Current.AutoSaveSeconds; set => Change(autoSave: value); }
+        public static string savePath { get => Current.SavePath; set => Change(path: value); }
+        public static bool MagnetSnapping { get => Current.MagnetSnapping; set => Change(magnet: value); }
         public static float trackListLeftMargin
         {
-            get => data.TrackListLeftMargin;
-            set
-            {
-                if (Math.Abs(data.TrackListLeftMargin - value) > 0.001f)
-                {
-                    data.TrackListLeftMargin = value;
-                    Save();
-                }
-            }
+            get { _ = Current; return store.TrackListLeftMargin; }
+            set { if (Math.Abs(trackListLeftMargin - value) > .001f) store.WriteMargin(Current, value); }
         }
-
         public static TimeStepMode timeStepMode
         {
-            get => data.TimeStepMode;
-            set
-            {
-                if (data.TimeStepMode != value)
-                {
-                    data.TimeStepMode = value;
-                    FrameRate = value == TimeStepMode.Frames ? 30 : 10;
-                    Save();
-                }
-            }
+            get => (TimeStepMode)Current.TimeStepMode;
+            set { if (value != timeStepMode) { var rate = value == TimeStepMode.Frames ? 30 : 10; Change(mode: value, fps: rate, snap: 1f / rate); } }
         }
-
-        public static int FrameRate
-        {
-            get => data.FrameRate;
-            set
-            {
-                if (data.FrameRate != value)
-                {
-                    data.FrameRate = value;
-                    SnapInterval = 1f / value;
-                    Save();
-                }
-            }
-        }
-
-        public static float SnapInterval
-        {
-            get => Mathf.Max(data.SnapInterval, 0.001f);
-            set
-            {
-                if (Math.Abs(data.SnapInterval - value) > 0.001f)
-                {
-                    data.SnapInterval = Mathf.Max(value, 0.001f);
-                    Save();
-                }
-            }
-        }
-
-        static void Save()
-        {
-            System.IO.File.WriteAllText(CONFIG_PATH, JsonUtility.ToJson(data));
-        }
-
+        public static int FrameRate { get => Current.FrameRate; set => Change(fps: value, snap: 1f / value); }
+        public static float SnapInterval { get => Current.SnapInterval; set => Change(snap: Mathf.Max(value, .001f)); }
 
         public static readonly Dictionary<string, Type> AssetTypes = new Dictionary<string, Type>();
         public static readonly List<string> AssetNames = new List<string>();

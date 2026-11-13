@@ -19,8 +19,8 @@ namespace NBC.ActionEditor
         private WelcomeView _welcomeView;
         private TimelineView _timelineView;
         public OriginalTimelineGesture Gesture { get; } = new OriginalTimelineGesture();
-        private JsonEditTransaction guiEdit;
-        internal JsonEditTransaction CurrentEdit => guiEdit;
+        private NBC.ActionEditor.Application.Documents.DocumentEditTransaction guiEdit;
+        internal NBC.ActionEditor.Application.Documents.DocumentEditTransaction CurrentEdit => guiEdit;
         internal Vector2 ContentOffset { get; private set; }
 
         #region Init

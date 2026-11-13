@@ -16,9 +16,9 @@ namespace NBC.ActionEditor
         public static CallbackFunction OnDisable;
         public static OpenAssetFunction OnOpenAsset;
         
-        public static ActionEditorContext Context { get; } = new ActionEditorContext(new JsonDocumentSession());
+        public static ActionEditorContext Context { get; } = new ActionEditorContext(NBC.ActionEditor.Composition.DocumentComposition.Create());
         public static ActionEditorViews Views { get; } = new ActionEditorViews();
-        public static JsonDocumentSession Session => Context.Session;
+        public static NBC.ActionEditor.Application.Documents.DocumentSession Session => Context.Session;
         public static ActionDocument AssetData => Context.Document;
         public static event Action DocumentChanged;
 
@@ -37,12 +37,8 @@ namespace NBC.ActionEditor
             get => Context.Source;
             set
             {
-                try
-                {
-                    Context.Open(value);
-                    if (AssetData != null) OnOpenAsset?.Invoke(AssetData);
-                }
-                catch (System.IO.InvalidDataException e) { Debug.LogError("ActionEditor 打开失败，原文档已保留：" + e.Message); }
+                Context.Open(value);
+                if (AssetData != null) OnOpenAsset?.Invoke(AssetData);
             }
         }
 
@@ -61,9 +57,10 @@ namespace NBC.ActionEditor
 
         public static void SaveAssetTo(string path)
         {
-            Session.Save(path);
-            _lastSaveTime = DateTime.Now;
-            _lastSaveClock = EditorApplication.timeSinceStartup;
+            var result = Context.Lifecycle.Save(path);
+            if (!result.Succeeded) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(result.Exception).Throw();
+            _lastSaveTime = Context.Clock.LocalTime;
+            _lastSaveClock = Context.Clock.Now;
         }
 
         public static void OnGUIEnd()
@@ -91,8 +88,8 @@ namespace NBC.ActionEditor
 
         public static DateTime LastSaveTime => _lastSaveTime;
 
-        private static DateTime _lastSaveTime = DateTime.Now;
-        private static double _lastSaveClock = EditorApplication.timeSinceStartup;
+        private static DateTime _lastSaveTime = Context.Clock.LocalTime;
+        private static double _lastSaveClock = Context.Clock.Now;
 
         /// <summary>
         /// 尝试自动保存
@@ -101,9 +98,9 @@ namespace NBC.ActionEditor
         {
             if (Session.IsEditing) return;
             if (AssetData == null || string.IsNullOrEmpty(Session.Path) || !Session.IsDirty) return;
-            if (NBC.ActionEditor.Model.AutoSaveSchedule.IsDue(_lastSaveClock, EditorApplication.timeSinceStartup, Prefs.autoSaveSeconds))
+            if (NBC.ActionEditor.Model.AutoSaveSchedule.IsDue(_lastSaveClock, Context.Clock.Now, Prefs.autoSaveSeconds))
             {
-                _lastSaveClock = EditorApplication.timeSinceStartup;
+                _lastSaveClock = Context.Clock.Now;
                 try { SaveAssetTo(Session.Path); } catch (Exception e) { Debug.LogError("ActionEditor 自动保存失败，内存内容已保留：" + e.Message); }
             }
         }
@@ -182,7 +179,7 @@ namespace NBC.ActionEditor
                 return;
             }
 
-            Context.Playback.Play(Time.realtimeSinceStartup);
+            Context.Playback.Play(Context.Clock.PlaybackTime);
         }
 
         public static void Pause(bool pause = true)
@@ -208,7 +205,7 @@ namespace NBC.ActionEditor
 
         private static void PlayerUpdate()
         {
-            if (Context.Playback.Update(Time.realtimeSinceStartup, Time.timeScale)) Repaint();
+            if (Context.Playback.Update(Context.Clock.PlaybackTime, Context.Clock.TimeScale)) Repaint();
         }
 
         #endregion

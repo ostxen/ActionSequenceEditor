@@ -3,7 +3,7 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF23 `complete`（限执行记录范围，RF23记录GUI输入重放间歇性风险）。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26工程验收完成（219/219），领域归位、RootItems、逐窗工作区及v2硬切。偏好最小链按RF30–RF32接入产品视图。具体规格以第4.3节及最新执行记录为准。
+- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27工程验收233/233，待本地提交；RF26工程验收完成，领域归位、RootItems、逐窗工作区及v2硬切。偏好最小链按RF30–RF32接入产品视图。具体规格以第4.3节及最新执行记录为准。
 - 下一步：从RF27继续Application会话与基础设施，再顺序实施RF28–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
@@ -513,8 +513,8 @@ RF36对最终源码全量复核上述要求，并抽查结构编辑、属性编�
 | complete | RF24 | 清理取消项、可执行基线、逐文件归属及退役清单 | 最终205/205；下方执行记录 |
 | complete | RF25 | 具体职责设计、状态/调用链、契约与命名规范、验证依赖规则 | 最终213/213；下方执行记录 |
 | complete | RF26 | 新领域模型、有序根结构与version 2序列化硬切 | RF25 |
-| planned | RF27 | Application会话、事务、用例及基础设施端口 | RF26 |
-| planned | RF28 | 共享时间轴Presenter、输入状态机、几何与工作区 | RF27 |
+| complete | RF27 | Application会话、事务、用例及基础设施端口 | RF26 |
+| implementing | RF28 | 共享时间轴Presenter、输入状态机、几何与工作区 | RF27 |
 | planned | RF29 | Group/Track统一结构拖放、排序与指示线状态 | RF28 |
 | planned | RF30 | UI Toolkit被动视图接线与三项反馈修正 | RF29 |
 | planned | RF31 | IMGUI被动视图接线及统一交互规则 | RF30 |
@@ -752,6 +752,19 @@ void ITimelineView.SetCapture(bool requested);
 - 验证：手写新用例`20261113T023456Z-984b0573`4/4；最终完整`20261113T025321Z-29090915`编译通过，**219执行/219通过，0失败/跳过/不确定**，含逐窗状态与手势所有权、真实双UI事件、旧Recovery拒绝和程序集门禁。先前完整`024751Z-4a14e187`亦219/219，最终在补充真实双窗工作区断言后重新跑全量，不以旧证据代替。
 - 离线：`20261113T025725Z-83eba6f1`工作流46/46、Unity真实生成21项目684源码方案构建通过；文档结构解析仍缺yaml/markdown_it，整体code profile为blocked，未安装。`git diff --check`通过。无资源目标的asset-validation为skipped，不声称完整资产/Player Build/冷进程/性能验收。保护路径只核对状态，未建立历史字节哈希，不声称字节级证明。RF24三项症状基线仍描述缺陷，按RF29–RF31修正目标测试。
 - 下一项：RF27 Application会话、事务/用例与基础设施端口。保持共享作者文档/选择/剪贴板/播放头及逐窗工作区，逐项验证并中文本地提交。
+### RF27 Application与基础设施执行记录
+
+- 状态：complete（工程验收，人工未代签），2026-11-13。按RF24–RF37连续授权实施，本项未推送，未修改用户场景、JSON、Timeline、个人配置、Combat或包/设置。
+- 会话：`Application.Documents.DocumentSession/DocumentEditTransaction`实际移入独立Application程序集，构造注入快照、仓储、Undo和恢复编码端口，无UnityEditor/Json具体类/静态App/File依赖。事务owner/token、同owner重入、其他owner拒绝、陈旧/重复令牌、嵌套异常回滚、空操作无Undo和Dispose释放有假端口测试。保留唯一Recovery v2的Json/SavedJson字段及契约ID，不新增旧名转发或兼容封套。
+- 用例：`DocumentLifecycle`协调Create/Open/Save/SaveAs/Export，统一结果区分成功、取消、提交前失败、字节已提交但导入失败，并保留异常类型。真实创建入口、打开上下文、保存与导出窗口已接入；不再日志吞掉打开失败。`StructureEditing/ClipboardEditing/ClipEditing/PropertyEditing/PropertyPath/CollectionEditing/EditOperation`承接现行创建、删除、重排、复制粘贴、命名、开关和属性/集合写入。两UI直接调用新用例，不保留旧JsonEditCommands代理。视图完整被动化及统一像素候选属于RF28–RF32，不把机械接线称作完成Presenter。
+- 所属与通知：共享ClipboardState由上下文持有，片段编解码经IFragmentCodec；属性路径逐次检查当前图/锁定并回写嵌套struct；Structure常用属性入口拒绝失效对象。保存只发布会话状态，不发布作者图变化，避免OnDocumentChanged释放预览/选择；订阅异常隔离并保留NotificationWarning。实际上下文测试覆盖保存导入失败、导出、外部冲突、活动令牌拒绝时图/选择/暂停/播放头/预览保持。
+- 基础设施：JsonDocumentRepository/AtomicFileCommit/DocumentExportService与DocumentSnapshot/UnityUndoHistory/RecoveryCodec/FragmentCodec/DocumentFactory/PropertyValueFactory显式装配。来源图与revision改为同一批读取字节，拒绝用缓存TextAsset配新版本。可靠提交原算法与真实锁文件/校验失败门禁保留；导入失败前先推进精确提交revision与基线，无自动覆盖重试。导出适配器只接收文档/路径/格式，不持会话。时钟EditorClock、SessionState RecoveryStore及PreferencesStore已移入Infrastructure，Prefs当前入口提交RF25共享不可变SettingsSession，实际偏好窗口Presenter接线留RF32；测试偏好写入只在Temp唯一新目录，不写个人配置。
+- 四项资源移动：固定`arrange_application_layout` preview `20261113T030642Z-4b27b935` → approval `030724Z-85dc5025` → apply `030740Z-f78eb603` passed，4/4 GUID及源码/meta字节在移动瞬间保留。包括JsonDocumentSession→Application/Documents/DocumentSession、JsonDocumentStore→Infrastructure/Documents/JsonDocumentRepository、ReliableFileCommit→AtomicFileCommit、DocumentExportService归基础设施。随后按职责改写源码，不声称最终源码字节不变。
+- 三项退役：调用闭包检索确认旧JsonEditCommand/JsonEditCommands/JsonPropertyEditing仅剩自身与历史/固定清单；固定`retire_editing_sources`经AssetDatabase删除三源码及meta、SyncAll。最初preview `035215Z-1438f2ed`审批后因时间变化过期，apply `111226Z-cf2d31fb`明确blocked未删除；刷新preview `111342Z-be77de3c`在只读哈希阶段超时，确认owner PID10184已不存在后才清理本次遗留锁。重新preview `111705Z-604de331`展示相同GUID/哈希 → approval `111816Z-060ae688` → apply `111835Z-3ead7a69` passed 3/3；未盲目复用过期审批、未手改meta。
+- 中间失败：`031526Z-762b67ae`/`031633Z-bdd05666`/`031730Z-901b55c8`编译暴露直接程序集引用、实验同名和未迁移Open调用者，`031841Z-841c374e`恢复；`032015Z-0d87f0cc`原219/219通过。用例接入后`033946Z-b002f9fa`实际215/219，两个旧断言期待日志吞异常、创建异常类型丢失及自动保存double减法抵消。保留业务断言，改为明确失败/原异常类型；AutoSaveSchedule比较截止时刻修复边界，不放宽时间阈值。`113705Z-e813277e`新增测试namespace及遗留导出签名编译失败，修正后`113817Z-08d5a170`232/233，仅旧导出抛异常断言未改为新结果，补充失败、未提交及IOException类型三断言。
+- 定向：`034823Z-2e74ebcd`无窗口DocumentSessionTests 11/11；`112937Z-02094423`真实上下文/同批字节适配2/2。新增偏好适配测试纳入最终套件，合计新增14项。最终`20261113T114227Z-7e9d64d9`：Unity编译通过，NBC.ActionEditor.Editor.Tests EditMode **233/233，0失败/跳过/不确定**。覆盖假端口及真实文件/锁文件/外部冲突/导入失败、两UI真实输入、属性与预览。无资产目标，asset-validation skipped；不声称完整资源/Player Build/冷进程/性能或人工验收。
+- 离线：`20261113T114608Z-f92e4d8f`工作流46/46；Unity真实生成21项目701源码，方案0错误39既有警告、12.26秒。文档检查仍缺yaml/markdown_it，整体code profile blocked，未安装。git diff --check通过。保护路径仅核对状态不读取内容，不声称历史字节哈希证明。
+- 职责审查与下一项：应用层持会话/命令与端口，格式/文件/Undo/时钟/偏好/恢复为基础设施；没有把App整体改名搬入Presenter。当前上下文仍承担宿主装配与旧选择/播放，按RF28/RF32/RF33收敛。RF28开始中性输入、逐窗TimelinePresenter、渲染状态及交互状态机；RF29完成组块结构算法；RF30/31替换双UI内部手势，不在RF27虚报这些目标完成。
 #### RF24 静态职责清点补充
 
 以下按当前真实文件逐项指定目标职责，不代表已经实施、移动或验证。路径均相对`Assets/ActionEditor/`。已逐文件读取源码并提取声明、引用和具体平台API，专项检索混杂职责；此步骤不是完整方法级可读性验收。未读取用户数据。尚待真实调用者闭包和GUID清单复核的删除项不得执行。

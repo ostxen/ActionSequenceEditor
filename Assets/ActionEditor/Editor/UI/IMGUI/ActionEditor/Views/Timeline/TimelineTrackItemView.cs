@@ -171,7 +171,7 @@ namespace NBC.ActionEditor
                 NBLayout.Space(2);
                 if (GUI.Button(NBLayout.GetHRect(16, 16), Styles.LockIcon, GUIStyle.none))
                 {
-                    JsonEditCommands.ToggleLock(Data);
+                    App.Context.Structure.ToggleLock(Data);
                     Event.current.Use();
                 }
             }
@@ -181,7 +181,7 @@ namespace NBC.ActionEditor
                 NBLayout.Space(2);
                 if (GUI.Button(NBLayout.GetHRect(16, 16), Styles.EyeIcon, GUIStyle.none))
                 {
-                    JsonEditCommands.ToggleActive(Data);
+                    App.Context.Structure.ToggleActive(Data);
                     Event.current.Use();
                 }
             }
@@ -255,7 +255,7 @@ namespace NBC.ActionEditor
                     continue;
                 }
 
-                var canAdd = JsonEditCommands.Creation(group, info.type).CanExecute(out _);
+                var canAdd = App.Context.Structure.Creation(group, info.type).CanExecute(out _);
 
                 var finalPath = string.IsNullOrEmpty(info.category)
                     ? info.name
@@ -266,7 +266,7 @@ namespace NBC.ActionEditor
                 {
                     genericMenu.AddItem(new GUIContent(path), false, () =>
                     {
-                        var track = JsonEditCommands.AddTrack(group, info.type);
+                        var track = App.Context.Structure.AddTrack(group, info.type);
                         App.Select(track);
                         App.Refresh();
                     });
@@ -282,7 +282,7 @@ namespace NBC.ActionEditor
 
             if (App.CopyAsset is TimelineTrack copyTrack)
             {
-                if (JsonEditCommands.CanPaste(group))
+                if (App.Context.ClipboardEditing.CanPaste(group))
                 {
                     genericMenu.AddItem(new GUIContent(Lan.MenuPasteTrack), false, PasteTrackContextMenu);
                 }
@@ -317,13 +317,13 @@ namespace NBC.ActionEditor
 
             menu.AddSeparator("");
 
-            menu.AddItem(new GUIContent(Lan.TrackCopy), false, () => JsonEditCommands.Copy(track));
+            menu.AddItem(new GUIContent(Lan.TrackCopy), false, () => App.Context.ClipboardEditing.Copy(track));
 
             if (track.GetType().RTGetAttribute<UniqueAttribute>(true) == null)
             {
                 menu.AddItem(new GUIContent(Lan.TrackReplica), false, () =>
                 {
-                    JsonEditCommands.Duplicate(track);
+                    App.Context.ClipboardEditing.Duplicate(track);
                 });
             }
             else
@@ -347,13 +347,13 @@ namespace NBC.ActionEditor
 
         private void LockedContextMenuCmd()
         {
-            JsonEditCommands.ToggleLock(Data);
+            App.Context.Structure.ToggleLock(Data);
             App.Refresh();
         }
 
         private void ActiveContextMenuCmd()
         {
-            JsonEditCommands.ToggleActive(Data);
+            App.Context.Structure.ToggleActive(Data);
             App.Refresh();
         }
 
@@ -369,7 +369,7 @@ namespace NBC.ActionEditor
                 if (EditorUtility.DisplayDialog(Lan.GroupDelete, Lan.GroupDeleteTips, Lan.TipsConfirm,
                         Lan.TipsCancel))
                 {
-                    JsonEditCommands.Delete(group);
+                    App.Context.Structure.Delete(group);
                 }
             }
             else if (Data is TimelineTrack track)
@@ -377,7 +377,7 @@ namespace NBC.ActionEditor
                 if (EditorUtility.DisplayDialog(Lan.TrackDelete, Lan.TrackDeleteTips, Lan.TipsConfirm,
                         Lan.TipsCancel))
                 {
-                    JsonEditCommands.Delete(track);
+                    App.Context.Structure.Delete(track);
                 }
             }
 
@@ -386,7 +386,7 @@ namespace NBC.ActionEditor
 
         private void PasteTrackContextMenu()
         {
-            JsonEditCommands.Paste(Data);
+            App.Context.ClipboardEditing.Paste(Data);
         }
 
         #endregion
@@ -573,9 +573,9 @@ namespace NBC.ActionEditor
                     var info = metaInfo;
                     var category = string.IsNullOrEmpty(info.category) ? string.Empty : (info.category + "/");
                     var tName = info.name;
-                    var command = JsonEditCommands.Creation(track, info.type, cursorTime);
+                    var command = App.Context.Structure.Creation(track, info.type, cursorTime);
                     if (command.CanExecute(out var reason)) menu.AddItem(new GUIContent(category + tName), false,
-                        () => JsonEditCommands.AddClip(track, info.type, cursorTime));
+                        () => App.Context.Structure.AddClip(track, info.type, cursorTime));
                     else menu.AddDisabledItem(new GUIContent(category + tName, reason));
                 }
 
@@ -588,7 +588,7 @@ namespace NBC.ActionEditor
                         menu.AddItem(new GUIContent(string.Format(Lan.ClipPaste, copyType.Name)), false,
                             () =>
                             {
-                                JsonEditCommands.Paste(track, cursorTime);
+                                App.Context.ClipboardEditing.Paste(track, cursorTime);
                             });
                     }
                 }
@@ -622,10 +622,10 @@ namespace NBC.ActionEditor
             //     return;
             // }
 
-            menu.AddItem(new GUIContent(Lan.ClipCopy), false, () => JsonEditCommands.Copy(clip));
+            menu.AddItem(new GUIContent(Lan.ClipCopy), false, () => App.Context.ClipboardEditing.Copy(clip));
             menu.AddItem(new GUIContent(Lan.ClipCut), false, () =>
             {
-                JsonEditCommands.Copy(clip, true);
+                App.Context.ClipboardEditing.Copy(clip, true);
             });
 
             if (clip is ISubClipContainable subContainable && subContainable.SubClipLength > 0)
@@ -641,7 +641,7 @@ namespace NBC.ActionEditor
 
             menu.AddItem(new GUIContent(Lan.ClipDelete), false, () =>
             {
-                JsonEditCommands.Delete(clip);
+                App.Context.Structure.Delete(clip);
                 App.Refresh();
             });
 

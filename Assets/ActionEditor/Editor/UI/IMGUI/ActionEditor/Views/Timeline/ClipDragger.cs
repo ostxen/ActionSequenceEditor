@@ -39,7 +39,7 @@ namespace NBC.ActionEditor
     {
         public NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace Workspace { get; set; } = new NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace();
         private ItemDragType _dragType = ItemDragType.None;
-        private JsonEditTransaction edit;
+        private NBC.ActionEditor.Application.Documents.DocumentEditTransaction edit;
         private readonly object editOwner = new object();
         private bool bypassMagnet;
         public IDirectable MoveToItem { get; private set; }
@@ -138,7 +138,7 @@ namespace NBC.ActionEditor
 
         #region Drag
 
-        public void OnBeginDrag(PointerEventData eventData, JsonEditTransaction transaction = null)
+        public void OnBeginDrag(PointerEventData eventData, NBC.ActionEditor.Application.Documents.DocumentEditTransaction transaction = null)
         {
             bypassMagnet = eventData.Shift;
             if (!eventData.IsLeft() || App.SelectItems.Any(i => i.IsLocked)) return;
@@ -246,7 +246,7 @@ namespace NBC.ActionEditor
             token?.Cancel();
         }
 
-        internal void Cancel(JsonEditTransaction owner)
+        internal void Cancel(NBC.ActionEditor.Application.Documents.DocumentEditTransaction owner)
         {
             if (ReferenceEquals(edit, owner)) Cancel();
         }
@@ -316,12 +316,8 @@ namespace NBC.ActionEditor
             }
 
             var max = TimelineCandidates.ClampMoveDelta(subTimes.Max(), NowDragClips.Select(clip => _dragBeginStartTime[clip].StartTime));
-            foreach (var clipItem in NowDragClips)
-            {
-                var newTime = _dragBeginStartTime[clipItem].StartTime + max;
-                clipItem.StartTime = newTime;
-                CheckBlendInOut(clipItem);
-            }
+            App.Context.Clips.Move(edit, NowDragClips.ToDictionary(clip => clip, clip => _dragBeginStartTime[clip].StartTime), max);
+            foreach (var clipItem in NowDragClips) CheckBlendInOut(clipItem);
 
             eventData.StopPropagation();
         }
@@ -401,8 +397,7 @@ namespace NBC.ActionEditor
             newTime = asset.SnapTime(newTime);
             var candidate = TimelineCandidates.Resize(new Vector2(_dragStretchTime, _dragStretchLength),
                 DragType == ItemDragType.StretchStart, newTime, .1f, _limitMinTime, _limitMaxTime, value => asset.SnapTime(value));
-            if (DragType == ItemDragType.StretchStart) { clipData.StartTime = candidate.x; clipData.Length = candidate.y; }
-            else clipData.EndTime = candidate.x + candidate.y;
+            App.Context.Clips.Resize(edit, clipData, candidate.x, candidate.y);
 
             App.Refresh();
         }
@@ -434,11 +429,11 @@ namespace NBC.ActionEditor
             if (track == null) return;
             var drop = TimelineMiddleView.TrackDrop(track, eventData.MousePosition, Workspace);
             TrackDrop = drop;
-            var allowed = drop.IsValid && JsonEditCommands.Reorder(track, drop.Group, drop.Index).CanExecute(out _);
+            var allowed = drop.IsValid && App.Context.Structure.Reorder(track, drop.Group, drop.Index).CanExecute(out _);
             MoveToItem = allowed ? drop.Row : null; MoveBefore = drop.Before;
             App.Repaint();
             if (!confirm) return;
-            if (allowed) { JsonEditCommands.MoveTrack(track, drop.Group, drop.Index); App.Refresh(); }
+            if (allowed) { App.Context.Structure.MoveTrack(track, drop.Group, drop.Index); App.Refresh(); }
             MoveToItem = null;
             movingTrack = null;
         }

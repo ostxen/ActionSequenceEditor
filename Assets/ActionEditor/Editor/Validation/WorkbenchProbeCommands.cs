@@ -18,7 +18,7 @@ namespace NBC.ActionEditor.Validation
         private const string DocumentPath = Root + "/Sample.asset";
 
         [CliGroupCommand("actioneditor.validation", "Read-only current JSON roundtrip field paths only. Never returns field values or writes assets.")]
-        public static object JsonStatus() => new { differences = App.Session.InspectReadbackDifferences() };
+        public static object JsonStatus() => new { differences = JsonDocumentCodec.InspectReadbackDifferences(App.AssetData) };
 
         [CliGroupCommand("actioneditor.validation", "Read-only ActionEditor window types, focus and loaded menu bindings. No asset contents or UI actions.")]
         public static object WindowStatus()

@@ -40,7 +40,7 @@ namespace NBC.ActionEditor.Workbench
             if (!string.IsNullOrEmpty(description)) root.Add(new HelpBox(description, HelpBoxMessageType.None));
             if (value is IDirectable directable)
             {
-                if (value is TimelineGroup || value is TimelineTrack) Add(root, "Name", directable.Name, next => JsonEditCommands.Rename(directable, next));
+                if (value is TimelineGroup || value is TimelineTrack) Add(root, "Name", directable.Name, next => App.Context.Structure.Rename(directable, next));
                 if (value is TimelineClip clip)
                 {
                     DrawClipControls(root, clip, refresh);
@@ -50,7 +50,7 @@ namespace NBC.ActionEditor.Workbench
             DrawFields(root, value, refresh, 0);
         }
 
-        private static void Change(Action change) => JsonPropertyEditing.Change(change);
+        private static void Change(Action change) => App.Context.Properties.Change(change);
         private static VisualElement Box(VisualElement root)
         {
             var box = new VisualElement(); box.style.marginTop = box.style.marginBottom = 2;
@@ -126,10 +126,10 @@ namespace NBC.ActionEditor.Workbench
             field.RegisterValueChangedCallback(evt => changed(evt.newValue)); root.Add(field);
         }
 
-        public static void DrawFields(VisualElement root, object obj, Action refresh, int depth, JsonPropertyPath propertyPath = null)
+        public static void DrawFields(VisualElement root, object obj, Action refresh, int depth, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath = null)
         {
             if (obj == null || depth > 6) return;
-            propertyPath ??= new JsonPropertyPath(obj);
+            propertyPath ??= new NBC.ActionEditor.Application.Editing.PropertyPath(App.Context.Properties, obj);
             foreach (var description in JsonFieldDescription.For(obj.GetType()))
             {
                 var field = description.Field;
@@ -167,7 +167,7 @@ namespace NBC.ActionEditor.Workbench
             control.RegisterValueChangedCallback(e => set(e.newValue)); root.Add(control);
         }
 
-        private static void DrawValue(VisualElement root, string label, Type type, object value, Action<object> set, Action refresh, int depth, JsonPropertyPath propertyPath)
+        private static void DrawValue(VisualElement root, string label, Type type, object value, Action<object> set, Action refresh, int depth, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath)
         {
             if (type == typeof(string)) Bind(root, new TextField(label) { isDelayed = true }, value, set);
             else if (type == typeof(float)) Bind(root, new FloatField(label) { isDelayed = true }, value, set);
@@ -206,19 +206,19 @@ namespace NBC.ActionEditor.Workbench
                     DrawValue(row, "Element " + i, elementType, list[i], next => { propertyPath.Element(index).Write(next); refresh(); }, refresh, depth + 1, propertyPath.Element(index));
                     row.Add(new Button(() =>
                     {
-                        propertyPath.Transform(current => JsonPropertyEditing.Remove(type, (IList)current, index)); refresh();
+                        propertyPath.Transform(current => NBC.ActionEditor.Application.Editing.CollectionEditing.Remove(type, (IList)current, index)); refresh();
                     }) { text = "删除元素" });
                 }
                 fold.Add(new Button(() =>
                 {
-                    var item = JsonPropertyEditing.CreateElement(elementType);
-                    propertyPath.Transform(current => JsonPropertyEditing.Append(type, (IList)current, item)); refresh();
+                    var item = App.Context.Properties.CreateElement(elementType);
+                    propertyPath.Transform(current => NBC.ActionEditor.Application.Editing.CollectionEditing.Append(type, (IList)current, item)); refresh();
                 }) { text = "+ 元素" });
             }
             else if (depth < 6)
             {
                 var fold = new Foldout { text = label, value = true }; root.Add(fold);
-                if (value == null) fold.Add(new Button(() => set(JsonPropertyEditing.CreateElement(type))) { text = "创建 " + type.Name });
+                if (value == null) fold.Add(new Button(() => set(App.Context.Properties.CreateElement(type))) { text = "创建 " + type.Name });
                 else DrawFields(fold, value, refresh, depth + 1, propertyPath);
             }
         }

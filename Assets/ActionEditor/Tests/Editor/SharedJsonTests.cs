@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Infrastructure.Documents;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Domain;
 using System;
@@ -330,7 +331,7 @@ namespace NBC.ActionEditor.Tests
                 var canvas = window.Canvas;
                 var clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; window.Select(clip);
                 var input = new TextField { value = "editable text" }; canvas.Add(input); input.Focus(); yield return null;
-                var before = JsonDocumentSession.Encode(App.AssetData);
+                var before = NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(App.AssetData);
                 var escapeReachedInput = false;
                 input.RegisterCallback<KeyDownEvent>(e => { if (e.keyCode == KeyCode.Escape) escapeReachedInput = true; });
                 foreach (var key in new[] { KeyCode.Delete, KeyCode.C, KeyCode.X, KeyCode.V, KeyCode.D, KeyCode.Z, KeyCode.Escape })
@@ -338,7 +339,7 @@ namespace NBC.ActionEditor.Tests
                     using var e = KeyDownEvent.GetPooled(new Event { type = EventType.KeyDown, keyCode = key, control = key != KeyCode.Delete });
                     e.target = input.Q("unity-text-input"); canvas.SendEvent(e);
                 }
-                Assert.That(JsonDocumentSession.Encode(App.AssetData), Is.EqualTo(before));
+                Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(App.AssetData), Is.EqualTo(before));
                 Assert.That(escapeReachedInput, Is.True, "The root timeline handler must not steal text-editor Escape.");
                 Assert.That(App.Session.IsDirty || App.Session.IsEditing, Is.False);
                 input.RemoveFromHierarchy(); canvas.Focus();
@@ -388,7 +389,7 @@ namespace NBC.ActionEditor.Tests
         {
             previous = App.TextAsset;
             recovery = App.Session.CaptureRecovery();
-            fixture = new TextAsset(JsonDocumentSession.Encode(new LegacyExperienceAsset()));
+            fixture = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
             App.TextAsset = fixture;
             Workspace.Bind(null); Workspace.Bind(App.AssetData); Workspace.SetRange(0, 7);
         }
@@ -441,7 +442,7 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void SharedContextOwnsStateAndServicesWithoutAnEditorWindow()
         {
-            using (var context = new ActionEditorContext(new JsonDocumentSession()))
+            using (var context = new ActionEditorContext(NBC.ActionEditor.Composition.DocumentComposition.Create()))
             {
                 context.Open(fixture);
                 var clip = context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
@@ -473,13 +474,12 @@ namespace NBC.ActionEditor.Tests
             var invalid = new TextAsset("{}");
             try
             {
-                LogAssert.Expect(LogType.Error, new Regex("ActionEditor 打开失败"));
-                App.TextAsset = invalid;
+                Assert.Throws<System.IO.InvalidDataException>(() => App.TextAsset = invalid);
                 Assert.That(context.Document, Is.SameAs(document));
                 Assert.That(context.Source, Is.SameAs(fixture));
                 Assert.That(context.Selection.First, Is.SameAs(clip));
                 Assert.That(AssetPlayer.Inst, Is.SameAs(context.Player));
-                JsonEditCommands.Copy(clip);
+                App.Context.ClipboardEditing.Copy(clip);
                 Assert.That(context.Clipboard.Item, Is.SameAs(App.CopyAsset));
                 Assert.That(context.Clipboard.Type, Is.EqualTo(clip.GetType()));
                 App.Pause(); Assert.That(context.Playback.IsPaused, Is.True);
@@ -511,7 +511,7 @@ namespace NBC.ActionEditor.Tests
         {
             var count = App.Views.Count; var previousWindow = ActionEditorHost.Window;
             ActionEditorWindow original = null; UIToolkitActionEditorWindow native = null;
-            var alternate = new TextAsset(JsonDocumentSession.Encode(new LegacyExperienceAsset { Version = 7 }));
+            var alternate = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset { Version = 7 }));
             try
             {
                 foreach (var nativeFirst in new[] { false, true })
@@ -651,18 +651,18 @@ namespace NBC.ActionEditor.Tests
             var clip = (LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
             clip.StartTime = 8; clip.Length = 3; clip.Count = 27;
             Assert.That(App.AssetData.Length, Is.EqualTo(6), "The public graph can contain a stale derived duration before commit.");
-            Assert.That(App.Session.InspectReadbackDifferences(), Is.Empty, "Readback validates an isolated derived snapshot.");
-            var json = App.Session.CreateSaveSnapshot();
-            var loaded = JsonDocumentSession.Decode(json);
+            Assert.That(JsonDocumentCodec.InspectReadbackDifferences(App.AssetData), Is.Empty, "Readback validates an isolated derived snapshot.");
+            var json = JsonDocumentCodec.CreateSaveSnapshot(App.AssetData);
+            var loaded = NBC.ActionEditor.Storage.JsonDocumentCodec.Decode(json);
             Assert.That(App.AssetData.Length, Is.EqualTo(6), "Save snapshot must not mutate source duration.");
             Assert.That(loaded.Length, Is.EqualTo(11));
             Assert.That(((LegacyExperienceInterval)loaded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(27));
-            Assert.That(App.Session.InspectReadbackDifferences(), Is.Empty);
+            Assert.That(JsonDocumentCodec.InspectReadbackDifferences(App.AssetData), Is.Empty);
         }
         [Test] public void ExtractedJsonCodecPreservesFormatAndRejectsPayloadDifferences()
         {
             var document = App.AssetData;
-            var json = JsonDocumentSession.Encode(document);
+            var json = NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(document);
             Assert.That(JsonDocumentCodec.Encode(document), Is.EqualTo(json));
             var decoded = JsonDocumentCodec.Decode(json);
             Assert.That(JsonDocumentCodec.ReadbackDifferences(json, decoded), Is.Empty);
@@ -694,10 +694,10 @@ namespace NBC.ActionEditor.Tests
                         if (clip.CanScale()) clip.Length = (float)(random.NextDouble() * 4 + .01);
                     }
                 });
-                var json = App.Session.CreateSaveSnapshot();
-                var differences = App.Session.InspectReadbackDifferences();
+                var json = JsonDocumentCodec.CreateSaveSnapshot(App.AssetData);
+                var differences = JsonDocumentCodec.InspectReadbackDifferences(App.AssetData);
                 Assert.That(differences, Is.Empty, "Iteration " + iteration + ": " + string.Join(", ", differences));
-                Assert.That(JsonDocumentSession.Decode(json).Length, Is.EqualTo(App.AssetData.Length));
+                Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Decode(json).Length, Is.EqualTo(App.AssetData.Length));
             }
         }
         [Test] public void FloatSerializationPreservesAuthoredBitsAndStandardJsonNumbers()
@@ -737,12 +737,12 @@ namespace NBC.ActionEditor.Tests
         [Test] public void CopyPasteTrackAndCutClipPreservePayloadAndRespectLocks()
         {
             var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); var track = group.Tracks[0];
-            JsonEditCommands.Copy(track); var pasted = (TimelineTrack)JsonEditCommands.Paste(group);
+            App.Context.ClipboardEditing.Copy(track); var pasted = (TimelineTrack)App.Context.ClipboardEditing.Paste(group);
             Assert.That(pasted, Is.Not.SameAs(track)); Assert.That(pasted.Clips.Count, Is.EqualTo(3));
             Assert.That(((LegacyExperienceInterval)pasted.Clips[1]).Offset, Is.EqualTo(new Vector3(2, 1, 0)));
-            var clip = track.Clips[0]; JsonEditCommands.Copy(clip, true); JsonEditCommands.Paste(pasted, 6);
+            var clip = track.Clips[0]; App.Context.ClipboardEditing.Copy(clip, true); App.Context.ClipboardEditing.Paste(pasted, 6);
             Assert.That(track.Clips.Count, Is.EqualTo(2)); Assert.That(pasted.Clips.Last().StartTime, Is.EqualTo(6));
-            Assert.Throws<InvalidOperationException>(() => JsonEditCommands.Delete(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(2).Tracks[0]));
+            Assert.Throws<InvalidOperationException>(() => App.Context.Structure.Delete(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(2).Tracks[0]));
         }
         private sealed class FailingCreationClip : TimelineClip
         {
@@ -751,18 +751,18 @@ namespace NBC.ActionEditor.Tests
         [Test] public void StructuralCommandsRevalidateAndRollbackFailuresWithoutEmptyUndo()
         {
             var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); var track = group.Tracks[0];
-            var command = JsonEditCommands.Creation(track, typeof(LegacyExperienceInterval), 8);
+            var command = App.Context.Structure.Creation(track, typeof(LegacyExperienceInterval), 8);
             Assert.That(command.CanExecute(out var reason), Is.True, reason);
             track.IsLocked = true;
             Assert.That(command.CanExecute(out reason), Is.False); Assert.That(reason, Is.Not.Empty);
             Assert.Throws<InvalidOperationException>(() => command.Execute());
             Assert.That(track.Clips.Count, Is.EqualTo(3)); track.IsLocked = false;
-            var before = JsonDocumentSession.Encode(App.AssetData);
-            Assert.Catch(() => JsonEditCommands.AddClip(track, typeof(FailingCreationClip), 8));
-            Assert.That(JsonDocumentSession.Encode(App.AssetData), Is.EqualTo(before));
+            var before = NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(App.AssetData);
+            Assert.Catch(() => App.Context.Structure.AddClip(track, typeof(FailingCreationClip), 8));
+            Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(App.AssetData), Is.EqualTo(before));
             Assert.That(App.Session.IsEditing, Is.False);
             group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); track = group.Tracks[0];
-            var created = JsonEditCommands.AddClip(track, typeof(LegacyExperienceInterval), 8);
+            var created = App.Context.Structure.AddClip(track, typeof(LegacyExperienceInterval), 8);
             Assert.That(created.StartTime, Is.EqualTo(8)); Assert.That(created.Parent, Is.SameAs(track));
             Undo.PerformUndo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Count, Is.EqualTo(3));
             Undo.PerformRedo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Count, Is.EqualTo(4));
@@ -772,23 +772,23 @@ namespace NBC.ActionEditor.Tests
         {
             var track = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var clip = track.Clips[0];
             var locked = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(2).Tracks[0];
-            var batch = JsonEditCommands.Deletion(clip, locked);
+            var batch = App.Context.Structure.Deletion(clip, locked);
             Assert.That(batch.CanExecute(out var reason), Is.False, reason);
             Assert.Throws<InvalidOperationException>(() => batch.Execute());
             Assert.That(track.Clips.Count, Is.EqualTo(3));
-            JsonEditCommands.Copy(clip, true); track.IsLocked = true;
+            App.Context.ClipboardEditing.Copy(clip, true); track.IsLocked = true;
             var target = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
-            Assert.That(JsonEditCommands.CanPaste(target), Is.False);
-            Assert.Throws<InvalidOperationException>(() => JsonEditCommands.Paste(target, 7));
+            Assert.That(App.Context.ClipboardEditing.CanPaste(target), Is.False);
+            Assert.Throws<InvalidOperationException>(() => App.Context.ClipboardEditing.Paste(target, 7));
             Assert.That(App.IsCut, Is.True); Assert.That(track.Clips.Count, Is.EqualTo(3));
             track.IsLocked = false;
-            JsonEditCommands.Paste(target, 7);
+            App.Context.ClipboardEditing.Paste(target, 7);
             Assert.That(track.Clips.Count, Is.EqualTo(2)); Assert.That(target.Clips.Count, Is.EqualTo(3));
             Undo.PerformUndo();
             Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Count, Is.EqualTo(3));
             Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Clips.Count, Is.EqualTo(2));
             track = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0];
-            JsonEditCommands.Deletion(track.Clips[0], track.Clips[1]).Execute();
+            App.Context.Structure.Deletion(track.Clips[0], track.Clips[1]).Execute();
             Assert.That(track.Clips.Count, Is.EqualTo(1));
             Undo.PerformUndo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Count, Is.EqualTo(3));
         }
@@ -879,7 +879,7 @@ namespace NBC.ActionEditor.Tests
         {
             App.Session.Edit("change", () => ((LegacyExperienceAsset)App.AssetData).Version = 9);
             var recovery = App.Session.CaptureRecovery();
-            using var restored = new JsonDocumentSession(); restored.RestoreRecovery(recovery);
+            using var restored = NBC.ActionEditor.Composition.DocumentComposition.Create(); restored.RestoreRecovery(recovery);
             Assert.That(((LegacyExperienceAsset)restored.Document).Version, Is.EqualTo(9));
             Assert.That(restored.IsDirty, Is.True);
         }
@@ -887,13 +887,13 @@ namespace NBC.ActionEditor.Tests
         {
             Workspace.ViewTimeMin = 1; Workspace.ViewTimeMax = 10;
             App.Session.Edit("change", () => ((LegacyExperienceAsset)App.AssetData).Version = 9);
-            using var restored = new JsonDocumentSession();
+            using var restored = NBC.ActionEditor.Composition.DocumentComposition.Create();
             restored.RestoreRecovery(App.Session.CaptureRecovery());
             restored.DiscardChanges();
             Assert.That(((LegacyExperienceAsset)restored.Document).Version, Is.EqualTo(1));
             Assert.That(Workspace.ViewTimeMin, Is.EqualTo(1));
             Assert.That(Workspace.ViewTimeMax, Is.EqualTo(10));
-            Assert.That(JsonDocumentSession.Encode(restored.Document), Does.Not.Contain("isCollapsed"));
+            Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(restored.Document), Does.Not.Contain("isCollapsed"));
             Assert.That(restored.IsDirty, Is.False);
             restored.DiscardChanges();
             Assert.That(restored.IsDirty || restored.IsEditing, Is.False);
@@ -911,13 +911,13 @@ namespace NBC.ActionEditor.Tests
         {
             Assert.Throws<InvalidDataException>(() => App.Session.Edit("invalid", () => App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime = float.NaN));
             Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
-            Assert.Throws<ArgumentException>(() => JsonDocumentSession.ValidatePath("Assets/CombatEditor/Original.json"));
-            Assert.Throws<ArgumentException>(() => JsonDocumentSession.ValidatePath("Assets/../Original.json"));
+            Assert.Throws<ArgumentException>(() => JsonDocumentRepository.ValidatePath("Assets/CombatEditor/Original.json"));
+            Assert.Throws<ArgumentException>(() => JsonDocumentRepository.ValidatePath("Assets/../Original.json"));
         }
         [Test] public void NestedCommandsStayInOneUndoAndRangeCanBeShorterThanDocument()
         {
             App.Session.BeginEdit();
-            JsonEditCommands.Rename(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], "nested");
+            App.Context.Structure.Rename(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], "nested");
             Assert.That(App.Session.IsEditing, Is.True);
             App.AssetData.RangeMin = 1; App.AssetData.RangeMax = 2;
             Assert.That(App.AssetData.RangeMax, Is.EqualTo(2));
@@ -931,7 +931,7 @@ namespace NBC.ActionEditor.Tests
             App.Select(clip); ItemDragger.DragType = ItemDragType.StretchEnd;
             clip.Length = 10; ItemDragger.DragType = ItemDragType.None;
             Assert.That(clip.Length, Is.EqualTo(1.5f));
-            JsonEditCommands.MoveTrack(track, group, 3);
+            App.Context.Structure.MoveTrack(track, group, 3);
             Assert.That(group.Tracks[2], Is.SameAs(track));
             Undo.PerformUndo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(track.Name));
         }
@@ -951,10 +951,10 @@ namespace NBC.ActionEditor.Tests
             Directory.CreateDirectory(directory); var path = System.IO.Path.Combine(directory, "Document.json");
             try
             {
-                var original = System.Text.Encoding.UTF8.GetBytes(JsonDocumentSession.Encode(App.AssetData));
-                new ReliableFileCommit().Save(path, () => original, bytes => JsonDocumentSession.Decode(System.Text.Encoding.UTF8.GetString(bytes)));
-                Assert.That(JsonDocumentSession.Decode(File.ReadAllText(path)).RootItems.OfType<TimelineGroup>().Count(), Is.EqualTo(3));
-                Assert.Throws<IOException>(() => new ReliableFileCommit().Save(path, () => original, _ => { }, new byte[] { 1 }));
+                var original = System.Text.Encoding.UTF8.GetBytes(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(App.AssetData));
+                new AtomicFileCommit().Save(path, () => original, bytes => NBC.ActionEditor.Storage.JsonDocumentCodec.Decode(System.Text.Encoding.UTF8.GetString(bytes)));
+                Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Decode(File.ReadAllText(path)).RootItems.OfType<TimelineGroup>().Count(), Is.EqualTo(3));
+                Assert.Throws<IOException>(() => new AtomicFileCommit().Save(path, () => original, _ => { }, new byte[] { 1 }));
                 Assert.That(File.ReadAllBytes(path), Is.EqualTo(original));
             }
             finally { Directory.Delete(directory, true); }
@@ -1174,7 +1174,7 @@ namespace NBC.ActionEditor.Tests
             ((LegacyExperienceAsset)App.AssetData).Version = 5;
             session.EndEdit(); session.CancelEdit();
             Assert.That(session.IsEditing, Is.True, "Legacy callers cannot finish another owner's transaction.");
-            JsonEditCommands.Rename(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], "nested-owned");
+            App.Context.Structure.Rename(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], "nested-owned");
             Assert.That(token.IsActive, Is.True);
             token.Commit("Owned gesture"); token.Commit(); token.Cancel();
             Assert.That(session.IsEditing, Is.False);
@@ -1400,7 +1400,7 @@ namespace NBC.ActionEditor.Tests
                 Pointer(canvas, EventType.MouseDrag, new Vector2(rect.xMin + 2, rect.center.y)); yield return null;
                 canvas.Cancel();
                 Assert.That(canvas.ClassListContains("json-resize-horizontal"), Is.False);
-                JsonEditCommands.ToggleLock(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]); yield return null;
+                App.Context.Structure.ToggleLock(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]); yield return null;
                 Pointer(canvas, EventType.MouseDrag, new Vector2(rect.xMin + 2, rect.center.y)); yield return null;
                 Assert.That(ComputedCursor(canvas), Is.EqualTo(normal));
                 Assert.That(App.Session.IsEditing, Is.False); LogAssert.NoUnexpectedReceived();

@@ -16,7 +16,7 @@ namespace NBC.ActionEditor
         private void OnGUI()
         {
             newName = EditorGUILayout.TextField("名称", newName);
-            if (GUILayout.Button("确定")) { JsonEditCommands.Rename(item, newName); Close(); }
+            if (GUILayout.Button("确定")) { App.Context.Structure.Rename(item, newName); Close(); }
         }
     }
 }

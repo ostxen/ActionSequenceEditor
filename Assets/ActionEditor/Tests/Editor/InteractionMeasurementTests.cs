@@ -86,7 +86,7 @@ namespace NBC.ActionEditor.Tests
         }
         private static IEnumerator Playback()
         {
-            using (var context = new ActionEditorContext(new Storage.JsonDocumentSession()))
+            using (var context = new ActionEditorContext(NBC.ActionEditor.Composition.DocumentComposition.Create()))
             {
                 var fixture = new TextAsset(Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
                 try

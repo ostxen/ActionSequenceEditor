@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Infrastructure.Documents;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -43,7 +44,7 @@ namespace NBC.ActionEditor.Tests
         {
             var files = new Files { Failure = failure };
             files.Data["document"] = new byte[] { 1, 2, 3 };
-            Assert.Catch(() => new ReliableFileCommit(files).Save("document", () =>
+            Assert.Catch(() => new AtomicFileCommit(files).Save("document", () =>
             {
                 if (failure == "serialize") throw new InvalidOperationException();
                 return failure == "invalid" ? Array.Empty<byte>() : new byte[] { 4, 5, 6 };
@@ -56,7 +57,7 @@ namespace NBC.ActionEditor.Tests
         public void RepeatedSuccessAndExternalChangeHaveDefinedOutcomes()
         {
             var files = new Files();
-            var store = new ReliableFileCommit(files);
+            var store = new AtomicFileCommit(files);
             store.Save("document", () => new byte[] { 1 }, _ => { });
             store.Save("document", () => new byte[] { 2 }, _ => { }, new byte[] { 1 });
             Assert.That(files.Data["document"].Single(), Is.EqualTo(2));
@@ -72,7 +73,7 @@ namespace NBC.ActionEditor.Tests
             var target = Path.Combine(root, "document.bin");
             try
             {
-                var store = new ReliableFileCommit();
+                var store = new AtomicFileCommit();
                 store.Save(target, () => new byte[] { 1, 2 }, _ => { });
                 store.Save(target, () => new byte[] { 3, 4 }, _ => { }, new byte[] { 1, 2 });
                 Assert.Throws<InvalidDataException>(() => store.Save(target, () => new byte[] { 5 }, _ => throw new InvalidDataException()));
@@ -97,26 +98,26 @@ namespace NBC.ActionEditor.Tests
         [Test] public void CreateOnlyCommitRejectsExistingTargetWithoutReplacingIt()
         {
             var files = new Files(); files.Data["document"] = new byte[] { 1 };
-            Assert.Throws<IOException>(() => new ReliableFileCommit(files).Save("document", () => new byte[] { 2 }, _ => { }, createOnly: true));
+            Assert.Throws<IOException>(() => new AtomicFileCommit(files).Save("document", () => new byte[] { 2 }, _ => { }, createOnly: true));
             Assert.That(files.Data["document"], Is.EqualTo(new byte[] { 1 })); Assert.That(files.Writes, Is.Zero);
         }
         [Test] public void ImportFailureKeepsCommittedPathBaselineAndExactRevisionWithoutReplaying()
         {
             const string path = "Assets/ActionEditor/RF19-Fake.json";
             var files = new Files(); var imports = 0;
-            var store = new JsonDocumentStore(files, _ => { imports++; throw new InvalidOperationException("Injected import failure"); });
-            using var session = new JsonDocumentSession(store);
+            var store = new JsonDocumentRepository(files, _ => { imports++; throw new InvalidOperationException("Injected import failure"); });
+            using var session = NBC.ActionEditor.Composition.DocumentComposition.Create(store);
             var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
             try
             {
-                session.Open(memory); session.Edit("change", () => ((LegacyExperienceAsset)session.Document).Version = 7);
+                session.Open(new JsonDocumentRepository().ReadSource(memory)); session.Edit("change", () => ((LegacyExperienceAsset)session.Document).Version = 7);
                 var source = session.Document;
                 var failure = Assert.Throws<IOException>(() => session.Save(path));
                 Assert.That(failure.Message, Does.Contain("字节已提交")); Assert.That(imports, Is.EqualTo(1));
                 Assert.That(files.Writes, Is.EqualTo(1)); Assert.That(session.Path, Is.EqualTo(path));
                 Assert.That(session.Document, Is.SameAs(source)); Assert.That(session.IsDirty, Is.False);
                 var committed = files.Data[path].ToArray();
-                using var recovered = new JsonDocumentSession(store); recovered.RestoreRecovery(session.CaptureRecovery());
+                using var recovered = NBC.ActionEditor.Composition.DocumentComposition.Create(store); recovered.RestoreRecovery(session.CaptureRecovery());
                 recovered.Edit("change", () => ((LegacyExperienceAsset)recovered.Document).Version = 8);
                 files.Data[path] = new byte[] { 42 };
                 Assert.Throws<IOException>(() => recovered.Save());
@@ -129,16 +130,16 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void StoreRejectsMetaAndDirectoryTargetsAndSaveDoesNotEndActiveGesture()
         {
-            var files = new Files(); var store = new JsonDocumentStore(files, _ => { });
+            var files = new Files(); var store = new JsonDocumentRepository(files, _ => { });
             const string path = "Assets/ActionEditor/RF19-Fake.json";
             files.Data[path + ".meta"] = new byte[] { 1 };
             Assert.Throws<IOException>(() => store.Commit(path, new LegacyExperienceAsset(), null));
             Assert.That(files.Writes, Is.Zero);
-            using var session = new JsonDocumentSession(store);
+            using var session = NBC.ActionEditor.Composition.DocumentComposition.Create(store);
             var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
             try
             {
-                session.Open(memory); var source = session.Document; using var token = session.BeginEdit(this);
+                session.Open(new JsonDocumentRepository().ReadSource(memory)); var source = session.Document; using var token = session.BeginEdit(this);
                 ((LegacyExperienceAsset)source).Version = 9;
                 Assert.Throws<InvalidOperationException>(() => session.Save(path));
                 Assert.That(token.IsActive, Is.True); Assert.That(session.Document, Is.SameAs(source)); Assert.That(files.Writes, Is.Zero);

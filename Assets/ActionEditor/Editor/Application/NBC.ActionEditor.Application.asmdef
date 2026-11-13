@@ -1,6 +1,6 @@
 {
     "name": "NBC.ActionEditor.Application",
-    "references": [],
+    "references": ["NBC.ActionEditor.Domain"],
     "overrideReferences": true,
     "precompiledReferences": [],
     "autoReferenced": true,
