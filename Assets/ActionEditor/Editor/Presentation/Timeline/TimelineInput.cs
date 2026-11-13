@@ -32,12 +32,13 @@ namespace NBC.ActionEditor.Presentation.Timeline
     }
     public readonly struct TimelineSize
     {
-        public readonly float Width, Height, RowHeight, WindowWidth;
-        public TimelineSize(float width, float height, float rowHeight = 28, float windowWidth = 0)
+        public readonly float Width, Height, RowHeight, WindowWidth, ContentInset;
+        public TimelineSize(float width, float height, float rowHeight = 28, float windowWidth = 0, float contentInset = 0)
         {
-            if (!Finite(width) || !Finite(height) || !Finite(rowHeight) || !Finite(windowWidth) || width <= 0 || height < 0 || rowHeight <= 0)
+            if (!Finite(width) || !Finite(height) || !Finite(rowHeight) || !Finite(windowWidth) || !Finite(contentInset)
+                || width <= 0 || height < 0 || rowHeight <= 0 || contentInset < 0)
                 throw new ArgumentOutOfRangeException(nameof(width));
-            Width = width; Height = height; RowHeight = rowHeight; WindowWidth = windowWidth > 0 ? windowWidth : width;
+            Width = width; Height = height; RowHeight = rowHeight; WindowWidth = windowWidth > 0 ? windowWidth : width; ContentInset = contentInset;
         }
         private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
     }

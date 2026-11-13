@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF23 `complete`（限执行记录范围，RF23记录GUI输入重放间歇性风险）。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29工程验收276/276，待本地提交；RF26工程验收完成，领域归位、RootItems、逐窗工作区及v2硬切。偏好最小链按RF30–RF32接入产品视图。具体规格以第4.3节及最新执行记录为准。
-- 下一步：从RF30继续UI Toolkit被动视图接线，再顺序实施RF31–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
+- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30工程验收278/278，待本地提交；RF26工程验收完成，领域归位、RootItems、逐窗工作区及v2硬切。偏好最小链按RF30–RF32接入产品视图。具体规格以第4.3节及最新执行记录为准。
+- 下一步：从RF31继续IMGUI被动视图接线，再顺序实施RF32–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -516,8 +516,8 @@ RF36对最终源码全量复核上述要求，并抽查结构编辑、属性编�
 | complete | RF27 | Application会话、事务、用例及基础设施端口 | RF26 |
 | complete | RF28 | 共享时间轴Presenter、输入状态机、几何与工作区 | RF27 |
 | complete | RF29 | Group/Track统一结构拖放、排序与指示线状态 | RF28 |
-| implementing | RF30 | UI Toolkit被动视图接线与三项反馈修正 | RF29 |
-| planned | RF31 | IMGUI被动视图接线及统一交互规则 | RF30 |
+| complete | RF30 | UI Toolkit被动视图接线与三项反馈修正 | RF29 |
+| implementing | RF31 | IMGUI被动视图接线及统一交互规则 | RF30 |
 | planned | RF32 | 属性/菜单/设置/文档Presenter与业务扩展契约 | RF31 |
 | planned | RF33 | 播放预览、生命周期、Undo/恢复/保存完整闭环 | RF32 |
 | planned | RF34 | 删除旧架构/实验/无用入口与残留命名 | RF33 |
@@ -765,6 +765,18 @@ void ITimelineView.SetCapture(bool requested);
 - 定向：`034823Z-2e74ebcd`无窗口DocumentSessionTests 11/11；`112937Z-02094423`真实上下文/同批字节适配2/2。新增偏好适配测试纳入最终套件，合计新增14项。最终`20261113T114227Z-7e9d64d9`：Unity编译通过，NBC.ActionEditor.Editor.Tests EditMode **233/233，0失败/跳过/不确定**。覆盖假端口及真实文件/锁文件/外部冲突/导入失败、两UI真实输入、属性与预览。无资产目标，asset-validation skipped；不声称完整资源/Player Build/冷进程/性能或人工验收。
 - 离线：`20261113T114608Z-f92e4d8f`工作流46/46；Unity真实生成21项目701源码，方案0错误39既有警告、12.26秒。文档检查仍缺yaml/markdown_it，整体code profile blocked，未安装。git diff --check通过。保护路径仅核对状态不读取内容，不声称历史字节哈希证明。
 - 职责审查与下一项：应用层持会话/命令与端口，格式/文件/Undo/时钟/偏好/恢复为基础设施；没有把App整体改名搬入Presenter。当前上下文仍承担宿主装配与旧选择/播放，按RF28/RF32/RF33收敛。RF28开始中性输入、逐窗TimelinePresenter、渲染状态及交互状态机；RF29完成组块结构算法；RF30/31替换双UI内部手势，不在RF27虚报这些目标完成。
+### RF30 UI Toolkit被动时间轴执行记录
+
+- 状态：complete（时间轴主体/标尺/标题/捕获原生链；窗口文档/属性/播放按钮余项按RF32/33），2026-11-13；前置RF29本地提交`0f6ea31`。
+- 实现：现行`UIToolkitTimelineCanvas`实质重写为ITimelineView容器，移除自身GestureMode、模型快照/集合遍历、拖放/吸附/取消算法与App/Storage调用。拆出`TimelinePainter`（Body/Ruler/Insertion原生Painter2D绘制）、`TimelineControls`（标题按钮/文字）、`TimelineInputAdapter`（原生事件/坐标/文本优先/捕获）。没有IMGUIContainer。
+- 真实装配：`TimelineComposition.Create(context, workspace, view)`逐窗显式建立TimelinePresenter，注入共享播放头和偏好读取；目录与确认/重命名适配在组合边界。菜单新增TimelineMenuPresenter，根据应用用例生成描述，控件只展示/执行已描述意图。窗口通过Presenter处理滚动/视域/适配Tick；旧全局App仍仅在尚待RF32/33迁移的窗口工具栏/生命周期，不以本项宣称全部Editor已被动。
+- 快照：补齐颜色、片段混合边界/合法性/相邻遮挡、作者时长/播放范围、手势参考线/游标。为避免视图再遍历领域对象，Presentation按4.3.2允许UnityEngine.Color值（asmdef允许CoreModule），门禁仍拒绝UnityEditor、UnityEngine.UI/IMGUI模块和具体Editor程序集；Application继续无Engine引用。不是删除控件边界或把可写模型交给View。
+- 三项修正：独立`timeline-insertion-overlay`最后绘制，从x=0至主体真实右边界，蓝/红线，无三种拖动提示文字；原生Group标题进入共享Structure模式并整块重排。空组仅菜单按钮和Ignore占位，没有折叠Button；首轨出现/末轨消失/UndoRedo同步，真实MouseDown/Up点击折叠不启动标题手势。
+- 保留：40px头/20px标尺/28px行/16px底部、9px内容偏移、实际缩放窗口宽、独立滚动、原生属性入口、点事件/颜色/混合/选择/锁定遮罩、参考线实/虚/秒标签、resize USS游标。原生Canvas不再返回领域Rows；现行测试改用值快照键，验证命令仍可使用ClipRect定位实际事件。
+- 验证：现有结构缺陷断言改为目标行为，不删除断言；实际GrabPixels在当前DPI检测标题、时间区及最右4px均蓝线，overlay无Label。新增真实窗口空组占位点击→创建首轨→原生折叠按钮→Undo/Redo，及小视口滚动后组拖动→Tick边缘15px→越界隐藏→Esc→拖动中CtrlZ。共享序列/属性/菜单、捕获丢失/错误按钮、两窗口交错、标尺Seek、四尺寸与参考线旧验收仍通过。
+- 失败：`130607Z-30ea8a8a`测试仍调用已移除Rows，直接迁移到State及Presenter键；`130833Z-44105bb5`230/276，首次CreateGUI尚无有效布局时NaN尺寸导致初始化失败，后续残留窗口SyncView连带空引用。Resize等待有效布局，窗口SyncView拒绝部分初始化，OnDisable清空Canvas，非吞日志；`131238Z-126d1173`原生链12/12，`131432Z-b6d55f8b`共享链通过。`132002Z-0d7e469b`13/14，新Button测试只发Pointer未产生Unity2022默认Click，改为真实MouseDown/Up并等待布局，`132247Z-b85a737e`14/14。
+- 最终：`20261113T132502Z-319f12c7`编译通过，完整Editor **278/278，0失败/跳过/不确定**。`133123Z-e21583b8`工作流46/46，21项目722源码真实方案构建0错误39既有警告，16.45秒。文档解析器yaml/markdown_it缺失使code整体blocked，未安装。diff --check通过。未把纯截图说成人工H01–H09通过，未运行完整资产/冷进程/Player Build。
+- 审阅：输入层仅原生坐标/按钮/焦点/捕获，业务规则仍唯一；绘制只读取值。捕获释放先清本地pointer并屏蔽自身CaptureOut重入；另一按下不替换活跃pointer；CtrlZ/Redo先取消当前手势再请求宿主Undo。菜单创建/锁定/删除执行时应用用例重验，不直接改集合。当前命名目录归位和完整目录过滤仍需RF32/34固定资源清单执行，不直接编辑meta。
 ### RF29 统一结构拖放执行记录
 
 - 状态：complete（共享结构核心及现行命令调用者；双UI原生事件替换按RF30/31），2026-11-13，前置RF28提交`b87cf42`。

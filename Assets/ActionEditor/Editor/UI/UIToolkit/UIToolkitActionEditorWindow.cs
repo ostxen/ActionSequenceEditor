@@ -52,7 +52,7 @@ namespace NBC.ActionEditor.Workbench
         }
         private void OnDisable()
         {
-            Canvas?.Dispose(); App.Views.Detach(this); EditorApplication.update -= Tick;
+            Canvas?.Dispose(); Canvas = null; App.Views.Detach(this); EditorApplication.update -= Tick;
             if (target != null) DestroyImmediate(target);
             if (App.Views.Count == 0) App.Stop();
         }
@@ -60,8 +60,10 @@ namespace NBC.ActionEditor.Workbench
         private void Tick()
         {
             if (EditorApplication.timeSinceStartup - lastTick < 0.03) return;
+            var delta = EditorApplication.timeSinceStartup - lastTick;
             lastTick = EditorApplication.timeSinceStartup;
-            Canvas?.MarkDirtyRepaint();
+            Canvas?.Tick(delta);
+            Canvas?.Presenter.PlaybackState(App.IsPlay, App.IsRange);
             if (Document != null) SyncView();
         }
         public void CreateGUI()
@@ -116,19 +118,28 @@ namespace NBC.ActionEditor.Workbench
             right.Add(toolbar); var rulerSpace = new VisualElement(); rulerSpace.style.height = 20; right.Add(rulerSpace); head.Add(right); rootVisualElement.Add(head);
             var body = new VisualElement(); body.style.flexGrow = 1; body.style.minHeight = 0; body.style.flexDirection = FlexDirection.Row;
             Canvas = new UIToolkitTimelineCanvas(this); body.Add(Canvas);
-            scroll = new Scroller(0, 0, value => { if (!syncing) { ScrollY = value; Canvas.SyncAddGroup(); Canvas.MarkDirtyRepaint(); } }, SliderDirection.Vertical);
+            Canvas.Bind(Composition.TimelineComposition.Create(Context, Workspace, Canvas));
+            scroll = new Scroller(0, 0, value => { if (!syncing) Canvas.Presenter.Scroll(value); }, SliderDirection.Vertical);
             scroll.style.width = 14; scroll.style.flexShrink = 0; body.Add(scroll); rootVisualElement.Add(body);
             footer = new VisualElement { name = "json-footer" }; footer.style.height = BottomHeight; footer.style.flexShrink = 0; footer.style.flexDirection = FlexDirection.Row;
             var blank = new VisualElement { name = "json-footer-blank" }; blank.style.width = LeftWidth + 9; blank.style.flexShrink = 0; footer.Add(blank);
             range = new MinMaxSlider(0, 7, 0, 7) { name = "json-view-range" }; range.style.flexGrow = 1;
-            range.RegisterValueChangedCallback(e => { if (syncing || Document == null) return; Workspace.ViewTimeMax = e.newValue.y; Workspace.ViewTimeMin = e.newValue.x; Canvas.MarkDirtyRepaint(); });
+            range.RegisterValueChangedCallback(e => { if (syncing || Document == null) return; Canvas.Presenter.ViewRange(e.newValue.x, e.newValue.y); });
             range.style.marginLeft = 0; range.style.marginRight = 5; range.style.marginTop = 0; range.style.height = 18;
-            range.RegisterCallback<PointerDownEvent>(e => { if (e.clickCount == 2 && Document != null) { Workspace.ViewTimeMin = 0; Workspace.ViewTimeMax = Document.Length; SyncView(); } });
+            range.RegisterCallback<PointerDownEvent>(e => { if (e.clickCount == 2 && Document != null) { Canvas.Presenter.Fit(); SyncView(); } });
             footer.Add(range); rootVisualElement.Add(footer);
             error = new Label { name = "json-error" }; error.style.display = DisplayStyle.None; rootVisualElement.Add(error);
             Canvas.AttachRuler(); Canvas.RegisterCallback<GeometryChangedEvent>(_ => SyncView()); Refresh();
         }
         public void Seek(float time) { AssetPlayer.Inst.Sample(time); Canvas?.MarkDirtyRepaint(); }
+        public void CreateDocument() => CreateAssetWindow.Show();
+        public void OpenDocument() => ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, ActionEditorHost.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath);
+        public void ShowTimelineError(string message)
+        {
+            LastError = message;
+            if (error == null) return;
+            error.text = message ?? ""; error.style.display = message == null ? DisplayStyle.None : DisplayStyle.Flex;
+        }
         public void Run(Action action)
         {
             try { action(); LastError = null; if (error != null) error.style.display = DisplayStyle.None; }
@@ -161,7 +172,7 @@ namespace NBC.ActionEditor.Workbench
         }
         public void SyncView()
         {
-            if (transport == null || Canvas == null) return;
+            if (transport == null || Canvas?.State == null || scroll == null || footer == null || range == null || lastSave == null || magnet == null) return;
             transport.parent.style.display = Document == null ? DisplayStyle.None : DisplayStyle.Flex;
             footer.style.display = Document == null ? DisplayStyle.None : DisplayStyle.Flex;
             transport.style.width = LeftWidth;
@@ -175,9 +186,9 @@ namespace NBC.ActionEditor.Workbench
             syncing = true;
             try
             {
-                scroll.highValue = Mathf.Max(0, Canvas.Rows().Count * RowHeight + 32 - Canvas.contentRect.height);
+                scroll.highValue = Mathf.Max(0, Canvas.State.Rows.Count * RowHeight + 32 - Canvas.contentRect.height);
                 scroll.style.display = Document != null && scroll.highValue > 0 ? DisplayStyle.Flex : DisplayStyle.None;
-                scroll.Adjust(Canvas.contentRect.height / Mathf.Max(1, Canvas.Rows().Count * RowHeight + 32));
+                scroll.Adjust(Canvas.contentRect.height / Mathf.Max(1, Canvas.State.Rows.Count * RowHeight + 32));
                 ScrollY = Mathf.Clamp(ScrollY, 0, scroll.highValue); scroll.value = ScrollY;
                 Canvas.SyncAddGroup();
                 if (Document != null)

@@ -10,15 +10,17 @@ namespace NBC.ActionEditor
     {
         private static readonly Dictionary<Type, Texture2D> _iconDictionary = new Dictionary<Type, Texture2D>();
 
-        public static Texture2D GetIcon(this IDirectable track)
+        public static Texture2D GetIcon(this IDirectable track) => GetIcon(track.GetType());
+
+        // 被动标题仅持有类型身份，图标解析不要求拿到作者对象。
+        public static Texture2D GetIcon(Type type)
         {
-            var type = track.GetType();
             if (_iconDictionary.TryGetValue(type, out var icon))
             {
                 return icon;
             }
 
-            var att = track.GetType().RTGetAttribute<ShowIconAttribute>(true);
+            var att = type.RTGetAttribute<ShowIconAttribute>(true);
 
             if (att != null)
             {

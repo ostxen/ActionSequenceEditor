@@ -976,9 +976,9 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(window.rootVisualElement.Q("json-header").resolvedStyle.height, Is.EqualTo(40));
                 Assert.That(window.rootVisualElement.Q("json-footer").resolvedStyle.height, Is.EqualTo(16).Within(.001f));
                 Assert.That(window.rootVisualElement.Q("json-ruler").worldBound.yMin - window.rootVisualElement.worldBound.yMin, Is.EqualTo(20).Within(1));
-                Assert.That(window.Canvas.Rows().Count, Is.EqualTo(10));
-                window.Workspace.SetCollapsed(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(2), true);
-                Assert.That(window.Canvas.Rows().Count, Is.EqualTo(8));
+                Assert.That(window.Canvas.State.Rows.Count, Is.EqualTo(10));
+                window.Canvas.Presenter.ToggleFold(window.Canvas.Presenter.KeyFor(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(2)));
+                Assert.That(window.Canvas.State.Rows.Count, Is.EqualTo(8));
                 var clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; window.Select(clip);
                 var view = window.CreatePropertyView(); window.rootVisualElement.Add(view); yield return null;
                 var count = view.Query<IntegerField>().ToList().First(f => f.label == "次数");
@@ -1112,7 +1112,7 @@ namespace NBC.ActionEditor.Tests
                 rect = canvas.ClipRect(item, 1); center = rect.center;
                 Pointer(canvas, EventType.MouseDown, center); Pointer(canvas, EventType.MouseDrag, center + new Vector2(30, 0));
                 yield return null;
-                var captured = (int)typeof(UIToolkitTimelineCanvas).GetField("pointer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas);
+                var captured = canvas.PointerId;
                 Assert.That(captured, Is.GreaterThanOrEqualTo(0));
                 Assert.That(App.Session.IsEditing, Is.True, "An open original window must not commit the native drag during repaint.");
                 canvas.ReleasePointer(captured);
@@ -1355,7 +1355,7 @@ namespace NBC.ActionEditor.Tests
                     }
                     else
                     {
-                        var captured = (int)typeof(UIToolkitTimelineCanvas).GetField("pointer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas);
+                        var captured = canvas.PointerId;
                         canvas.ReleasePointer(captured); Pointer(canvas, EventType.MouseDrag, edge); yield return null;
                     }
                     yield return null;
@@ -1427,10 +1427,10 @@ namespace NBC.ActionEditor.Tests
                 var root = window.rootVisualElement; var canvas = window.Canvas;
                 window.Seek(.5f);
                 Pointer(root, EventType.MouseDown, new Vector2(canvas.X(1), 30));
-                Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas).ToString(), Is.EqualTo("Seek"), "ruler down mode");
+                Assert.That(canvas.Presenter.Mode.ToString(), Is.EqualTo("Seek"), "ruler down mode");
                 Pointer(root, EventType.MouseDrag, new Vector2(canvas.X(2), 30));
-                Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas).ToString(), Is.EqualTo("Seek"), "ruler move mode");
-                Assert.That((float)typeof(UIToolkitTimelineCanvas).GetField("seekBefore", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas), Is.EqualTo(.5f), "ruler snapshot");
+                Assert.That(canvas.Presenter.Mode.ToString(), Is.EqualTo("Seek"), "ruler move mode");
+                Assert.That(App.Session.IsEditing, Is.False, "Seeking is not authoring.");
                 Assert.That(AssetPlayer.Inst.CurrentTime, Is.EqualTo(2).Within(.051));
                 var receivedKey = false;
                 root.RegisterCallback<KeyDownEvent>(_ => receivedKey = true, TrickleDown.TrickleDown);

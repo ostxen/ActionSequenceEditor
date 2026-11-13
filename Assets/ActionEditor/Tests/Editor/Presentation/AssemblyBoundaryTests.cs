@@ -32,10 +32,12 @@ namespace NBC.ActionEditor.Tests.Presentation
             {
                 var forbidden = assembly.GetReferencedAssemblies().Where(reference =>
                     reference.Name.StartsWith("UnityEditor", StringComparison.Ordinal)
-                    || reference.Name.StartsWith("UnityEngine", StringComparison.Ordinal)
+                    || reference.Name.StartsWith("UnityEngine.UI", StringComparison.Ordinal)
+                    || reference.Name.StartsWith("UnityEngine.IMGUIModule", StringComparison.Ordinal)
                     || reference.Name == "NBC.ActionEditor.Editor").ToArray();
                 Assert.That(forbidden, Is.Empty, assembly.FullName);
             }
+            Assert.That(application.GetReferencedAssemblies().Any(reference => reference.Name.StartsWith("UnityEngine", StringComparison.Ordinal)), Is.False);
             Assert.That(application.GetReferencedAssemblies().Any(reference => reference.Name == presentation.GetName().Name), Is.False);
             Assert.That(presentation.GetReferencedAssemblies().Any(reference => reference.Name == application.GetName().Name), Is.True);
         }

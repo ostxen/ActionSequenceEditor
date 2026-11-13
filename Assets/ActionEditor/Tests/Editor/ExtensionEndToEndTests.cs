@@ -62,6 +62,7 @@ namespace NBC.ActionEditor.Tests
             UnityEngine.Object.DestroyImmediate(fixture);
         }
         private static TimelineClip Last(int track) => App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track].Clips.Last();
+        private static int RowIndex(UIToolkitTimelineCanvas canvas, IDirectable item) => canvas.State.Rows.ToList().FindIndex(row => row.Key == canvas.Presenter.KeyFor(item));
         private static void OriginalCreate(TimelineTrack track, Type type)
         {
             var view = new TimelineTrackItemRightView();
@@ -75,8 +76,8 @@ namespace NBC.ActionEditor.Tests
         }
         private static void NativeCreate(UIToolkitActionEditorWindow window, int track, Type type)
         {
-            var canvas = window.Canvas; var rows = canvas.Rows(); var target = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track];
-            var row = rows.IndexOf(target);
+            var canvas = window.Canvas; var target = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track];
+            var row = RowIndex(canvas, target);
             var position = canvas.LocalToWorld(new Vector2(canvas.X(6.5f), row * 28 + 13 - window.ScrollY));
             var menu = new DropdownMenu();
             using (var trigger = MouseUpEvent.GetPooled(new Event { type = EventType.MouseUp, mousePosition = position, button = 1 }))
@@ -273,12 +274,14 @@ namespace NBC.ActionEditor.Tests
                 var canvas = native.Canvas;
                 var headers = canvas.Q("json-row-headers");
                 var emptyHeader = headers.Children().First();
-                Assert.That(emptyHeader.Query<Button>().ToList().Count, Is.EqualTo(2), "Empty group currently has both collapse and menu buttons.");
+                Assert.That(emptyHeader.Query<Button>().ToList().Count, Is.EqualTo(1), "Empty group exposes only the menu button.");
+                Assert.That(emptyHeader.Q("timeline-fold"), Is.Null);
+                Assert.That(emptyHeader.Q("timeline-fold-placeholder").pickingMode, Is.EqualTo(PickingMode.Ignore));
                 Pointer(canvas, EventType.MouseDown, new Vector2(90, 13));
                 Pointer(canvas, EventType.MouseDrag, new Vector2(90, 90));
-                Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", Instance).GetValue(canvas).ToString(), Is.EqualTo("None"), "Group header currently does not enter structure capture.");
+                Assert.That(canvas.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 Pointer(canvas, EventType.MouseUp, new Vector2(90, 90));
-                Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0), Is.SameAs(group));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1), Is.SameAs(group));
                 native.DiscardChanges(); native.Close(); native = null;
 
                 group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0);
@@ -335,7 +338,7 @@ namespace NBC.ActionEditor.Tests
             }
         }
 
-        [UnityTest] public IEnumerator StructureInsertionPaintCurrentlyStopsAtHeaderBoundary()
+        [UnityTest] public IEnumerator ToolkitStructureInsertionPaintCoversFullBodyWithoutText()
         {
             var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             Texture2D image = null;
@@ -346,12 +349,13 @@ namespace NBC.ActionEditor.Tests
                 var canvas = window.Canvas;
                 Pointer(canvas, EventType.MouseDown, new Vector2(90, 69));
                 Pointer(canvas, EventType.MouseDrag, new Vector2(90, 31));
-                var drop = (TrackDropTarget)typeof(UIToolkitTimelineCanvas).GetField("trackDrop", Instance).GetValue(canvas);
-                Assert.That(drop.IsValid, Is.True);
+                var drop = canvas.State.Insertion;
+                Assert.That(drop.Visible && drop.Valid, Is.True);
+                Assert.That(canvas.Q("timeline-insertion-overlay").Query<Label>().ToList(), Is.Empty);
                 window.Repaint(); yield return null; yield return null;
                 image = ReadWindowPixels(window);
                 System.IO.File.WriteAllBytes(System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/structure-insertion-baseline.png"), image.EncodeToPNG());
-                Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", Instance).GetValue(canvas).ToString(), Is.EqualTo("Track"));
+                Assert.That(canvas.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 var scale = EditorGUIUtility.pixelsPerPoint;
                 bool BlueAt(float x)
                 {
@@ -365,7 +369,8 @@ namespace NBC.ActionEditor.Tests
                     return false;
                 }
                 Assert.That(BlueAt(60), Is.True, "Actual paint must contain the insertion line in the title area: bounds=" + canvas.worldBound + ", root=" + window.rootVisualElement.worldBound + ", dropY=" + drop.Y + ", scale=" + scale);
-                Assert.That(BlueAt(canvas.Left + 200), Is.False, "Current actual paint does not extend through the time area.");
+                Assert.That(BlueAt(canvas.Left + 200), Is.True, "Actual overlay must extend through the time area.");
+                Assert.That(BlueAt(canvas.contentRect.width - 4), Is.True, "Actual overlay must reach the drawable right edge.");
                 Pointer(canvas, EventType.MouseUp, new Vector2(-10, 31));
             }
             finally
@@ -430,14 +435,14 @@ namespace NBC.ActionEditor.Tests
                 window.position = new Rect(60, 60, 1000, 600); window.Show(); yield return null; yield return null;
                 var canvas = window.Canvas;
                 var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); var moving = group.Tracks[1]; var first = group.Tracks[0];
-                var start = new Vector2(90, canvas.Rows().IndexOf(moving) * 28 + 13);
-                var end = new Vector2(90, canvas.Rows().IndexOf(first) * 28 + 3);
+                var start = new Vector2(90, RowIndex(canvas, moving) * 28 + 13);
+                var end = new Vector2(90, RowIndex(canvas, first) * 28 + 3);
                 Pointer(canvas, EventType.MouseDown, start);
-                Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", Instance).GetValue(canvas).ToString(), Is.EqualTo("Track"), "Header press must start track capture.");
+                Assert.That(canvas.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure), "Header press must start structure capture.");
                 Pointer(canvas, EventType.MouseDrag, end);
-                var drop = (TrackDropTarget)typeof(UIToolkitTimelineCanvas).GetField("trackDrop", Instance).GetValue(canvas);
-                Assert.That(drop.IsValid, Is.True, "Drop target missing: start=" + start + ", end=" + end + ", bounds=" + canvas.contentRect);
-                Assert.That(drop.Index, Is.Zero);
+                var drop = canvas.State.Insertion;
+                Assert.That(drop.Visible && drop.Valid, Is.True, "Drop target missing: start=" + start + ", end=" + end + ", bounds=" + canvas.contentRect);
+                Assert.That(drop.Y, Is.EqualTo(28));
                 Assert.That(group.Tracks[1], Is.SameAs(moving), "Dragging must not commit before release.");
                 Pointer(canvas, EventType.MouseUp, end);
                 Assert.That(window.LastError, Is.Null);
@@ -445,16 +450,16 @@ namespace NBC.ActionEditor.Tests
                 Undo.PerformUndo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(first.Name));
                 Undo.PerformRedo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(moving.Name));
                 moving = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0];
-                start = new Vector2(90, canvas.Rows().IndexOf(moving) * 28 + 13);
+                start = new Vector2(90, RowIndex(canvas, moving) * 28 + 13);
                 end = new Vector2(5, start.y + 10);
                 Pointer(canvas, EventType.MouseDown, start); Pointer(canvas, EventType.MouseDrag, end);
                 Pointer(canvas, EventType.MouseUp, end);
                 Assert.That(window.LastError, Is.Null); Assert.That(moving.Group, Is.Null);
                 Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
                 Assert.That(moving.Root, Is.SameAs(App.AssetData)); Assert.That(moving.Clips, Is.Not.Empty);
-                Assert.That(canvas.Rows().Last(), Is.SameAs(moving));
-                start = new Vector2(90, canvas.Rows().IndexOf(moving) * 28 + 13);
-                end = new Vector2(90, canvas.Rows().IndexOf(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1)) * 28 + 13);
+                Assert.That(App.AssetData.RootItems[1], Is.SameAs(moving), "Root zone inserts after the whole first group block.");
+                start = new Vector2(90, RowIndex(canvas, moving) * 28 + 13);
+                end = new Vector2(90, RowIndex(canvas, App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1)) * 28 + 13);
                 Pointer(canvas, EventType.MouseDown, start); Pointer(canvas, EventType.MouseDrag, end);
                 Key(canvas, KeyCode.Escape); Pointer(canvas, EventType.MouseUp, end);
                 Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
@@ -639,6 +644,64 @@ namespace NBC.ActionEditor.Tests
                 if (native != null) { native.DiscardChanges(); native.Close(); }
                 original.DiscardChanges(); original.Close(); ActionEditorHost.Window = previous;
             }
+        }
+
+        [UnityTest] public IEnumerator ToolkitEmptyFoldPlaceholderStaysPassiveAndTracksUndoRedoFirstChild()
+        {
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
+            try
+            {
+                var group = App.AssetData.RootItems.OfType<TimelineGroup>().First(); group.Tracks.Clear(); App.AssetData.Validate();
+                window.position = new Rect(60, 60, 1000, 600); window.Show(); yield return null; yield return null;
+                var canvas = window.Canvas; var header = canvas.Q("json-row-headers").Children().First();
+                Assert.That(header.Q<Button>("timeline-fold"), Is.Null);
+                Pointer(canvas, EventType.MouseDown, new Vector2(12, 13)); Pointer(canvas, EventType.MouseUp, new Vector2(12, 13));
+                Assert.That(window.Workspace.IsCollapsed(group), Is.False);
+                App.Context.Structure.AddTrack(group, typeof(LegacyIntervalTrack)); yield return null; yield return null;
+                header = canvas.Q("json-row-headers").Children().First();
+                var fold = header.Q<Button>("timeline-fold"); Assert.That(fold, Is.Not.Null);
+                var point = fold.contentRect.center;
+                using (var down = MouseDownEvent.GetPooled(new Event { type = EventType.MouseDown, button = 0, mousePosition = fold.LocalToWorld(point) }))
+                { down.target = fold; fold.SendEvent(down); }
+                using (var up = MouseUpEvent.GetPooled(new Event { type = EventType.MouseUp, button = 0, mousePosition = fold.LocalToWorld(point) }))
+                { up.target = fold; fold.SendEvent(up); }
+                yield return null;
+                Assert.That(window.Workspace.IsCollapsed(group), Is.True); Assert.That(canvas.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
+                Undo.PerformUndo(); yield return null;
+                Assert.That(canvas.Q("json-row-headers").Children().First().Q<Button>("timeline-fold"), Is.Null);
+                Undo.PerformRedo(); yield return null;
+                Assert.That(canvas.Q("json-row-headers").Children().First().Q<Button>("timeline-fold"), Is.Not.Null);
+            }
+            finally { window.DiscardChanges(); window.Close(); }
+        }
+
+        [UnityTest] public IEnumerator ToolkitScrolledGroupDragRecalculatesOverlayAtViewportEdgesAndCancelsOnUndo()
+        {
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
+            try
+            {
+                window.position = new Rect(60, 60, 800, 250); window.Show(); yield return null; yield return null;
+                var canvas = window.Canvas; canvas.Presenter.Scroll(56); yield return null;
+                var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1);
+                var row = canvas.State.Rows.Single(value => value.Key == canvas.Presenter.KeyFor(group));
+                var before = JsonDocumentCodec.Content(App.AssetData);
+                Pointer(canvas, EventType.MouseDown, new Vector2(80, row.Bounds.Y + 13));
+                Pointer(canvas, EventType.MouseDrag, new Vector2(80, 12));
+                var scroll = window.ScrollY; canvas.Tick(.1);
+                Assert.That(window.ScrollY, Is.EqualTo(Mathf.Max(0, scroll - 15)).Within(.001f));
+                Assert.That(canvas.State.Insertion.Width, Is.EqualTo(canvas.contentRect.width));
+                Pointer(canvas, EventType.MouseDrag, new Vector2(-1, 12));
+                Assert.That(canvas.State.Insertion.Visible, Is.False);
+                Key(canvas, KeyCode.Escape);
+                Assert.That(canvas.PointerId, Is.EqualTo(-1)); Assert.That(JsonDocumentCodec.Content(App.AssetData), Is.EqualTo(before));
+                App.Session.Edit("sentinel", () => group.Name = "sentinel");
+                row = canvas.State.Rows.Single(value => value.Key == canvas.Presenter.KeyFor(group));
+                Pointer(canvas, EventType.MouseDown, new Vector2(80, row.Bounds.Y + 13)); Pointer(canvas, EventType.MouseDrag, new Vector2(80, 70));
+                Key(canvas, KeyCode.Z, control: true);
+                Assert.That(canvas.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle)); Assert.That(canvas.State.Insertion.Visible, Is.False);
+                Assert.That(JsonDocumentCodec.Content(App.AssetData), Is.EqualTo(before));
+            }
+            finally { window.DiscardChanges(); window.Close(); }
         }
 
         [Test] public void ExistingSampleUsesMetadataAndOptionalAdaptersWithoutBusinessBranches()

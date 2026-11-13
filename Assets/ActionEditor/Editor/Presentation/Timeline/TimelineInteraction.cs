@@ -30,6 +30,8 @@ namespace NBC.ActionEditor.Presentation.Timeline
         public TimelineGestureMode Mode { get; private set; }
         public TimelineRect? Marquee { get; private set; }
         public InsertionIndicator Insertion => structure.Indicator;
+        public ClipGuideState[] Guides => clip.Guides;
+        public bool ResizeCursor { get; private set; }
         public bool Captured => Mode != TimelineGestureMode.Idle;
         public TimelineInteraction(DocumentSession session, SelectionState selection, TimelineWorkspace workspace,
             VisibleTimelineLayout layout, ClipEditing editing, StructureEditing structureEditing, ITimelinePlayhead playhead, Func<EditorSettings> settings, Action<bool> capture)
@@ -48,7 +50,13 @@ namespace NBC.ActionEditor.Presentation.Timeline
         {
             if (input.Action == PointerAction.Cancel) { Cancel(); return; }
             if (input.Action == PointerAction.Down) { Down(input, size); return; }
-            if (!Captured) return;
+            if (!Captured)
+            {
+                var hovered = input.Action == PointerAction.Move && input.X >= workspace.LeftWidth ? layout.HitClip(input.X, input.Y) : null;
+                ResizeCursor = hovered != null && !hovered.IsLocked && hovered.CanScale()
+                    && (input.X - layout.Bounds(hovered).X < 5 || layout.Bounds(hovered).Right - input.X < 5);
+                return;
+            }
             if (input.Action == PointerAction.Up)
             {
                 if (input.Button != button) return;
@@ -89,6 +97,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
                     var edge = target.CanScale() ? input.X - bounds.X < 5 ? -1 : bounds.Right - input.X < 5 ? 1 : 0 : 0;
                     if (!clip.Begin(owner, target, selection.Items.OfType<TimelineClip>(), edge, input.X, playhead.Time)) return;
                     Mode = edge < 0 ? TimelineGestureMode.ResizeLeft : edge > 0 ? TimelineGestureMode.ResizeRight : TimelineGestureMode.Move;
+                    ResizeCursor = edge != 0;
                 }
             }
             capture(true);
@@ -132,6 +141,6 @@ namespace NBC.ActionEditor.Presentation.Timeline
             if (selected != null) selection.Set(selected.Where(item => session.Document != null && session.Document.directables.Contains(item)).ToArray(), false);
             if (seek) playhead.Seek(seekBefore);
         }
-        private void Clear() { var captured = Captured; Mode = TimelineGestureMode.Idle; Marquee = null; if (captured) capture(false); }
+        private void Clear() { var captured = Captured; Mode = TimelineGestureMode.Idle; Marquee = null; ResizeCursor = false; if (captured) capture(false); }
     }
 }

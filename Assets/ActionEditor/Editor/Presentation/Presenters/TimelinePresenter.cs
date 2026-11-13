@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NBC.ActionEditor.Application.Documents;
 using NBC.ActionEditor.Application.Editing;
@@ -22,10 +23,29 @@ namespace NBC.ActionEditor.Presentation.Presenters
         private readonly TimelineInteraction interaction;
         private TimelineSize size = new TimelineSize(1000, 500);
         private bool disposed, refreshing;
+        private bool playing, rangeEnabled;
         public TimelineWorkspace Workspace { get; }
         public TimelineRenderState State { get; private set; }
         public TimelineGestureMode Mode => interaction.Mode;
         public event Action<TimelineKey> HostAction;
+        public TimelineMenuPresenter Menus { private get; set; }
+        public IReadOnlyList<TimelineMenuEntry> Menu(float x, float y)
+        {
+            if (Menus == null || interaction.Captured) return Array.Empty<TimelineMenuEntry>();
+            var item = x < State.ContentLeft ? layout.RowAt(y, Workspace, size) : (NBC.ActionEditor.IDirectable)layout.HitClip(x, y) ?? layout.RowAt(y, Workspace, size);
+            var time = Math.Max(0, layout.Transform.Time(x)); var value = settings();
+            if (value.MagnetSnapping) time = (float)Math.Round(time / value.TimeStep, MidpointRounding.ToEven) * value.TimeStep;
+            return Menus.Build(item, x < State.ContentLeft, time);
+        }
+        public IReadOnlyList<TimelineMenuEntry> GroupMenu() => Menus?.Groups() ?? Array.Empty<TimelineMenuEntry>();
+        public void Invoke(TimelineMenuEntry entry) => Run(() => { if (entry.Enabled) entry.Invoke(); });
+        public int KeyFor(NBC.ActionEditor.IDirectable item) => layout.KeyFor(item);
+        public void ToggleLock(int key) => Run(() => structure.ToggleLock(layout.Resolve(key)));
+        public void ToggleActive(int key) => Run(() => structure.ToggleActive(layout.Resolve(key)));
+        public void PlaybackState(bool isPlaying, bool isRange) { playing = isPlaying; rangeEnabled = isRange; Refresh(); }
+        public void Scroll(float value) => Run(() => Workspace.ScrollY = Math.Max(0, value));
+        public void ViewRange(float minimum, float maximum) => Run(() => Workspace.SetRange(minimum, maximum));
+        public void Fit() => Run(() => Workspace.SetRange(0, Math.Max(.25f, session.Document?.Length ?? 7)));
         public TimelinePresenter(DocumentSession session, SelectionState selection, StructureEditing structure, ClipboardEditing clipboard,
             ClipEditing clips, TimelineWorkspace workspace, ITimelinePlayhead playhead, Func<EditorSettings> settings, ITimelineView view)
         {
@@ -73,6 +93,8 @@ namespace NBC.ActionEditor.Presentation.Presenters
             Run(() =>
             {
                 if (input.Key == TimelineKey.Escape) { interaction.Cancel(); return; }
+                if (input.Key == TimelineKey.Undo || input.Key == TimelineKey.Redo)
+                { interaction.Cancel(); HostAction?.Invoke(input.Key); return; }
                 if (interaction.Captured) return;
                 switch (input.Key)
                 {
@@ -92,7 +114,8 @@ namespace NBC.ActionEditor.Presentation.Presenters
         {
             if (disposed || refreshing) return;
             refreshing = true;
-            try { State = layout.Build(session.Document, selection, Workspace, size, playhead.Time, interaction.Marquee, interaction.Insertion); view.Render(State); }
+            try { State = layout.Build(session.Document, selection, Workspace, size, playhead.Time, interaction.Marquee, interaction.Insertion,
+                interaction.Guides, interaction.ResizeCursor, playing, rangeEnabled); view.Render(State); }
             finally { refreshing = false; }
         }
         private void OnContentChanged() { interaction.Cancel(); Workspace.Bind(session.Document); }

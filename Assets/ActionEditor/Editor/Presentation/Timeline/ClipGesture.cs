@@ -19,6 +19,13 @@ namespace NBC.ActionEditor.Presentation.Timeline
         private float length, downX;
         private int edge;
         private float[] references = Array.Empty<float>();
+        private bool moved;
+        public ClipGuideState[] Guides => !Active || !moved ? Array.Empty<ClipGuideState>() : new[]
+        {
+            Guide(starts.Keys.Min(clip => clip.StartTime), edge <= 0),
+            Guide(starts.Keys.Max(clip => clip.EndTime), edge >= 0)
+        };
+        private ClipGuideState Guide(float time, bool visible) => new ClipGuideState(time, references.Any(reference => Math.Abs(reference - time) < .00001f), visible);
         public bool Active => token?.IsActive == true;
         public ClipGesture(DocumentSession session, ClipEditing editing) { this.session = session; this.editing = editing; }
         public bool Begin(object owner, TimelineClip target, IEnumerable<TimelineClip> selected, int resizeEdge, float x, float playhead)
@@ -36,6 +43,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
         public void Move(float x, bool shift, TimeTransform transform, EditorSettings settings)
         {
             if (!Active) return;
+            moved |= x != downX;
             var delta = transform.Duration(x - downX);
             var original = starts[hit];
             if (edge == 0)
@@ -84,6 +92,6 @@ namespace NBC.ActionEditor.Presentation.Timeline
             if (valid) Commit(); else Cancel();
         }
         public void Cancel() { var current = token; Clear(); current?.Cancel(); }
-        private void Clear() { token = null; hit = null; starts.Clear(); references = Array.Empty<float>(); }
+        private void Clear() { token = null; hit = null; starts.Clear(); references = Array.Empty<float>(); moved = false; }
     }
 }
