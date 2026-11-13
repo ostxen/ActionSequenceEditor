@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF23 `complete`（限执行记录范围，RF23记录GUI输入重放间歇性风险）。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27工程验收233/233，待本地提交；RF26工程验收完成，领域归位、RootItems、逐窗工作区及v2硬切。偏好最小链按RF30–RF32接入产品视图。具体规格以第4.3节及最新执行记录为准。
-- 下一步：从RF27继续Application会话与基础设施，再顺序实施RF28–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
+- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28工程验收250/250，待本地提交；RF26工程验收完成，领域归位、RootItems、逐窗工作区及v2硬切。偏好最小链按RF30–RF32接入产品视图。具体规格以第4.3节及最新执行记录为准。
+- 下一步：从RF28继续共享时间轴Presenter，再顺序实施RF29–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -514,8 +514,8 @@ RF36对最终源码全量复核上述要求，并抽查结构编辑、属性编�
 | complete | RF25 | 具体职责设计、状态/调用链、契约与命名规范、验证依赖规则 | 最终213/213；下方执行记录 |
 | complete | RF26 | 新领域模型、有序根结构与version 2序列化硬切 | RF25 |
 | complete | RF27 | Application会话、事务、用例及基础设施端口 | RF26 |
-| implementing | RF28 | 共享时间轴Presenter、输入状态机、几何与工作区 | RF27 |
-| planned | RF29 | Group/Track统一结构拖放、排序与指示线状态 | RF28 |
+| complete | RF28 | 共享时间轴Presenter、输入状态机、几何与工作区 | RF27 |
+| implementing | RF29 | Group/Track统一结构拖放、排序与指示线状态 | RF28 |
 | planned | RF30 | UI Toolkit被动视图接线与三项反馈修正 | RF29 |
 | planned | RF31 | IMGUI被动视图接线及统一交互规则 | RF30 |
 | planned | RF32 | 属性/菜单/设置/文档Presenter与业务扩展契约 | RF31 |
@@ -765,6 +765,17 @@ void ITimelineView.SetCapture(bool requested);
 - 定向：`034823Z-2e74ebcd`无窗口DocumentSessionTests 11/11；`112937Z-02094423`真实上下文/同批字节适配2/2。新增偏好适配测试纳入最终套件，合计新增14项。最终`20261113T114227Z-7e9d64d9`：Unity编译通过，NBC.ActionEditor.Editor.Tests EditMode **233/233，0失败/跳过/不确定**。覆盖假端口及真实文件/锁文件/外部冲突/导入失败、两UI真实输入、属性与预览。无资产目标，asset-validation skipped；不声称完整资源/Player Build/冷进程/性能或人工验收。
 - 离线：`20261113T114608Z-f92e4d8f`工作流46/46；Unity真实生成21项目701源码，方案0错误39既有警告、12.26秒。文档检查仍缺yaml/markdown_it，整体code profile blocked，未安装。git diff --check通过。保护路径仅核对状态不读取内容，不声称历史字节哈希证明。
 - 职责审查与下一项：应用层持会话/命令与端口，格式/文件/Undo/时钟/偏好/恢复为基础设施；没有把App整体改名搬入Presenter。当前上下文仍承担宿主装配与旧选择/播放，按RF28/RF32/RF33收敛。RF28开始中性输入、逐窗TimelinePresenter、渲染状态及交互状态机；RF29完成组块结构算法；RF30/31替换双UI内部手势，不在RF27虚报这些目标完成。
+### RF28 共享时间轴Presenter执行记录
+
+- 状态：complete（无窗口交互核心工程验收；双原生视图替换按RF30/RF31），2026-11-13。RF27提交`38035e9`后顺序推进；没有复制App为巨型Presenter或静态服务表。
+- 实现：`SelectionState`归Application并被现行上下文真实使用，保留Inspector请求语义，新增选择变更订阅。`PointerInput/KeyInput/WheelInput/TimelineSize/TimelineRect`为中性值；`TimeTransform/VisibleTimelineLayout`按当前图和工作区生成几何、命中和不透明键，图替换或移除释放旧键，不暴露可写集合。`TimelineRenderState/RowState/ClipState`是不可变值快照，空组CanFold=false。
+- 职责：逐实例`TimelinePresenter`协调会话、共享选择/剪贴板用例、工作区、播放头端口和ITimelineView；`TimelineInteraction`只处理片段移动/左右拉伸、框选、标尺定位、中键平移、分栏和捕获，`ClipGesture`独立持有快照/令牌/吸附参考，`ViewportNavigation`负责鼠标锚点缩放与过零平移。视图契约只有Render/SetCapture/ShowError；无UnityEditor/控件/Event.current/App/File依赖，程序集门禁实测通过。
+- 规则：最短0.01秒、短片段左柄优先、多选过滤锁定项且统一delta钳制起点、Toolkit原重叠提交检查；网格由磁吸开关控制，Shift仅绕过参考吸附，秒/帧步长取EditorSettings。缩放225步进、鼠标锚点、最小跨度0.25和240秒外扩限制统一；中键过零保留跨度。文本已消费快捷键不进入作者操作；框选Esc恢复按下前选择。
+- 生命周期：每窗独立Workspace/捕获/状态机，另一Presenter Cancel/Dispose不结束当前owner令牌；错误按钮松开不释放，越界松开取消。图替换/Undo取消并刷新引用；异常同时清理捕获和事务，清理期间播放头再次失败合并到错误反馈。Dispose幂等退订并清理行/片段键引用。Tick只刷新显示，结构手势及24px自动滚动按依赖进入RF29。
+- 独立测试：新增`NBC.ActionEditor.Tests.Presentation.TimelinePresenterTests`17项，不创建EditorWindow，不读取Event.current。覆盖完整Down→Move→Up→Undo/Redo、错误按钮/越界/Esc、两实例交错与另一窗释放、换图陈旧键拒绝、四锚点缩放/平移、分组折叠/框选/文本快捷键、Seek故障、锁定、吸附开关/Shift、多选间距、最小拉伸极限、同一中性输入两Presenter作者结果一致。这里的双实例不是实际双UI，真实输入适配验收仍须RF30/31，不以本项替代。
+- 失败证据：`115815Z-9ff9af1c`编译遇UnityEditor.EditorSettings同名，改用明确别名；`115913Z-5c64ced1`实际11/12，Seek故障后的取消再次Seek抛出，修复清理异常隔离；`120204Z-f55b6845`12/12。补充同输入/最小极值后`120953Z-feb41491`测试引用Storage导致实验DocumentSession同名，移除无必要using，`121057Z-5654830b`专项通过。未删业务断言或吞掉失败报告。
+- 最终：`20261113T121314Z-198128f5`Unity编译通过，NBC.ActionEditor.Editor.Tests / editor **250/250，0失败/跳过/不确定**。`121713Z-fae6a348`工作流46/46、真实生成21项目711源码方案构建通过；文档解析器yaml/markdown_it仍缺，整体code profile blocked。git diff --check通过，无asset目标为skipped；不宣称资源/冷进程/性能/人工验收。
+- 接入边界及下一项：当前两个产品窗口仍使用旧内部事件适配/绘制，RF28交付可实际驱动的共享核心，不以之宣称视图已被动化。RF29实现完整Group/Track结构落点、领域释放重验、插入线状态与自动滚动，再由RF30/31一次替换对应UI内部状态机，禁止增加旧名代理或双路fallback。
 #### RF24 静态职责清点补充
 
 以下按当前真实文件逐项指定目标职责，不代表已经实施、移动或验证。路径均相对`Assets/ActionEditor/`。已逐文件读取源码并提取声明、引用和具体平台API，专项检索混杂职责；此步骤不是完整方法级可读性验收。未读取用户数据。尚待真实调用者闭包和GUID清单复核的删除项不得执行。

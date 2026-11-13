@@ -31,7 +31,7 @@ namespace NBC.ActionEditor.Tests
             Assert.That(typeof(App).GetMethod("ConfirmDocumentSwitch"), Is.Null);
             Assert.That(typeof(App).GetMethod("OnObjectPickerConfig"), Is.Null);
             Assert.That(typeof(EditorTools).GetNestedType("TypeMetaInfo"), Is.Null);
-            var selection = new ActionEditorSelection();
+            var selection = new NBC.ActionEditor.Application.Editing.SelectionState();
             var requests = 0; selection.InspectorRequested += () => requests++;
             var item = new TimelineGroup();
             selection.Set(new IDirectable[] { item }, false);

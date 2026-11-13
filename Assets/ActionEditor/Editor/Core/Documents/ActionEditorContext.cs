@@ -16,7 +16,7 @@ namespace NBC.ActionEditor
         private readonly NBC.ActionEditor.Infrastructure.Documents.JsonDocumentRepository repository;
         public NBC.ActionEditor.Application.Documents.DocumentLifecycle Lifecycle { get; }
         public TextAsset Source => string.IsNullOrEmpty(Session.Path) ? source : repository.Load(Session.Path);
-        public ActionEditorSelection Selection { get; } = new ActionEditorSelection();
+        public NBC.ActionEditor.Application.Editing.SelectionState Selection { get; } = new NBC.ActionEditor.Application.Editing.SelectionState();
         public NBC.ActionEditor.Application.Editing.ClipboardState Clipboard { get; } = new NBC.ActionEditor.Application.Editing.ClipboardState();
         public NBC.ActionEditor.Application.Editing.StructureEditing Structure { get; }
         public NBC.ActionEditor.Application.Editing.ClipboardEditing ClipboardEditing { get; }
@@ -69,41 +69,6 @@ namespace NBC.ActionEditor
             Session.Changed -= OnSessionChanged;
             Playback.Stop(false);
             Session.Dispose();
-        }
-    }
-
-    public sealed class ActionEditorSelection
-    {
-        private readonly List<IDirectable> items = new List<IDirectable>();
-        public IDirectable[] Items => items.ToArray();
-        public int Count => items.Count;
-        public IDirectable First => items.Count == 0 ? null : items[0];
-        public bool CanMultipleSelect { get; set; }
-        public bool Contains(IDirectable item) => items.Contains(item);
-        public IDirectable[] ClickCandidate(IDirectable item, bool add, bool retainSelected)
-        {
-            if (item == null) return Array.Empty<IDirectable>();
-            if (retainSelected && items.Contains(item)) return Items;
-            return add ? items.Concat(new[] { item }).Distinct().ToArray() : new[] { item };
-        }
-
-        public event Action InspectorRequested;
-
-        public bool Set(IDirectable[] selected, bool allowMultiple)
-        {
-            var next = selected?.Where(item => item != null).ToArray() ?? Array.Empty<IDirectable>();
-            var changed = next.Length != items.Count || next.Any(item => !items.Contains(item));
-            if (allowMultiple && !changed) return false;
-            items.Clear(); items.AddRange(next);
-            CanMultipleSelect = allowMultiple && items.Count == 1 && items[0] is not TimelineClip;
-            if (allowMultiple && changed && selected != null) InspectorRequested?.Invoke();
-            return changed;
-        }
-
-        internal void Retain(ActionDocument document)
-        {
-            items.RemoveAll(item => document == null || !document.directables.Contains(item));
-            if (items.Count != 1 || items[0] is TimelineClip) CanMultipleSelect = false;
         }
     }
 
