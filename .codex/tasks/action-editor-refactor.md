@@ -3,12 +3,43 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF23 `complete`（限执行记录范围，RF23记录GUI输入重放间歇性风险）。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF17–RF23工程交付完成，等待用户实际体验。RF16完成后用户追加“我要先休息了，你往后执行任务。各种授权我都允许了，在这个系列任务中，不要等我回复而中断操作。”此真实授权覆盖RF17–RF23串行实施、必要的最小受审核工作流扩展、精确清单移动、隔离探针与逐项中文本地提交；不伪造另一次人工确认。
-- 下一步：用户按唯一教程在独立新样例中体验并完成H01–H09；本系列自动实施结束。保留两个UI与共用状态，数据格式按开发期硬切、不建设旧格式兼容。人工验收仍待用户实际使用，不自动进入Combat，不重建已取消循环，不保存/清脏/修改无关资源，不推送。
+- 当前执行任务：RF24基线及取消项清理完成，真实双UI症状复现通过，最终205/205；准备精确本地提交并进入RF25。具体规格以第4.3节及最新执行记录为准。
+- 下一步：按RF25实现具体职责契约及可运行最小用例，再顺序实施RF26–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
+## RF23后续：空目录清理（2026-11-12）
+
+- 用户本轮明确授权：“空目录或者无效的目录可以去掉了”。只清理ActionEditor迁移后确认无内容的目录，不据此删除实验实现、资源或用户数据。
+- 已完成：逐层目录清点，确认下列15个目录仅有目录及其meta，无源码/资源；检查生产路径和已跟踪Assets/Packages/ProjectSettings内目录GUID引用，匹配仅为待删meta自身。逐项preview/approve/apply，经AssetDatabase删除四个遗留根及全部子目录。未直接修改meta或使用文件系统删除。
+- 精确删除清单（以下均相对`Assets/ActionEditor/Editor/`，每项连同自身`.meta`）：`Def`、`Events`、`Events/Interfaces`、`GUIS`、`GUIS/ActionEditor`、`GUIS/ActionEditor/Views`、`GUIS/ActionEditor/Views/Base`、`GUIS/ActionEditor/Views/Timeline`、`GUIS/ActionEditor/Views/Timeline/ClipDraw`、`GUIS/Customized`、`GUIS/Customized/Header`、`GUIS/Customized/Inspectors`、`GUIS/Customized/Inspectors/Com`、`Tools`、`Tools/Extensions`。
+- 删除终态证据：Def `20261112T005803Z-b40f6b55`，Events `20261112T005911Z-c4d87d56`，GUIS `20261112T010002Z-64301ea1`，Tools `20261112T010053Z-aec8387f`均passed。最初Def apply工具调用长时间无运行记录后中断；检查目录仍在、审批未消费且无apply证据，重新doctor/预览/审批后才执行，未盲目复用旧凭据。
+- 保留：`Editor/Workbench/JsonTimelineCanvas.uss`仍是实际样式资源；Resources、Experiments及所有有内容目录保留。用户未跟踪Jsons/NewAction、Main CameraTimeline.playable及个人配置未读取、修改或暂存。本轮不改源码、Combat、包/设置，不擅自提交或推送。
+- 已验证：四个根及meta实际不存在；Git差异准确为15个目录meta删除（50行），没有源码/资源删除；`git diff --check`通过。`20261112T010413Z-2cdd4fd7`当前Editor编译up_to_date、0编译错误。测试发现仍为191项。
+- 首次验证阻塞（历史）：定向TypeCatalogTests异步运行已受理，但后续被本工程`Scene(s) Have Been Modified`模态框阻塞，未取得该次测试终态；没有把此前191/191旧结果作为此次通过。最初使用错误filter-type值full被参数校验拒绝，改为testName后才实际发起。未替用户选择Save/Don't Save/Cancel或关闭用户窗口。
+- 用户“继续”后补齐验证：doctor `20261112T121840Z-b18eab28`通过；`test status` `20261112T121931Z-727a9304`明确no_tests，无活动测试，模态已不再阻塞，旧终态不可恢复。重新发现`20261112T122000Z-d1add3a6`仍191项后，执行`verify --profile unity --test-filter NBC.ActionEditor.Tests.TypeCatalogTests --filter-type testName --test-mode editor --timeout 180`，`20261112T122052Z-eff2f8b3`编译及测试通过，**7/7，0失败/跳过/不确定**，包含RelocatedStylesAndExtensionAdaptersKeepTheirResourceAndTypeBindings。再次确认四个遗留根/meta未重现、无新增源码/资源差异。空目录清理及其定向回归完成；没有重跑全量191项、不宣称完整资产验收，H01–H09仍待人工体验。
+
+## RF23后续：UI Toolkit命名整理（2026-11-12）
+
+- 用户请求与授权：解释Json前缀历史后，用户明确“那就这样改一下”，按已展示的四个UIToolkit名称实施，只整理UI命名，不扩大到共享Core/JSON编解码器命名或功能重构。
+- 完成映射：`JsonActionWorkbench → UIToolkitActionEditorWindow`、`JsonTimelineCanvas → UIToolkitTimelineCanvas`、`JsonPropertyView → UIToolkitPropertyView`、`JsonPreferencesWindow → UIToolkitPreferencesWindow`，文件名与类型名同步；属性文件内`JsonInspectorTarget/JsonSelectionInspector`同步为`UIToolkitInspectorTarget/UIToolkitSelectionInspector`。现行创建入口、验证命令和测试调用同步，无旧类型兼容别名；命名空间、菜单、UI元素name/class/viewDataKey、布局及序列化格式保持不变。
+- Unity资源移动：在既有验证命令文件内加入固定零参数`rename_toolkit_ui`，只允许四个确定源/目标/GUID，拒绝已有目标及参数覆盖，预览绑定源码/meta哈希，AssetDatabase移动并逐项复核GUID/字节，SyncAll生成真实解决方案。工作流策略、参数拒绝测试及operations同步更新，不开放任意asset move或代码执行。首次命令属性误把完整命令放进group，注册诊断发现后修正，未在错误注册状态执行移动。
+- 移动证据：preview `20261112T123808Z-f366afef` → approval `20261112T123859Z-5c44fb8b`（引用本轮真实授权）→ apply `20261112T123918Z-c326c987` passed，4/4 GUID及meta字节保留。旧RF17历史移动清单及新命令的源路径字符串保留，不再次执行；样式`Editor/Workbench/JsonTimelineCanvas.uss`及引用保留，不把其当失效类型名批量替换。
+- 自动验证：TypeCatalogTests现明确断言四个新脚本路径的固定GUID、两个EditorWindow的MonoScript.GetClass绑定及既有样式加载。重新发现`20261112T124151Z-defcf91f`191项后，完整`verify --profile unity --test-filter NBC.ActionEditor.Editor.Tests --filter-type assembly --test-mode editor --timeout 600`，`20261112T124224Z-4a0dd402`编译通过、**191/191，0失败/跳过/不确定**，覆盖真实菜单/双UI/属性Inspector/预览生命周期等现有用例。RF23此前输入间歇性风险不因本轮通过自动认定根除。
+- 代码验证：`20261112T124611Z-7a2c07e3`工作流45/45，Unity生成的18项目674源码真实方案构建0错误43既有警告、10.19秒；整体code profile仍仅因缺少yaml/markdown_it文档解析器blocked，未安装依赖。`git diff --check`通过。合同/架构/验收文档仅在当前阅读区补充新名，历史证据不追溯改写。
+- 边界：用户未跟踪JSON、Timeline资产及个人配置未读取/修改/暂存，保留上一轮15份空目录meta删除；不改Combat/包/设置，不提交或推送，不声称Player Build、完整资产验证或人工体验验收通过。
+
 ## 1. 目标、范围与授权
+
+### RF23后续：鼠标锚点缩放与轨道排序/归组（2026-11-12）
+
+- 用户请求：缩放以鼠标悬停位置为中心；轨道拖拽排序、移出/加入组。明确选择“可以脱离所有组，成为根级独立轨道”及“IMGUI和UI Toolkit两个界面”。本轮实现限该功能，不提交/推送、不修改Combat或用户数据。
+- 状态：complete，限下列工程证据；人工体验未代签。共享ZoomAt保留225步进、最小0.25秒和原偏好作用域，鼠标时间固定；两UI时间区/标尺接线。共享落点处理前插/后插/组首/根级及滚动、视口边界；轨道标题拖动松开提交，Esc取消，双UI显示归属和插入提示。根级真实rootTracks列表位于组之后，支持根级排序、跨组及重新入组。
+- 模型/数据：Track保留根指针，根级Parent=null；AllTracks用于时长/预览/绘制/快照。图校验跨组/根拒绝共享所有权，Unique和锁定/Attachable重验；复制/剪切/删除、Undo/Redo、Recovery及磁盘快照覆盖根轨道。v1唯一新增可省略rootTracks：缺省强制空、空编码省略、null拒绝，其余字段仍严格。无旧格式迁移/别名/回退。合同与唯一教程已补充该成员及手势。
+- 失败与定位：最初Toolkit定向20261112T131502Z-f46121c4为1执行0通过1失败，不是零执行；补充捕获/落点断言后131734Z-d27194a9通过。首轮全量132010Z-0727bedb为198/199，原版窗口输入用例失败。后续逐次保留失败报告，确认窗口内容偏移与实际小视口未滚到根行，不能以无效窗口坐标测试行为；测试改用真实GUIToScreen内容偏移并滚动后140217Z-296e2a83定向通过。原版还固定拖动源并在文档变更后刷新旧行引用，防止释放选择变化/Undo取消换图后的陈旧缓存。临时诊断字符串已移除，保留有效断言。域重载期间Pipeline短暂不可达有独立blocked报告，未强杀/保存用户资源。
+- 最终Unity：20261112T140928Z-5b1a9555编译通过，NBC.ActionEditor.Editor.Tests / editor全量 **202/202，0失败/跳过/不确定**。覆盖BothRulersZoomAroundHoveredTimeWithoutAuthorChanges、OriginalTrackHeadersReorderDetachRejoinAndCancelThroughWindowInput（真实窗口、滚动、Undo/Redo、脱组、Esc后再入组）、ToolkitTrackHeaderCanMoveUpAndDetachWithoutLosingClips（真实指针、取消/外部释放）、RootTrackDiskSnapshotReopensWithClipsAndExactOrder（Temp唯一新目录可靠提交/新TextAsset打开/清理）、根级顺序复制剪切锁定Recovery及锚点0/.25/.75/1最小跨度。发现140856Z-a02922af尚199，verify编译后实际执行202，不冒充发现结果已更新。
+- 最终发现：20261112T141406Z-fdb5c779重新test list明确202项，与最终执行计数一致。
+- 离线：20261112T141259Z-30ecbf66工作流45/45，真实生成18项目674源码解决方案构建通过，0错误43既有警告、11.60秒；git diff --check通过。code整体仍因yaml/markdown_it缺失blocked，未安装依赖。测试磁盘文件仅Temp本次唯一目录，无已有资源覆盖，未修改用户未跟踪JSON/Timeline/个人配置。未宣称OS全桌面人工操作、Player Build、跨进程引用或完整资产验收。
 
 目标：完善 ActionEditor 通用编辑平台，将 Combat 整理为第一套完整业务扩展。新工作台原生使用 UI Toolkit，自定义二维时间轴；Scene Handles/EditorTool 与三维预览独立。
 
@@ -373,7 +404,511 @@ Assets/ActionEditor/
 4. 遇到实验模块删除、数据覆盖、工程外导出、包/设置变更、未知移动能力或布局/操作习惯冲突时停下确认；不得以“开发期硬切”扩大权限。编译、精度或数据安全验证失败不能勾选完成。
 5. 人工验收H01–H09保持待验，直到用户明确实际验证；当前的“粗看没明显问题”不作为通过。最终回复说明下一项与真实阻塞，不能把规划完成写成实现完成。
 
-## 5. 分项实施与验收（A–F历史路线，当前优先第4.2节）
+## 4.3 MVP硬切与结构拖放 RF24–RF37
+
+本节是当前实施规格，优先于第1节及第4.2节中保留旧模型名称、旧布局差异、仅RF16–23授权和逐项等待的限制；数据安全及Unity审核边界继续有效。前文与历史执行记录不是本阶段兼容要求。MVP只规定总体架构方向，不是已经完成的具体设计，也不要求把所有职责强塞进Model/View/Presenter三个类。
+
+### 4.3.1 已确认范围及执行授权
+
+- 本会话只列详细任务，不实施。新会话由用户启动本节后，允许按依赖连续实施、自行验收，安全阻塞时记录并停止受阻项，不以等候人工体验为工程任务阻塞。
+- 本轮补充需求：按职责完整重构，以表现与逻辑分离、高可读性为交付目标；具体模块、类、接口、状态、调用链及目录由执行代理主动设计并验证。不能以“符合MVP”代替具体设计，也不能把拆分类、命名和依赖取舍退回用户决定。
+- 不以过往代码结构、API、类型/文件/目录命名习惯、测试名称、格式或操作分支为兼容目标。保留的是本节明确要求的产品能力与数据正确性，不是历史实现。重构后生产代码、测试、样例和当前教程只描述当前意图，不保留改造日志和来龙去脉；真实执行证据留在本任务记录。
+- 代码添加精简中文注释：类/方法说明仅写意图和作用；具体规则、边界、顺序及资源释放理由紧邻对应逻辑代码。禁止把函数实现说明、历史修复过程、任务编号或变更日志堆在类/方法头部。注释和可读性是每项完成门槛，不是最后可选润色。
+- 两个产品界面都保留，共享核心逻辑和Presenter；交互规则统一，以当前UI Toolkit规则为起点，以下明确规则优先。IMGUI/UI Toolkit是技术名，不是旧/新版产品名。
+- 结构移动只显示插入线，不显示“移到根级”“加入组”“不能放置”等拖动文本。线覆盖时间轴主体的全部可绘制宽度，包括轨道标题区和时间内容区，不跨顶部工具栏、底栏或垂直滚动条。
+- 空Group隐藏展开/折叠图标，保留相同宽度的对齐占位。Group和根级独立轨道允许任意交错排序；不允许组嵌套。
+- 代码、目录、命名空间、程序集、菜单、样例和存储契约均可重定。删除核对无现行用途的实验实现、历史专用验证入口和无用依赖，不保留兼容壳、旧名别名、旧格式探测、迁移器或双写。复用经验证的算法，不复用混乱职责。
+- 允许必要的固定清单AssetDatabase移动/重命名/退役、新测试资产验证及最小审核工作流扩展。仍执行preview→展示精确范围→approve引用本次真实授权→apply；不伪造另一条人工确认，不将宽泛权限变成任意代码执行。
+- 每项通过后可中文本地提交，限定已核对的ActionEditor工作及专属文档。当前多轮未提交改动先核对归属；禁止git add全工程、覆盖未知改动、提交用户未跟踪文件或推送。
+- 用户确认原JSON有问题并取消修复。`Assets/NewAction.json`此前仅获只读检查，未修改；修复preview `20261112T142822Z-1bf6a677`失败于类型身份，未approve/apply，无修复副本成功记录。当前新增的`RepairNewActionCopy`及workflow策略/测试/规程说明是已取消任务的未提交准备物，RF24逐项移除，不得继续创建副本/探针或迁移旧文件。
+- 不改用户JSON/Timeline资产及个人配置，不改Combat、包/ProjectSettings、不安装依赖、不强杀Editor、不运行Player Build。硬切允许开发中的编译失败和API/格式断裂，但不允许丢用户工作、降低验收或以失败状态交付。
+
+### 4.3.2 目标职责与依赖
+
+采用被动视图MVP，禁止把现有App换名为另一个巨型单例。一个共享编辑会话、选择、剪贴板、播放头及Undo；每个窗口有独立视域/滚动/焦点和手势捕获所有权。Presenter实现共享，每个窗口建立自己的Presenter实例，绑定同一应用会话；取消只影响本窗口拥有的手势。
+
+```text
+Runtime/Domain/                 文档/组/轨/片段、所有权、时间与能力规则
+Runtime/Metadata/               业务声明Attribute、类型描述，不含具体UI发现
+Runtime/Serialization/          唯一格式、值树、严格校验和引用解析端口
+Runtime/Samples/FeatureSample/  无Legacy前缀的当前样例业务
+Editor/Application/            用例、会话、事务、选择/剪贴板、属性操作、播放协调
+Editor/Presentation/Contracts/  视图/输入/输出契约，不含UnityEditor或控件类型
+Editor/Presentation/Presenters/ 文档、时间轴、属性、播放、设置Presenter
+Editor/Presentation/Timeline/   几何、输入状态机、命中与插入指示数据
+Editor/Infrastructure/         文件提交/AssetDatabase/Undo/时钟/偏好/恢复/类型发现适配
+Editor/Views/IMGUI/             被动IMGUI窗口、绘制、控件和原生事件适配
+Editor/Views/UIToolkit/         被动原生VisualElement窗口、绘制和事件适配
+Editor/Composition/            唯一组合根、菜单、Editor生命周期、Inspector桥接
+Editor/Resources/              当前产品样式、图标、语言资源，按用途子分
+Editor/Extensions/             双UI业务扩展契约及装配，不混入核心规则
+Editor/Verification/           仍有用途的固定范围工程验收命令
+Tests/Editor/                  按Domain/Application/Presentation/Infrastructure/Views分目录
+```
+
+- 程序集边界：`NBC.ActionEditor.Domain`、`NBC.ActionEditor.Serialization`、`NBC.ActionEditor.Application`、`NBC.ActionEditor.Presentation`、`NBC.ActionEditor.Editor`、`NBC.ActionEditor.Editor.Tests`及专用Verification Editor程序集。Domain/Serialization不引用UnityEditor；Application/Presentation无UnityEditor及IMGUI/UI Toolkit依赖；Editor装配基础设施和两个视图。必要UnityEngine值类型可用，不追求与Unity脱离的抽象框架。
+- 允许依赖：Serialization→Domain；Application→Domain及窄端口；Presentation→Application/Domain；Editor→以上并实现端口。Application不反向依赖序列化具体实现、文件系统或窗口。通过程序集引用及测试约束，不仅靠目录约定。
+- Model持有文档事实和合法性；Application执行用例并管理事务；Presenter解释用户意图、协调服务、生成只读视图状态；View只绘制和上报意图。输入适配仅处理坐标/按钮/捕获/原生焦点，不计算业务规则或直接修改模型。
+- 窄接口由使用方层定义，例如`IDocumentRepository`、`IUndoHistory`、`IEditorClock`、`IPreferencesStore`、`IDocumentView`、`ITimelineView`、`IPropertyView`。只为真实替换边界建接口，不为每个类造接口，不建立全局服务定位器或万能事件总线。
+- 目标词汇：`ActionDocument`、`TimelineGroup`、`TimelineTrack`、`TimelineClip`；`DocumentSession`、`DocumentEditTransaction`；`DocumentPresenter`、`TimelinePresenter`、`PropertyPresenter`、`PlaybackPresenter`。名称按当前职责选定，不以旧名替换表决定类边界；编辑用例按能力划分，不能汇入万能`DocumentCommands`或`PropertyEditingService`。两窗口为各自命名空间内的`ActionEditorWindow`，菜单统一`NBC/Action Editor/IMGUI`及`NBC/Action Editor/UI Toolkit`。Json仅用于真实JSON格式实现，不用于会话、命令、属性或UI名称。
+- 根结构唯一为有序`RootItems`（仅Group/Track）；Group持有Tracks；Track持有Clips。不再并存groups/rootTracks再拼接、不用索引映射表伪装混排。组移动携带整个子树，轨道只能有一个所有者，Parent/Root为派生关联不持久化。
+- 新存储显式`actioneditor.json` version 2，严格当前字段和完整类型身份，所有新契约成员必需，无v1/裸根回退。重命名造成旧样例失效属硬切范围，但不自动转换或覆盖既有文件。新类型注册、快照、Undo、Recovery、复制和导出统一消费新图。
+- 保留数据正确性：float原始位（含负零）、多态/集合/null、曲线/引用、隔离回调、严格图校验、原子提交、外部revision保护、导入失败字节已提交语义。不可借硬切改成有损浮点、弱校验或吞错。UI Toolkit不嵌IMGUI容器冒充原生视图。
+
+#### 4.3.2.1 具体设计责任与职责划分
+
+上面的目录和词汇是实施目标骨架，不是让现有文件逐个套新名称。RF25由执行代理给出能落实到代码的设计，后续按用例实现；必要的内部设计细化自行判断，涉及已确认产品要求或安全边界才请用户取舍。
+
+| 职责 | 承担内容 | 不得承担内容 |
+|---|---|---|
+| 领域模型与规则 | 文档事实、所有权、时间/锁定/能力合法性、可独立测试的规则 | 控件、像素、窗口、文件对话框、Undo API |
+| 编辑用例与会话 | 组织领域操作、事务与撤销边界、共享选择/剪贴板、文档操作结果 | 原生事件分发、绘制、文件/Unity具体API |
+| 交互状态机 | 手势阶段、候选值、提交/取消、捕获请求、输入优先级 | 第二套模型规则、直接持久化、原生控件 |
+| 几何与布局计算 | 时间/像素转换、可见行、命中、组块边界、线位置 | 修改文档、发起保存、控制播放资源 |
+| Presenter | 将视图意图转为用例/交互输入，组合只读显示状态，更新对应View | 重写领域校验、实现原子文件提交、绘制控件、承包所有手势细节 |
+| View与渲染器 | 原生布局/控件/绘制、样式、焦点/坐标/事件适配，发出意图 | 直接写模型、决定编辑规则、读写存储、通过静态门面取得业务状态 |
+| 基础设施适配 | 文件/AssetDatabase/Unity Undo/时钟/偏好/恢复/资源引用等具体实现 | 决定业务策略、持有窗口内部状态 |
+| 组合根与生命周期 | 显式创建依赖、注册/解除订阅、明确共享与逐窗对象归属 | 执行业务用例细节、成为全局服务定位器 |
+
+- 共享规则只有一个权威实现：菜单可用性、拖放预检和提交校验调用同一规则，不把条件分别复制到View、Presenter和命令。必要提交重验是重复调用同一规则，不是复制算法。
+- 显示数据、交互候选和作者模型分别表达；View接收只读状态或明确差量，不持有可写文档入口。事务完成后由会话变更通知驱动Presenter重新生成显示状态，不靠View互相调用刷新。
+- 每个用例明确输入、输出、前置条件、失败结果、写入范围及Undo/副作用；每个有状态对象明确状态所有者、有效期、订阅解除、异常/取消后的不变量。
+- 代表调用链必须具体到职责：原生输入→意图/中性输入→交互计算→用例重验并提交→会话通知→Presenter显示状态→原生绘制。属性提交、保存和播放各给出对应调用链，不能只有拖动场景符合分层。
+- 避免过度设计：按内聚职责拆模块，不按每个方法拆类；无真实替换边界不加接口，无实际用途不建空层、通用框架、万能Manager/Helper/Utility或大量透传方法。简单明确的直接调用优先于隐藏调用关系的机制。
+
+#### 4.3.2.2 可读性、命名和注释规范
+
+- 文件/目录/类/方法用当前领域及职责命名，不用新旧、版本、迁移阶段、任务编号或修复过程命名；已有NBC产品标识和IMGUI/UI Toolkit等准确技术名不属历史兼容层。测试以当前能力和预期命名，不继承Legacy、RF编号等旧测试组织习惯。
+- 一个方法围绕一个明确动作，先检查前置条件，再执行主流程，最后统一收尾；优先有意义的局部变量、明确参数、早返回和窄作用域，避免多层嵌套、隐式共享状态、布尔参数组合及重复条件。复杂度失控时拆分职责，不靠长注释替代重构；不设凑数的行数门槛。
+- 新建或实质重写的生产类、接口和关键/非直观方法补充一行精简中文用途说明；声明处只解释“负责什么”，不重复签名、不列实现步骤、不逐个装饰显而易见的访问器。公共契约确需说明的前置条件/返回语义保持精简，具体分支说明放到实现位置。
+- 局部注释紧邻需要解释的计算、规则分支或资源操作，说明意图、约束、特殊顺序或单位，例如“先移除源项，再校正同列表插入位置”；不逐行翻译代码，不写“为修复某次问题”“兼容旧版”“RFxx新增”等历史叙述。
+- 时间/坐标单位、提交与导入的先后、捕获owner、取消/回滚边界、快照隔离及原始float位等不直观约束，在实际执行位置注明。不要将这些逻辑说明堆进类或方法summary。
+- 注释随实现同步删除或改写，无注释掉的旧实现、永久TODO迁移占位、作者/日期/修改记录头。必要运行时诊断仍在对应失败边界记录当前操作和原因，不把“无需历史日志”误解成删除有用错误诊断，也不记录用户数据或秘密。
+- 使用当前术语组织测试和文档；历史决策、运行编号、失败修复证据只留任务记录。不得为了删历史叙述改写真实证据或破坏第三方许可证。
+
+#### 4.3.2.3 每项结构与可读性验收
+
+每个实施项除功能验证，还必须审查本项全部新建/实质重写的生产文件：职责是否单一、依赖是否单向、业务规则是否唯一、状态归属是否明确、命名是否反映当前职责、用途与局部注释是否精简准确。任一项不满足就继续重构，不能把问题全部推迟至RF34或RF36。
+
+RF36对最终源码全量复核上述要求，并抽查结构编辑、属性编辑、存储和播放四条真实调用链。架构测试证明可自动判定的边界，人工代码审阅判定职责和可读性；不能仅凭测试通过、文件行数下降、目录齐全或Presenter类存在判定完整重构成功。
+
+### 4.3.3 统一交互细则
+
+1. 标题左键拖动3px以上进入结构手势；折叠/锁定/菜单按钮不启动拖动。仅松开主按钮提交，一次成功移动一次Undo；同位/原位无操作不新增Undo、不标脏。
+2. Track→轨道上半行前插、下半行后插；所有者取目标轨道当前所有者。Track→Group标题的内容区域加入该组第一条；空组/折叠组同样可接收，放入后展开以显示结果。目标Attachable/Unique/锁定在开始和释放时校验。
+3. Track根级落点由最左20px根缩进区确定：组标题上/下半行分别置于该组整个块前/后；组内部行对应所属组整个块前/后；根轨道上/下半行前/后；主体行下方空白追加到根末尾。普通轨道缩进区按第2条归组，根区与入组区不得重叠解释。
+4. Group标题拖动只做根级排序：在任意组块上半区域之前、下半区域之后插入，展开子轨视为同一块；根轨道行上/下半之前/之后。不能把Group放入Group或Track，不能拆散被拖组。空组/折叠组照常排序。
+5. 锁定源组不可移动，锁定组下轨道不可移出/重排/接收。移动未锁定组携带其子树，不单独改子轨内容；子轨自身锁定不阻止所属未锁定组整体换位。禁用状态不等于锁定。
+6. 共享`InsertionIndicator`只包含可见性、有效性、Y/线宽/颜色，不携带拖动提示文本；View从主体x=0画至可绘制右边界，合法蓝线，命中但被规则拒绝红线，越界不显示。无标题宽度截断，无被子行遮挡或滚动裁切后的短线。
+7. 空组不生成可点击折叠控件；添加首轨后出现，删掉/移走末轨后消失，Undo/Redo同步恢复；占位不改变标题对齐。折叠是窗口工作区状态，不改变作者内容。
+8. 拖动支持滚动视口与边缘自动滚动：上下24px边缘区内，按距边缘程度从0至300px/秒滚动，基于时钟步进且不超滚动范围；每帧重新计算落点。窗口外释放、Esc、失焦、捕获丢失、关闭、文档替换、Undo使当前手势取消并清理线/捕获/事务；错误按钮释放不提交也不窃取主按钮捕获。
+9. 时间缩放继续以鼠标时间为锚点，标尺/时间内容区一致，最小跨度0.25秒；允许负视域但片段Start非负。两UI统一225×滚轮方向/窗口宽×跨度步进及现有240秒外扩限制；滚轮缩放统一受设置开关控制。左标题区滚轮仅垂直滚动，中键平移过零保留跨度。
+10. 片段统一最短0.01秒、左手柄优先、UI Toolkit现有重叠和多选过滤规则；网格量化跟随磁吸开关，Shift仅临时绕过邻近参考磁吸，秒/帧步长由显式偏好确定。属性编辑与手势消费同一时间合法性规则，不再保留原版0.1秒和旧边界分支。
+11. 点击选择/Ctrl追加、框选、复制剪切粘贴、删除、属性提交/取消及快捷键统一通过Presenter。文本输入优先消费文字编辑快捷键，不能被时间轴抢走。两个窗口共享作者状态，不共享滚动或活动捕获。
+
+### 4.3.4 逐项任务及完成门槛
+
+| 状态 | 编号 | 交付 | 前置 |
+|---|---|---|---|
+| complete | RF24 | 清理取消项、可执行基线、逐文件归属及退役清单 | 最终205/205；下方执行记录 |
+| planned | RF25 | 具体职责设计、状态/调用链、契约与命名规范、验证依赖规则 | RF24 |
+| planned | RF26 | 新领域模型、有序根结构与version 2序列化硬切 | RF25 |
+| planned | RF27 | Application会话、事务、用例及基础设施端口 | RF26 |
+| planned | RF28 | 共享时间轴Presenter、输入状态机、几何与工作区 | RF27 |
+| planned | RF29 | Group/Track统一结构拖放、排序与指示线状态 | RF28 |
+| planned | RF30 | UI Toolkit被动视图接线与三项反馈修正 | RF29 |
+| planned | RF31 | IMGUI被动视图接线及统一交互规则 | RF30 |
+| planned | RF32 | 属性/菜单/设置/文档Presenter与业务扩展契约 | RF31 |
+| planned | RF33 | 播放预览、生命周期、Undo/恢复/保存完整闭环 | RF32 |
+| planned | RF34 | 删除旧架构/实验/无用入口与残留命名 | RF33 |
+| planned | RF35 | 双UI真实操作、边界矩阵与持久完整回归 | RF34 |
+| planned | RF36 | 冷进程/资源测量及全量职责、可读性、命名和注释验收 | RF35 |
+| planned | RF37 | 当前架构文档、唯一教程、最终验收与交付 | RF36 |
+
+**RF24｜基线与取消项清理**
+
+- 检查所有未提交改动的真实diff和归属，列出可提交文件与保护文件，不把所有现有变化混入本轮首项提交。之前目录删除/四个UI源码移动需保留GUID证据，不能当新一轮可删除用户工作。
+- 保护所有未知未跟踪项，当前还包括`Assets/NewAction1.json[.meta]`及`ProjectSettings/TimelineSettings.asset`；只核对路径/状态，不读业务内容、不修改/暂存。用户Jsons、NewAction、Main CameraTimeline及WhootActionSequencer配置继续保护。
+- 移除本轮已取消修复的命令、workflow策略项/拒参清单项及operations说明，保留未涉及修复的同文件改动。确认没有修复副本和创建探针，若已有未知同名文件只能报告，不删除。
+- 记录当前实际编译/测试发现和执行结果；202/202仅是上一轮结果，不作为新阶段通过。复现短线/文本、空组图标、Group不可拖动三个现象，并补现有正常数据安全特性断言。
+- 同一任务内产出逐文件“保留/拆分/改名/移动/删除/替代”清单，包含调用者、测试、资源GUID与外部依赖；识别Experiments、FullSerializer标记/DLL、旧工作流专用命令、旧样式及Inspector代理的现行用途。删除前核实所有真实调用者，不以名称判断。
+- 上述清单用于覆盖率与安全审计，不要求沿用现有类结构；“保留”必须说明其职责已符合目标且无历史耦合，算法可取用不等于把旧文件搬入新目录。列出现有职责混杂点及要验证的产品能力，不把旧测试/代码逐字不变作为要求。
+- 验收：取消项不可执行，用户文件字节未变；基线和缺陷复现可追溯；所有生产文件有明确目标职责，未判定项列为阻塞而非默认搬入Common。
+
+**RF25｜具体职责设计、契约与命名规范**
+
+- 将第4.3.2节落实为精确类型/namespace/asmdef/文件路径/资源键设计，按目标职责设计后再建立旧文件去向映射，不反过来沿袭旧文件结构。具体类与方法由执行代理规划，MVP标签不是交付物。
+- 在本任务记录中补齐设计清单：模块/类职责、输入输出、依赖与端口、状态归属/生命周期、失败/取消语义、订阅释放，以及结构编辑/属性编辑/保存/播放四条具体调用链；接口给出关键签名、显示状态字段和意图示例，防止空泛分层。
+- 明确领域校验、用例事务、交互状态机、几何、Presenter、View和基础设施的边界；Timeline/Document/Property/Playback Presenter只做各自协调。把复杂算法放入具体职责组件，禁止巨型Presenter或万能命令/服务类接替原App。
+- 将第4.3.2.2节落实到代表代码样式：一行声明用途、局部逻辑意图注释、当前命名及简单主流程。实际接口与调用链验证这些约定，不能只口头承诺最后再整理。
+- 装配根显式构造一个共享Application会话，逐窗口创建/销毁Presenter与View；Unity窗口、对话框、Inspector Selection、AssetDatabase、Undo、SessionState与EditorApplication只在适配层。
+- 引入程序集引用门禁及源码架构测试：禁止App静态门面/全局可变Window/Width、Presenter引用控件/EditorWindow、View调用仓储/序列化/直接写模型、Domain引用Editor，禁止隐式反向依赖。
+- 验收：设计清单具体可执行，四条调用链职责和状态无歧义，实际生成工程能验证依赖约束；代表最小用例走通，不只写接口图。移动/删除通过固定清单审核命令实施，不手改meta/GUID或生成项目。
+- 分阶段接入时可让尚未迁移调用者继续使用原实现；不得新增旧名代理、双路fallback或临时接口转发层。RF26涉及类型断裂时，同项完成必需调用者的机械迁移以恢复编译，后续RF27–RF33再按职责拆解；不能把“每项可编译”误解为允许兼容壳。
+
+**RF26｜领域与格式硬切**
+
+- 用唯一有序RootItems表达组/根轨混排，重建所属关系和遍历；组/轨/片段类型、能力和时间规则使用明确名称。折叠/滚动/视域归窗口工作区，选择/播放/事务不进入存储图；作者范围、激活/锁定和业务参数保留。
+- 唯一version 2格式与类型目录，清除optional rootTracks等旧模型结构特例，不增加旧格式适配器；快照、内容比较、复制片段、Recovery同时切换。新Recovery用新契约ID，不静默接受旧快照。
+- 编写独立手写新契约fixture：Group/根Track交错、多态片段/空组/曲线/引用/float极值与负零；严格拒绝重复所有权/嵌套组/失效类型/非有限数/缺未知字段。验证读入不使用构造器默认样例补内容。
+- 验收：从新建→编码→解析→重建顺序/所有权一致，作者内容与工作区隔离；保存精度/安全门禁不降级。新模型可临时让未迁移UI编译失败，但该项最终需以已明确范围的可编译工程/测试证明，不以“后续再看”完成。
+
+**RF27｜Application与基础设施**
+
+- Session不依赖Json具体类；事务明确owner/token、提交/取消/重复/陈旧令牌与异常回滚。创建、打开、保存、另存、导出、结构编辑、属性编辑通过用例调用，View不操作集合。
+- 把可靠字节提交、导入、Undo、时钟、偏好和恢复实现移到Infrastructure；统一成功/失败结果，创建/导入/打开失败不得被日志吞掉后继续宣称成功。导入失败保留已提交字节和revision，不能重试覆盖。
+- 验收：使用假端口和真实文件适配各覆盖成功/失败/外部冲突/锁文件/导入失败；保存和导出不修改活动选择/捕获/预览，失败不切来源或清脏。
+
+**RF28｜共享时间轴Presenter**
+
+- 提取中性Pointer/Key/Wheel输入、布局尺寸与坐标变换、命中结果、可见行、不可变渲染状态。原生Event/PointerCapture只留View适配，禁止从Event.current推导共享状态。
+- 片段移动/拉伸/框选、标尺定位、缩放/平移、分栏调整、取消和多选快照进入独立交互状态机，由TimelinePresenter协调。统一第4.3.3节规则，删除双UI的不同解释。
+- 工作区归每个窗口，渲染状态不向View暴露可变领域集合；Undo/文档替换更新引用或标识，不保留失效行缓存。测试两窗口并行展示/交错输入及另一窗口关闭不误取消owner。
+- 验收：不创建EditorWindow即可驱动完整输入序列，结果与预期模型一致，异常/取消清理捕获请求、预览态和事务；跨实现同一输入得到同一作者状态。
+
+**RF29｜结构拖放**
+
+- 一个结构命令处理根Group重排、根Track重排、组内前后、跨组、脱组、重新入组，正确处理同列表下移删除后的索引、相邻无操作及根混排。
+- 不在每帧修改模型；落点候选引用真实所有者和插入边界，提交前重验锁定/Unique/Attachable/文档版本。组块几何取整个展开子树，不按某个子轨错误拆分落点。
+- 实现自动滚动/空白/空组/折叠组/视口边界；折叠接收后的展开由工作区事件完成。插入线状态覆盖完整宽度、只画线；无效落点不弹拖动文字。
+- 验收：全部结构变化一步Undo/Redo恢复树与顺序，源轨片段参数逐字段一致；根混排保存重开保持；取消/无操作不留空Undo或作者脏。
+
+**RF30｜UI Toolkit视图**
+
+- 将大Canvas按Renderers、Controls、InputAdapters和窗口容器拆分；只消费Presenter状态，发送意图，处理原生捕获。菜单可用性和错误结果由Presenter/用例提供，不在控件回调里再做业务校验。
+- 全宽插入线独立overlay，移除三种拖动文本；空组折叠控件不创建，保留对齐占位；Group标题支持拖动且不抢按钮点击。Viewport resize/滚动/高DPI坐标及时重算。
+- 验收：真实VisualElement Pointer/Key/Wheel事件通过窗口入口覆盖三项反馈与根混排，检查渲染命令线端点、无文本、空组控件树和点击行为；截图保留辅助证据但不替代断言。
+
+**RF31｜IMGUI视图**
+
+- 替换OriginalTimelineGesture及旧ClipDragger职责，ViewBase不再拥有第二套业务手势/全GUI事件事务；保留必要IMGUI事件适配、布局和平衡，所有编辑走同一Presenter。
+- 分开时间轴渲染、轨道标题、标尺、片段、输入适配，消除静态_itemViews/全局viewport/Width耦合。全宽插入线在统一主体坐标overlay绘制，不被BeginScrollView/Clip裁成标题短线。
+- 验收：真实窗口SendEvent覆盖折叠/滚动/高DPI内容偏移、组拖动/跨组/根混排、Esc后重拖、外部释放与Undo；不是只测试旧Gesture适配器。与Toolkit同输入同结果。
+
+**RF32｜其余Presenter与扩展**
+
+- 属性Presenter处理字段描述、路径、条件/选项、集合编辑、延迟文本提交和取消；View只建控件。文档、播放、设置Presenter统一按钮/快捷键/菜单意图，移除UI对App/Storage直接依赖。
+- 业务元数据与编辑器扩展发现分层；精确绑定/显式子类匹配/冲突报错保留。IMGUI/Toolkit Header和属性View扩展分别声明，不在Runtime契约携带绘制API。不将测试/Verification类型加入产品创建菜单或生产可保存目录。
+- 当前样例名称/路径/类型切至FeatureSample，新类型身份和菜单同步，不保留LegacyExperience命名转发。所有现行调用者直接迁移，无“暂时桥接”交付。
+- 唯一教程随样例通过AssetDatabase移动为`Assets/ActionEditor/Samples/FeatureSample/README.md`，修正全部现行链接；不保留旧路径副本、跳转README或第二份使用教程。
+- 验收：两个UI字段/菜单能力一致，条件字段/非连续选项/null数组和嵌套struct经真实控件编辑，锁定/陈旧路径拒绝；不调用测试类型构造器，不产生重复注册。
+
+**RF33｜生命周期及完整存储**
+
+- 组合根只注册一次Unity update；播放/预览资源单所有者、部分初始化失败释放、重复释放幂等。窗口开闭/失焦/重载时分清会话与View生命期，不跨窗口误清数据。
+- 两入口新建、打开、保存、自动保存、SaveChanges、另存、导出、撤销、Recovery全部走新用例；Unity Object引用仍为持久GUID/localFileId，不退回路径/实例ID。
+- 验收：隔离新目录内完整新建→编辑→组/轨混排→保存→关闭重开→导出读回；当前用户会话与资源保持，故障注入证明字节提交前后语义。域重载实际验证只在无未保存用户内容且审核范围允许时执行，不能杀进程或代选保存模态。
+
+**RF34｜退役与命名清扫**
+
+- 按RF24清单删除实验模型/工作台及只服务其的菜单、注册、测试、样式/资源；保留属于新产品的实际用例断言，不能靠删测试降低功能要求。FullSerializer标记替换为本产品明确字段策略后，无引用才删除DLL与孤立包装。
+- 清理App/旧静态Player入口、Json前缀中性类型、Original/Legacy/Workbench/Customized/Com/GUIS/Def等历史职责名；IMGUI/UI Toolkit、JSON具体实现和第三方许可名称不属于禁用历史名。
+- 固定验证命令按能力命名，移除已消费的一次性移动/已取消修复入口与死policy，保留当前所需验收能力。资源/源码删除移动均经AssetDatabase；空目录连meta按精确清单退役，不删用户数据。
+- 验收：新产品源码/菜单/资源键不存在旧别名、弃用兼容层、fallback和死依赖；新程序集反射加载与所有实际MonoScript/样式绑定通过；历史任务证据中的字符串不当作代码残留删除依据。
+- 同步清理测试类/方法、源码注释/summary、资源键和当前文档中的迁移阶段/历史叙述；不靠保留旧测试名或旧路径来适应验证工具，固定命令/筛选器与真实新身份同步调整。
+
+**RF35｜功能验收矩阵**
+
+- 每个UI分别跑：组首/尾/中间上下移；展开组整块移动；空组/折叠组；轨道组内上下移、跨组首末、脱组/入组、根Group/Track交错、同位及相邻无操作；连续多次操作中途Undo/Redo；删除末轨/添首轨图标同步。
+- 每个UI分别跑：滚动后拖放、不同尺寸与分栏宽、24px边缘自动滚动上/下界、视口外松开、错误按钮、Esc、捕获丢失、失焦、关闭、文档替换、拖动中另一窗刷新；锁定源/目标/子轨、Unique、Attachable拒绝且整图不变。
+- 绘制验收：线两端覆盖主体全宽、无拖动文本、正确层级/裁剪/颜色；空组无折叠可点击区域但对齐不变。以View实际绘制输出/控件和真实输入验证，不只测一个Geometry函数。
+- 回归：两个UI鼠标锚点缩放/平移/吸附、片段/属性/集合/菜单/快捷键/播放，严格浮点位/曲线/类型/引用、外部写冲突、原子提交/导入失败、创建/导出新路径保护与取消。
+- 验收：发现最终测试身份后执行相关单测及完整`NBC.ActionEditor.Editor.Tests` EditMode。计数按实际新增/迁移后的身份核对；实验测试删除必须映射被删除能力及保留要求，202不是新阶段固定计数。每次失败保留证据并修复，不重跑到绿后隐去失败。无对应PlayMode能力不拿包测试替代；不运行Player Build。
+
+**RF36｜资源与结构质量**
+
+- 新进程检查真实生成sln/csproj源码覆盖及构建；新增进程冷首调用测试Presenter/渲染状态/完整序列化并计入初始化，输入为样例及RF24选定的最大可重复合成文档。记录规模、时间、分配/存活对象和首调用/热调用，不编造性能达标预算。
+- 同一窗口重复开闭、重建控件、100次拖放/取消/Undo与双窗切换后，订阅/捕获/预览资源恢复初始值，无随次数增长的缓存、残留事务或用户资源写入。测量依据变化则对最终产物重新测量。
+- 架构门禁检查真实程序集引用与源码：业务规则不在View重复、Presenter不依赖具体View/UnityEditor、Application不调用AssetDatabase/File/Selection，命名/目录按RF25映射无漏项。静态搜索与代表调用链审查并用，不只看文件夹名称。
+- 对新架构生产源码全量检查第4.3.2.1–4.3.2.3节，记录结构/属性/保存/播放四条最终真实调用链和发现问题；修复职责漂移、巨型类/方法、无意义透传、历史命名、缺失/过量/过时注释。关键规则在具体实现处有精简意图说明，类/方法头无日志或改造故事。
+- 验收：方案0编译错误、结构门禁通过、重复操作无资源增长；既有警告/无法进行的真实冷Editor测量明确列出。缺依赖不自动安装，不能写整体full passed。
+
+**RF37｜交付**
+
+- 更新现有合同/架构文档当前区为最终结构及唯一version 2契约，入门教程只写当前两个菜单/同一真实操作链，无新旧对照、历史命名解释或兼容说明堆叠。任务文档仅保留可追溯证据，不把执行台账复制到教程。
+- 交付说明区分“MVP总体架构”与已落实的具体职责设计，说明模块边界和当前使用方式，不列历史改名过程。完整重构的判据是功能、职责分离和可读性共同通过，不是旧文件全部重写或每个类都加接口。
+- 最终验证覆盖最后代码/资源/文档变化：offline检查、真实方案、Unity编译、最终发现身份及完整Editor测试、双UI连续探针、架构门禁；文档解析缺yaml/markdown_it若仍缺明确blocked，不安装。
+- 审查精确diff、用户保护文件、GUID/资源绑定、取消任务无复活；分项提交核对staged diff及身份，遵守环境Git作者配置。最终只交付实现结果、命令/证据、未运行项和剩余风险，不讲旧实现故事。
+- 验收：RF24–RF36每项有真实证据，无待解决功能失败；不把人工H01–H09代签为通过，但必须自行完成可自动化的视觉/输入/结构判断，不以“请用户试试”代替工程验收。
+
+### 4.3.5 新会话启动、阻塞及验收纪律
+
+启动语句：`读取 .codex/tasks/action-editor-refactor.md 第4.3节，从RF24开始按RF24–RF37连续执行MVP硬切与双UI验收；遵守已确认授权，逐项验证并本地提交，不处理已取消的JSON修复。`
+
+1. 先读AGENTS、本节和项目Unity skill；检查实际Git状态、作用域、用户保护文件及当前唯一Editor/PID，不复用旧PID/审批或旧测试终态。
+2. 每次只一项in_progress；不得只搬文件/改名前缀就勾选架构完成。每项按第4.3.2.3节审查职责、命名、可读性及精简注释；必要中间编译失败需修复到该任务的真实门槛，再记录完成并提交，不引入临时兼容壳撑绿。
+3. 用户数据/安全/真实Unity能力不明确则停止受阻项并记录具体问题；仅名称、内部拆分类等在本节范围内的实现选择自行完成，不为非阻塞小细节反复等用户。依赖阻塞不谎报后续任务完成，不无限重复超时/失败命令。
+4. Unity操作串行，preview显示具体输入/文件清单；引用本轮连续授权approve/apply。超时结果未知先检查状态与目标，不盲目重放，不保存/放弃用户未保存内容，不强杀。现有工作流不能表达动作时先最小审核扩展及离线测试，不绕入口。
+5. 最终证据必须与最终代码一致。零用例、跳过、不确定、旧版本结果、截图单独、接口单测或合成坐标单测都不能冒充双UI真实入口验收；每条已报告症状都有复现与修复后同场景证据。
+6. 本计划会话未执行MVP代码改造/资源移动/删除或新回归，所有RF24–RF37均planned。下一会话启动前不自动执行。
+
+计划校验：已人工核对范围/依赖/授权和验收；离线结构检查确认14个planned条目与14个详细任务一一对应、代码围栏闭合、当前入口及取消项存在，`git diff --check`通过。首轮内联脚本的中文断言受PowerShell管道编码影响失败，改为Unicode转义后同一结构检查通过，未因此改写计划要求。本会话不跑Unity验证；完整文档解析器缺失问题不宣称已解决。
+
+2026-11-12需求补充：MVP仅为总体架构；完整重构的具体设计由执行代理承担。新增第4.3.2.1–4.3.2.3节职责矩阵、设计交付、命名/可读性/注释规范与逐项门槛，强化RF24/25/34/36/37；14项仍为planned。离线结构检查确认14项顺序和详细章节对应、三项新增规范存在、注释位置要求及代码围栏有效，`git diff --check`通过。本轮仅修改本任务文档，未修改源码/资源、未连接Unity、未提交。
+
+### RF24 执行记录（2026-11-12）
+
+- 状态：`complete`，最终205/205通过，取消项清理、三项真实窗口症状复现和逐文件职责/资源清单已完成；此前场景/许可证阻塞及失败见历史续记。不把基线完成当作MVP重构完成。
+- 用户请求与授权：本轮明确从RF24连续实施至RF37，逐项通过后中文本地提交；Unity写入仍须固定范围preview/展示/引用真实授权approve/apply。不改用户数据、Combat、包/设置，不安装升级、强杀、推送或代选保存模态。
+- 开始前归属核对：main，无已暂存改动。已有58个tracked路径差异及四个新UI源码/meta，主要属于此前15份空目录meta删除、四个UI脚本保持GUID的改名、鼠标锚点缩放、轨道排序/根轨存储及相应测试/文档；这些工作全部保留，不作为本轮新删除或自动混入首项提交。四个UI GUID仍以本文件对应移动记录和TypeCatalogTests为准。本任务文档第4.3节也是开始前已有计划，完整保留。
+- 保护范围：`Assets/ActionEditor/Jsons/`及meta、`Assets/NewAction.json[.meta]`、`Assets/NewAction1.json[.meta]`、`Assets/Main CameraTimeline.playable[.meta]`、`ProjectSettings/TimelineSettings.asset`、`ProjectSettings/WhootActionSequencer.txt`及其他未知未跟踪项。只核对Git路径/状态，不读取业务内容、不修改/暂存。未在修改前读取这些文件计算哈希，不能宣称已有逐字节前后校验证据。
+- 取消项实际编辑四个文件：`.codex/scripts/workflow_lib/unity.py`移除取消命令的mutation与拒参清单项；`.codex/tests/test_actioneditor_validation.py`移除原准入并新增未知命令preview/apply在连接Editor前即拒绝的回归；`.codex/skills/unity-cli/references/operations.md`删除修复操作说明；`Assets/ActionEditor/Editor/Validation/Rf18BoundaryCommands.cs`完整删除RepairNewActionCopy方法。后续在`ExtensionEndToEndTests.cs`增加标题及绘制复现，并更新本任务记录。各文件此前UI命名整理等无关差异保留。无资源移动/删除/创建，无新的Unity写入审批。
+- 取消项验证：源码命令方法已删除；`unity list` `.codex/runs/20261112T150826Z-60f3f422/report.json`运行时注册已无repair_new_action_copy。Glob确认Assets根下无NewAction-Repaired或NewAction-CreationProbe目标，不创建、不恢复旧修复。拒绝测试中的命令字符串仅用于保证不可执行。
+- 环境：doctor `.codex/runs/20261112T150251Z-91b2f05d/report.json`确认当前工程唯一Editor PID12400 ready，Unity2022.3.62f3、Pipeline0.10.0-exp.1、CLI1.0.0-beta.16；未复用旧PID。窗口查询`.codex/runs/20261112T150932Z-f9f5c235/report.json`显示无产品窗口，当前焦点为用户Timeline窗口，未关闭/聚焦/改动它。
+- 实际检查：`python .codex/scripts/workflow.py unity compile --timeout 180`，`.codex/runs/20261112T150638Z-a4bbc8d3/report.json`编译终态up_to_date，failed=false、errors=[]、compilationFailed=false；控制台保留的历史报错未作为本次编译失败或本次测试结果。`verify --profile code` `.codex/runs/20261112T150826Z-b2847ed0/report.json`工作流46/46，真实ActionEditor.sln 18项目674源码构建0错误43既有警告，7.05秒；整个code profile仍因缺yaml/markdown_it为blocked，未安装。独立unittest同46/46；`git diff --check`通过。
+- 初始测试发现：`.codex/runs/20261112T150545Z-02f3b45e/report.json`发现NBC.ActionEditor.Editor.Tests EditMode 202项；当时尚未执行，场景处理后的新执行见下方续记，不以历史202/202补位。
+- 安全阻塞：`unity query "scene list_open"` `.codex/runs/20261112T150410Z-449aab4e/report.json`确认`Assets/Scenes/SampleScene.unity`为isDirty=true、已加载且活动。读取已安装test-framework 1.1.33的TestJobRunner及SaveModiedSceneTask实现，证实EditMode测试开始前无条件调用EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo；当前运行会要求处理用户未保存场景。未发送test run，未代选Save/Don't Save/Cancel，未清脏或绕过测试入口。该阻塞影响RF24必须的真实基线及后续依赖，须用户自行处理场景后重查。
+- 初步源码定位（不是动态复现）：UIToolkitTimelineCanvas.Draw在trackDrop分支仅画到owner.LeftWidth并调用DrawText输出三种拖动文案；RebuildHeaders对所有Group创建折叠按钮；Down只允许Track进入结构手势。IMGUI的TimelineTrackItemView同样仅用Styles.TimelineLeftWidth画插入线、无条件创建Group折叠按钮；OriginalTimelineGesture只有Track源。后续必须先在真实窗口复现再验证修正，不能拿这些源码结论冒充已完成交互验收。
+- 职责/可读性检查范围：本次没有新增生产架构类，只删除固定修复入口；门禁回归不调用Editor、不接受新参数、不扩大授权。App/ActionEditorContext混合会话、播放、选择与Editor时钟；Toolkit Canvas混合控件、几何、事务和规则；IMGUI行视图/OriginalTimelineGesture混合菜单、模型写入和手势，仍须按第4.3节分层。下方补齐142份非测试源码/程序集/样式目标处置、20份测试及测试程序集能力映射、31项资源GUID和可重复合成负载；精确调用者闭包、全部源码GUID与动态验收尚未完成，不以静态清点代替完成门槛。
+- 恢复步骤：当前先由用户处理Unity许可证错误；再doctor、scene list_open、test status确认当前工程ready、无未保存场景及活动运行，继续RF24逐文件审计、真实绘制复现及最终基线。精确审查暂存范围，RF24真正通过后才提交并进入RF25。无需为非阻塞内部设计另行确认。
+
+#### RF24 场景处理后续记与许可证阻塞
+
+- 用户回复“我已经处理了”后，doctor `20261112T152708Z-7f434e00`通过，scene list_open `20261112T152721Z-6ab1afd3`确认SampleScene isDirty=false，原场景安全阻塞已解除。Git此后显示`Assets/Scenes/SampleScene.unity`已修改及`ProjectSettings/SceneTemplateSettings.json`未跟踪，均按用户工作保护，不读取内容、不编辑、不暂存。
+- 新完整基线 `20261112T152857Z-5f1b312b`：Unity编译通过，`NBC.ActionEditor.Editor.Tests` EditMode实际202执行/202通过，0失败/跳过/不确定。该结果早于新增复现，不是最终代码全量回归，也不是完整资源验证。
+- 新增`StructureHeadersExposeCurrentInputAndControlBehavior`通过真实Toolkit Pointer事件及IMGUI窗口SendEvent证明空组仍有折叠入口、Group标题不进入结构拖动。首次`20261112T154133Z-4f6b0dd7`实际1执行/0通过/1失败，是DiscardChanges换图后测试仍持有旧Group引用；重新从会话取Group并恢复空组初态后，`20261112T154413Z-c219bc2e`编译通过且1/1通过。此用例有意记录当前缺陷，不是缺陷修复验收；后续接入须改为目标行为断言。
+- 新增`StructureInsertionPaintCurrentlyStopsAtHeaderBoundary`尝试通过真实窗口GrabPixels验证线在标题区存在、时间区不存在；`20261112T154806Z-9e90ad16`编译通过，实际1执行/0通过/1失败，标题采样未检出蓝线。当前不能据此声称短线/文本已动态复现，也不能直接认定为产品绘制故障。后续加入捕获模式/坐标诊断及仅写Temp的图像辅助证据，但尚未成功执行，Temp未发现该图像。未削弱断言或将截图冒充验收。
+- 域重载阶段`20261112T154013Z-492026d2`及`20261112T155459Z-2ced4bfc`编译连接blocked、tests skipped；分别检查恢复后才发起新验证。最后`20261112T155653Z-78c6e2c1`编译查询45秒超时、tests skipped；工具执行还遭遇长时间调度间隔，不能把墙钟间隔当作测试耗时或性能测量。
+- 最新doctor `20261112T230811Z-bd84ad37`：本工程唯一Editor PID12400仍在，CLI明确报告阻塞主线程的`License error`模态，仅有`Open Hub`/`Exit`按钮。未点击、关闭、退出、强杀或尝试代办许可证。此为当前安全/环境阻塞，不继续重放编译或测试；Temp保留的旧测试/编译状态不能证明最新代码通过。
+- 静态源码证据`.codex/runs/rf24-source-audit/source-map.json`包含163份cs/asmdef/uss（142份非测试）、meta GUID、声明及候选消费者；它是词法候选关系，不是解析后的完整调用者闭包。最终仍须补齐真实引用与资源绑定核实。尚无暂存/本地提交或RF25架构实施。
+- 许可证阻塞后可独立执行的最终离线检查`20261112T231210Z-d5140475`：workflow 46/46通过，真实ActionEditor.sln 18项目674源码构建0错误43既有警告，12.55秒；当前绘制复现诊断源码可编译，但不等于已在Editor执行。整个code profile仍因缺yaml/markdown_it为blocked，未安装依赖。`git diff --check`通过。再次检索确认CreateUtilities/Easing/RectUtility无其他Assets源码调用，Preview.png在ActionEditor仅有自身meta命中；候选仍未删除，未读取用户资产内容以追查其引用。
+
+#### RF24 最终验收（2026-11-13）
+
+- 用户处理许可证后，doctor `20261113T003617Z-4739cb13`通过，场景查询`20261113T003637Z-787c6e6a`确认SampleScene干净。Temp原状态文件已随重开消失，未依赖旧状态判定成功。发现`20261113T003717Z-9a24f5d2`204项，新增IMGUI绘制用例后最终实际205项。
+- Toolkit绘制初次`20261113T003739Z-94d058ee`1失败，实际捕获已包含标题短线及“加入组”重叠文字；独立System.Drawing读取图像确认蓝线像素RGB约144/205/231，坐标正确，原阈值因捕获色彩转换误判。改为通道差判别（仍要求标题区实际有线、时间区实际无线），`20261113T004021Z-3df33337`1/1通过。未改产品以迎合基线；缺少Pillow的首次离线分析失败后使用系统已有System.Drawing，没有安装依赖。
+- IMGUI通过真实窗口SendEvent起拖并GrabPixels采样，`20261113T004259Z-e9a4f5d3`1/1通过，同样证明线只在标题区。两份Temp图像仅是辅助，像素断言与标题控件/输入断言共同构成复现证据；后续两视图接线必须将当前缺陷预期替换为目标行为，不永久保留缺陷测试。
+- 最终完整`20261113T004433Z-3b43434f`：Unity编译通过，`NBC.ActionEditor.Editor.Tests` EditMode **205执行/205通过，0失败/跳过/不确定**。包括正常数据安全与实验测试，不能称205项全部属于新架构；资产验证未指定目标而skipped，不冒充全资源通过。此时尚无MVP生产架构改造。
+- 所有163份源码/程序集/样式均有GUID，142份非测试处置表、20份测试能力迁移表和31项资源身份已列。对仍未证明无用途的资源与工具统一明确保留，RF34删除前必须再次核实真实调用者/序列化绑定，不把保留候选当成可删除清单；因此当前没有“待判定后随意搬入Common”的生产文件。记录中的词法图不冒充语义闭包。
+- 提交范围分离：先前根轨/缩放、四UI改名与15目录meta删除全部保留，RF24只提交本项症状复现、拒绝取消入口的回归及任务证据；交叠文件通过精确index补丁分离，不自动打包其余既有变化。用户场景、JSON、Timeline及ProjectSettings均排除；没有修改前哈希，仍不宣称完整逐字节前后证明。取消命令未复活。
+- 先前产品差异已独立提交`48a1881`（57文件），RF24新增症状复现和取消入口回归未混入；该提交不代表MVP完成。当前RF24提交仅三文件：本记录、ExtensionEndToEndTests.cs的三项复现及像素读取、test_actioneditor_validation.py的取消命令拒绝回归。
+
+#### RF24 静态职责清点补充
+
+以下按当前真实文件逐项指定目标职责，不代表已经实施、移动或验证。路径均相对`Assets/ActionEditor/`。已逐文件读取源码并提取声明、引用和具体平台API，专项检索混杂职责；此步骤不是完整方法级可读性验收。未读取用户数据。尚待真实调用者闭包和GUID清单复核的删除项不得执行。
+
+| 当前文件 | 处置 | 目标职责与约束 |
+|---|---|---|
+| `Editor/Core/Documents/ActionEditorContext.cs` | 拆分 | Application/EditingSession、SelectionState、ClipboardState；Presentation逐窗订阅，不保留Views注册器 |
+| `Editor/Core/Documents/App.cs` | 替代并删除 | Composition显式装配；文档用例、播放协调、时钟与自动保存分离，无静态业务门面 |
+| `Editor/Core/Documents/DocumentCreationService.cs` | 拆分 | Application/CreateDocument用例；Infrastructure仓储提交与导入 |
+| `Editor/Core/Documents/JsonDocumentSession.cs` | 拆分 | Application/DocumentSession与DocumentEditTransaction；Infrastructure/UnityUndoHistory与RecoveryStore |
+| `Editor/Core/Editing/JsonEditCommand.cs` | 替代 | Application用例结果及事务执行，不读取App |
+| `Editor/Core/Editing/JsonEditCommands.cs` | 拆分 | Application/StructureEditing、ClipboardEditing、CreationEditing；Domain唯一结构合法性规则 |
+| `Editor/Core/Editing/JsonPropertyEditing.cs` | 拆分 | Application/PropertyValueEditing及CollectionEditing用例 |
+| `Editor/Core/Properties/FieldInfoExtensions.cs` | 合并替代 | Application/Properties字段描述实现，移除无调用反射透传 |
+| `Editor/Core/Properties/JsonFieldDescription.cs` | 拆分 | Application/PropertySchema与PropertyPath；路径以会话版本校验，不读取App |
+| `Editor/Core/Timeline/DirectableAssetExtensions.cs` | 替代 | Presentation/Timeline/TimeTransform，不依赖作者视域字段 |
+| `Editor/Core/Timeline/TimelineCandidates.cs` | 拆分 | Presentation/Timeline/ClipGestureCandidates；Domain/ClipTimingRules统一时间与邻居约束 |
+| `Editor/Core/Timeline/TimelineGeometry.cs` | 拆分 | Presentation/Timeline/TimeTransform、VisibleTimelineLayout、StructureDropGeometry |
+| `Editor/Core/Timeline/TimelineNavigation.cs` | 替代 | Presentation/Timeline/ViewportNavigation；范围/滚动归逐窗Workspace |
+| `Editor/Extensions/ActionEditorTypeCatalog.cs` | 拆分 | Infrastructure/LoadedTypeDiscovery；Domain/Metadata类型描述；Editor/Extensions编辑器绑定 |
+| `Editor/Extensions/ExtensionResolver.cs` | 改名并精简 | Editor/Extensions/ExtensionBindingResolver，保留精确及显式子类冲突诊断算法 |
+| `Editor/Extensions/TypeMetaInfo.cs` | 替代 | Domain/Metadata/TimelineTypeDescriptor，不携带绘制类型 |
+| `Editor/Languages/ILanguages.cs` | 替代 | Editor/Resources/Localization翻译目录契约 |
+| `Editor/Languages/Lan.cs` | 拆分 | Resources/Localization目录；Infrastructure语言偏好；移除隐式反射发现 |
+| `Editor/Languages/LanCHS.cs` | 改名移动 | Editor/Resources/Localization/ChineseText，只有当前产品文案 |
+| `Editor/Languages/LanEN.cs` | 改名移动 | Editor/Resources/Localization/EnglishText，只有当前产品文案 |
+| `Editor/NBC.ActionEditor.Editor.asmdef` | 重写 | Editor仅承载视图、Composition、Infrastructure及Unity扩展，引用新下层程序集 |
+| `Editor/Preferences/Prefs.cs` | 拆分 | Application/EditorPreferences值与IPreferencesStore；Infrastructure存储及路径；SettingsPresenter消费 |
+| `Editor/Preferences/PrefsConst.cs` | 合并替代 | Infrastructure偏好存储路径常量，不进入Application |
+| `Editor/Preview/ActionEditorPlayback.cs` | 拆分 | Application/PlaybackController调度；PlaybackPresenter显示，不读取静态播放器 |
+| `Editor/Preview/ActionEditorPreviewSession.cs` | 改名移动并调整依赖 | Application/PreviewSession维护单一资源所有权，Editor扩展提供工厂 |
+| `Editor/Preview/AssetPlayer.cs` | 替代 | Application/TimelinePlayback实例，移除Inst及App默认来源 |
+| `Editor/Preview/PreviewBase.cs` | 拆分 | Application预览生命周期端口与Editor/Extensions业务预览适配 |
+| `Editor/Preview/TimePointers.cs` | 改名移动并精简 | Application/Playback/TimelineBoundaryScheduler，保留确定边界算法 |
+| `Editor/Samples/LegacyExperiencePreview.cs` | 拆分改名 | Editor/Extensions/FeatureSampleHeader；Views/FeaturePreviewWindow只展示状态 |
+| `Editor/Serialization/DocumentExportService.cs` | 拆分 | Application/ExportDocument用例与Infrastructure编码/文件适配 |
+| `Editor/Serialization/DocumentFormats.cs` | 拆分 | Serialization/DocumentFormatRegistry；Infrastructure/UnityReferenceResolver与生产类型发现 |
+| `Editor/Serialization/DocumentSnapshots.cs` | 改名移动并重写根遍历 | Serialization/DocumentSnapshots，完整RootItems与隔离回调 |
+| `Editor/Serialization/JsonDocumentCodec.cs` | 替代 | Serialization字段快照/作者比较与Json格式适配，Session不引用具体Json实现 |
+| `Editor/Storage/JsonDocumentStore.cs` | 拆分 | Infrastructure/FileDocumentRepository、DocumentPathPolicy、UnityDocumentImport；Application窄仓储端口 |
+| `Editor/Storage/ReliableFileCommit.cs` | 移动保留核心算法 | Infrastructure/Storage/ReliableFileCommit，已有createOnly/读回/外部版本语义；不加入会话或UI职责 |
+| `Editor/UI/ActionEditorHost.cs` | 拆分 | Composition/EditorLifetime、WindowFactory；Infrastructure/InspectorSelectionBridge、RecoveryStore、文件对话框 |
+| `Editor/UI/DirectableAppearance.cs` | 拆分 | Editor/Resources/TimelineAppearance；图标加载适配，不混元数据/领域规则 |
+| `Editor/UI/DocumentExportWindow.cs` | 重写移动 | Views共享导出参数视图，DocumentPresenter处理导出意图 |
+| `Editor/UI/Extensions/EditorCustomFactory.cs` | 替代 | Editor/Extensions双UI绑定装配，不使用静态可变工厂 |
+| `Editor/UI/Extensions/HeaderBase.cs` | 重写 | Editor/Extensions分别声明IMGUI与UIToolkit Header视图契约 |
+| `Editor/UI/IMGUI/ActionEditor/ActionEditorWindow.cs` | 重写移动 | Views/IMGUI/ActionEditorWindow，被动窗口与原生生命周期适配 |
+| `Editor/UI/IMGUI/ActionEditor/Views/Base/ItemViewBase.cs` | 替代并删除 | Views/IMGUI渲染器只消费行状态，不保留对象树事件路由 |
+| `Editor/UI/IMGUI/ActionEditor/Views/Base/ViewBase.cs` | 替代并删除 | IMGUI输入适配与布局；移除全GUI事务及全局Window事件树 |
+| `Editor/UI/IMGUI/ActionEditor/Views/SplitterView.cs` | 替代 | Views/IMGUI/SplitterRenderer与中性Splitter意图 |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/ClipDragger.cs` | 拆分后删除 | Presentation/Timeline/ClipGesture、StructureGesture、SnapReferences，清除OriginalTimelineGesture |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/ClipDraw/BasicClipDraw.cs` | 拆分重写 | Views/IMGUI/ClipRenderer只负责外观；手柄与编辑归Presentation |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/ClipDraw/ClipDrawer.cs` | 替代 | Views/IMGUI/ClipRenderer实例，无静态可变clip缓存或模型命中 |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/ClipDraw/SignalClipDraw.cs` | 合并替代 | Views/IMGUI/PointClipRenderer消费点几何 |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/ClipDraw/SimpleClipDraw.cs` | 合并替代 | Views/IMGUI/CollapsedGroupRenderer消费只读概览 |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelineBottomView.cs` | 重写 | Views/IMGUI/ViewportRangeControl，只发范围意图 |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelineHeaderView.cs` | 拆分重写 | Views/IMGUI/DocumentToolbar和PlaybackToolbar，Presenter决定可用性 |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelineMiddleView.cs` | 拆分重写 | Views/IMGUI/TimelineBodyRenderer、InputAdapter、全宽InsertionOverlay |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelinePointerView.cs` | 拆分重写 | Views/IMGUI/RulerRenderer、PlayheadRenderer；Presentation/SeekGesture |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelineTrackItemView.cs` | 拆分重写 | Views/IMGUI/RowHeaderRenderer与ClipRenderer；菜单由Presenter状态驱动，无模型写入 |
+| `Editor/UI/IMGUI/ActionEditor/Views/Timeline/TimelineView.cs` | 替代 | Views/IMGUI/TimelinePanel布局，不持有业务对象缓存 |
+| `Editor/UI/IMGUI/ActionEditor/Views/WelcomeView.cs` | 重写 | Views/IMGUI/WelcomePanel与DocumentPresenter创建/打开意图 |
+| `Editor/UI/IMGUI/Controls/DrawTools.cs` | 精简移动 | Views/IMGUI/Rendering绘制原语，仅保留实际绘制调用 |
+| `Editor/UI/IMGUI/Controls/EditorTools.cs` | 拆分 | Views/IMGUI/Controls值控件；元数据/菜单解析留共享层 |
+| `Editor/UI/IMGUI/Controls/Extensions/EditorWindowExtensions.cs` | 删除替代 | Composition管理逐窗Presenter，清除静态窗口视图缓存 |
+| `Editor/UI/IMGUI/Controls/Extensions/RectExtensions.cs` | 合并替代 | Presentation几何明确单位，视图原语仅保留局部布局 |
+| `Editor/UI/IMGUI/Controls/NBLayout.cs` | 替代 | Views/IMGUI局部布局值，无静态堆栈泄露和业务状态 |
+| `Editor/UI/IMGUI/Controls/PreviewResizer.cs` | 精简移动 | Views/IMGUI/ObjectPickerPreviewResize，保留原生预览输入，不进入共享业务 |
+| `Editor/UI/IMGUI/CreateAssetWindow.cs` | 拆分重写 | Views/IMGUI/CreateDocumentDialog采集参数；DocumentPresenter调用创建用例 |
+| `Editor/UI/IMGUI/Customized/CustomizedDrawTools.cs` | 替代 | Editor/Extensions/InspectorBindingResolver，移除跨职责反射缓存 |
+| `Editor/UI/IMGUI/Customized/Header/HeaderGUI.cs` | 拆分重写 | Views/IMGUI/DocumentHeader；Document/Playback Presenter协调 |
+| `Editor/UI/IMGUI/Customized/ICustomized.cs` | 替代 | Editor/Extensions明确扩展绑定契约，不保留泛化历史命名 |
+| `Editor/UI/IMGUI/Customized/Inspectors/Com/ActionClipInspector.cs` | 拆分重写 | PropertyPresenter提供Timing字段状态，Views/IMGUI/ClipPropertyControls绘制 |
+| `Editor/UI/IMGUI/Customized/Inspectors/Com/AssetInspector.cs` | 替代 | Views/IMGUI/DocumentPropertyControls消费PropertyPresenter |
+| `Editor/UI/IMGUI/Customized/Inspectors/Com/GroupInspector.cs` | 替代 | Views/IMGUI/GroupPropertyControls消费PropertyPresenter |
+| `Editor/UI/IMGUI/Customized/Inspectors/Com/TrackInspector.cs` | 替代 | Views/IMGUI/TrackPropertyControls消费PropertyPresenter |
+| `Editor/UI/IMGUI/Customized/Inspectors/InspectorPreviewAssetInspector.cs` | 拆分重写 | Composition/InspectorBridge与Views/IMGUI/SelectionInspector；无App或直接事务 |
+| `Editor/UI/IMGUI/Customized/Inspectors/InspectorsBase.cs` | 拆分重写 | Views/IMGUI/PropertyControlFactory；Application字段/集合规则；Infrastructure资源选择 |
+| `Editor/UI/IMGUI/Events/PointerEventData.cs` | 替代 | Presentation/Contracts/PointerInput；IMGUI仅转换Event参数 |
+| `Editor/UI/IMGUI/ObjectSelectorWindow.cs` | 拆分精简 | Views/IMGUI/ObjectPicker控件；Infrastructure/AssetSearch与ResourcePreview；不决定文档打开策略 |
+| `Editor/UI/IMGUI/PreferencesWindow.cs` | 重写 | Views/IMGUI/SettingsWindow消费SettingsPresenter |
+| `Editor/UI/IMGUI/RenameItemWindow.cs` | 重写 | Views/IMGUI/RenameDialog只提交意图，PropertyPresenter重验 |
+| `Editor/UI/Styles.cs` | 拆分 | Editor/Resources主题/图标；逐窗Workspace尺寸与滚动，清除共享可变几何 |
+| `Editor/UI/UIToolkit/UIToolkitActionEditorWindow.cs` | 重写移动 | Views/UIToolkit/ActionEditorWindow，被动布局与Presenter绑定 |
+| `Editor/UI/UIToolkit/UIToolkitPreferencesWindow.cs` | 重写移动 | Views/UIToolkit/SettingsWindow，原生控件只发偏好意图 |
+| `Editor/UI/UIToolkit/UIToolkitPropertyView.cs` | 拆分重写 | Views/UIToolkit/PropertyControlFactory与SelectionInspector；PropertyPresenter持有字段语义 |
+| `Editor/UI/UIToolkit/UIToolkitTimelineCanvas.cs` | 拆分重写 | Views/UIToolkit/TimelinePanel、Renderers、InputAdapter、InsertionOverlay；Presentation拥有全部交互算法 |
+| `Editor/Validation/ControlledQuitCommands.cs` | 退役 | 当前不授权重开，不保留历史退出菜单/准入；未来冷测不能借此丢弃现场 |
+| `Editor/Validation/PersistenceProbeCommands.cs` | 退役 | 实验.asset验证专用；新产品存储要求由新Verification固定探针覆盖 |
+| `Editor/Validation/PersistenceProbeDocument.cs` | 退役 | 仅PersistenceProbeCommands引用，不加入产品可保存类型 |
+| `Editor/Validation/Rf17MoveCommands.cs` | 拆分后退役 | 一次性move/rename入口删除，仍需的固定移动能力改为当前精确清单并独立审核 |
+| `Editor/Validation/Rf18BoundaryCommands.cs` | 拆分后退役 | 保留引用持久/导出/双UI连续链断言至当前Verification；删除已消费移动和任务编号入口 |
+| `Editor/Validation/SessionProbeCommands.cs` | 退役 | 实验DocumentSession探针；迁移保留创建/故障/引用断言而非旧.asset路径 |
+| `Editor/Validation/SharedJsonProbeCommands.cs` | 替代 | Verification/DocumentPersistenceProbe，以新v2和隔离新目录覆盖完整存储链 |
+| `Editor/Validation/WorkbenchProbeCommands.cs` | 拆分后退役 | 只读window_status迁入WindowDiagnostics；实验窗口探针删除，产品窗口真实控件断言保留 |
+| `Editor/Validation/NBC.ActionEditor.Validation.Editor.asmdef` | 重写改名 | NBC.ActionEditor.Verification.Editor，只引用新产品及Pipeline属性，测试类型不进生产目录 |
+| `Editor/Workbench/JsonTimelineCanvas.uss` | 改名移动 | Editor/Resources/Timeline.uss，仍被产品Canvas使用，不作为实验样式误删 |
+| `Runtime/Assets/Asset.cs` | 拆分重写 | Domain/ActionDocument唯一RootItems；Presentation工作区移出；Serialization不保留groups/rootTracks拼接 |
+| `Runtime/Assets/Clip.cs` | 拆分重写 | Domain/TimelineClip及PointClip/IntervalClip能力，播放回调端口与作者字段分清 |
+| `Runtime/Assets/Group.cs` | 重写 | Domain/TimelineGroup只持Tracks与作者事实，结构规则单一实现 |
+| `Runtime/Assets/Track.cs` | 重写 | Domain/TimelineTrack只持Clips；所有权派生，创建/删除通过用例 |
+| `Runtime/Assets/InspectorPreviewAsset.cs` | 替代移动 | Composition/SelectionInspectorTarget Editor专用代理，Runtime无Inspector类型 |
+| `Runtime/Attributes/Attributes.cs` | 拆分 | Domain/Metadata业务属性；Editor/Extensions绘制/预览绑定属性，无UI发现进Domain |
+| `Runtime/Attributes/PropertyAttributes.cs` | 改名移动 | Domain/Metadata/PropertyConstraints，声明必填等业务语义 |
+| `Runtime/Const/Enums.cs` | 改名移动 | Domain/PlaybackWrapMode，删除与具体UI无关的旧通用命名 |
+| `Runtime/Extensions/IDirectableExtensions.cs` | 拆分 | Domain能力/时间/邻居规则；Application复制编辑；显示文本归Presentation |
+| `Runtime/Extensions/StringExtensions.cs` | 精简合并 | 仅当前显示名算法归Metadata/DisplayName，不保留无调用扩展 |
+| `Runtime/Interfaces/IData.cs` | 合并替代 | Domain明确TimelineNode契约，去除无用途标记 |
+| `Runtime/Interfaces/IDirectable.cs` | 拆分替代 | Domain/TimelineNode与TimelineClip能力接口，不含折叠/视域/GUI |
+| `Runtime/Interfaces/IDirector.cs` | 拆分替代 | Domain文档作者范围；Presentation/TimelineWorkspace视域；Application播放上下文 |
+| `Runtime/Interfaces/ISubClipContainable.cs` | 改名移动 | Domain/ISubClipSource描述业务子片段时长，无UI实现 |
+| `Runtime/Model/AutoSaveSchedule.cs` | 移动保留算法 | Application/AutoSaveSchedule，单一单调时间间隔判定，不持时钟或文件 |
+| `Runtime/Model/TimelineTime.cs` | 拆分精简 | Domain/TimelineTime保留当前边界算法；StableId/实验double事件模型仅在真实需要时保留，不强加新合同 |
+| `Runtime/NBC.ActionEditor.asmdef` | 替代拆分 | NBC.ActionEditor.Domain与NBC.ActionEditor.Serialization独立引用，Domain无Editor或FullSerializer |
+| `Runtime/Samples/LegacyExperience/LegacyExperienceAsset.cs` | 重写改名移动 | Runtime/Samples/FeatureSample/FeatureDocument及组/轨/点/区间样例，无Legacy别名 |
+| `Runtime/Serialization/ActionDocumentGraph.cs` | 重写 | Serialization/ActionDocumentGraph校验RootItems、派生父链和唯一所有权 |
+| `Runtime/Serialization/ActionDocumentJsonFormat.cs` | 重写 | Serialization/ActionDocumentJsonFormat唯一version2，完整字段必需与受控类型 |
+| `Runtime/Serialization/DocumentValue.cs` | 保留并精简注释 | Serialization/DocumentValue与DocumentJson严格值树/词法，不引用Domain以外UI |
+| `Runtime/Serialization/DocumentValueConverter.cs` | 拆分重写 | Serialization/DocumentFieldContract、DocumentValueConverter、Float/Curve/Reference值适配，替换fsIgnore策略 |
+| `Runtime/Serialization/FullSerializerExtensions.cs` | 改名移动 | Serialization/DocumentNumber.cs，当前实际仅Single精确位文本算法，无FullSerializer调用 |
+| `Runtime/Serialization/IActionDocumentFormat.cs` | 拆分精简 | Serialization格式契约/类型上下文；Application定义消费侧快照与仓储窄端口 |
+| `Runtime/Utility/AttributesUtility.cs` | 精简移动 | Domain/Metadata/AttributeReader，仅保留实际语义，不建万能Common |
+| `Runtime/Utility/ClipTimingRules.cs` | 重写移动 | Domain/ClipTimingRules统一属性/手势0.01秒、非负与邻居校验 |
+| `Runtime/Utility/ColorUtility.cs` | 移动精简 | Presentation主题颜色算法，仅UnityEngine值，不处理领域内容 |
+| `Runtime/Utility/CreateUtilities.cs` | 待外部依赖核实后删除 | ActionEditor内无SaveAssetIntoObject调用；删除前必须查已跟踪非Combat调用，不能擅改外部使用者 |
+| `Runtime/Utility/DirectableTypeInfo.cs` | 拆分重写 | Domain/Metadata/TimelineTypeDescriptor与能力规则；Editor图标/自定义绘制分离 |
+| `Runtime/Utility/Easing.cs` | 待外部依赖核实后删除 | ActionEditor内仅自引用，不能仅以文件名判定；先查非Combat调用再决定退役 |
+| `Runtime/Utility/RectUtility.cs` | 待外部依赖核实后删除或取用算法 | ActionEditor调用发现仅自身；若新几何需要只取用明确Rect计算，不原样搬万能工具 |
+| `Runtime/Utility/ReflectionTools.cs` | 拆分精简 | Infrastructure/LoadedTypeDiscovery；Domain/Metadata必要属性读取；其余无调用反射API删除 |
+
+补充实验与输入路径逐项去向：
+
+| 当前文件 | 处置 | 目标职责与约束 |
+|---|---|---|
+| `Editor/Experiments/AssetWorkbench/ActionWorkbench.cs` | 退役 | 实验多文档窗口/菜单；当前双产品窗口接管必须的布局与操作能力 |
+| `Editor/Experiments/AssetWorkbench/DocumentSession.cs` | 退役 | 实验独立会话/选择/工作区；不作Application新会话的兼容壳 |
+| `Editor/Experiments/AssetWorkbench/DocumentStore.cs` | 退役 | 实验.asset仓储；ReliableFileCommit已有独立生产实现，文件安全断言迁入新仓储测试 |
+| `Editor/Experiments/AssetWorkbench/DocumentTransaction.cs` | 退役 | 实验Candidate/ID命令；保留原子失败/锁定/Undo能力测试，不保留万能DocumentCommands |
+| `Editor/Experiments/AssetWorkbench/EventPropertyContext.cs` | 退役 | 实验属性控件回调；null/集合/多选断言迁入PropertyPresenter及双UI控件测试 |
+| `Editor/Experiments/AssetWorkbench/EventRegistry.cs` | 退役 | 实验事件注册；原子注册/冲突/工厂隔离要求迁入当前扩展测试 |
+| `Editor/Experiments/AssetWorkbench/TimelineCanvas.cs` | 退役 | 实验几何和绘制；点事件边界/密集布局断言迁入共享布局与双UI测试 |
+| `Editor/Experiments/AssetWorkbench/TimelineInteraction.cs` | 退役 | 实验控件手势；取消/外部释放/锁定/多选断言保留于共享交互测试 |
+| `Editor/Experiments/AssetWorkbench/WorkbenchInspectorTarget.cs` | 退役 | 只为实验窗口选择代理，当前双UI各自Inspector桥显式装配 |
+| `Runtime/Experiments/AssetWorkbench/ActionDocument.cs` | 退役 | 实验ScriptableObject/double事件图，不为其建立旧名别名；新ActionDocument为Domain作者图 |
+| `Runtime/Experiments/AssetWorkbench/DocumentValidation.cs` | 退役 | 实验ID/时间图校验；有效图/有限值/邻接规则仍由新Domain/Serialization覆盖 |
+| `Editor/UI/IMGUI/Events/Interfaces/IDragBeginHandler.cs` | 退役替代 | IMGUI输入适配统一中性PointerInput，不保留ViewBase分发协议 |
+| `Editor/UI/IMGUI/Events/Interfaces/IDragEndHandler.cs` | 退役替代 | 共享手势owner/token处理结束，原生层只上报按钮释放 |
+| `Editor/UI/IMGUI/Events/Interfaces/IPointerClickHandler.cs` | 退役替代 | TimelinePresenter处理选择意图，不暴露领域对象可写入口 |
+| `Editor/UI/IMGUI/Events/Interfaces/IPointerDownHandler.cs` | 退役替代 | IMGUI原生按下转换为共享中性输入 |
+| `Editor/UI/IMGUI/Events/Interfaces/IPointerDragHandler.cs` | 退役替代 | Presentation手势计算候选，View不计算业务变化 |
+| `Editor/UI/IMGUI/Events/Interfaces/IPointerEnterHandler.cs` | 退役替代 | 原生悬停转中性Hover意图，状态归逐窗Workspace |
+| `Editor/UI/IMGUI/Events/Interfaces/IPointerExitHandler.cs` | 退役替代 | 原生离开上报指针坐标与可见性，Presentation清理候选 |
+| `Editor/UI/IMGUI/Events/Interfaces/IPointerUpHandler.cs` | 退役替代 | 原生释放保留按钮身份，错误按钮不结束主捕获 |
+
+- 142个非Tests的cs/asmdef/uss均已有逐文件处置；这是目标职责清单，不是授权apply清单。DLL、实际资源、测试及GUID/调用者仍须下述补齐。
+- 已查清FullSerializer当前仅为Asset/Group/Track/Clip的fsIgnore标记及DocumentValueConverter.Fields筛选依赖；生产读写不调用其序列化器。需先实现明确字段策略并通过精度/图校验后才能经AssetDatabase退役DLL。
+- 当前样式并非实验遗留：UIToolkitTimelineCanvas实际加载Editor/Workbench/JsonTimelineCanvas.uss，TypeCatalogTests也核对加载。InspectorPreviewAsset由ActionEditorHost.ShowInspector创建，CustomEditor及SharedJsonTests真实使用，不能直接删除而不替换选择桥。
+- 实验调用闭包已定位：11份Experiments源码被WorkbenchTests、SessionTests、TransactionTests、RegistryPropertyTests、InteractionTests、TimelineTests、DocumentModelTests和专用验证命令调用，LegacySafetyTests亦查询实验窗口存在性。删除前必须保留产品要求的属性/null/集合/选择/Undo/输入/引用断言到新测试，实验双会话/稳定ID/.asset格式不是新产品兼容目标。
+- 新阶段可重复负载选定：小样为当前3组7轨13片段业务样例；大样为固定64个组、每组16轨、每轨64个不重叠片段（共65536片段），另交错64根轨、各64片段，总1024组内轨+64根轨、69632片段。点/区间按轨交替，时间i*0.25、区间长0.125，名称/参数固定种子，包含空组与折叠工作区但作者图不存折叠。该负载是可重复压力样本，不冒称用户最大业务数据或既定性能预算；RF36须从新进程首调用测量真实最终实现。
+
+#### RF24 测试与资源去向补充
+
+测试源码统一改为当前能力命名和Domain/Application/Presentation/Infrastructure/Views目录。以下为保留要求的映射，不承诺旧类型/测试名或固定202计数；实际删测前必须逐断言核实新用例覆盖，仍受当前真实运行阻塞。
+
+| 当前Tests/Editor文件 | 目标与保留要求 |
+|---|---|
+| DocumentFormatTests.cs | Serialization：有限float位、负零、独立手写v2 fixture、多态/曲线/引用、原始读回、回调隔离及拒绝构造前无效输入 |
+| DocumentExportTests.cs | Application/Infrastructure：干净/脏导出不变、源别名/已有目标/失败/活动手势保护、只写格式 |
+| DocumentModelTests.cs | 实验专用模型断言退役；有效作者图/所有权/邻接/集合隔离要求迁入新Domain测试，不保留实验StableId要求 |
+| ExtensionEndToEndTests.cs | Views：双UI真实属性/菜单/拖动/取消/根混排/保存重开/播放；禁止用直接用例调用替代SendEvent/Pointer验收 |
+| InteractionMeasurementTests.cs | 迁至性能测试；保留实际入口计时/分配，增加独立进程冷首调用，不把当前live Editor测量冒充冷测 |
+| InteractionTests.cs | 实验窗口测试退役；移动/拉伸/框选/锁定/吸附/外部释放能力转新Presentation和双UI输入测试 |
+| JsonPropertyTests.cs | PropertyPresenter及真实双UI控件：字段条件/实际选项值、延迟提交/Esc、null/数组/嵌套struct、锁定和陈旧路径 |
+| LegacyBaselineTests.cs | Domain/Playback/Serialization当前样例回归；保留数值与边界预期，删除历史名称与格式假设 |
+| LegacySafetyTests.cs | Application/Views：无效打开不切换、创建失败、保存取消、单调自动保存、两个独立UI入口；不再查询实验窗口 |
+| PreviewOwnershipTests.cs | Application/Composition：单update驱动、初始化部分失败释放、幂等Dispose、停止异常与预览冲突诊断 |
+| RegistryPropertyTests.cs | 实验注册实现退役；原子发布、冲突工厂隔离和真实控件集合/null要求转现行扩展/PropertyPresenter测试 |
+| SessionTests.cs | 实验.asset会话退役；磁盘/Recovery/来源切换失败不变要求由新Application/Infrastructure完整覆盖 |
+| SharedJsonTests.cs | 按Application/Presentation/Views拆分；保留真实控件、事务owner、Undo、选择、保存/自动保存/恢复、取消/输入作用域等断言 |
+| StorageSafetyTests.cs | Infrastructure：真实锁文件、外部revision、createOnly、meta/目录边界、写入/替换/读回故障、提交后导入失败 |
+| TimeContractTests.cs | Domain时间边界/邻接/同时间排序；只保留当前模型和float要求的规则，不强行兼容实验ID/double图 |
+| TimelineGeometryTests.cs | Presentation：变换、点/短片段、左手柄优先、可见布局、组块、根混排、鼠标锚点与最小跨度 |
+| TimelineTests.cs | 实验TimelineCanvas退役；密集绘制、命中、端点点事件与不标脏要求进入双UI实际渲染断言 |
+| TransactionTests.cs | 实验DocumentTransaction退役；整批失败/异常回滚/一手势一Undo/锁定/取消要求进入新Application测试 |
+| TypeCatalogTests.cs | Metadata/Infrastructure/Views：精确/子类绑定、冲突、Unique/Attachable、类型排除、MonoScript及资源GUID绑定更新 |
+| WorkbenchTests.cs | 实验多文档窗口能力退役；产品布局、缩放/重建/订阅释放、标题/选择控件能力进入当前双UI，不保留独立作者会话要求 |
+| NBC.ActionEditor.Editor.Tests.asmdef | 引用新Domain/Serialization/Application/Presentation/Editor/Verification；EditMode身份按实际发现核对 |
+
+资源身份（只读取meta，不修改；路径相对Assets/ActionEditor）：
+
+| 资源 | GUID | 处置与实际使用者 |
+|---|---|---|
+| Samples/LegacyExperience/README.md | 30542892b6cdb57489102ba2218a9a47 | 唯一教程经AssetDatabase移动至FeatureSample，所有当前链接同步，无副本 |
+| Runtime/ThirdParty/FullSerializer.dll | 9dc8c82304565a640ac31a6947ed0d6e | DocumentValueConverter字段筛选和四模型标记仍依赖；字段策略替换且引用清零后才准退役 |
+| Editor/Workbench/JsonTimelineCanvas.uss | 13b45d38c01bc764f9018485fb04554d | 产品Canvas实际加载，改名移动保留GUID；TypeCatalogTests跟随真实资源键 |
+| Editor/Resources/nbc/TimelineTimeCursor.png | c58e983cbb4db7a4bbd2efd60f68cfab | Styles与播放头绘制使用，保留 |
+| Editor/Resources/nbc/TimelineStartPlayback.png | bce9df23539a4fd4db8784078e6a62c5 | Styles与播放范围绘制使用，保留 |
+| Editor/Resources/nbc/TimelineEndPlayback.png | d1afdab7b0fec474db14e510daef9319 | Styles与播放范围绘制使用，保留 |
+| Editor/Resources/nbc/StyleSheet.guiskin | b1dadcfa2042b1f4294d2c3aa5895d22 | Styles及IMGUI实际皮肤，TypeCatalogTests加载，保留 |
+| Editor/Resources/nbc/Stripes.png | 6fa7b844727ccb14db02a945bbf44956 | Styles及轨道禁用/锁定绘制使用，保留 |
+| Editor/Resources/nbc/Signal.png | f6809b24f4c24624b904034f88021e0f | Styles及点片段绘制使用，保留 |
+| Editor/Resources/nbc/play/stop.png | 5d7dad9165e79a84885d65deea68c427 | Styles及播放工具栏，保留 |
+| Editor/Resources/nbc/play/Range.png | c1c2b6de8b78449408cafb6b509c07e6 | Styles及范围按钮，保留 |
+| Editor/Resources/nbc/play/Preview.png | 614ccc393da46a244a7b87eb0eec5d97 | 当前源码无资源键调用；须再查序列化GUID引用才可决定退役，当前保留 |
+| Editor/Resources/nbc/play/PrevFrame.png | 95c7e4101ba535244b587f390f2ee8f8 | Styles及播放步进，保留 |
+| Editor/Resources/nbc/play/Play.png | 372ef45ffbfd75e4e89dc110e87ee2f7 | Styles及播放工具栏，保留 |
+| Editor/Resources/nbc/play/pause.png | 31cc2b8237daf614e85f24fb44d7ac93 | Styles及播放工具栏，保留 |
+| Editor/Resources/nbc/play/NextFrame.png | dbbb13c578db54b41bffe89938f17c69 | Styles及播放步进，保留 |
+| Editor/Resources/nbc/play/LastFrame.png | 84823f6b728f48943bc1154b32eafa5b | Styles及播放定位，保留 |
+| Editor/Resources/nbc/play/FirstFrame.png | 3b3d4fea489e91b40b96466b17ce329d | Styles及播放定位，保留 |
+| Editor/Resources/nbc/Logo.png | 0a565ffb56d0d444c85082f1c0e7cc5c | Styles、双UI欢迎页，保留 |
+| Editor/Resources/nbc/HeaderBoxImage.png | 24ff3175619799f44ac47ab6fdff9da4 | StyleSheet.guiskin第1359行实际GUID引用，保留，不可因无源码键调用删除 |
+| Editor/Resources/nbc/block.png | 2c2ea21d71a7595429cfd360181fad7f | StyleSheet.guiskin第1425/1491行实际GUID引用，保留，不可因无源码键调用删除 |
+| Editor/Resources/nbc/Background.png | b7b47fd1b1118bb4fa8f7f732f640e77 | Styles背景绘制使用，保留 |
+| Editor/Resources/nbc/icon/settings.png | 67d28dcbd177a0043810e9d749f8bc23 | Styles及设置入口，保留 |
+| Editor/Resources/nbc/icon/save.png | a26403185674fa948ae479c83597d1c0 | Styles及保存入口，保留 |
+| Editor/Resources/nbc/icon/rollback.png | 86302af329dfe7d46abc4037658bc47f | Styles及返回入口，保留 |
+| Editor/Resources/nbc/icon/Menu.png | 50277e1c02d60474bb4dfafe1d2bb1bd | Styles及组菜单，保留 |
+| Editor/Resources/nbc/icon/magnet.png | 7d2ee7f699e63c04b895ebc94ebccbf6 | Styles及吸附开关，保留 |
+| Editor/Resources/nbc/icon/Lock.png | 7c45fce4e7abcb4418922ef4878f7fd0 | Styles及锁定状态，保留 |
+| Editor/Resources/nbc/icon/Expanded.png | 5de42cde4e3d30f45afda130d3cf3e47 | Styles及有轨组折叠控件，空组只占位，保留 |
+| Editor/Resources/nbc/icon/Create.png | 7748c10cdb90e944388b0cea84a920dd | Styles及创建入口，保留 |
+| Editor/Resources/nbc/icon/Collapsed.png | 13c7a6b42b31a1d4fb62fedb021707cd | Styles及有轨组折叠控件，空组只占位，保留 |
+
+全Assets范围仅输出路径的源码搜索未发现ActionEditor外使用CreateUtilities/Easing/EaseType/RectUtility或FullSerializer的文件；这不等于已覆盖忽略资源、反射字符串或外部项目，Combat未改且不承担其兼容。当前不执行这些候选删除。Source mapping中“待外部核实”记录因此补充为“当前源码范围未发现外部调用，资源闭包仍待核实”。静态覆盖检查142/142目标处置存在、代码围栏配对，负载计算1088轨/69632片段；git diff --check通过。HeaderBoxImage/block已确认皮肤依赖；Preview.png在ActionEditor范围仅命中自身meta，仍保留至完整依赖审计。以上只有任务记录补充，无新增源码或资源变化，不需要据此冒跑受阻的Editor测试。
+## 5. 分项实施与验收（当前执行入口为第4.3节）
 
 ### A00｜重命名后环境、源码和行为基线
 

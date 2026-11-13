@@ -256,6 +256,171 @@ namespace NBC.ActionEditor.Tests
             }
         }
 
+        [UnityTest] public IEnumerator StructureHeadersExposeCurrentInputAndControlBehavior()
+        {
+            var previousWindow = ActionEditorHost.Window;
+            var previousScroll = Styles.TimelineScrollPos;
+            UIToolkitActionEditorWindow native = null;
+            ActionEditorWindow imgui = null;
+            try
+            {
+                var group = App.AssetData.groups[0];
+                group.Tracks.Clear(); App.AssetData.Init();
+                native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
+                native.position = new Rect(60, 60, 1000, 600); native.Show(); native.Focus();
+                yield return null; yield return null;
+                var canvas = native.Canvas;
+                var headers = canvas.Q("json-row-headers");
+                var emptyHeader = headers.Children().First();
+                Assert.That(emptyHeader.Query<Button>().ToList().Count, Is.EqualTo(2), "Empty group currently has both collapse and menu buttons.");
+                Pointer(canvas, EventType.MouseDown, new Vector2(90, 13));
+                Pointer(canvas, EventType.MouseDrag, new Vector2(90, 90));
+                Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", Instance).GetValue(canvas).ToString(), Is.EqualTo("None"), "Group header currently does not enter structure capture.");
+                Pointer(canvas, EventType.MouseUp, new Vector2(90, 90));
+                Assert.That(App.AssetData.groups[0], Is.SameAs(group));
+                native.DiscardChanges(); native.Close(); native = null;
+
+                group = App.AssetData.groups[0];
+                group.Tracks.Clear(); App.AssetData.Init();
+                Styles.TimelineScrollPos = Vector2.zero;
+                imgui = ScriptableObject.CreateInstance<ActionEditorWindow>();
+                imgui.position = new Rect(60, 60, 1000, 600); imgui.Show(); imgui.Focus(); imgui.Repaint();
+                yield return null; yield return null; yield return null;
+                var offset = (Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", Instance).GetValue(imgui);
+                var start = offset + new Vector2(90, Styles.PlayControlHeight + 13);
+                var end = start + new Vector2(0, 70);
+                imgui.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
+                Assert.That(App.FistSelect, Is.SameAs(group));
+                imgui.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
+                Assert.That(imgui.Gesture.DragType, Is.Not.EqualTo(ItemDragType.Track), "Group currently has no structure gesture.");
+                imgui.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
+                imgui.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
+                group = App.AssetData.groups[0];
+                var wasCollapsed = group.IsCollapsed;
+                var fold = offset + new Vector2(12, Styles.PlayControlHeight + 12);
+                imgui.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = fold });
+                imgui.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = fold });
+                Assert.That(group.IsCollapsed, Is.Not.EqualTo(wasCollapsed), "Empty group currently exposes a clickable collapse icon.");
+            }
+            finally
+            {
+                if (native != null) { native.DiscardChanges(); native.Close(); }
+                if (imgui != null) { imgui.Gesture.Cancel(); imgui.DiscardChanges(); imgui.Close(); }
+                ActionEditorHost.Window = previousWindow; Styles.TimelineScrollPos = previousScroll;
+            }
+        }
+
+        private static Texture2D ReadWindowPixels(EditorWindow window)
+        {
+            var host = typeof(EditorWindow).GetField("m_Parent", Instance).GetValue(window);
+            var scale = EditorGUIUtility.pixelsPerPoint;
+            var raw = RenderTexture.GetTemporary(Mathf.RoundToInt(window.position.width * scale), Mathf.RoundToInt(window.position.height * scale), 0);
+            var upright = RenderTexture.GetTemporary(raw.descriptor);
+            var previous = RenderTexture.active;
+            var image = new Texture2D(raw.width, raw.height, TextureFormat.RGB24, false);
+            try
+            {
+                host.GetType().GetMethod("GrabPixels", Instance).Invoke(host, new object[] { raw, new Rect(0, 0, raw.width, raw.height) });
+                Graphics.Blit(raw, upright, EditorGUIUtility.Load("SceneView/BlitSceneViewCapture.mat") as Material);
+                RenderTexture.active = upright;
+                image.ReadPixels(new Rect(0, 0, upright.width, upright.height), 0, 0); image.Apply();
+                return image;
+            }
+            catch { UnityEngine.Object.DestroyImmediate(image); throw; }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(upright); RenderTexture.ReleaseTemporary(raw);
+            }
+        }
+
+        [UnityTest] public IEnumerator StructureInsertionPaintCurrentlyStopsAtHeaderBoundary()
+        {
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
+            Texture2D image = null;
+            try
+            {
+                window.position = new Rect(60, 60, 1000, 600); window.Show(); window.Focus();
+                yield return null; yield return null;
+                var canvas = window.Canvas;
+                Pointer(canvas, EventType.MouseDown, new Vector2(90, 69));
+                Pointer(canvas, EventType.MouseDrag, new Vector2(90, 31));
+                var drop = (TrackDropTarget)typeof(UIToolkitTimelineCanvas).GetField("trackDrop", Instance).GetValue(canvas);
+                Assert.That(drop.IsValid, Is.True);
+                window.Repaint(); yield return null; yield return null;
+                image = ReadWindowPixels(window);
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(Application.dataPath, "../Temp/structure-insertion-baseline.png"), image.EncodeToPNG());
+                Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", Instance).GetValue(canvas).ToString(), Is.EqualTo("Track"));
+                var scale = EditorGUIUtility.pixelsPerPoint;
+                bool BlueAt(float x)
+                {
+                    var px = Mathf.Clamp(Mathf.RoundToInt(x * scale), 0, image.width - 1);
+                    var y = Mathf.RoundToInt((canvas.worldBound.yMin - window.rootVisualElement.worldBound.yMin + drop.Y) * scale);
+                    for (var delta = -3; delta <= 3; delta++)
+                    {
+                        var c = image.GetPixel(px, Mathf.Clamp(image.height - 1 - y + delta, 0, image.height - 1));
+                        if (c.b - c.r > .2f && c.g - c.r > .1f) return true;
+                    }
+                    return false;
+                }
+                Assert.That(BlueAt(60), Is.True, "Actual paint must contain the insertion line in the title area: bounds=" + canvas.worldBound + ", root=" + window.rootVisualElement.worldBound + ", dropY=" + drop.Y + ", scale=" + scale);
+                Assert.That(BlueAt(canvas.Left + 200), Is.False, "Current actual paint does not extend through the time area.");
+                Pointer(canvas, EventType.MouseUp, new Vector2(-10, 31));
+            }
+            finally
+            {
+                if (image != null) UnityEngine.Object.DestroyImmediate(image);
+                window.Canvas?.Cancel(); window.DiscardChanges(); window.Close();
+            }
+        }
+
+        [UnityTest] public IEnumerator ImguiStructureInsertionPaintCurrentlyStopsAtHeaderBoundary()
+        {
+            var previousWindow = ActionEditorHost.Window;
+            var previousScroll = Styles.TimelineScrollPos;
+            var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            Texture2D image = null;
+            try
+            {
+                Styles.TimelineScrollPos = Vector2.zero;
+                window.position = new Rect(60, 60, 1000, 600); window.Show(); window.Focus(); window.Repaint();
+                yield return null; yield return null; yield return null;
+                var offset = ((Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", Instance).GetValue(window)).y;
+                var pitch = Styles.LineHeight + Styles.Space;
+                var start = new Vector2(90, offset + Styles.PlayControlHeight + 2 * pitch + 13);
+                var end = new Vector2(90, offset + Styles.PlayControlHeight + pitch + 3);
+                window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = start + Vector2.down * 4 });
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
+                Assert.That(window.Gesture.DragType, Is.EqualTo(ItemDragType.Track));
+                Assert.That(window.Gesture.TrackDrop.IsValid, Is.True);
+                window.Repaint(); yield return null; yield return null;
+                image = ReadWindowPixels(window);
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(Application.dataPath, "../Temp/structure-insertion-imgui-baseline.png"), image.EncodeToPNG());
+                var scale = EditorGUIUtility.pixelsPerPoint;
+                var y = Mathf.RoundToInt((Styles.PlayControlHeight + window.Gesture.TrackDrop.Y) * scale);
+                bool BlueAt(float x)
+                {
+                    var px = Mathf.Clamp(Mathf.RoundToInt(x * scale), 0, image.width - 1);
+                    for (var delta = -4; delta <= 4; delta++)
+                    {
+                        var c = image.GetPixel(px, Mathf.Clamp(image.height - 1 - y + delta, 0, image.height - 1));
+                        if (c.b - c.r > .2f && c.g - c.r > .1f) return true;
+                    }
+                    return false;
+                }
+                Assert.That(BlueAt(60), Is.True, "Actual IMGUI title paint must contain the insertion line.");
+                Assert.That(BlueAt(Styles.TimelineLeftTotalWidth + 200), Is.False, "Current IMGUI insertion paint does not reach the time area.");
+                window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
+            }
+            finally
+            {
+                if (image != null) UnityEngine.Object.DestroyImmediate(image);
+                window.Gesture.Cancel(); window.DiscardChanges(); window.Close();
+                ActionEditorHost.Window = previousWindow; Styles.TimelineScrollPos = previousScroll;
+            }
+        }
+
         [UnityTest] public IEnumerator ToolkitTrackHeaderCanMoveUpAndDetachWithoutLosingClips()
         {
             var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();

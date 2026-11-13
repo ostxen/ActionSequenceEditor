@@ -41,6 +41,23 @@ class ActionEditorValidationTests(unittest.TestCase):
             unity.call.assert_not_called()
             unity.ready.assert_not_called()
 
+    def test_cancelled_repair_is_unavailable_without_contacting_editor(self):
+        command = "actioneditor.validation repair_new_action_copy"
+        self.assertNotIn(command, READ_ONLY)
+        self.assertNotIn(command, MUTATIONS)
+        unity = Unity(SimpleNamespace(context=Context()))
+        unity.ready = Mock()
+        unity.discover = Mock()
+        unity.call = Mock()
+        for parameters in ({}, {"path": "Assets/Other"}):
+            with self.assertRaises(WorkflowError):
+                unity.preview(command, parameters)
+            with self.assertRaises(WorkflowError):
+                unity.apply({"kind": "unity", "command": command, "parameters": parameters}, "unused")
+        unity.ready.assert_not_called()
+        unity.discover.assert_not_called()
+        unity.call.assert_not_called()
+
     def test_rf17_move_is_fixed_and_rejects_parameter_overrides(self):
         command = "actioneditor.validation rf17_move"
         self.assertNotIn(command, READ_ONLY)
