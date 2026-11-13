@@ -80,24 +80,28 @@ namespace NBC.ActionEditor.Application.Editing
         public EditOperation Deletion(params IDirectable[] items) => new EditOperation(session, "Delete timeline items",
             () => items == null || items.Length == 0 ? "没有选择对象。" : items.Any(i => i == null || !Contains(i) || i.IsLocked) ? "选择中有失效或锁定对象，未删除任何内容。" : null,
             () => { foreach (var item in items.Distinct()) DeleteCore(item); });
-        public EditOperation Reorder(TimelineTrack track, TimelineGroup target, int index) => new EditOperation(session, "Move track", () =>
+        public string MoveError(TimelineRootItem source, TimelineGroup target, int boundary, long version)
         {
-            if (track == null || !Contains(track) || track.IsLocked || target != null && (!Contains(target) || target.IsLocked)) return "锁定或失效轨道/分组不能重排。";
-            if (track.Group != target && target != null && !target.CanAddTrackOfType(track.GetType())) return "此轨道类型不适用于目标分组。";
-            if (track.Group != target && target == null && DirectableTypeInfo.For(track.GetType()).IsUnique
-                && session.Document.RootItems.OfType<TimelineTrack>().Any(t => t != track && t.GetType() == track.GetType())) return "根级已存在唯一轨道。";
-            return null;
-        }, () =>
+            if (session.Version != version) return "文档版本已改变，请重新拖动。";
+            if (session.IsEditing) return "另一项编辑尚未完成。";
+            return StructureRules.Error(session.Document, source, target, boundary);
+        }
+        public EditOperation Reorder(TimelineRootItem source, TimelineGroup target, int index)
         {
-            var document = session.Document;
-            var oldOwner = track.Group;
-            var sourceIndex = oldOwner == null ? document.RootItems.ToList().IndexOf(track) : oldOwner.Tracks.IndexOf(track);
-            var destination = index;
-            if (oldOwner == target && sourceIndex < destination) destination--;
-            if (oldOwner == null) document.RemoveRoot(track); else oldOwner.Tracks.Remove(track);
-            if (target == null) document.InsertRoot(Math.Max(0, Math.Min(destination, document.RootItems.Count)), track);
-            else target.Tracks.Insert(Math.Max(0, Math.Min(destination, target.Tracks.Count)), track);
-        });
+            var version = session.Version;
+            return new EditOperation(session, "Move timeline structure",
+                () => session.Version != version ? "文档版本已改变。" : StructureRules.Error(session.Document, source, target, index),
+                () => StructureRules.Move(session.Document, source, target, index));
+        }
+        // 释放前重新校验版本，原位不创建事务，也不触发图替换通知。
+        public bool Move(TimelineRootItem source, TimelineGroup target, int boundary, long version)
+        {
+            var error = MoveError(source, target, boundary, version);
+            if (error != null) throw new InvalidOperationException(error);
+            if (StructureRules.IsNoOp(session.Document, source, target, boundary)) return false;
+            Reorder(source, target, boundary).Execute();
+            return true;
+        }
         public void Rename(IDirectable item, string name)
         {
             if (!Contains(item) || item.IsLocked) throw new InvalidOperationException("锁定或失效对象不能重命名。");
@@ -125,7 +129,10 @@ namespace NBC.ActionEditor.Application.Editing
 
         public void MoveTrack(TimelineTrack track, TimelineGroup target, int index)
         {
-            Reorder(track, target, index).Execute();
+            var operation = Reorder(track, target, index);
+            if (!operation.CanExecute(out var reason)) throw new InvalidOperationException(reason);
+            if (StructureRules.IsNoOp(session.Document, track, target, index)) return;
+            operation.Execute();
         }
     }
 }

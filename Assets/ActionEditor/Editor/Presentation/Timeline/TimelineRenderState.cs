@@ -16,12 +16,13 @@ namespace NBC.ActionEditor.Presentation.Timeline
         public float ScrollY { get; }
         public float Playhead { get; }
         public TimelineRect? Marquee { get; }
+        public InsertionIndicator Insertion { get; }
         public TimelineRenderState(IEnumerable<TimelineRowState> rows, IEnumerable<TimelineClipState> clips,
-            TimelineSize size, TimelineWorkspace workspace, float playhead, TimelineRect? marquee)
+            TimelineSize size, TimelineWorkspace workspace, float playhead, TimelineRect? marquee, InsertionIndicator insertion = default)
         {
             Rows = Array.AsReadOnly(rows.ToArray()); Clips = Array.AsReadOnly(clips.ToArray()); Size = size;
             LeftWidth = workspace.LeftWidth; Minimum = workspace.ViewTimeMin; Maximum = workspace.ViewTimeMax;
-            ScrollY = workspace.ScrollY; Playhead = playhead; Marquee = marquee;
+            ScrollY = workspace.ScrollY; Playhead = playhead; Marquee = marquee; Insertion = insertion;
         }
     }
     public readonly struct TimelineRowState

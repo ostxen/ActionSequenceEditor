@@ -8,7 +8,7 @@ using NBC.ActionEditor.Presentation.Contracts;
 
 namespace NBC.ActionEditor.Presentation.Timeline
 {
-    public enum TimelineGestureMode { Idle, Move, ResizeLeft, ResizeRight, Marquee, Pan, Splitter, Seek }
+    public enum TimelineGestureMode { Idle, Structure, Move, ResizeLeft, ResizeRight, Marquee, Pan, Splitter, Seek }
 
     // 捕获和候选归单窗口实例，取消只触碰本实例创建的令牌。
     public sealed class TimelineInteraction
@@ -19,6 +19,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
         private readonly TimelineWorkspace workspace;
         private readonly VisibleTimelineLayout layout;
         private readonly ClipGesture clip;
+        private readonly StructureGesture structure;
         private readonly ITimelinePlayhead playhead;
         private readonly Action<bool> capture;
         private readonly Func<EditorSettings> settings;
@@ -28,11 +29,20 @@ namespace NBC.ActionEditor.Presentation.Timeline
         private PointerButton button;
         public TimelineGestureMode Mode { get; private set; }
         public TimelineRect? Marquee { get; private set; }
+        public InsertionIndicator Insertion => structure.Indicator;
         public bool Captured => Mode != TimelineGestureMode.Idle;
         public TimelineInteraction(DocumentSession session, SelectionState selection, TimelineWorkspace workspace,
-            VisibleTimelineLayout layout, ClipEditing editing, ITimelinePlayhead playhead, Func<EditorSettings> settings, Action<bool> capture)
+            VisibleTimelineLayout layout, ClipEditing editing, StructureEditing structureEditing, ITimelinePlayhead playhead, Func<EditorSettings> settings, Action<bool> capture)
         { this.session = session; this.selection = selection; this.workspace = workspace; this.layout = layout;
-            this.playhead = playhead; this.settings = settings; this.capture = capture; clip = new ClipGesture(session, editing); }
+            this.playhead = playhead; this.settings = settings; this.capture = capture; clip = new ClipGesture(session, editing);
+            structure = new StructureGesture(session, structureEditing, layout, workspace); }
+
+        public void Tick(double seconds, TimelineSize size)
+        {
+            if (Mode != TimelineGestureMode.Structure) return;
+            structure.Tick(seconds, size);
+            if (!structure.Active) Cancel();
+        }
 
         public void Pointer(PointerInput input, TimelineSize size)
         {
@@ -43,6 +53,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
             {
                 if (input.Button != button) return;
                 if (input.X < 0 || input.X >= size.Width || input.Y < 0 || input.Y >= size.Height) { Cancel(); return; }
+                if (Mode == TimelineGestureMode.Structure) structure.Move(input.X, input.Y, size);
                 Finish(); return;
             }
             if (input.Action == PointerAction.Move) Move(input, size);
@@ -60,8 +71,10 @@ namespace NBC.ActionEditor.Presentation.Timeline
             else if (input.X < workspace.LeftWidth)
             {
                 var row = layout.RowAt(input.Y, workspace, size);
-                if (row != null) selection.Set(selection.ClickCandidate(row, input.Control, false), true);
-                return;
+                if (row == null) return;
+                selection.Set(selection.ClickCandidate(row, input.Control, false), true);
+                if (!structure.Begin((TimelineRootItem)row, input.X, input.Y)) return;
+                Mode = TimelineGestureMode.Structure;
             }
             else
             {
@@ -82,7 +95,9 @@ namespace NBC.ActionEditor.Presentation.Timeline
         }
         private void Move(PointerInput input, TimelineSize size)
         {
-            if (Mode == TimelineGestureMode.Pan) ViewportNavigation.Pan(workspace, size, input.X - lastX);
+            if (Mode == TimelineGestureMode.Structure)
+            { structure.Move(input.X, input.Y, size); if (!structure.Active) Cancel(); }
+            else if (Mode == TimelineGestureMode.Pan) ViewportNavigation.Pan(workspace, size, input.X - lastX);
             else if (Mode == TimelineGestureMode.Splitter) workspace.LeftWidth = Math.Max(120, Math.Min(size.Width - 120, workspace.LeftWidth + input.X - lastX));
             else if (Mode == TimelineGestureMode.Seek) playhead.Seek(Math.Max(0, layout.Transform.Time(input.X)));
             else if (Mode == TimelineGestureMode.Marquee) Marquee = TimelineRect.Between(Math.Max(workspace.LeftWidth, downX), downY, Math.Max(workspace.LeftWidth, input.X), input.Y);
@@ -98,7 +113,8 @@ namespace NBC.ActionEditor.Presentation.Timeline
             var mode = Mode; var marquee = Marquee;
             Clear();
             selectionBefore = null;
-            if (mode == TimelineGestureMode.Marquee && marquee.HasValue)
+            if (mode == TimelineGestureMode.Structure) structure.Finish();
+            else if (mode == TimelineGestureMode.Marquee && marquee.HasValue)
             {
                 var selected = layout.In(marquee.Value).Cast<IDirectable>();
                 if (control) selected = selection.Items.Concat(selected).Distinct();
@@ -112,7 +128,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
             var selected = Mode == TimelineGestureMode.Marquee ? selectionBefore : null;
             selectionBefore = null;
             try { Clear(); }
-            finally { clip.Cancel(); }
+            finally { structure.Cancel(); clip.Cancel(); }
             if (selected != null) selection.Set(selected.Where(item => session.Document != null && session.Document.directables.Contains(item)).ToArray(), false);
             if (seek) playhead.Seek(seekBefore);
         }

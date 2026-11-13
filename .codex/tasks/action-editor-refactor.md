@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF23 `complete`（限执行记录范围，RF23记录GUI输入重放间歇性风险）。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28工程验收250/250，待本地提交；RF26工程验收完成，领域归位、RootItems、逐窗工作区及v2硬切。偏好最小链按RF30–RF32接入产品视图。具体规格以第4.3节及最新执行记录为准。
-- 下一步：从RF28继续共享时间轴Presenter，再顺序实施RF29–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
+- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29工程验收276/276，待本地提交；RF26工程验收完成，领域归位、RootItems、逐窗工作区及v2硬切。偏好最小链按RF30–RF32接入产品视图。具体规格以第4.3节及最新执行记录为准。
+- 下一步：从RF30继续UI Toolkit被动视图接线，再顺序实施RF31–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -515,8 +515,8 @@ RF36对最终源码全量复核上述要求，并抽查结构编辑、属性编�
 | complete | RF26 | 新领域模型、有序根结构与version 2序列化硬切 | RF25 |
 | complete | RF27 | Application会话、事务、用例及基础设施端口 | RF26 |
 | complete | RF28 | 共享时间轴Presenter、输入状态机、几何与工作区 | RF27 |
-| implementing | RF29 | Group/Track统一结构拖放、排序与指示线状态 | RF28 |
-| planned | RF30 | UI Toolkit被动视图接线与三项反馈修正 | RF29 |
+| complete | RF29 | Group/Track统一结构拖放、排序与指示线状态 | RF28 |
+| implementing | RF30 | UI Toolkit被动视图接线与三项反馈修正 | RF29 |
 | planned | RF31 | IMGUI被动视图接线及统一交互规则 | RF30 |
 | planned | RF32 | 属性/菜单/设置/文档Presenter与业务扩展契约 | RF31 |
 | planned | RF33 | 播放预览、生命周期、Undo/恢复/保存完整闭环 | RF32 |
@@ -765,6 +765,18 @@ void ITimelineView.SetCapture(bool requested);
 - 定向：`034823Z-2e74ebcd`无窗口DocumentSessionTests 11/11；`112937Z-02094423`真实上下文/同批字节适配2/2。新增偏好适配测试纳入最终套件，合计新增14项。最终`20261113T114227Z-7e9d64d9`：Unity编译通过，NBC.ActionEditor.Editor.Tests EditMode **233/233，0失败/跳过/不确定**。覆盖假端口及真实文件/锁文件/外部冲突/导入失败、两UI真实输入、属性与预览。无资产目标，asset-validation skipped；不声称完整资源/Player Build/冷进程/性能或人工验收。
 - 离线：`20261113T114608Z-f92e4d8f`工作流46/46；Unity真实生成21项目701源码，方案0错误39既有警告、12.26秒。文档检查仍缺yaml/markdown_it，整体code profile blocked，未安装。git diff --check通过。保护路径仅核对状态不读取内容，不声称历史字节哈希证明。
 - 职责审查与下一项：应用层持会话/命令与端口，格式/文件/Undo/时钟/偏好/恢复为基础设施；没有把App整体改名搬入Presenter。当前上下文仍承担宿主装配与旧选择/播放，按RF28/RF32/RF33收敛。RF28开始中性输入、逐窗TimelinePresenter、渲染状态及交互状态机；RF29完成组块结构算法；RF30/31替换双UI内部手势，不在RF27虚报这些目标完成。
+### RF29 统一结构拖放执行记录
+
+- 状态：complete（共享结构核心及现行命令调用者；双UI原生事件替换按RF30/31），2026-11-13，前置RF28提交`b87cf42`。
+- 领域：`StructureRules`统一Group根重排、Track组内/跨组/脱组/入组及根混排；所有者从当前列表查找，不依赖历史Parent缓存。边界采用移除前索引，同列表下移减一；源项前后两边界均原位。检查源/目标锁定、Unique/Attachable和边界，未锁定组整体移动不检查子轨自身锁定，不修改片段参数。
+- 应用：`StructureEditing.Reorder`现有双UI调用者直接消费同一规则，不新增兼容壳。`Move`专供结构手势释放，重验会话Version、当前图及活动事务；原位不建事务/Undo/脏。现行MoveTrack仍允许在其原有宿主事务中执行，并在原位前完成校验；所有算法只有一份。
+- 表现：`StructureDropGeometry`区分最左20px根区与普通内容区；Group落点取展开完整块中点，Track根区按所在行上下半行对应整组前后；空白追加根。`StructureGesture`按下只保存源和版本，距离严格>3px显示候选；每帧不改作者图，释放才调用一次Move。接收折叠组成功后由本窗口Workspace展开。
+- `InsertionIndicator`只含Visible/Valid/Y/Width及颜色，无提示文本/领域对象；全主体宽度为TimelineSize.Width、从x=0绘制，合法蓝/拒绝红，视口外隐藏。TimelineInteraction/Presenter接入结构模式及Tick，错误按钮不释放，Esc/越界/换图/另窗提交/Dispose清理，不取消其他owner的令牌。
+- 自动滚动：上下24px线性0–300px/秒，Tick传秒增量，滚动钳制内容范围，每帧从真实ScrollY重算落点。精确测试y=0/12/24/76/88/99、最大步进至两端；无模型预览写入。
+- 验证：新增`NBC.ActionEditor.Tests.Presentation.StructureGestureTests`26项，覆盖四个根/组内边界、整组带锁子树、跨组→脱组→混排v2编解码→入组、连续Undo/Redo、锁定/Unique/Attachable/陈旧版本/非法边界、空组图标状态、折叠接收展开、20px互斥、整块子行落点/全宽/蓝红、阈值/错误按钮/Esc/越界/空白、逐帧滚动/另owner/原位不吞Undo。
+- 失败：`122958Z-164c9f9e`测试误用不存在的Codec.Serialize/Deserialize及EditorSettings.Default；按真实Encode/Decode/显式设置修正；`123138Z-593cfe0e`补Settings命名空间；`123248Z-cd886e84`专项23/23。`123546Z-be5f7293`完整275/276，旧IMGUI宿主已持有事务时MoveTrack误走“拒绝另一编辑”入口，释放被取消；恢复现行调用者在其宿主事务内使用Reorder，同一领域规则，不改原断言；`124139Z-7b198f26`276/276。
+- 最终代码`20261113T124613Z-e907424e`Unity编译通过，完整 **276/276，0失败/跳过/不确定**。`125010Z-99fb8506`工作流46/46，21项目716源码方案构建0错误39既有警告、12.43秒；code整体仍因yaml/markdown_it缺失blocked，未安装。git diff --check通过。资源/冷进程/真实双UI结构新体验尚未以本项代验，RF30/31替换适配后验证，不把纯几何测试说成绘制证据。
+- 责任审阅：领域合法性、应用事务、几何候选、交互快照、Presenter协调分别独立，无控件依赖/全局locator；新增生产类及非直观边界均有精简中文用途说明。用户场景/未跟踪文档/配置不读写暂存，未推送。
 ### RF28 共享时间轴Presenter执行记录
 
 - 状态：complete（无窗口交互核心工程验收；双原生视图替换按RF30/RF31），2026-11-13。RF27提交`38035e9`后顺序推进；没有复制App为巨型Presenter或静态服务表。

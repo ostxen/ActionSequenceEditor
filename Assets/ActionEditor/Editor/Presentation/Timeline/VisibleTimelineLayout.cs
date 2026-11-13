@@ -45,7 +45,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
             return index >= 0 && index < rows.Count ? rows[index] : null;
         }
         public TimelineRenderState Build(ActionDocument source, SelectionState selection, TimelineWorkspace workspace,
-            TimelineSize size, float playhead, TimelineRect? marquee)
+            TimelineSize size, float playhead, TimelineRect? marquee, InsertionIndicator insertion = default)
         {
             if (!ReferenceEquals(document, source)) { keys.Clear(); values.Clear(); document = source; }
             var current = new HashSet<IDirectable>(source?.directables ?? Enumerable.Empty<IDirectable>());
@@ -79,7 +79,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
                         clip.GetType().AssemblyQualifiedName, point, selection.Contains(clip), clip.IsLocked, clip.CanScale(), rect));
                 }
             }
-            return new TimelineRenderState(rowStates, clipStates, size, workspace, playhead, marquee);
+            return new TimelineRenderState(rowStates, clipStates, size, workspace, playhead, marquee, insertion);
         }
         private int Key(IDirectable item)
         {

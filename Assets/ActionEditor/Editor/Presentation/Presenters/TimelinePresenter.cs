@@ -37,7 +37,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
             this.playhead = playhead ?? throw new ArgumentNullException(nameof(playhead));
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.view = view ?? throw new ArgumentNullException(nameof(view));
-            interaction = new TimelineInteraction(session, selection, workspace, layout, clips, playhead, settings, view.SetCapture);
+            interaction = new TimelineInteraction(session, selection, workspace, layout, clips, structure, playhead, settings, view.SetCapture);
             session.ContentChanged += OnContentChanged; session.Changed += Refresh; selection.Changed += Refresh;
             try { Refresh(); }
             catch { Dispose(); throw; }
@@ -47,7 +47,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
         {
             RequireAlive();
             if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds < 0) throw new ArgumentOutOfRangeException(nameof(seconds));
-            Refresh();
+            Run(() => interaction.Tick(seconds, size));
         }
         public void Pointer(PointerInput input) => Run(() => interaction.Pointer(input, size));
         public void Wheel(WheelInput input) => Run(() =>
@@ -92,7 +92,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
         {
             if (disposed || refreshing) return;
             refreshing = true;
-            try { State = layout.Build(session.Document, selection, Workspace, size, playhead.Time, interaction.Marquee); view.Render(State); }
+            try { State = layout.Build(session.Document, selection, Workspace, size, playhead.Time, interaction.Marquee, interaction.Insertion); view.Render(State); }
             finally { refreshing = false; }
         }
         private void OnContentChanged() { interaction.Cancel(); Workspace.Bind(session.Document); }
