@@ -23,7 +23,8 @@ namespace NBC.ActionEditor
 
         protected void ShowCommonInspector(bool showBaseInspector = true)
         {
-            action.Name = EditorGUILayout.TextField("Name", action.Name);
+            var name = EditorGUILayout.DelayedTextField("Name", action.Name);
+            if (name != action.Name) Presenter.Rename(action, name);
             if (showBaseInspector)
             {
                 base.OnInspectorGUI();

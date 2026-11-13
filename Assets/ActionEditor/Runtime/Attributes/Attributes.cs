@@ -90,48 +90,6 @@ namespace NBC.ActionEditor
     }
 
     /// <summary>
-    /// 自定义检视面板
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class)]
-    public class CustomInspectors : Attribute
-    {
-        public Type InspectedType;
-        public bool _editorForChildClasses;
-
-        public CustomInspectors(Type inspectedType)
-        {
-            InspectedType = inspectedType;
-        }
-
-        public CustomInspectors(Type inspectedType, bool editorForChildClasses)
-        {
-            InspectedType = inspectedType;
-            _editorForChildClasses = editorForChildClasses;
-        }
-    }
-
-    /// <summary>
-    /// 自定义检视面板
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class)]
-    public class CustomHeader : Attribute
-    {
-        public bool EditorForChildClasses { get; }
-        public Type InspectedType;
-
-        public CustomHeader(Type inspectedType)
-        {
-            InspectedType = inspectedType;
-        }
-
-        public CustomHeader(Type inspectedType, bool editorForChildClasses)
-        {
-            EditorForChildClasses = editorForChildClasses;
-            InspectedType = inspectedType;
-        }
-    }
-
-    /// <summary>
     /// 自定义名称
     /// </summary>
     [AttributeUsage(AttributeTargets.Class)]

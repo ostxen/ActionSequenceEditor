@@ -5,7 +5,7 @@ using System;
 using System.Collections;
 using System.Linq;
 using System.Reflection;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NBC.ActionEditor.Storage;
 using NBC.ActionEditor.Workbench;
 using NUnit.Framework;
@@ -23,7 +23,8 @@ namespace NBC.ActionEditor.Tests
         private const BindingFlags Instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         private sealed class FieldInspector : InspectorsBase
         {
-            public void Draw(object value, string field) => FieldDefaultInspector(value.GetType().GetField(field), value);
+            public void Draw(object value, string field)
+            { if (Presenter == null) Bind(Composition.PropertyComposition.Create(App.Context)); FieldDefaultInspector(value.GetType().GetField(field), value); }
         }
         private sealed class FieldWindow : EditorWindow
         {
@@ -45,7 +46,7 @@ namespace NBC.ActionEditor.Tests
         [SetUp] public void SetUp()
         {
             source = App.TextAsset; recovery = App.Session.CaptureRecovery();
-            fixture = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset())); App.TextAsset = fixture;
+            fixture = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument())); App.TextAsset = fixture;
         }
         [TearDown] public void TearDown()
         {
@@ -108,14 +109,13 @@ namespace NBC.ActionEditor.Tests
                     App.TextAsset = fixture;
                     foreach (var track in new[] { 0, 2 })
                     {
-                        var type = track == 0 ? typeof(LegacyExperienceInterval) : typeof(LegacyExperienceMarker);
+                        var type = track == 0 ? typeof(FeatureSampleInterval) : typeof(FeatureSampleMarker);
                         if (ui == 0) OriginalCreate(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track], type);
                         else NativeCreate(window, track, type);
                         var clip = Last(track);
                         Assert.That(clip.GetType(), Is.EqualTo(type)); Assert.That(clip.StartTime, Is.EqualTo(6.5f).Within(.0001f));
                         var fieldName = track == 0 ? "Caption" : "Message";
                         var field = type.GetField(fieldName); var initial = (string)field.GetValue(clip);
-                        var token = App.Session.BeginEdit(this);
                         if (ui == 0)
                         {
                             original.Value = clip; original.Field = fieldName; original.Focus(); original.Repaint(); yield return null; yield return null;
@@ -124,26 +124,27 @@ namespace NBC.ActionEditor.Tests
                             original.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = point });
                             original.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.A, control = true });
                             original.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Alpha7, character = '7' });
+                            original.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Return, character = '\n' });
                             yield return null;
                         }
                         else
                         {
                             window.Focus(); window.Select(clip);
-                            var root = new VisualElement(); window.rootVisualElement.Add(root); UIToolkitPropertyView.DrawFields(root, clip, () => { }, 0);
+                            var root = new VisualElement(); window.rootVisualElement.Add(root); new UIToolkitPropertyView(Composition.PropertyComposition.Create(App.Context)).DrawFields(root, clip, () => { }, 0);
                             var text = root.Query<TextField>().ToList().Single(f => f.label == (track == 0 ? "标题" : "消息"));
                             var input = text.Q("unity-text-input").Q<TextElement>(); input.Focus(); yield return null;
                             Key(input, KeyCode.A, control: true); Key(input, KeyCode.Alpha7, '7'); Key(input, KeyCode.Return, '\n');
                             window.Canvas.Focus(); yield return null; root.RemoveFromHierarchy();
                         }
                         Assert.That(field.GetValue(clip), Is.EqualTo("7"), "Real property control must change the authored field: UI=" + ui + ", track=" + track + ", input=" + original.Input + ", offset=" + original.ContentOffset + ", focus=" + EditorWindow.focusedWindow?.GetType().Name + ", hot=" + GUIUtility.hotControl + ", trace=" + original.InputTrace);
-                        token.Cancel(); clip = Last(track); Assert.That(field.GetValue(clip), Is.EqualTo(initial));
-                        token = App.Session.BeginEdit(this); new NBC.ActionEditor.Application.Editing.PropertyPath(App.Context.Properties, clip).Field(field).Write("7"); token.Commit();
-                        Undo.PerformUndo(); Assert.That(field.GetValue(Last(track)), Is.EqualTo(initial));
+                        original.Value = null;
+                        // 真实控件拥有自己的提交；宿主测试不再替它预开另一所有者的事务。
+                        Undo.PerformUndo(); clip = Last(track); Assert.That(field.GetValue(clip), Is.EqualTo(initial));
                         Undo.PerformRedo(); Assert.That(field.GetValue(Last(track)), Is.EqualTo("7"));
                     }
                     var encoded = JsonDocumentCodec.CreateSaveSnapshot(App.AssetData);
                     var reopened = JsonDocumentCodec.Decode(encoded);
-                    Assert.That(reopened.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(), Is.TypeOf<LegacyExperienceInterval>());
+                    Assert.That(reopened.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(), Is.TypeOf<FeatureSampleInterval>());
                     Assert.That(reopened.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[2].Clips.Last().Length, Is.Zero);
                     if (ui == 0) expected = JsonDocumentCodec.Content(reopened);
                     else Assert.That(JsonDocumentCodec.Content(reopened), Is.EqualTo(expected));
@@ -174,7 +175,7 @@ namespace NBC.ActionEditor.Tests
                 for (var ui = 0; ui < 2; ui++)
                 {
                     App.TextAsset = fixture;
-                    var type = typeof(LegacyExperienceInterval);
+                    var type = typeof(FeatureSampleInterval);
                     if (ui == 0) OriginalCreate(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], type);
                     else NativeCreate(native, 0, type);
                     var created = Last(0); App.Context.ClipboardEditing.Copy(created);
@@ -243,7 +244,7 @@ namespace NBC.ActionEditor.Tests
                     native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>(); native.Show(); yield return null;
                     Assert.That(original.Context.Document, Is.SameAs(native.Document));
                     Assert.That(JsonDocumentCodec.Content(native.Document), Is.EqualTo(expected));
-                    Assert.That(((LegacyExperienceInterval)native.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8)).Caption, Is.EqualTo("RF15"));
+                    Assert.That(((FeatureSampleInterval)native.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8)).Caption, Is.EqualTo("RF15"));
                     var now = (float)EditorApplication.timeSinceStartup; App.Context.Playback.Play(now); App.Context.Playback.Update(now + .1f, 1);
                     Assert.That(App.Context.Playback.IsPlaying, Is.True); Assert.That(App.Context.Player.CurrentTime, Is.GreaterThan(0));
                     App.Stop(); Assert.That(App.Context.Player.IsInitialized, Is.False); Assert.That(App.Context.Player.CurrentTime, Is.Zero);
@@ -659,7 +660,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(header.Q<Button>("timeline-fold"), Is.Null);
                 Pointer(canvas, EventType.MouseDown, new Vector2(12, 13)); Pointer(canvas, EventType.MouseUp, new Vector2(12, 13));
                 Assert.That(window.Workspace.IsCollapsed(group), Is.False);
-                App.Context.Structure.AddTrack(group, typeof(LegacyIntervalTrack)); yield return null; yield return null;
+                App.Context.Structure.AddTrack(group, typeof(FeatureSampleIntervalTrack)); yield return null; yield return null;
                 header = canvas.Q("json-row-headers").Children().First();
                 var fold = header.Q<Button>("timeline-fold"); Assert.That(fold, Is.Not.Null);
                 var point = fold.contentRect.center;
@@ -721,7 +722,7 @@ namespace NBC.ActionEditor.Tests
                     window.SendEvent(new Event { type = kind, button = 0, mousePosition = fold });
                 Assert.That(window.Workspace.IsCollapsed(group), Is.False);
                 Assert.That(window.Timeline.State.Rows.First().CanFold, Is.False);
-                App.Context.Structure.AddTrack(group, typeof(LegacyIntervalTrack)); window.Repaint();
+                App.Context.Structure.AddTrack(group, typeof(FeatureSampleIntervalTrack)); window.Repaint();
                 yield return null; yield return null;
                 foreach (var kind in new[] { EventType.MouseDown, EventType.MouseUp })
                     window.SendEvent(new Event { type = kind, button = 0, mousePosition = fold });
@@ -775,11 +776,11 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void ExistingSampleUsesMetadataAndOptionalAdaptersWithoutBusinessBranches()
         {
-            Assert.That(DirectableTypeInfo.For(typeof(LegacyExperienceMarker)).IsSignal, Is.True);
-            Assert.That(EditorCustomFactory.GetHeader(App.AssetData), Is.TypeOf<Samples.LegacyExperienceHeader>());
-            Assert.That(EditorCustomFactory.GetHeader(App.AssetData).CreateGUI(), Is.Not.Null);
-            Assert.That(EditorCustomFactory.GetInspectorType(typeof(LegacyExperienceMarker)), Is.EqualTo(typeof(ActionClipInspector)), "The shared clip inspector inherits generic authored fields.");
-            Assert.That(ActionEditorTypeCatalog.CreatePreview(typeof(LegacyExperienceMarker)), Is.Null, "The sample state view has no scene side effects.");
+            Assert.That(DirectableTypeInfo.For(typeof(FeatureSampleMarker)).IsSignal, Is.True);
+            Assert.That(EditorCustomFactory.GetHeader(App.AssetData), Is.TypeOf<Samples.FeatureSampleHeader>());
+            Assert.That(EditorCustomFactory.GetToolkitHeader(App.AssetData).CreateGUI(), Is.Not.Null);
+            Assert.That(EditorCustomFactory.GetInspectorType(typeof(FeatureSampleMarker)), Is.EqualTo(typeof(ActionClipInspector)), "The shared clip inspector inherits generic authored fields.");
+            Assert.That(ActionEditorTypeCatalog.CreatePreview(typeof(FeatureSampleMarker)), Is.Null, "The sample state view has no scene side effects.");
         }
     }
 }

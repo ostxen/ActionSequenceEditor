@@ -3,20 +3,14 @@ using UnityEditor;
 
 namespace NBC.ActionEditor
 {
+    // 文档公共信息以只读值显示，业务字段仍由统一属性控件绘制。
     [CustomInspectors(typeof(ActionDocument), true)]
     public class AssetInspector : InspectorsBase
     {
-        private ActionDocument action => (ActionDocument)target;
-
         public override void OnInspectorGUI()
         {
-            ShowCommonInspector();
+            EditorGUILayout.LabelField("Length", Presenter.DocumentLength.ToString());
             base.OnInspectorGUI();
-        }
-
-        protected void ShowCommonInspector(bool showBaseInspector = true)
-        {
-            EditorGUILayout.TextField("Name", action.Length.ToString());
         }
     }
 }

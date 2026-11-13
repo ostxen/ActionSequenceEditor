@@ -7,7 +7,7 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using UnityEngine.UIElements;
 using NBC.ActionEditor.Workbench;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NBC.ActionEditor.Serialization;
 using NBC.ActionEditor.Storage;
 using Unity.Pipeline.Commands;
@@ -110,11 +110,11 @@ namespace NBC.ActionEditor.Validation
             {
                 owns = !string.IsNullOrEmpty(AssetDatabase.CreateFolder("Assets", "ActionEditorValidationRF20"));
                 if (!owns) throw new IOException("Fixture folder creation failed.");
-                App.TextAsset = DocumentCreationService.Create(typeof(Samples.LegacyExperience.LegacyExperienceAsset), root + "/Source.json");
+                App.TextAsset = DocumentCreationService.Create(typeof(Samples.FeatureSample.FeatureSampleDocument), root + "/Source.json");
                 var sourceBytes = File.ReadAllBytes(App.Session.Path);
                 for (var dirty = 0; dirty < 2; dirty++)
                 {
-                    if (dirty != 0) App.Session.Edit("RF20 business", () => ((Samples.LegacyExperience.LegacyExperienceAsset)App.AssetData).Version = 9);
+                    if (dirty != 0) App.Session.Edit("RF20 business", () => ((Samples.FeatureSample.FeatureSampleDocument)App.AssetData).Version = 9);
                     App.SelectWithoutInspector(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]);
                     App.Context.Player.Sample(.5f); App.Play(); App.Pause();
                     var source = App.AssetData; var selection = App.FistSelect; var before = App.Session.CaptureRecovery(); var path = App.Session.Path;
@@ -123,15 +123,15 @@ namespace NBC.ActionEditor.Validation
                     if (open == null) throw new InvalidOperationException("Both UI shared menu missing export.");
                     open(); window = Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Single();
                     var target = root + (dirty == 0 ? "/Clean.json" : "/Dirty.json");
-                    if (DocumentExportWindow.ExportTo("actioneditor.json", null)) throw new InvalidOperationException("Cancel exported a file.");
-                    DocumentExportWindow.ExportTo("actioneditor.json", target);
+                    if (window.ExportTo("actioneditor.json", null)) throw new InvalidOperationException("Cancel exported a file.");
+                    window.ExportTo("actioneditor.json", target);
                     window.Close(); window = null;
                     var loaded = JsonDocumentCodec.Decode(File.ReadAllText(target));
-                    if (((Samples.LegacyExperience.LegacyExperienceAsset)loaded).Version != (dirty == 0 ? 1 : 9)) throw new InvalidOperationException("Export lost business content.");
+                    if (((Samples.FeatureSample.FeatureSampleDocument)loaded).Version != (dirty == 0 ? 1 : 9)) throw new InvalidOperationException("Export lost business content.");
                     foreach (var rejected in new[] { target, root.ToLowerInvariant() + "/./Source.JSON" })
                     {
                         var refused = false;
-                        try { DocumentExportWindow.ExportTo("actioneditor.json", rejected); } catch (Exception error) when (error is IOException || error is ArgumentException) { refused = true; }
+                        try { Composition.DocumentPresenterComposition.Create(App.Context).Export(rejected, "actioneditor.json"); } catch (Exception error) when (error is IOException || error is ArgumentException) { refused = true; }
                         if (!refused) throw new InvalidOperationException("Unsafe export target accepted.");
                     }
                     if (!ReferenceEquals(source, App.AssetData) || App.Session.CaptureRecovery() != before || path != App.Session.Path
@@ -140,12 +140,12 @@ namespace NBC.ActionEditor.Validation
                     App.Stop();
                 }
                 Undo.PerformUndo();
-                if (((Samples.LegacyExperience.LegacyExperienceAsset)App.AssetData).Version != 1) throw new InvalidOperationException("Export changed Undo.");
+                if (((Samples.FeatureSample.FeatureSampleDocument)App.AssetData).Version != 1) throw new InvalidOperationException("Export changed Undo.");
                 Undo.PerformRedo();
-                if (((Samples.LegacyExperience.LegacyExperienceAsset)App.AssetData).Version != 9) throw new InvalidOperationException("Export changed Redo.");
+                if (((Samples.FeatureSample.FeatureSampleDocument)App.AssetData).Version != 9) throw new InvalidOperationException("Export changed Redo.");
                 var edit = App.Session.BeginEdit(new object());
                 var refusedEdit = false;
-                try { DocumentExportWindow.ExportTo("actioneditor.json", root + "/Active.json"); } catch (InvalidOperationException) { refusedEdit = true; }
+                try { Composition.DocumentPresenterComposition.Create(App.Context).Export(root + "/Active.json", "actioneditor.json"); } catch (InvalidOperationException) { refusedEdit = true; }
                 if (!refusedEdit || !edit.IsActive || File.Exists(root + "/Active.json")) throw new InvalidOperationException("Export ended active gesture.");
                 edit.Cancel();
                 return new { status = "passed", checks = new[] { "clean/dirty exact readback", "export window/menu entry", "cancel no writes", "existing/source alias rejected", "active edit remains owned", "source/baseline/selection/paused playback/Undo unchanged" } };
@@ -166,7 +166,7 @@ namespace NBC.ActionEditor.Validation
             if (Directory.Exists(root) || File.Exists(root) || File.Exists(root + ".meta")) throw new IOException("Fixture exists, refusing overwrite.");
             if (App.Session.IsEditing || App.IsPlay || Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Length != 0
                 || Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>().Length != 0 || Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Length != 0
-                || Resources.FindObjectsOfTypeAll<Samples.LegacyExperiencePreview>().Length != 0)
+                || Resources.FindObjectsOfTypeAll<Samples.FeatureSamplePreview>().Length != 0)
                 throw new InvalidOperationException("Requires no active edit/playback or existing product/preview/export windows; never reuse user windows.");
             if (dryRun) return new { root, targets = new[] { root + "/IMGUI.json", root + "/IMGUI-Export.json", root + "/Toolkit.json", root + "/Toolkit-Export.json" },
                 operations = new[] { "open both real menu methods in turn", "create preset via creation popup's shared confirmed action", "select and edit properties, move and resize using each window's gesture adapter", "Undo/Redo", "sample state preview and playback", "save via each window SaveChanges", "close/reopen same source", "open shared export menu and export independent copy", "restore prior session and delete only owned fixture folder" },
@@ -174,7 +174,7 @@ namespace NBC.ActionEditor.Validation
             if (!confirm) throw new InvalidOperationException("Preview and explicit approval required.");
             var recovery = App.Session.CaptureRecovery(); var previous = App.TextAsset; var previousHost = ActionEditorHost.Window;
             var previousWidth = ActionEditorHost.Width; var owns = false;
-            ActionEditorWindow original = null; UIToolkitActionEditorWindow native = null; Samples.LegacyExperiencePreview preview = null; DocumentExportWindow export = null;
+            ActionEditorWindow original = null; UIToolkitActionEditorWindow native = null; Samples.FeatureSamplePreview preview = null; DocumentExportWindow export = null;
             var results = new System.Collections.Generic.List<object>();
             try
             {
@@ -187,7 +187,7 @@ namespace NBC.ActionEditor.Validation
                     else { ActionEditorWindow.OpenDirectorWindow(); original = Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Single(); original.position = new Rect(60, 60, 1000, 600); }
                     await TutorialFrames();
                     var path = root + (toolkit ? "/Toolkit.json" : "/IMGUI.json");
-                    CreateAssetWindow.CreateAndOpen(typeof(LegacyExperienceAsset), path, toolkit);
+                    new Composition.DocumentDialogComposition(App.Context).CreateAndOpen(typeof(FeatureSampleDocument), path);
                     await TutorialFrames();
                     if (App.Session.Path != path || App.AssetData.RootItems.OfType<TimelineGroup>().Count() != 3 || App.AssetData.RootItems.OfType<TimelineGroup>().Sum(g => g.Tracks.Count) != 7
                         || App.AssetData.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).Sum(t => t.Clips.Count) != 13 || App.Session.IsDirty
@@ -200,8 +200,8 @@ namespace NBC.ActionEditor.Validation
                         properties.Query<TextField>().ToList().Single(f => f.label == "标题").value = "Tutorial";
                         properties.RemoveFromHierarchy();
                     }
-                    else App.Session.Edit("Tutorial property", () => new NBC.ActionEditor.Application.Editing.PropertyPath(App.Context.Properties, clip).Field(typeof(LegacyExperienceInterval).GetField("Caption")).Write("Tutorial"));
-                    if (((LegacyExperienceInterval)clip).Caption != "Tutorial") throw new InvalidOperationException("Property edit failed.");
+                    else App.Session.Edit("Tutorial property", () => new NBC.ActionEditor.Application.Editing.PropertyPath(App.Context.Properties, clip).Field(typeof(FeatureSampleInterval).GetField("Caption")).Write("Tutorial"));
+                    if (((FeatureSampleInterval)clip).Caption != "Tutorial") throw new InvalidOperationException("Property edit failed.");
                     await TutorialFrames();
                     for (var resize = 0; resize < 2; resize++)
                     {
@@ -233,7 +233,7 @@ namespace NBC.ActionEditor.Validation
                     var editedLength = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length;
                     Undo.PerformUndo(); if (App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length != 1.5f) throw new InvalidOperationException("Undo failed.");
                     Undo.PerformRedo(); if (App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length != editedLength) throw new InvalidOperationException("Redo failed.");
-                    preview = ScriptableObject.CreateInstance<Samples.LegacyExperiencePreview>(); preview.Show(); preview.Repaint();
+                    preview = ScriptableObject.CreateInstance<Samples.FeatureSamplePreview>(); preview.Show(); preview.Repaint();
                     var now = (float)EditorApplication.timeSinceStartup; App.Context.Playback.Play(now); App.Context.Playback.Update(now + .1f, 1);
                     if (!App.IsPlay || App.Context.Player.CurrentTime <= 0) throw new InvalidOperationException("Playback failed.");
                     App.Pause(); App.Context.Player.Sample(.75f); await TutorialFrames(); App.Stop(); preview.Close(); preview = null;
@@ -249,7 +249,7 @@ namespace NBC.ActionEditor.Validation
                     var before = App.Session.CaptureRecovery(); var graph = App.AssetData;
                     Action openExport = null; ActionEditorHost.PopulateSaveMenu((label, action) => { if (label == Lan.Export) openExport = action; });
                     openExport(); export = Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Single(); await TutorialFrames();
-                    var target = path.Replace(".json", "-Export.json"); DocumentExportWindow.ExportTo("actioneditor.json", target); export.Close(); export = null;
+                    var target = path.Replace(".json", "-Export.json"); export.ExportTo("actioneditor.json", target); export.Close(); export = null;
                     if (!ReferenceEquals(graph, App.AssetData) || App.Session.CaptureRecovery() != before || !File.ReadAllBytes(path).SequenceEqual(bytes)
                         || JsonDocumentCodec.Content(JsonDocumentCodec.Decode(File.ReadAllText(target))) != expected) throw new InvalidOperationException("Export not independent or readback differs.");
                     results.Add(new { ui = toolkit ? "UI Toolkit" : "IMGUI", source = path, exported = target, groups = 3, tracks = 7, clips = 13, start = .5f, length = 1.25f,

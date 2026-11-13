@@ -22,11 +22,11 @@ namespace NBC.ActionEditor
                 headerBindings[asset.GetType()] = type = ExtensionResolver.ResolveExtension(headers, asset.GetType(), false);
             return type == null ? null : (HeaderBase)Activator.CreateInstance(type);
         }
-        public static InspectorsBase GetInspector(IData value)
+        public static InspectorsBase GetInspector(IData value, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter)
         {
             var type = GetInspectorType(value.GetType());
             var inspector = type == null ? new InspectorsBase() : (InspectorsBase)Activator.CreateInstance(type);
-            inspector.SetTarget(value); return inspector;
+            inspector.Bind(presenter); inspector.SetTarget(value); return inspector;
         }
 
         public static Type GetInspectorType(Type target)
@@ -35,6 +35,17 @@ namespace NBC.ActionEditor
             if (!inspectorBindings.TryGetValue(target, out var type))
                 inspectorBindings[target] = type = ExtensionResolver.ResolveExtension(inspectors, target, true);
             return type;
+        }
+
+        public static ToolkitHeaderView GetToolkitHeader(ActionDocument document)
+        {
+            var type = document == null ? null : ExtensionResolver.ResolveExtension(Discover(typeof(ToolkitHeaderView)), document.GetType(), typeof(ToolkitHeaderAttribute));
+            return type == null ? null : (ToolkitHeaderView)Activator.CreateInstance(type);
+        }
+        public static ToolkitPropertyExtension GetToolkitProperties(Type target)
+        {
+            var type = ExtensionResolver.ResolveExtension(Discover(typeof(ToolkitPropertyExtension)), target, typeof(ToolkitPropertiesAttribute));
+            return type == null ? null : (ToolkitPropertyExtension)Activator.CreateInstance(type);
         }
 
     }

@@ -64,7 +64,7 @@ namespace NBC.ActionEditor
         {
             AssetTypes.Clear();
             AssetNames.Clear();
-            var types = ReflectionTools.GetImplementationsOf(typeof(ActionDocument));
+            var types = ActionEditorTypeCatalog.DerivedFrom(typeof(ActionDocument)).Select(info => info.type);
             foreach (var t in types)
             {
                 var typeName = t.GetCustomAttributes(typeof(NameAttribute), false).FirstOrDefault() is NameAttribute nameAtt ? nameAtt.name : t.Name.SplitCamelCase();
@@ -75,7 +75,7 @@ namespace NBC.ActionEditor
 
         public static string GetAssetTypeName(Type type)
         {
-            if (type == typeof(Samples.LegacyExperience.LegacyExperienceAsset)) return Lan.FeatureSample;
+            if (type == typeof(Samples.FeatureSample.FeatureSampleDocument)) return Lan.FeatureSample;
             foreach (var key in AssetTypes.Keys)
             {
                 var v = AssetTypes[key];

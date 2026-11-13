@@ -20,8 +20,8 @@ namespace NBC.ActionEditor.Validation
 
             public Move(string source, string destination, string guid)
             {
-                Source = Root + source;
-                Destination = Root + destination;
+                Source = source.StartsWith("Assets/", StringComparison.Ordinal) ? source : Root + source;
+                Destination = destination.StartsWith("Assets/", StringComparison.Ordinal) ? destination : Root + destination;
                 Guid = guid;
             }
         }
@@ -39,11 +39,28 @@ namespace NBC.ActionEditor.Validation
         public static object ArrangeApplicationLayout(
             [CliArg("confirm", "Apply the reviewed manifest.")] bool confirm = false,
             [CliArg("dry-run", "Inspect the exact fixed scope.")] bool dryRun = false)
+            => MoveManifest(Moves, confirm, dryRun);
+
+        // 只归位当前样例、唯一教程及业务字段描述，固定清单不接受外部路径。
+        [CliGroupCommand("actioneditor.validation", "Move the fixed FeatureSample sources, sole tutorial and runtime field metadata. Preserve GUID and bytes; no user data or overwrite.")]
+        public static object ArrangeFeatureLayout(
+            [CliArg("confirm", "Apply the reviewed manifest.")] bool confirm = false,
+            [CliArg("dry-run", "Inspect the exact fixed scope.")] bool dryRun = false)
+            => MoveManifest(new[]
+            {
+                new Move("Assets/ActionEditor/Runtime/Samples/LegacyExperience/LegacyExperienceAsset.cs", "Assets/ActionEditor/Runtime/Samples/FeatureSample/FeatureSampleDocument.cs", "85564f260125ced47ad7a93282cf1f6c"),
+                new Move("Samples/LegacyExperiencePreview.cs", "Samples/FeatureSamplePreview.cs", "8057cd80c2f7e7649be696ad53a648e8"),
+                new Move("Assets/ActionEditor/Samples/LegacyExperience/README.md", "Assets/ActionEditor/Samples/FeatureSample/README.md", "30542892b6cdb57489102ba2218a9a47"),
+                new Move("Core/Properties/JsonFieldDescription.cs", "Assets/ActionEditor/Runtime/Metadata/PropertyDescription.cs", "24fa94a40f752a142bddcde4c236fd8e")
+            }, confirm, dryRun);
+
+        // 清单来自封闭命令，预览与应用均重验身份、目标和字节。
+        private static object MoveManifest(Move[] moves, bool confirm, bool dryRun)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
                 throw new InvalidOperationException("需要空闲的编辑模式。");
 
-            foreach (var move in Moves)
+            foreach (var move in moves)
             {
                 if (!File.Exists(move.Source) || !File.Exists(move.Source + ".meta")
                     || AssetDatabase.AssetPathToGUID(move.Source) != move.Guid)
@@ -52,9 +69,9 @@ namespace NBC.ActionEditor.Validation
                     throw new IOException("目标已存在：" + move.Destination);
             }
 
-            var folders = Moves.SelectMany(m => MissingFolders(Parent(m.Destination))).Distinct()
+            var folders = moves.SelectMany(m => MissingFolders(Parent(m.Destination))).Distinct()
                 .OrderBy(f => f.Count(c => c == '/')).ThenBy(f => f, StringComparer.Ordinal).ToArray();
-            var before = Moves.Select(m => new
+            var before = moves.Select(m => new
             {
                 source = m.Source, destination = m.Destination, guid = m.Guid,
                 sha256 = Hash(m.Source), metaSha256 = Hash(m.Source + ".meta")
@@ -70,7 +87,7 @@ namespace NBC.ActionEditor.Validation
             AssetDatabase.StartAssetEditing();
             try
             {
-                foreach (var move in Moves)
+                foreach (var move in moves)
                 {
                     var error = AssetDatabase.ValidateMoveAsset(move.Source, move.Destination);
                     if (!string.IsNullOrEmpty(error)) throw new IOException(error);
@@ -87,7 +104,7 @@ namespace NBC.ActionEditor.Validation
                     || Hash(item.destination) != item.sha256 || Hash(item.destination + ".meta") != item.metaSha256)
                     throw new IOException("移动后校验失败：" + item.destination);
             Unity.CodeEditor.CodeEditor.CurrentEditor.SyncAll();
-            return new { status = "passed", count = Moves.Length, moves = before, createdFolders = folders, guidAndBytesPreserved = true, projectsRegenerated = true };
+            return new { status = "passed", count = moves.Length, moves = before, createdFolders = folders, guidAndBytesPreserved = true, projectsRegenerated = true };
         }
 
         private static string Parent(string path) => Path.GetDirectoryName(path).Replace('\\', '/');

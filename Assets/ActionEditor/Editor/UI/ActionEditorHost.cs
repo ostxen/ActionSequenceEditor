@@ -82,9 +82,10 @@ namespace NBC.ActionEditor
         }
         public static void PopulateSaveMenu(Action<string, Action> add)
         {
-            add(Lan.Save, App.SaveAsset);
-            add(Lan.SaveAs, SaveAs);
-            add(Lan.Export, DocumentExportWindow.ShowForCurrent);
+            var documents = Composition.DocumentPresenterComposition.Create(App.Context);
+            add(Lan.Save, () => documents.Invoke(Presentation.Contracts.DocumentIntent.Save));
+            add(Lan.SaveAs, () => documents.Invoke(Presentation.Contracts.DocumentIntent.SaveAs));
+            add(Lan.Export, () => documents.Invoke(Presentation.Contracts.DocumentIntent.Export));
         }
     }
 }

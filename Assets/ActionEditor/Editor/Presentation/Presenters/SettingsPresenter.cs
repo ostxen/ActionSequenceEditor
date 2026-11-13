@@ -31,6 +31,25 @@ namespace NBC.ActionEditor.Presentation.Presenters
             view.ShowError(null); view.Render(draft);
         }
 
+        // 即时控件仍经过草稿与同一提交边界，校验或落盘失败只反馈给当前视图。
+        public SettingsResult Change(TimeStepMode? mode = null, float? snap = null, int? fps = null,
+            bool? magnet = null, bool? wheel = null, int? autoSave = null, string path = null)
+        {
+            ThrowIfDisposed();
+            try
+            {
+                var current = draft ?? session.Current;
+                var nextMode = mode ?? current.TimeStepMode;
+                var changedMode = nextMode != current.TimeStepMode;
+                var rate = fps ?? (changedMode ? nextMode == TimeStepMode.Frames ? 30 : 10 : current.FrameRate);
+                var interval = snap ?? (fps.HasValue || changedMode ? 1f / rate : current.SnapInterval);
+                Preview(new EditorSettings(nextMode, interval, rate, magnet ?? current.MagnetSnapping,
+                    wheel ?? current.ScrollWheelZooms, autoSave ?? current.AutoSaveSeconds, path ?? current.SavePath));
+                return Apply();
+            }
+            catch (Exception error) { view.ShowError(error.Message); return SettingsResult.Failure(error.Message); }
+        }
+
         // 陈旧草稿不能覆盖另一窗口已经提交的偏好。
         public SettingsResult Apply()
         {

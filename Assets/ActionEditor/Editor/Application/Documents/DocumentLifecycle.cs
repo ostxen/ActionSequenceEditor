@@ -40,6 +40,7 @@ namespace NBC.ActionEditor.Application.Documents
             var committed = false;
             try
             {
+                if (session.IsEditing) throw new InvalidOperationException("请先完成或取消当前编辑，再创建文档。");
                 target = repository.ValidatePath(target);
                 repository.Commit(target, factory.Create(type), null);
                 committed = true;

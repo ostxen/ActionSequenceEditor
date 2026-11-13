@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -13,6 +13,34 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class PreviewOwnershipTests
     {
+        [Test] public void FeatureSampleProjectionUsesValuesAndKeepsCapturedFramesIndependent()
+        {
+            var document = new FeatureSampleDocument();
+            var time = .5f;
+            var presenter = new NBC.ActionEditor.Presentation.Presenters.FeatureSamplePresenter(() => document, () => time);
+            var state = presenter.Capture();
+            Assert.That(state.Available, Is.True);
+            Assert.That(state.Intervals.Count, Is.EqualTo(1));
+            Assert.That(state.Intervals[0].Progress, Is.EqualTo(1f / 6).Within(.00001f));
+            Assert.That(state.Loops.Count, Is.EqualTo(1));
+            Assert.That(state.Loops[0].Iteration, Is.EqualTo(1));
+            Assert.That(state.Loops[0].Time, Is.Zero);
+            Assert.That(state.Markers.Count, Is.EqualTo(1));
+            Assert.That(state.Markers[0].Time, Is.EqualTo(.5f));
+            var caption = state.Intervals[0].Caption;
+            ((FeatureSampleInterval)document.AllTracks.First().Clips[0]).Caption = "changed";
+            time = 2;
+            Assert.That(state.Time, Is.EqualTo(.5f));
+            Assert.That(state.Intervals[0].Caption, Is.EqualTo(caption));
+            var later = presenter.Capture();
+            Assert.That(later.Intervals.Any(i => i.Caption == caption), Is.False);
+            Assert.That(later.Loops[0].Iteration, Is.EqualTo(3));
+            Assert.That(later.Loops[0].Time, Is.Zero);
+            document = null;
+            Assert.That(presenter.Capture().Available, Is.False);
+            Assert.That(presenter.Capture().Intervals, Is.Empty);
+        }
+
         private class Probe : PreviewBase
         {
             public int Disposals, Updates;
@@ -34,10 +62,10 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void PreviewSessionReusesResourcesAndDisposesOnceOnResetAndFailure()
         {
-            var asset = new LegacyExperienceAsset(); var probes = new List<Probe>();
+            var asset = new FeatureSampleDocument(); var probes = new List<Probe>();
             var player = new AssetPlayer(() => asset, type =>
             {
-                if (type != typeof(LegacyExperienceInterval)) return null;
+                if (type != typeof(FeatureSampleInterval)) return null;
                 var probe = new Probe(); probes.Add(probe); return probe;
             });
             player.Sample(0); var count = probes.Count;
@@ -53,7 +81,7 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void PartialFactoryFailureReleasesAlreadyCreatedResources()
         {
-            var asset = new LegacyExperienceAsset(); var probe = new Probe(); var count = 0;
+            var asset = new FeatureSampleDocument(); var probe = new Probe(); var count = 0;
             var player = new AssetPlayer(() => asset, type =>
             {
                 if (++count == 2) throw new InvalidOperationException("factory failure");
@@ -65,8 +93,8 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void PlaybackPauseLoopStepAndFaultKeepResourceOwnershipExplicit()
         {
-            var asset = new LegacyExperienceAsset(); var probes = new List<Probe>();
-            var player = new AssetPlayer(() => asset, type => { if (type != typeof(LegacyExperienceInterval)) return null; var p = new Probe(); probes.Add(p); return p; });
+            var asset = new FeatureSampleDocument(); var probes = new List<Probe>();
+            var player = new AssetPlayer(() => asset, type => { if (type != typeof(FeatureSampleInterval)) return null; var p = new Probe(); probes.Add(p); return p; });
             var playback = new ActionEditorPlayback(player);
             playback.Play(10); playback.Update(11, 1); Assert.That(player.CurrentTime, Is.EqualTo(1));
             playback.Pause(true); playback.Update(12, 1); Assert.That(player.CurrentTime, Is.EqualTo(1));
@@ -84,7 +112,7 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void StopCallbackFailureStillReleasesPreviewAndClearsPlayback()
         {
-            var asset = new LegacyExperienceAsset(); var probes = new List<Probe>();
+            var asset = new FeatureSampleDocument(); var probes = new List<Probe>();
             var player = new AssetPlayer(() => asset, type => { var p = new Probe(); probes.Add(p); return p; });
             var playback = new ActionEditorPlayback(player); playback.Play(0); player.Sample(1);
             playback.Stopped += () => throw new InvalidOperationException("stop callback failure");
@@ -96,19 +124,66 @@ namespace NBC.ActionEditor.Tests
         {
             var previousWindow = ActionEditorHost.Window;
             var source = App.TextAsset; var recovery = App.Session.CaptureRecovery();
-            var fixture = new TextAsset(Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset())); App.TextAsset = fixture;
+            var fixture = new TextAsset(Storage.JsonDocumentCodec.Encode(new FeatureSampleDocument())); App.TextAsset = fixture;
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
             var native = ScriptableObject.CreateInstance<Workbench.UIToolkitActionEditorWindow>();
             try
             {
                 original.Show(); native.Show(); yield return null; yield return null;
                 Assert.That(EditorApplication.update.GetInvocationList().Count(callback => callback.Method.DeclaringType == typeof(ActionEditorHost) && callback.Method.Name == "UpdateSharedEditor"), Is.EqualTo(1));
+                App.Context.Playback.Play((float)EditorApplication.timeSinceStartup);
+                App.Context.Playback.Pause(true);
+                native.Close();
+                Assert.That(App.Context.Playback.IsPlaying, Is.True, "Closing one view must not stop the shared playback.");
+                Assert.That(App.Context.Playback.IsPaused, Is.True);
             }
             finally
             {
-                original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close(); ActionEditorHost.Window = previousWindow;
+                original.DiscardChanges();
+                if (native != null) { native.DiscardChanges(); native.Close(); }
+                original.Close(); ActionEditorHost.Window = previousWindow;
                 App.TextAsset = source; App.Session.RestoreRecovery(recovery); UnityEngine.Object.DestroyImmediate(fixture);
             }
+        }
+
+        private sealed class Preferences : NBC.ActionEditor.Application.Settings.IPreferencesStore
+        {
+            public NBC.ActionEditor.Application.Settings.EditorSettings Read() => new NBC.ActionEditor.Application.Settings.EditorSettings(
+                NBC.ActionEditor.Application.Settings.TimeStepMode.Seconds, .1f, 30, true, true, 0, "Assets/");
+            public void Write(NBC.ActionEditor.Application.Settings.EditorSettings value) => throw new AssertionException("Closing a window must not write preferences.");
+        }
+
+        [Test] public void IsolatedBindingsReleaseLastPlaybackAndSubscriptionsExactlyOnce()
+        {
+            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            var fixture = new TextAsset(Storage.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
+            var views = new ActionEditorViews();
+            var settings = new NBC.ActionEditor.Application.Settings.SettingsSession(new Preferences());
+            var redraws = 0; var stopped = 0;
+            var first = new Composition.WindowBinding(new object(), () => redraws++, () => { }, context, views, settings, () => DateTime.MinValue);
+            var second = new Composition.WindowBinding(new object(), () => redraws++, () => { }, context, views, settings, () => DateTime.MinValue);
+            try
+            {
+                context.Open(fixture);
+                first.Playback.Invoke(NBC.ActionEditor.Presentation.Contracts.PlaybackIntent.Next);
+                Assert.That(context.Player.CurrentTime, Is.EqualTo(.1f).Within(.00001f), "Step must use the settings supplied to this binding.");
+                first.Playback.Invoke(NBC.ActionEditor.Presentation.Contracts.PlaybackIntent.Previous);
+                Assert.That(context.Player.CurrentTime, Is.Zero);
+                context.Open(fixture); context.Playback.Play(0); context.Player.Sample(1); context.Playback.Pause(true);
+                context.Playback.Stopped += () => stopped++;
+                first.Dispose(); first.Dispose();
+                Assert.That(views.Count, Is.EqualTo(1)); Assert.That(stopped, Is.Zero);
+                Assert.That(context.Playback.IsPlaying && context.Playback.IsPaused, Is.True);
+                second.Dispose(); second.Dispose();
+                Assert.That(views.Count, Is.Zero); Assert.That(stopped, Is.EqualTo(1));
+                Assert.That(context.Playback.IsPlaying || context.Playback.IsPaused || context.Player.IsInitialized, Is.False);
+                Assert.That(context.Player.CurrentTime, Is.Zero);
+                var count = redraws; views.Repaint(); views.NotifyChanged();
+                Assert.That(redraws, Is.EqualTo(count));
+                var listeners = typeof(NBC.ActionEditor.Application.Settings.SettingsSession).GetField("Changed", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(settings) as Delegate;
+                Assert.That(listeners, Is.Null);
+            }
+            finally { first.Dispose(); second.Dispose(); UnityEngine.Object.DestroyImmediate(fixture); }
         }
     }
 }

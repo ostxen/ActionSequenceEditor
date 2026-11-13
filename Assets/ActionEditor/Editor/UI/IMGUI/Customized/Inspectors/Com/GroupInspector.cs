@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace NBC.ActionEditor.Design.Editor.Inspectors
 {
-    public abstract class GroupInspector<T> : ActionClipInspector where T : TimelineGroup
+    public abstract class GroupInspector<T> : GroupInspector where T : TimelineGroup
     {
         protected T action => (T)target;
     }
@@ -22,7 +22,8 @@ namespace NBC.ActionEditor.Design.Editor.Inspectors
 
         protected void ShowCommonInspector(bool showBaseInspector = true)
         {
-            action.Name = EditorGUILayout.TextField("Name", action.Name);
+            var name = EditorGUILayout.DelayedTextField("Name", action.Name);
+            if (name != action.Name) Presenter.Rename(action, name);
             if (showBaseInspector)
             {
                 base.OnInspectorGUI();

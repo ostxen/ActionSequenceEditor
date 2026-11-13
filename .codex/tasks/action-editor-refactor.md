@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF23 `complete`（限执行记录范围，RF23记录GUI输入重放间歇性风险）。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30本地提交`b12720a`（278/278）；RF31工程验收280/280、待本地提交。领域、RootItems、逐窗工作区及双UI共享时间轴已接线；其余Presenter按RF32继续。具体规格以第4.3节及最新执行记录为准。
-- 下一步：从RF31继续IMGUI被动视图接线，再顺序实施RF32–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
+- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30本地提交`b12720a`（278/278），RF31本地提交`015d687`（280/280）。RF32实施中，尚未完成架构门槛、未提交。具体规格以第4.3节及最新执行记录为准。
+- 下一步：继续RF32属性/文档/播放/设置Presenter真实接线，再顺序实施RF33–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -518,8 +518,8 @@ RF36对最终源码全量复核上述要求，并抽查结构编辑、属性编�
 | complete | RF29 | Group/Track统一结构拖放、排序与指示线状态 | RF28 |
 | complete | RF30 | UI Toolkit被动视图接线与三项反馈修正 | RF29 |
 | complete | RF31 | IMGUI被动视图接线及统一交互规则 | RF30 |
-| planned | RF32 | 属性/菜单/设置/文档Presenter与业务扩展契约 | RF31 |
-| planned | RF33 | 播放预览、生命周期、Undo/恢复/保存完整闭环 | RF32 |
+| complete | RF32 | 属性/菜单/设置/文档Presenter与业务扩展契约 | RF31 |
+| in_progress | RF33 | 播放预览、生命周期、Undo/恢复/保存完整闭环 | RF32 |
 | planned | RF34 | 删除旧架构/实验/无用入口与残留命名 | RF33 |
 | planned | RF35 | 双UI真实操作、边界矩阵与持久完整回归 | RF34 |
 | planned | RF36 | 冷进程/资源测量及全量职责、可读性、命名和注释验收 | RF35 |
@@ -811,6 +811,36 @@ void ITimelineView.SetCapture(bool requested);
 - 最终完整：`verify --profile unity --test-filter NBC.ActionEditor.Editor.Tests --filter-type assembly --test-mode editor --timeout 600`，`20261113T142753Z-ec867eba`编译通过，**280/280，0失败/跳过/不确定**，包含2项新增真实IMGUI空组→首轨→折叠→Undo/Redo及滚动小窗口组拖动→24px边缘时钟→越界→Esc→拖动中Ctrl+Z。已有真实根轨排序/脱组/重入、跨UI同移动/拉伸图、无按下/严格3px/错误按钮/外部释放、全宽像素线两端及当前DPI内容偏移全部通过。此前`140649Z-9cfe981c`278/278，`142225Z-3dfe7133`280/280，最终以职责拆分后的142753结果为准。
 - 离线：`20261113T143304Z-36ed3ec0`workflow46/46、真实生成21项目715源码方案构建0错误39既有警告12.27秒；code整体仍因yaml/markdown_it缺失blocked，未安装。最终测试后仅添加精简用途注释与换行，无行为改变。git diff --check通过。资源验证无目标skipped，不宣称冷进程/多DPI设置切换/完整资源/Player Build/人工验收。
 - 责任审阅：Surface拥有视图生命周期，Controls只发意图，InputAdapter持原生捕获，Renderer只读取值快照；所有作者规则仍在Domain/Application/共享交互，没有复制菜单校验或改名巨型Presenter。后续RF32其他Presenter与样例扩展，RF33统一更新驱动和完整保存生命周期，RF34再清理剩余历史名字/失效接口。
+
+### RF32 Presenter、扩展及样例执行记录
+
+- 状态：complete，前置RF31提交`015d687`。完成下面的真实控件、输入所有权、只读字段投影和职责审查后本地提交；不以Presenter类型存在或完整测试通过代替架构检查。
+- 已实现：两套偏好窗口接入共享SettingsSession及逐窗SettingsPresenter；字段元数据进入Domain的PropertyDescription，PropertyPresenter协调条件/非连续选项、路径、集合、时间/混合提交，两原生属性控件实际调用；IMGUI延迟字段及嵌套struct写回接入，Inspector取消静态全图缓存和每帧作者事务。DocumentPresenter与PlaybackPresenter已接入两套工具栏、保存快捷键/SaveChanges、欢迎页、创建/导出弹窗及保存菜单。独立声明IMGUI/Toolkit Header和属性扩展，编辑器绑定Attribute不再属于Runtime。
+- 固定移动已完成，禁止重放：`arrange_feature_layout` preview `20261113T145320Z-307c779e`→approval `145418Z-bfb01457`（展示四项范围，引用4.3.1连续授权）→apply `145447Z-822f8625` passed4/4。Runtime样例→`Runtime/Samples/FeatureSample/FeatureSampleDocument.cs`（GUID85564f260125ced47ad7a93282cf1f6c）；Editor预览→`Editor/Samples/FeatureSamplePreview.cs`（8057cd80c2f7e7649be696ad53a648e8）；唯一教程→`Samples/FeatureSample/README.md`（30542892b6cdb57489102ba2218a9a47）；字段描述→`Runtime/Metadata/PropertyDescription.cs`（24fa94a40f752a142bddcde4c236fd8e）。AssetDatabase移动、源码/meta字节与GUID核对、SyncAll通过，空旧目录留RF34审计退役。现行类型/调用者已硬切FeatureSample，无旧类型代理；历史记录不改写，教程链接更新。
+- 产品目录：ActionEditorTypeCatalog及Prefs创建目录过滤测试/Validation/Verification程序集，不实例化候选；保存目录继续拒绝这些类型。新增门禁验证测试构造器未调用、字段描述与编辑器绑定程序集归属、原生Header独立选择及教程GUID。
+- 验证：`144035Z-6eaa3da6`设置专项7/7；`150426Z-cc3fc2a8`属性专项通过；`150709Z-dac66d84`完整281/281。`153009Z-71a8409c`完整281/281；`154024Z-ba224083`完整283/283；`154848Z-c41d4a7b`及`155439Z-af78adc8`完整285/285，0失败/跳过/不确定。新增真实Toolkit设置控件只写注入内存store/失败显示、IMGUI嵌套struct延迟Enter与Esc。资源无目标skipped，不宣称完整资源/冷进程/性能/人工验收。
+- 失败与恢复：`151539Z-d4e0e064`编译通过但测试被真实保存框阻塞，原因为Document宿主适配绕过现行可取消SavePathRequested端口，已修复到原调用者输入；同次测试恢复后`152649Z-1083b2dd`终态280/281，唯一失败为路径请求计数0而非2，保留断言。固定取消两次：PID25660，首句柄12454426 preview `152154Z-5f71671e`→approve `152225Z-a2ba5c41`→apply `152244Z-a3bf52ac`；次句柄12519962 preview `152345Z-51ae3075`→approve `152415Z-4205e9df`→apply `152438Z-4e3d8169`。均独立展示/审批，仅IDCANCEL，无保存/文件选择/强杀。`152852Z-aa4e7bd0`编译失败为测试仍调用HeaderBase.CreateGUI，直接迁移GetToolkitHeader后恢复。
+- 其他实际问题：域重载CreateGUI中Toolkit控件依赖EditorStyles.label未初始化，改用原生Label裁剪；销毁TextAsset后的延迟刷新改用Unity null判定，不靠吞异常。仍需补充该重载状态的定向证据，不能仅以套件通过认定覆盖。
+- 后续接线：WindowBinding逐窗拥有四类Presenter和偏好订阅；两主窗口及HeaderGUI不再直接访问App，磁吸按钮经过SettingsPresenter。Inspector代理负责组合Presenter，View释放旧选中适配和草稿。最后一个视图关闭才停止共享播放；两窗口任意一个关闭不清另一窗口播放。ClipPropertyState统一时间/混合显示，PropertyText统一诊断文案；时间/混合作者规则归入Domain ClipTimingRules及Application ClipEditing，拒绝借用外部手势事务、最短长度突破邻居、非有限输入，点事件移动不改保留长度。IMGUI补整数Range、Object基类、BoundsInt与集合值类型控件，并限制递归层数。
+- 延迟输入：PropertyDraft由Presenter持有路径、版本与基线；两原生字段将Enter/失焦提交及Esc取消接入，取消/图替换/其他作者操作后旧草稿不能覆盖当前图。IMGUI失效控件只显示禁用值，不在迟到绘制中重新创建草稿。曲线显示和提交各复制keys与wrap，控件原位修改不提前污染作者图；选项标签返回副本。Toolkit偏好重建保留错误文案。
+- 后续验证（均20261113）：`160238Z-7bf26f0a`、`161236Z-529ba43e`完整285/285；`161743Z-9e6925d1`284/285，原用例要求关闭IMGUI时停止仍由Toolkit使用的共享播放，按单一会话所有权更新为双向关闭保留/最后关闭释放，`162257Z-14ffaaad`285/285。`163021Z-ca1e7b18`连接暂不可用、未执行测试；doctor `163046Z-97e20ae0`恢复后`163115Z-3eec9387`287/287。`164126Z-1660137a`288/288；属性专项`164849Z-76707751`及`165124Z-86491be0`通过。
+- 草稿回归失败保留：`165537Z-8c977ffc`编译步骤实际因Editor连接中断失败，无C#编译错误证据；doctor `165656Z-e4622a8a`恢复。`165730Z-482b6dca`240/291，首失败是旧FieldWindow测试先开外部事务后要求新控件提交，随后测试窗口持旧对象绘制造成连锁日志失败。测试改走真实控件独占提交和真实Undo/Redo，不再用宿主预开事务；生产IMGUI补失效输入禁用，扩展专项`170501Z-96390f5f`通过。`170720Z-1bb26457`290/291，关闭用例错误假定现场没有其他窗口；只读`171340Z-e752a150`确认多个既有窗口，未擅自关闭。用例改核对本次两个视图释放到原始计数并按仍存在的所有者验证播放保留。最终`171500Z-b15e24b1`编译通过、完整291/291，0失败/跳过/不确定；无完整资源/人工验收声明。
+- 文档边界补充：DocumentPresenterComposition的关闭、选择及切换确认使用注入context，创建/导出弹窗绑定该context及Presenter，不在点击时重新取另一个全局会话；保留现行可取消SavePathRequested路径端口。切换与创建拒绝活动编辑；属性标量/集合Presenter也拒绝借用外部事务。新增注入上下文关闭隔离、保存取消/提交前失败/导入后失败及菜单意图测试。`172509Z-62f11f44`和`173313Z-446c326d`完整292/292；`173855Z-ce62fbcd`测试命名空间歧义CS0234，改显式Contracts using后`173948Z-834b976f`编译通过、完整293/293，0失败/跳过/不确定。
+- 离线：`172121Z-a3e0ea22`workflow46/46，真实21项目732源码方案0错误39警告8.75秒；整体code仍因yaml/markdown_it缺失blocked，未安装。该方案检查早于最后文档上下文修改，最终产物还需重跑。git diff --check通过。
+- 扩展及资源所有权补证：Toolkit属性扩展经显式测试目录解析后真实IntegerField提交和Undo，产品目录仍不含测试适配；扩展面板同样禁用锁定对象。WindowBinding增加显式context/views/settings组合入口，隔离注册表验证两次Dispose幂等、最后一个视图释放播放资源及偏好订阅，未关闭既有窗口。`174648Z-809c61df`属性专项通过，`175003Z-cb6db94d`完整295/295。补Toolkit null数组真实加号按钮输入后`175724Z-ecf3acbb`编译查询连接blocked，doctor `175844Z-af70fe47`恢复，`175909Z-98bd8b60`属性14/14。
+- 超时证据：`180135Z-a9525e81`编译已通过，停在只读test list；调度长时间暂停后返回查询超时，未发test run，不能算完整套件结果。doctor `210235Z-56c08f0f`通过，test status `210303Z-a621fc86`返回此前属性14/14终态，无活动测试。确认命令记录后重新完整`210417Z-6e3d08f2`295/295通过，没有重放未知写请求。
+- 样例预览：FeatureSamplePresenter从注入文档/播放头生成不可变值帧，区间位置/权重/循环时间/历史标记在显示层计算；FeatureSamplePreview只格式化和绘图，不访问App/静态播放器或遍历作者图。新测试核对样例独立数值、帧与后续作者修改隔离，`210838Z-67ad7f81`编译及完整Editor测试通过（计数待最终核对）。
+- 后续属性输入与隔离：播放步进改用WindowBinding注入的SettingsSession，不再读取全局Prefs；隔离绑定测试核对前后步进。草稿开始拒绝外部活动事务，锁定/失效提交清理自身输入且旧token不能取消新输入。Toolkit延迟字段将陈旧/锁定冲突显示为HelpBox并保留作者图；Escape无本地token时不取消其他字段输入。`211900Z-f3c370d9`完整297/297，`212339Z-c7caa600`属性专项通过。
+- 元数据缓存改为只读声明值，不暴露可变Attribute；双UI直接使用OptionType/ResourceType/范围数值，条件值保持私有复制。`212707Z-ef1c7b6f`完整298/298，失败/跳过均0。
+- IMGUI非连续选项实操补证：首次`213143Z-831ae4c2`和显式聚焦后的`213344Z-50f642bd`各1例失败，原因是测试假设方向键可直接改变Unity Popup，实际值仍7；未修改产品选项逻辑凑测试。改用当前Unity原生PopupCallbackInfo选择回调发送真实菜单选择命令，再由原控件处理7→20→7并重绘条件字段，`213530Z-04849bb7`1/1通过。该证据覆盖实际控件回调，不宣称操作系统下拉菜单桌面点击。
+- 文档弹窗改为显式实例DocumentDialogComposition，移除CurrentContext/静态Presenter服务获取和CreateAssetWindow静态创建入口；导出按钮及验收调用者使用实际窗口实例ExportTo，创建共享确认动作持注入context，不再创建额外IMGUI窗口或调用App.Refresh/Repaint。名称校验与类型显示移出创建View。DocumentLifecycle.Create本身拒绝活动编辑，延迟选择回调与确认前也重验；属性重命名不借用外部事务。`214023Z-f0f1f458`、`214452Z-0a89279e`完整通过，隔离弹窗/非法名称专项`214833Z-c894c0b7`通过。
+- 标题/描述解析移入PropertyPresenter，文档长度双UI只读显示，修正IMGUI将Length误标Name的可输入假控件；Toolkit磁吸偏好失败可见反馈。`215153Z-6c40efa3`完整300/300，失败/跳过均0。离线`213741Z-fa04e92f`工作流单测和方案构建通过，文档解析仍缺yaml/markdown_it而blocked，未安装；此离线结果早于最后弹窗/标题修改，需最终重跑。
+- 最新离线`215833Z-3f543971`针对上述最终源码，workflow单测及真实方案构建通过；文档解析缺yaml/markdown_it仍blocked。git diff --check通过。RF32保持in_progress，未暂存/提交；属性对象/集合仍有作者引用暴露、IMGUI集合递归/折叠身份与输入失败显示仍需收敛，不能仅凭300用例通过提交为完成。RF33–RF37尚未开始，没有push。
+- IMGUI对象折叠缓存由业务GetHashCode键改为弱引用身份，避免相同哈希串联折叠并保留目标切换清理；新增相同哈希隔离测试。`220003Z-828b83a5`属性专项通过，`220155Z-31caf756`完整301/301，失败/跳过均0。最后离线结果早于此缓存修改；嵌套值类型字段折叠仍需按稳定路径收敛，未宣称全面解决。
+- 属性快照继续收敛：PropertyPath以根引用/字段/索引提供稳定相等与哈希；IMGUI折叠最终统一按路径持有，移除对象折叠缓存及旧对象预展开入口。嵌套struct内null数组经实际折叠与加号按钮跨装箱重绘成功，`220633Z-a8702325`专项通过；数组/列表共用布局，支持递归集合且删除后结束当前枚举，`220856Z-b1622434`完整通过。IMGUI延迟输入冲突改为可见HelpBox，Toolkit集合递归也遵守深度界限，`221228Z-5d603bf9`完整通过。
+- 默认双UI字段现在消费PropertyPresenter.CaptureFields：复杂值投影为PropertyObjectState子字段，集合为只读快照，曲线复制；递归渲染不再读取作者对象字段。保留原类型/稳定路径供提交，新增快照不含作者集合/装箱对象及后续修改隔离测试。首次`221650Z-106ed553`完整302例中1例失败：旧测试按作者集合实例预展开，而控件已经只收到快照；测试改用实际字段路径展开，仍执行原生删除按钮并核对结果，未删除断言。`222010Z-0ec01bcc`连接blocked，doctor `222122Z-1649d314`恢复后`222141Z-0765150c`完整通过。清掉不再使用的对象折叠入口及可泄漏原始对象的公共快照构造后，`222525Z-97b131bb`编译/完整套件通过（计数待核对），未提交。
+- 收尾验收：`222930Z-835ad4ad`完整303/303，0失败/跳过/不确定；`223213Z-346bfc52`workflow46/46，真实21项目734源码构建0错误39警告17.20秒，文档解析仍因缺yaml/markdown_it而blocked，未安装。git diff --check通过。属性正常绘制为Presenter只读字段/集合/子对象投影，控件只回传路径和输入；扩展显式目标句柄及类型元数据不作为默认递归绘制的数据源。文档弹窗绑定显式context，播放/设置/属性分别持窄用例，未建万能Presenter。新生产文件与实质重写控件已审查状态所有权、单向依赖、错误反馈和精简中文注释，补偏好GUI颜色finally恢复。
+- 后续边界：共享宿主App/ActionEditorHost与更新/恢复/自动保存仍按RF33处理，历史目录/类型与当前文档旧说明按RF34/RF37清扫；不声称整个产品架构已完成。窗口历史失败残留与用户窗口不可无审计混删，RF36需独立计数验证。保护路径只核对Git状态，不声明历史字节哈希证明。完整资源、冷进程、性能及H01–H09仍未验收。
 
 #### RF24 静态职责清点补充
 

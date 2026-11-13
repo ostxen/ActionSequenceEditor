@@ -4,7 +4,8 @@ using System.IO;
 using System.Linq;
 using NBC.ActionEditor.Application.Documents;
 using NBC.ActionEditor.Infrastructure.Documents;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Presentation.Contracts;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NBC.ActionEditor.Storage;
 using NUnit.Framework;
 using UnityEngine;
@@ -13,6 +14,69 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class ApplicationAdapterTests
     {
+        [Test] public void DocumentDialogsKeepExplicitContextAndRejectInvalidCreationNames()
+        {
+            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            var fixture = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument())) { name = "Isolated source" };
+            var existing = Resources.FindObjectsOfTypeAll<DocumentExportWindow>();
+            DocumentExportWindow window = null;
+            var global = App.Context.Document;
+            try
+            {
+                context.Open(fixture);
+                var binding = new Composition.DocumentDialogComposition(context);
+                Assert.That(binding.DocumentName, Is.EqualTo("Isolated source"));
+                Assert.That(binding.ValidateName("  Example  "), Is.EqualTo("Example"));
+                foreach (var name in new[] { "", "..", "a/b", "a\\b" })
+                    Assert.Throws<ArgumentException>(() => binding.ValidateName(name));
+                Assert.That(binding.CreationTypes(), Does.Contain(typeof(FeatureSampleDocument)));
+                DocumentExportWindow.ShowFor(context);
+                window = Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Except(existing).Single();
+                Assert.That(window.ExportTo("actioneditor.json", null), Is.False);
+                using var token = context.Session.BeginEdit(this);
+                Assert.Throws<InvalidOperationException>(() => window.ExportTo("actioneditor.json", "Assets/ActionEditor/ActiveExportMustNotWrite.json"));
+                Assert.That(token.IsActive, Is.True);
+                Assert.That(App.Context.Document, Is.SameAs(global));
+            }
+            finally
+            {
+                if (window != null) window.Close();
+                UnityEngine.Object.DestroyImmediate(fixture);
+            }
+        }
+
+        [Test] public void DocumentPresenterClosesOnlyItsInjectedContextAndProtectsActiveEdit()
+        {
+            var global = App.Context.Document;
+            var globalSource = App.TextAsset;
+            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            var fixture = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument()));
+            try
+            {
+                context.Open(fixture);
+                var presenter = Composition.DocumentPresenterComposition.Create(context);
+                using (var token = context.Session.BeginEdit(this))
+                {
+                    Assert.Throws<InvalidOperationException>(() => presenter.Invoke(DocumentIntent.Close));
+                    Assert.Throws<InvalidOperationException>(() => presenter.Invoke(DocumentIntent.Open));
+                    Assert.Throws<InvalidOperationException>(() => presenter.Invoke(DocumentIntent.Create));
+                    Assert.Throws<InvalidOperationException>(() => Composition.DocumentPresenterComposition.ConfirmSwitch(context));
+                    var creation = context.Lifecycle.Create(typeof(FeatureSampleDocument), "Assets/ActionEditor/ActiveEditMustNotCreate.json");
+                    Assert.That(creation.Succeeded, Is.False);
+                    Assert.That(creation.Exception, Is.TypeOf<InvalidOperationException>());
+                    Assert.That(creation.BytesCommitted, Is.False);
+                    Assert.That(token.IsActive, Is.True);
+                    token.Commit();
+                }
+                presenter.Invoke(DocumentIntent.Close);
+                Assert.That(context.Document, Is.Null);
+                Assert.That(context.Source, Is.Null);
+                Assert.That(App.Context.Document, Is.SameAs(global));
+                Assert.That(App.TextAsset, Is.SameAs(globalSource));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(fixture); }
+        }
+
         [Test] public void PreferencesAdapterUsesOnlyItsExplicitPathAndFailedWriteKeepsSharedValue()
         {
             var directory = System.IO.Path.Combine("Temp", "RF27-Preferences-" + Guid.NewGuid().ToString("N"));
@@ -46,16 +110,16 @@ namespace NBC.ActionEditor.Tests
         [Test] public void OpeningUsesOneByteRevisionAndNotStaleUnityResourceContents()
         {
             const string path = "Assets/ActionEditor/RF27-Fake.json";
-            var files = new Files(); var source = new LegacyExperienceAsset { Version = 7 };
+            var files = new Files(); var source = new FeatureSampleDocument { Version = 7 };
             files.Data[path] = System.Text.Encoding.UTF8.GetBytes(JsonDocumentCodec.Encode(source));
             var repository = new JsonDocumentRepository(files, _ => { });
             var opened = repository.Read(path);
-            Assert.That(((LegacyExperienceAsset)opened.Document).Version, Is.EqualTo(7));
+            Assert.That(((FeatureSampleDocument)opened.Document).Version, Is.EqualTo(7));
             var bytes = opened.Revision; bytes[0] ^= 1;
             Assert.That(opened.Revision, Is.EqualTo(files.Data[path]));
-            files.Data[path] = System.Text.Encoding.UTF8.GetBytes(JsonDocumentCodec.Encode(new LegacyExperienceAsset { Version = 9 }));
+            files.Data[path] = System.Text.Encoding.UTF8.GetBytes(JsonDocumentCodec.Encode(new FeatureSampleDocument { Version = 9 }));
             Assert.Throws<IOException>(() => repository.Commit(path, opened.Document, opened.Revision));
-            Assert.That(((LegacyExperienceAsset)JsonDocumentCodec.Decode(System.Text.Encoding.UTF8.GetString(files.Data[path]))).Version, Is.EqualTo(9));
+            Assert.That(((FeatureSampleDocument)JsonDocumentCodec.Decode(System.Text.Encoding.UTF8.GetString(files.Data[path]))).Version, Is.EqualTo(9));
         }
         [Test] public void SaveExportAndFailedSavePreserveRealContextSelectionPlayheadAndPreview()
         {
@@ -63,7 +127,7 @@ namespace NBC.ActionEditor.Tests
             var files = new Files();
             var repository = new JsonDocumentRepository(files, _ => throw new IOException("import"));
             using var context = new ActionEditorContext(Composition.DocumentComposition.Create(repository), repository);
-            var fixture = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
+            var fixture = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument()));
             try
             {
                 context.Open(fixture);
@@ -77,7 +141,7 @@ namespace NBC.ActionEditor.Tests
                 Check();
                 Assert.That(lifecycle.Export("Assets/ActionEditor/RF27-Export.json", "actioneditor.json").Succeeded, Is.True);
                 Check();
-                context.Session.Edit("dirty", () => ((LegacyExperienceAsset)context.Document).Version = 4);
+                context.Session.Edit("dirty", () => ((FeatureSampleDocument)context.Document).Version = 4);
                 context.Player.Sample(.5f); context.Playback.Pause(true);
                 files.Data[path] = new byte[] { 42 };
                 Assert.That(lifecycle.Save().BytesCommitted, Is.False);

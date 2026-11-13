@@ -1,7 +1,7 @@
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Domain;
 using System.Linq;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -23,14 +23,14 @@ namespace NBC.ActionEditor.Tests
             var min = TimelineNavigation.ZoomAt(0, .25f, -1, 500, fraction, true);
             Assert.That(min.y - min.x, Is.EqualTo(.25f));
             Assert.That(TimelineNavigation.ZoomAt(1, 8, 1, 1000, fraction, false), Is.EqualTo(new Vector2(1, 8)));
-            var asset = new LegacyExperienceAsset();
+            var asset = new FeatureSampleDocument();
             TimelineNavigation.SetRange(workspace, new Vector2(-1, 9));
             Assert.That(workspace.ViewTimeMin, Is.EqualTo(-1)); Assert.That(workspace.ViewTimeMax, Is.EqualTo(9));
         }
 
         [Test] public void TrackDropResolvesBeforeAfterGroupAndRootFromScrolledCoordinates()
         {
-            var asset = new LegacyExperienceAsset(); var moving = asset.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
+            var asset = new FeatureSampleDocument(); var moving = asset.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
             var before = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 31), 0, 1000, 600, 28, workspace);
             var after = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 53), 0, 1000, 600, 28, workspace);
             Assert.That(before.Group, Is.SameAs(asset.RootItems.OfType<TimelineGroup>().ElementAt(0))); Assert.That(before.Index, Is.Zero);
@@ -73,8 +73,8 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void SnapReferencesExcludeSelectedAndRebuildWithoutChangingInput()
         {
-            var first = new LegacyExperienceInterval { StartTime = 1, Length = 2 };
-            var second = new LegacyExperienceMarker { StartTime = 4 };
+            var first = new FeatureSampleInterval { StartTime = 1, Length = 2 };
+            var second = new FeatureSampleMarker { StartTime = 4 };
             Assert.That(TimelineCandidates.References(new TimelineClip[] { first, second }, new[] { first }, 7, 2, true), Is.EqualTo(new[] { 0f, 7, 2, 4 }));
             second.StartTime = 5;
             Assert.That(TimelineCandidates.References(new TimelineClip[] { first, second }, new[] { first }, 7, 2, false), Is.EqualTo(new[] { 5f, 0, 7, 2 }));
@@ -96,7 +96,7 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void VisibleRowsHideCollapsedTracksWithoutChangingDocument()
         {
-            var asset = new LegacyExperienceAsset();
+            var asset = new FeatureSampleDocument();
             workspace.Bind(asset); workspace.SetCollapsed(asset.RootItems.OfType<TimelineGroup>().ElementAt(2), true);
             var json = NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(asset);
             var rows = TimelineGeometry.VisibleRows(asset, workspace);
@@ -110,12 +110,12 @@ namespace NBC.ActionEditor.Tests
         [Test] public void ShortClipsPointsScrollAndHandlePriorityAreExplicit()
         {
             var transform = new JsonTimelineTransform(0, 7, 700, 200);
-            var clip = new LegacyExperienceInterval { StartTime = 1, Length = .01f };
+            var clip = new FeatureSampleInterval { StartTime = 1, Length = .01f };
             var rect = transform.ClipRect(clip, 28 - 14, 26, 8, 4);
             Assert.That(rect, Is.EqualTo(new Rect(300, 14, 4, 26)));
             Assert.That(TimelineGeometry.ResizeEdge(rect, rect.center, 6), Is.EqualTo(-1));
             Assert.That(TimelineGeometry.ResizeEdge(rect, new Vector2(310, 20), 6), Is.Zero);
-            var marker = transform.ClipRect(new LegacyExperienceMarker { StartTime = 1 }, 14, 26, 8, 4);
+            var marker = transform.ClipRect(new FeatureSampleMarker { StartTime = 1 }, 14, 26, 8, 4);
             Assert.That(marker, Is.EqualTo(new Rect(296, 14, 8, 26)));
             Assert.That(TimelineGeometry.RowAt(14, 14, 28), Is.EqualTo(1));
             Assert.That(TimelineGeometry.Overlaps(rect, new Rect(310, 45, -15, -35)), Is.True);

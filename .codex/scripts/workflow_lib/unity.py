@@ -27,6 +27,7 @@ READ_ONLY = frozenset({
 
 # Explicit catalog, not a prefix heuristic. Only implemented return/poll contracts are admitted.
 MUTATIONS = {
+    "actioneditor.validation arrange_feature_layout": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation retire_imgui_timeline_sources": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation retire_editing_sources": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.validation arrange_application_layout": {"dry_run": True, "confirm": True, "poll": None},
@@ -334,6 +335,8 @@ class Unity:
 
     def preview(self, command, parameters, inputs=()):
         validate_parameters(parameters)
+        if command == "actioneditor.validation arrange_feature_layout" and parameters:
+            blocked("Fixed operation accepts no parameters; targets cannot be overridden.")
         if command == "actioneditor.validation cancel_save_dialog":
             if parameters:
                 blocked("Fixed dialog recovery accepts no parameters.")
@@ -354,6 +357,8 @@ class Unity:
         if plan.get("kind") != "unity" or plan.get("command") not in MUTATIONS:
             blocked("Unsupported Unity mutation plan.")
         validate_parameters(plan["parameters"])
+        if plan["command"] == "actioneditor.validation arrange_feature_layout" and plan["parameters"]:
+            blocked("Fixed operation accepts no parameters.")
         if plan["command"] == "actioneditor.validation cancel_save_dialog":
             if plan["parameters"]:
                 blocked("Fixed dialog recovery accepts no parameters.")

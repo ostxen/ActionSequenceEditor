@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace NBC.ActionEditor
 {
+    // 编辑器产品目录仅发现可发布类型，缓存结果不向调用者暴露可写数组。
     public static class ActionEditorTypeCatalog
     {
         private static readonly Dictionary<Type, TypeMetaInfo[]> menus = new Dictionary<Type, TypeMetaInfo[]>();
@@ -28,7 +29,7 @@ namespace NBC.ActionEditor
             if (!menus.TryGetValue(baseType, out var items))
             {
                 items = ReflectionTools.GetImplementationsOf(baseType)
-                    .Where(t => !t.ContainsGenericParameters && !t.IsDefined(typeof(ObsoleteAttribute), true))
+                    .Where(t => Infrastructure.Assets.ProductTypes.Includes(t) && !t.ContainsGenericParameters && !t.IsDefined(typeof(ObsoleteAttribute), true))
                     .Select(t =>
                     {
                         var info = DirectableTypeInfo.For(t);
@@ -37,7 +38,7 @@ namespace NBC.ActionEditor
                     }).OrderBy(i => i.name).ThenBy(i => i.category).ToArray();
                 menus[baseType] = items;
             }
-            // Old callers own mutable lists and arrays; never expose the cached copies.
+            // 各菜单可以调整自己的列表，不能改变共享目录缓存。
             return items.Select(i => new TypeMetaInfo { type = i.type, name = i.name, category = i.category,
                 attachableTypes = i.attachableTypes == null ? null : (Type[])i.attachableTypes.Clone(), isUnique = i.isUnique }).ToList();
         }

@@ -8,7 +8,7 @@ using NBC.ActionEditor.Infrastructure.Documents;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Presentation.Timeline;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NUnit.Framework;
 using UnityEditor;
 using EditorSettings = NBC.ActionEditor.Application.Settings.EditorSettings;
@@ -43,11 +43,11 @@ namespace NBC.ActionEditor.Tests.Presentation
             public readonly StructureEditing Structure;
             public readonly ClipboardEditing Clipboard;
             public EditorSettings Settings = new EditorSettings(TimeStepMode.Seconds, .1f, 30, false, true, 0, "Assets/");
-            public LegacyExperienceAsset Document => (LegacyExperienceAsset)Session.Document;
+            public FeatureSampleDocument Document => (FeatureSampleDocument)Session.Document;
             public TimelineClip Clip => Document.AllTracks.First().Clips.First();
             public Harness()
             {
-                Session.Open(new DocumentOpenData(new LegacyExperienceAsset()));
+                Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
                 Structure = new StructureEditing(Session, () => Selection.Items);
                 Clipboard = new ClipboardEditing(Session, Structure, new ClipboardState(), new FragmentCodec(), clip => Selection.Set(new[] { clip }, false));
                 Presenter = Create(View, new TimelineWorkspace());
@@ -110,7 +110,7 @@ namespace NBC.ActionEditor.Tests.Presentation
         {
             using var h = new Harness(); var key = h.First.Key; var rect = h.First.Bounds;
             h.Pointer(PointerAction.Down, rect.X + rect.Width / 2, rect.Y + 4);
-            h.Session.Open(new DocumentOpenData(new LegacyExperienceAsset()));
+            h.Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
             Assert.That(h.View.Captured || h.Session.IsEditing, Is.False);
             Assert.That(h.Presenter.State.Clips.Any(clip => clip.Key == key), Is.False);
             var previous = h.Selection.Count; h.Presenter.Select(key);

@@ -12,6 +12,23 @@ namespace NBC.ActionEditor.Application.Editing
         private readonly DocumentSession session;
         public ClipEditing(DocumentSession session) { this.session = session ?? throw new ArgumentNullException(nameof(session)); }
 
+        // 属性提交独占一次作者事务，不参与其他窗口尚未结束的手势。
+        public void SetTiming(TimelineClip clip, float start, float end, float step)
+        {
+            RequirePropertyEdit(clip);
+            session.Edit("Edit clip timing", () => ClipTimingRules.ApplyPropertyTiming(clip, start, end, step));
+        }
+        public void SetBlend(TimelineClip clip, bool incoming, float value)
+        {
+            RequirePropertyEdit(clip);
+            session.Edit("Edit clip blend", () => ClipTimingRules.ApplyPropertyBlend(clip, incoming, value));
+        }
+        private void RequirePropertyEdit(TimelineClip clip)
+        {
+            RequireClip(clip);
+            if (session.IsEditing) throw new InvalidOperationException("请先完成当前编辑。");
+        }
+
         // 一次候选中的片段必须仍属于当前图，全部重验后才一起更新。
         public void Move(DocumentEditTransaction token, IReadOnlyDictionary<TimelineClip, float> starts, float delta)
         {

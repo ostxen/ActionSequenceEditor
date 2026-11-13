@@ -37,9 +37,9 @@ namespace NBC.ActionEditor.Tests
             var previous = App.TextAsset;
             var previousWindow = ActionEditorHost.Window;
             var workbenches = Resources.FindObjectsOfTypeAll<ActionWorkbench>();
-            var sample = new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceAsset();
-            var group = new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceGroup { Name = "Reference" };
-            group.Tracks.Add(new NBC.ActionEditor.Samples.LegacyExperience.LegacyIntervalTrack { Name = "Events" });
+            var sample = new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument();
+            var group = new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleGroup { Name = "Reference" };
+            group.Tracks.Add(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleIntervalTrack { Name = "Events" });
             sample.ClearRoots(); sample.AddRoot(group); sample.Init();
             var json = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(sample));
             var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
@@ -149,7 +149,7 @@ namespace NBC.ActionEditor.Tests
         public void FailedLegacyOpenDoesNotChangeDocumentOrTarget()
         {
             var previous = App.TextAsset;
-            var valid = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceAsset()));
+            var valid = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument()));
             var invalid = new TextAsset("not json");
             try
             {

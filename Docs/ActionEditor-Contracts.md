@@ -12,7 +12,7 @@ A02 定案，2026-11-09。实施进度仅记录在[唯一任务清单](../.codex
 
 UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目录时间轴、属性视图与设置弹窗分别为`UIToolkitTimelineCanvas`、`UIToolkitPropertyView`、`UIToolkitPreferencesWindow`。去掉历史Json前缀仅区分界面职责，不改变存储格式或菜单；下方历史记录中的旧类型名按对应日期理解。
 
-`NBC > Action Editor > Open Action Editor`（IMGUI）和`Open Workbench`（UI Toolkit）共用唯一会话及float业务图。入门只看[功能体验样例教程](../Assets/ActionEditor/Samples/LegacyExperience/README.md)，不按下方历史实验方案创建`.asset`文档。当前生产格式为本文件RF16节的`actioneditor.json` v1封套，Runtime严格转换器已替代旧任意Json入口，无旧裸根回退、迁移或双写；FullSerializer仅保留相关忽略标记等依赖，不再决定生产读写规则。
+`NBC > Action Editor > Open Action Editor`（IMGUI）和`Open Workbench`（UI Toolkit）共用唯一会话及float业务图。入门只看[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)，不按下方历史实验方案创建`.asset`文档。当前生产格式为本文件RF16节的`actioneditor.json` v1封套，Runtime严格转换器已替代旧任意Json入口，无旧裸根回退、迁移或双写；FullSerializer仅保留相关忽略标记等依赖，不再决定生产读写规则。
 
 创建、两UI保存/SaveChanges、自动保存、另存均由`DocumentCreationService`/`JsonDocumentSession`进入同一个`JsonDocumentStore.Commit → ReliableFileCommit`，字节提交后推进来源与基线，再导入。独立导出由`DocumentExportService`使用同一格式目录与隔离快照，仅写新目标，不切来源、不清脏。新建/另存/导出拒绝已有目标及meta，保存检查外部磁盘版本；导入失败明确字节已提交，不重放。保存图标右键提供保存、另存为、导出；实际格式选项只有`JSON (.json)`。
 
@@ -32,7 +32,7 @@ UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目
 
 顶层仅为 `format`、`version`、`document`，分别固定为 `"actioneditor.json"`、整数 `2`、非空 Asset 节点。版本不同或缺失即拒绝，不读旧的裸根对象，不双写。版本号仅描述本契约，不表示对象稳定 ID。
 
-`document` 及每个 Group/Track/Clip 使用 `$type` 加序列化字段。`$type` 为 **`Type.FullName + ", " + Assembly.GetName().Name`**，例如 `NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceAsset, NBC.ActionEditor`，ordinal 精确匹配。它不是 Name/MenuName、短类名、路径或带版本的 AssemblyQualifiedName；程序集或命名空间改名是显式格式变更，不建设别名层。根节点仅允许 Group/Track，唯一 `rootItems` 保持任意交错顺序；Group 仅有 Track，Track 仅有 Clip，不允许组嵌套，也无第二份 groups/rootTracks 存储。集合保持顺序；不持久化父引用、`directables`、Actor 场景绑定、预览/选择/Undo/缓存、计算属性或委托。`ActorId` 是既有业务字段，不提升为持久 Unity 引用身份。
+`document` 及每个 Group/Track/Clip 使用 `$type` 加序列化字段。`$type` 为 **`Type.FullName + ", " + Assembly.GetName().Name`**，例如 `NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument, NBC.ActionEditor`，ordinal 精确匹配。它不是 Name/MenuName、短类名、路径或带版本的 AssemblyQualifiedName；程序集或命名空间改名是显式格式变更，不建设别名层。根节点仅允许 Group/Track，唯一 `rootItems` 保持任意交错顺序；Group 仅有 Track，Track 仅有 Clip，不允许组嵌套，也无第二份 groups/rootTracks 存储。集合保持顺序；不持久化父引用、`directables`、Actor 场景绑定、预览/选择/Undo/缓存、计算属性或委托。`ActorId` 是既有业务字段，不提升为持久 Unity 引用身份。
 
 序列化使用受控字段/类型策略，领域类型不依赖 FullSerializer：公共实例字段与 `[SerializeField]` 字段（含基类私有字段），排除 static、`[NonSerialized]`；不自动持久化属性。保留模型实际字段键，如 `rootItems`、`tracks`、`actionClips`、`startTime`、`length`、`blendIn`、`CrossBlendIn`。禁止框架元数据与业务字段重名、重复 JSON 键、未知字段静默丢弃、继承字段键冲突和 `$ref/$id` 对象图别名。序列化成员按 ordinal 名排序，数组/List 保持位置。所有契约成员必须存在，允许 null 的业务成员必须显式写 null；缺字段不使用样例构造器的预置数据补齐。
 
@@ -58,7 +58,7 @@ UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目
   "format": "actioneditor.json",
   "version": 2,
   "document": {
-    "$type": "NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceAsset, NBC.ActionEditor.Domain",
+    "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument, NBC.ActionEditor.Domain",
     "Background": { "a": 1, "b": 0.25, "g": 0.125, "r": 0.5 },
     "Notes": null,
     "Version": 1,
@@ -72,8 +72,8 @@ UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目
 
 | 样本/变体 | 必须断言的预期（RF18 实现检查，不是本轮产品通过） |
 |---|---|
-| 上述完整样本 | 根为 LegacyExperienceAsset，0组而非构造器预置3组；Notes=null；length 位为 `0x3dcccccd`，不因显示0.1改变；范围[0,6]；工作区不在文档中 |
-| 按现有 LegacyExperienceAsset 构造完整点/区间/循环样例后用新实现编码 | 3组、7轨、13片段；Marker零长度、Interval参数列表/Offset/Curve、Loop周期/速度逐字段相等；原样例业务类型身份不因产品文案改变 |
+| 上述完整样本 | 根为 FeatureSampleDocument，0组而非构造器预置3组；Notes=null；length 位为 `0x3dcccccd`，不因显示0.1改变；范围[0,6]；工作区不在文档中 |
+| 按现有 FeatureSampleDocument 构造完整点/区间/循环样例后用新实现编码 | 3组、7轨、13片段；Marker零长度、Interval参数列表/Offset/Curve、Loop周期/速度逐字段相等；原样例业务类型身份不因产品文案改变 |
 | 在测试专用派生 Clip 增加 `float[]`、null List、嵌套 struct、持久 Texture2D/子资产引用 | 位值/数组顺序/null与空分别保留；引用二元组及实际对象相等，不能用实验 `.asset` 引用测试冒充新格式测试 |
 | format错误、version=1、缺document、裸旧根、未知/错误基类 `$type`、未知/重复字段 | 非空错误，整份预检失败，不调用未知类型构造器、不切换会话、不写文件 |
 | null组/轨/片段、重复节点、负/非有限时间、嵌套非有限业务float、缺引用解析器/失效或临时引用 | 显式失败，不修复为可保存的半图，不用null替换失败引用 |
@@ -86,20 +86,20 @@ UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目
   "format": "actioneditor.json",
   "version": 2,
   "document": {
-    "$type": "NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceAsset, NBC.ActionEditor.Domain",
+    "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument, NBC.ActionEditor.Domain",
     "Background": { "a": 1, "b": 0.25, "g": 0.125, "r": 0.5 },
     "Notes": "RF16 point contract fixture",
     "Version": 1,
     "rootItems": [{
-      "$type": "NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceGroup, NBC.ActionEditor.Domain",
+      "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleGroup, NBC.ActionEditor.Domain",
       "ActorId": 0,
       "active": true,
       "isLocked": false,
       "name": "Markers",
       "tracks": [{
-        "$type": "NBC.ActionEditor.Samples.LegacyExperience.LegacyMarkerTrack, NBC.ActionEditor.Domain",
+        "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleMarkerTrack, NBC.ActionEditor.Domain",
         "actionClips": [{
-          "$type": "NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceMarker, NBC.ActionEditor.Domain",
+          "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleMarker, NBC.ActionEditor.Domain",
           "EventCode": 7,
           "Message": "Marker",
           "Notes": null,
@@ -158,9 +158,9 @@ RF08几何：两UI消费JsonTimelineTransform的float时间变换及TimelineGeom
 
 ## JSON 业务扩展示例（RF13）
 
-现有 `Runtime/Samples/LegacyExperience/LegacyExperienceAsset.cs` 是完整的非Combat扩展例子：`LegacyExperienceMarker : ClipSignal` 长度为零，`LegacyExperienceInterval : ClipCrossBlend` 有区间及混合；`Name/Category/Attachable/Color` 决定菜单名称、分类、允许父轨道和外观。公共字段及已有属性决定通用属性控件，首个片段分类仍限制轨道的创建菜单。新增此类业务类型不修改核心switch或分支。
+现有 `Runtime/Samples/FeatureSample/FeatureSampleDocument.cs` 是完整的非Combat扩展例子：`FeatureSampleMarker : ClipSignal` 长度为零，`FeatureSampleInterval : ClipCrossBlend` 有区间及混合；`Name/Category/Attachable/Color` 决定菜单名称、分类、允许父轨道和外观。公共字段及已有属性决定通用属性控件，首个片段分类仍限制轨道的创建菜单。新增此类业务类型不修改核心switch或分支。
 
-自定义绘制属于各UI适配：`Editor/Samples/LegacyExperiencePreview.cs` 的Header同时实现 `OnGUI()` 与原生 `CreateGUI()`，后者不嵌入前者；点/区间继承现有 `ActionClipInspector` 的共用属性编辑。可选预览没有绑定时不创建实例，样例状态窗口只读当前播放头，不触发游戏逻辑。Header/Inspector的精确、显式子类回退及冲突规则见RF06，预览的精确绑定/释放和异常规则见RF12。字段字符串资源路径不等同于Unity对象跨重启引用证明。
+自定义绘制属于各UI适配：`Editor/Samples/FeatureSamplePreview.cs` 的Header同时实现 `OnGUI()` 与原生 `CreateGUI()`，后者不嵌入前者；点/区间继承现有 `ActionClipInspector` 的共用属性编辑。可选预览没有绑定时不创建实例，样例状态窗口只读当前播放头，不触发游戏逻辑。Header/Inspector的精确、显式子类回退及冲突规则见RF06，预览的精确绑定/释放和异常规则见RF12。字段字符串资源路径不等同于Unity对象跨重启引用证明。
 
 `ExtensionEndToEndTests` 通过原版实际菜单构建产生的回调及Toolkit菜单事件，分别创建同样的点/区间；通过真实IMGUI文本输入及Toolkit延迟文本输入修改字段，并验证事务取消、共用路径提交、Undo/Redo、FullSerializer重开得到完全相同作者内容。菜单构建提取为私有方法供原版原入口调用，没有新增业务API；测试不声称自动操作系统弹出菜单。实际磁盘保存由固定授权Shared.json探针单独验证，不扩大到两个窗口的保存对话框或任意路径。
 
@@ -168,7 +168,7 @@ RF08几何：两UI消费JsonTimelineTransform的float时间变换及TimelineGeom
 
 RF12播放：App只注册一个EditorApplication.update共享更新入口，有注册视图时驱动自动保存及播放；两窗口自己的update仅更新视图，不再调用共享播放。AssetPlayer只持有播放头/前帧与ActionEditorPreviewSession，后者独占预览实例和指针，重复释放幂等；初始化部分失败、求值回调异常都会释放已拥有资源并传播异常，播放故障停机，不再吞异常继续预览。类型目录缓存可选预览工厂，保持精确绑定及派生适配器覆盖，无关冲突报双方来源，无绑定无预览。停止回调异常也在finally释放；原版关闭仍停止全局播放，最后窗口退出同样释放。文档变化/Undo/放弃和重载钩子沿用Reset，不因缩放/重绘重建。没有引入Combat工厂或场景副作用；真实域重载和任意第三方预览资源仍非已验收范围。
 
-RF11属性：JsonFieldDescription缓存字段、名称、条件、选项真实常量及资源/范围说明；两UI保留既有字段顺序、无名称时的显示差异、横排时间和原生控件。JsonPropertyPath按字段/集合索引重新读取并回写嵌套值类型，当前文档对象的旧引用/锁定在写前拒绝；集合变更先验证所有者再修改。JsonPropertyEditing提供事务、元素创建和数组/列表增删重排操作，Toolkit不再调用InspectorsBase。原版选项原先把常量当索引，改为真实常量映射，非连续值不再被误写为索引；未知值在没有用户选择时保留。原版既有Inspector外层令牌继续归并本轮写入，Toolkit延迟字段仍由Unity控件处理回车/失焦/Esc。当前JSON入口仍只显示首个选择的属性，没有新增批量混合编辑或集合重排按钮；Mixed与Move为共享操作能力，其单测不代表UI已提供这些功能。缺自定义Toolkit适配仍提示，不代绘IMGUI。
+RF11属性：PropertyDescription缓存字段、名称、条件、选项真实常量及资源/范围说明；两UI保留既有字段顺序、无名称时的显示差异、横排时间和原生控件。JsonPropertyPath按字段/集合索引重新读取并回写嵌套值类型，当前文档对象的旧引用/锁定在写前拒绝；集合变更先验证所有者再修改。JsonPropertyEditing提供事务、元素创建和数组/列表增删重排操作，Toolkit不再调用InspectorsBase。原版选项原先把常量当索引，改为真实常量映射，非连续值不再被误写为索引；未知值在没有用户选择时保留。原版既有Inspector外层令牌继续归并本轮写入，Toolkit延迟字段仍由Unity控件处理回车/失焦/Esc。当前JSON入口仍只显示首个选择的属性，没有新增批量混合编辑或集合重排按钮；Mixed与Move为共享操作能力，其单测不代表UI已提供这些功能。缺自定义Toolkit适配仍提示，不代绘IMGUI。
 
 RF10导航：TimelineNavigation统一225×滚轮符号/窗口宽×视域跨度的缩放候选，左端固定，是用户明确选择的行为变化；240秒上限检查、最小视域仍沿用原模型。两UI平移共用候选计算，但保留原版过零时缩短视域、Toolkit过零保留跨度的既有差异。原版滚轮原本不受scrollWheelZooms控制，Toolkit仍受其控制，不借统一步进改变偏好作用域。ActionEditorSelection提供无副作用点击候选，UI保留原版替换/Toolkit Ctrl追加与已选集合保留策略。Toolkit文本控件的Delete/Ctrl快捷键和Esc不被时间轴父节点抢占；原版没有新增全窗口快捷键。原版Esc/失焦同步清理待提交框选矩形，取消后不会残留旧框选。标尺、分栏与底栏的输入适配、现有阈值及布局仍各UI持有，人工H02/H04/H05/H06待确认。
 

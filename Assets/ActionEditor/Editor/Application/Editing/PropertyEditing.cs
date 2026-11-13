@@ -11,6 +11,8 @@ namespace NBC.ActionEditor.Application.Editing
         private readonly DocumentSession session;
         private readonly IPropertyValueFactory values;
         public ActionDocument Document => session.Document;
+        public long Version => session.Version;
+        public bool IsEditing => session.IsEditing;
         public PropertyEditing(DocumentSession session, IPropertyValueFactory values)
         { this.session = session ?? throw new ArgumentNullException(nameof(session)); this.values = values ?? throw new ArgumentNullException(nameof(values)); }
         public void Change(Action change) => session.Edit("Edit properties", change);

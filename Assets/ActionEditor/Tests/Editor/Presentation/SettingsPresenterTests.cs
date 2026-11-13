@@ -4,6 +4,11 @@ using NBC.ActionEditor.Application.Settings;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
 using NUnit.Framework;
+using System.Collections;
+using UnityEngine;
+using UnityEngine.TestTools;
+using UnityEngine.UIElements;
+using NBC.ActionEditor.Workbench;
 
 namespace NBC.ActionEditor.Tests.Presentation
 {
@@ -32,6 +37,34 @@ namespace NBC.ActionEditor.Tests.Presentation
             public EditorSettings State => Frames[Frames.Count - 1];
             public void Render(EditorSettings state) => Frames.Add(state);
             public void ShowError(string message) => Error = message;
+        }
+
+        [UnityTest] public IEnumerator NativeSettingsControlsCommitOnlyToInjectedStoreAndShowFailures()
+        {
+            var store = new Store(); var session = new SettingsSession(store);
+            var window = ScriptableObject.CreateInstance<UIToolkitPreferencesWindow>();
+            var imgui = new PreferencesWindow();
+            try
+            {
+                window.Bind(session); imgui.Bind(session); window.Show(); yield return null;
+                var toggles = window.rootVisualElement.Query<Toggle>().ToList();
+                toggles.Find(t => t.label == Lan.PreferencesMagnetSnapping).value = false;
+                Assert.That(session.Current.MagnetSnapping, Is.False); Assert.That(store.Writes, Is.EqualTo(1));
+                Assert.That(session.Current.AutoSaveSeconds, Is.Zero, "Opening controls must not enable autosave.");
+                var field = window.rootVisualElement.Q<TextField>();
+                field.value = " ";
+                Assert.That(session.Current.SavePath, Is.EqualTo("Assets/"));
+                Assert.That(window.rootVisualElement.Q<Label>("settings-error").text, Is.Not.Empty);
+                store.Fail = true;
+                window.rootVisualElement.Query<Toggle>().ToList().Find(t => t.label == Lan.PreferencesScrollWheelZooms).value = false;
+                Assert.That(session.Current.ScrollWheelZooms, Is.True);
+                Assert.That(window.rootVisualElement.Q<Label>("settings-error").text, Is.EqualTo("Storage unavailable"));
+                window.CreateGUI();
+                Assert.That(window.rootVisualElement.Q<Label>("settings-error").text, Is.EqualTo("Storage unavailable"), "Rebuilding controls must retain the draft diagnostic.");
+                Assert.That(store.Writes, Is.EqualTo(1));
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally { imgui.OnClose(); window.Close(); UnityEngine.Object.DestroyImmediate(window); }
         }
 
         [Test] public void TwoViewsShareCommitsButKeepDraftAndCancelIndependent()
@@ -72,6 +105,25 @@ namespace NBC.ActionEditor.Tests.Presentation
             Assert.That(presenter.Apply().Succeeded, Is.True);
             Assert.That(notifications, Is.EqualTo(1));
             Assert.That(view.Error, Is.Null);
+        }
+
+        [Test] public void ImmediateIntentsShareModeDefaultsAndRejectInvalidValuesWithoutWriting()
+        {
+            var store = new Store(); var session = new SettingsSession(store); var view = new View();
+            using var presenter = new SettingsPresenter(session, view);
+            Assert.That(presenter.Change(mode: TimeStepMode.Frames).Succeeded, Is.True);
+            Assert.That(session.Current.FrameRate, Is.EqualTo(30));
+            Assert.That(session.Current.SnapInterval, Is.EqualTo(1f / 30));
+            Assert.That(presenter.Change(fps: 60).Succeeded, Is.True);
+            Assert.That(session.Current.TimeStep, Is.EqualTo(1f / 60));
+            Assert.That(presenter.Change(mode: TimeStepMode.Seconds).Succeeded, Is.True);
+            Assert.That(session.Current.FrameRate, Is.EqualTo(10));
+            Assert.That(session.Current.TimeStep, Is.EqualTo(.1f));
+            var writes = store.Writes;
+            Assert.That(presenter.Change(path: " ").Succeeded, Is.False);
+            Assert.That(presenter.Change(fps: 0).Succeeded, Is.False);
+            Assert.That(store.Writes, Is.EqualTo(writes));
+            Assert.That(session.Current.SavePath, Is.EqualTo("Assets/"));
         }
 
         [Test] public void StaleDraftCannotOverwriteAnotherWindowsCommit()

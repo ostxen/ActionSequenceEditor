@@ -86,6 +86,61 @@ namespace NBC.ActionEditor.Tests.Application
             }
             public void Dispose() => Session.Dispose();
         }
+        private sealed class Interaction : NBC.ActionEditor.Presentation.Contracts.IDocumentInteraction
+        {
+            public bool Confirm;
+            public string Path;
+            public int PathRequests, Saves, Opens, Creates, Closes, Exports, Undos, Redos;
+            public string ChooseSavePath(bool saveAs) { PathRequests++; return Path; }
+            public void PickDocument() => Opens++;
+            public void CreateDocument() => Creates++;
+            public void CloseDocument() => Closes++;
+            public bool ConfirmSwitch() => Confirm;
+            public void ShowExport() => Exports++;
+            public void Saved() => Saves++;
+            public void Undo(bool redo) { if (redo) Redos++; else Undos++; }
+        }
+
+        [Test] public void DocumentPresenterKeepsCanceledIntentsAndFailedSavesNonDestructive()
+        {
+            using var h = new Harness();
+            var interaction = new Interaction();
+            var presenter = new NBC.ActionEditor.Presentation.Presenters.DocumentPresenter(h.Session, h.Lifecycle, interaction);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Create);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Open);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Close);
+            Assert.That(interaction.Creates + interaction.Opens + interaction.Closes, Is.Zero);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.SaveAs);
+            Assert.That(interaction.PathRequests, Is.EqualTo(1));
+            Assert.That(h.Repository.Commits, Is.Zero);
+            using (var token = h.Session.BeginEdit(this))
+            {
+                Assert.Throws<InvalidOperationException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.SaveAs));
+                Assert.Throws<InvalidOperationException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Export));
+                Assert.That(interaction.PathRequests, Is.EqualTo(1));
+                Assert.That(interaction.Exports, Is.Zero);
+                Assert.That(token.IsActive, Is.True);
+                token.Commit();
+            }
+            h.Session.Edit("change", () => h.Current.Value = 8);
+            h.Repository.FailCommit = true;
+            Assert.Throws<IOException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Save));
+            Assert.That(presenter.Dirty, Is.True); Assert.That(interaction.Saves, Is.Zero);
+            h.Repository.FailCommit = false; h.Repository.FailImport = true;
+            Assert.Throws<IOException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Save));
+            Assert.That(presenter.Dirty, Is.False); Assert.That(h.Session.CommitVersion, Is.EqualTo(1));
+            Assert.That(interaction.Saves, Is.Zero);
+            h.Repository.FailImport = false;
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Save);
+            Assert.That(interaction.Saves, Is.EqualTo(1));
+            interaction.Confirm = true;
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Create);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Open);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Close);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Undo);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Redo);
+            Assert.That(new[] { interaction.Creates, interaction.Opens, interaction.Closes, interaction.Undos, interaction.Redos }, Is.All.EqualTo(1));
+        }
         [Test] public void OwnerAndStaleTokensCannotCompleteAnotherEdit()
         {
             using var h = new Harness(); var owner = new object();

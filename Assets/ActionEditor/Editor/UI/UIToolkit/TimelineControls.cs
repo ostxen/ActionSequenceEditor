@@ -72,7 +72,7 @@ namespace NBC.ActionEditor.Workbench
                 }
                 label.text = clip.Title; label.style.left = clip.Bounds.X - state.ContentLeft; label.style.top = clip.Bounds.Y;
                 label.style.width = clip.Bounds.Width; label.style.height = clip.Bounds.Height;
-                label.style.display = clip.Bounds.Width > EditorStyles.label.CalcSize(new GUIContent(clip.Title)).x ? DisplayStyle.Flex : DisplayStyle.None;
+                label.style.overflow = Overflow.Hidden;
             }
         }
         private static void Icon(VisualElement row, Texture2D texture, float left, Action action, string name)

@@ -1,13 +1,13 @@
 ﻿using NBC.ActionEditor.Domain;
 using System;
-using System.IO;
 using System.Linq;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Composition;
 using UnityEditor;
 using UnityEngine;
 
 namespace NBC.ActionEditor
 {
+    // 创建弹窗只收集原生控件输入，目录和提交由显式文档绑定提供。
     public class CreateAssetWindow : PopupWindowContent
     {
         private static Rect _myRect;
@@ -15,13 +15,13 @@ namespace NBC.ActionEditor
         private int selectedType;
         private string createName = "NewAction";
         private string error;
-        private bool nativeOwner;
+        private DocumentDialogComposition binding;
 
-        public static void Show()
+        public static void Show(ActionEditorContext context)
         {
             var rect = new Rect(20, 25, 440, 240);
             _myRect = rect;
-            PopupWindow.Show(new Rect(rect.x, rect.y, 0, 0), new CreateAssetWindow { nativeOwner = EditorWindow.focusedWindow is NBC.ActionEditor.Workbench.UIToolkitActionEditorWindow });
+            PopupWindow.Show(new Rect(rect.x, rect.y, 0, 0), new CreateAssetWindow { binding = new DocumentDialogComposition(context) });
         }
 
         public override Vector2 GetWindowSize()
@@ -31,11 +31,7 @@ namespace NBC.ActionEditor
 
         public override void OnOpen()
         {
-            Prefs.InitializeAssetTypes();
-            types = ReflectionTools.GetImplementationsOf(typeof(ActionDocument)).Distinct()
-                .Where(t => !t.IsAbstract && !t.ContainsGenericParameters && t.GetConstructor(Type.EmptyTypes) != null
-                    && !t.Assembly.GetName().Name.EndsWith(".Tests", StringComparison.Ordinal))
-                .OrderBy(t => t.FullName, StringComparer.Ordinal).ToArray();
+            types = binding.CreationTypes();
         }
 
         public override void OnGUI(Rect rect)
@@ -48,8 +44,8 @@ namespace NBC.ActionEditor
                 return;
             }
             selectedType = EditorGUILayout.Popup(new GUIContent(Lan.CrateAssetType), selectedType,
-                types.Select(t => new GUIContent(types.Count(other => Prefs.GetAssetTypeName(other) == Prefs.GetAssetTypeName(t)) > 1
-                    ? Prefs.GetAssetTypeName(t) + " (" + t.FullName + ")" : Prefs.GetAssetTypeName(t), t.FullName)).ToArray());
+                types.Select(t => new GUIContent(types.Count(other => binding.TypeName(other) == binding.TypeName(t)) > 1
+                    ? binding.TypeName(t) + " (" + t.FullName + ")" : binding.TypeName(t), t.FullName)).ToArray());
             createName = EditorGUILayout.TextField(Lan.CrateAssetName, createName);
             if (!string.IsNullOrEmpty(error)) EditorGUILayout.HelpBox(error, MessageType.Error);
             if (GUILayout.Button(Lan.CreateAssetConfirm))
@@ -62,26 +58,16 @@ namespace NBC.ActionEditor
 
         void CreateConfirm()
         {
-            if (!ActionEditorHost.ConfirmDocumentSwitch()) return;
+            if (!binding.ConfirmSwitch()) return;
             if (types.Length == 0) throw new InvalidOperationException(Lan.NoResourceTypes);
-            var name = createName?.Trim();
-            if (string.IsNullOrEmpty(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || name == "." || name == "..")
-                throw new ArgumentException(Lan.InvalidResourceName);
+            var name = binding.ValidateName(createName);
             var path = EditorUtility.SaveFilePanelInProject(Lan.CreateAsset, name, "json", Lan.NewPathHint);
             if (string.IsNullOrEmpty(path)) return;
-            path = DocumentCreationService.ValidateNewPath(path);
+            path = binding.ValidateNewPath(path);
             var type = types[selectedType];
-            if (!EditorUtility.DisplayDialog(Lan.CreateAsset, string.Format(Lan.CreateConfirmation, Prefs.GetAssetTypeName(type), path), Lan.CreateAssetConfirm, Lan.TipsCancel)) return;
-            CreateAndOpen(type, path, nativeOwner);
+            if (!EditorUtility.DisplayDialog(Lan.CreateAsset, string.Format(Lan.CreateConfirmation, binding.TypeName(type), path), Lan.CreateAssetConfirm, Lan.TipsCancel)) return;
+            binding.CreateAndOpen(type, path);
             editorWindow?.Close();
-        }
-
-        public static void CreateAndOpen(Type type, string path, bool nativeOwner)
-        {
-            var created = DocumentCreationService.Create(type, path);
-            ActionEditorHost.OnObjectPickerConfig(created);
-            if (!nativeOwner) ActionEditorWindow.OpenDirectorWindow();
-            App.Refresh(); App.Repaint();
         }
 
     }

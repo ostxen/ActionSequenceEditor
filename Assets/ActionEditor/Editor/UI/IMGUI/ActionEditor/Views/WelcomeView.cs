@@ -39,14 +39,14 @@ namespace NBC.ActionEditor
 
             if (DrawCenteredButton(Lan.CreateAsset))
             {
-                CreateAssetWindow.Show();
+                ((ActionEditorWindow)Window).Documents.Invoke(Presentation.Contracts.DocumentIntent.Create);
             }
 
             GUI.backgroundColor = Color.white;
 
             if (DrawCenteredButton(Lan.SelectAsset))
             {
-                ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, ActionEditorHost.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath);
+                ((ActionEditorWindow)Window).Documents.Invoke(Presentation.Contracts.DocumentIntent.Open);
             }
 
             GUI.backgroundColor = Color.white;

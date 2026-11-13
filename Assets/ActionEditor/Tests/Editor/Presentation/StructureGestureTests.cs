@@ -8,7 +8,7 @@ using NBC.ActionEditor.Infrastructure.Documents;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Presentation.Timeline;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NUnit.Framework;
 using UnityEditor;
 using EditorSettings = NBC.ActionEditor.Application.Settings.EditorSettings;
@@ -17,7 +17,7 @@ namespace NBC.ActionEditor.Tests.Presentation
 {
     public sealed class StructureGestureTests
     {
-        [Serializable, Unique, Attachable(typeof(LegacyExperienceGroup))] private sealed class UniqueTrack : TimelineTrack { }
+        [Serializable, Unique, Attachable(typeof(FeatureSampleGroup))] private sealed class UniqueTrack : TimelineTrack { }
         private sealed class View : ITimelineView
         {
             public bool Captured;
@@ -38,7 +38,7 @@ namespace NBC.ActionEditor.Tests.Presentation
             public ActionDocument Document => Session.Document;
             public Harness(int height = 500)
             {
-                Session.Open(new DocumentOpenData(new LegacyExperienceAsset()));
+                Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
                 Editing = new StructureEditing(Session, () => Selection.Items);
                 var clipboard = new ClipboardEditing(Session, Editing, new ClipboardState(), new FragmentCodec(), item => Selection.Set(new[] { item }, false));
                 Presenter = new TimelinePresenter(Session, Selection, Editing, clipboard, new ClipEditing(Session), new TimelineWorkspace(),
@@ -81,8 +81,8 @@ namespace NBC.ActionEditor.Tests.Presentation
             Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Content(loaded), Is.EqualTo(h.Content));
             h.Editing.Move(track, first, 0, h.Session.Version);
             Assert.That(h.Content, Is.EqualTo(original)); Assert.That(track.Clips, Is.EqualTo(clips));
-            Undo.PerformUndo(); Assert.That(h.Document.RootItems[1], Is.TypeOf<LegacyIntervalTrack>());
-            Undo.PerformUndo(); Assert.That(h.Group(1).Tracks[1], Is.TypeOf<LegacyIntervalTrack>());
+            Undo.PerformUndo(); Assert.That(h.Document.RootItems[1], Is.TypeOf<FeatureSampleIntervalTrack>());
+            Undo.PerformUndo(); Assert.That(h.Group(1).Tracks[1], Is.TypeOf<FeatureSampleIntervalTrack>());
             Undo.PerformUndo(); Assert.That(h.Content, Is.EqualTo(original));
         }
         [TestCase(0)] [TestCase(1)] [TestCase(2)] [TestCase(3)]
@@ -108,7 +108,7 @@ namespace NBC.ActionEditor.Tests.Presentation
         }
         [Test] public void UniqueAttachableNestedGroupAndInvalidBoundariesRejectWithoutMutation()
         {
-            var document = new LegacyExperienceAsset(); var first = (TimelineGroup)document.RootItems[0]; var second = (TimelineGroup)document.RootItems[1];
+            var document = new FeatureSampleDocument(); var first = (TimelineGroup)document.RootItems[0]; var second = (TimelineGroup)document.RootItems[1];
             var unique = new UniqueTrack(); first.Tracks.Add(unique); second.Tracks.Add(new UniqueTrack()); document.Validate();
             Assert.That(StructureRules.Error(document, unique, second, 0), Is.Not.Null);
             Assert.That(StructureRules.Error(document, unique, first, 0), Is.Null);

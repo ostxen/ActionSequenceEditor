@@ -7,16 +7,18 @@ namespace NBC.ActionEditor
     public static class ExtensionResolver
     {
         public static Type ResolveExtension(IEnumerable<Type> candidates, Type target, bool inspector)
+            => ResolveExtension(candidates, target, inspector ? typeof(CustomInspectors) : typeof(CustomHeader));
+
+        // 最近目标优先；同目标仅允许唯一最派生适配，禁止按扫描顺序覆盖。
+        public static Type ResolveExtension(IEnumerable<Type> candidates, Type target, Type binding)
         {
             for (var current = target; current != null; current = current.BaseType)
             {
                 var matches = candidates.Where(t => !t.IsAbstract && !t.ContainsGenericParameters &&
-                    (inspector ? t.GetCustomAttributes(typeof(CustomInspectors), true).Cast<CustomInspectors>()
-                        .Any(a => a.InspectedType == current && (current == target || a._editorForChildClasses))
-                    : t.GetCustomAttributes(typeof(CustomHeader), true).Cast<CustomHeader>()
-                        .Any(a => a.InspectedType == current && (current == target || a.EditorForChildClasses))))
+                    t.GetCustomAttributes(binding, true).Cast<EditorViewBindingAttribute>()
+                        .Any(a => a.Target == current && (current == target || a.Children)))
                     .Distinct().ToArray();
-                // Preserve the established more-derived adapter override, never assembly scan order.
+                // 同一绑定的派生适配可以明确替换基类，不依赖程序集枚举顺序。
                 var mostDerived = matches.Where(t => !matches.Any(other => other != t && t.IsAssignableFrom(other))).ToArray();
                 if (mostDerived.Length > 1) throw new InvalidOperationException("ActionEditor扩展冲突：" + current.AssemblyQualifiedName + " => "
                     + string.Join("; ", mostDerived.OrderBy(t => t.AssemblyQualifiedName).Select(t => t.AssemblyQualifiedName)));

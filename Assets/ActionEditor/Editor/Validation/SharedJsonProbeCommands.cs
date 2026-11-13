@@ -3,7 +3,7 @@ using NBC.ActionEditor.Domain;
 using System;
 using System.IO;
 using System.Linq;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NBC.ActionEditor.Storage;
 using Unity.Pipeline.Commands;
 using UnityEditor;
@@ -47,28 +47,28 @@ namespace NBC.ActionEditor.Validation
             {
                 ownsFolder = !string.IsNullOrEmpty(AssetDatabase.CreateFolder("Assets", "ActionEditorValidationR10"));
                 if (!ownsFolder) throw new IOException("Could not create fixture folder.");
-                var created = DocumentCreationService.Create(typeof(LegacyExperienceAsset), Path);
+                var created = DocumentCreationService.Create(typeof(FeatureSampleDocument), Path);
                 App.TextAsset = created;
                 Require(App.Session.Path == Path && App.TextAsset == created, "Create/open did not bind source.");
-                memory = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
+                memory = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
                 Require(!App.Session.IsDirty, "New save is dirty.");
                 App.Session.Edit("R10 payload", () =>
                 {
-                    ((LegacyExperienceAsset)App.AssetData).Version = 42;
-                    ((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1]).Count = 17;
+                    ((FeatureSampleDocument)App.AssetData).Version = 42;
+                    ((FeatureSampleInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1]).Count = 17;
                 });
                 App.SaveAsset();
                 var committed = File.ReadAllBytes(Path);
                 Require(!App.Session.IsDirty, "Saved payload is dirty.");
-                Undo.PerformUndo(); Require(App.Session.IsDirty && ((LegacyExperienceAsset)App.AssetData).Version == 1, "Undo after save failed.");
-                Undo.PerformRedo(); Require(!App.Session.IsDirty && ((LegacyExperienceAsset)App.AssetData).Version == 42, "Redo to saved state failed.");
-                App.Session.Edit("R10 discarded payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 99);
-                App.Session.BeginEdit(); ((LegacyExperienceAsset)App.AssetData).Version = 100;
+                Undo.PerformUndo(); Require(App.Session.IsDirty && ((FeatureSampleDocument)App.AssetData).Version == 1, "Undo after save failed.");
+                Undo.PerformRedo(); Require(!App.Session.IsDirty && ((FeatureSampleDocument)App.AssetData).Version == 42, "Redo to saved state failed.");
+                App.Session.Edit("R10 discarded payload", () => ((FeatureSampleDocument)App.AssetData).Version = 99);
+                App.Session.BeginEdit(); ((FeatureSampleDocument)App.AssetData).Version = 100;
                 App.Session.DiscardChanges(); App.TryAutoSave();
-                Require(!App.Session.IsDirty && !App.Session.IsEditing && ((LegacyExperienceAsset)App.AssetData).Version == 42
+                Require(!App.Session.IsDirty && !App.Session.IsEditing && ((FeatureSampleDocument)App.AssetData).Version == 42
                     && File.ReadAllBytes(Path).SequenceEqual(committed), "Discard did not restore saved baseline without writes.");
                 Undo.PerformUndo(); Undo.PerformRedo();
-                Require(((LegacyExperienceAsset)App.AssetData).Version == 42, "Discarded edits returned through Undo/Redo.");
+                Require(((FeatureSampleDocument)App.AssetData).Version == 42, "Discarded edits returned through Undo/Redo.");
                 using (var other = NBC.ActionEditor.Composition.DocumentComposition.Create())
                 {
                     other.Open(new JsonDocumentRepository().ReadSource(memory));
@@ -85,20 +85,20 @@ namespace NBC.ActionEditor.Validation
                     Require(refused && ReferenceEquals(App.AssetData, beforeOpen), "Failed open replaced the current graph.");
                 }
                 finally { UnityEngine.Object.DestroyImmediate(invalidText); }
-                App.Session.Edit("R10 recovery payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 88);
+                App.Session.Edit("R10 recovery payload", () => ((FeatureSampleDocument)App.AssetData).Version = 88);
                 using (var restored = NBC.ActionEditor.Composition.DocumentComposition.Create())
                 {
                     restored.RestoreRecovery(App.Session.CaptureRecovery());
-                    Require(restored.IsDirty && ((LegacyExperienceAsset)restored.Document).Version == 88, "Recovery lost unsaved content.");
+                    Require(restored.IsDirty && ((FeatureSampleDocument)restored.Document).Version == 88, "Recovery lost unsaved content.");
                     restored.DiscardChanges();
-                    Require(!restored.IsDirty && restored.Path == Path && ((LegacyExperienceAsset)restored.Document).Version == 42, "Recovery lost saved baseline.");
+                    Require(!restored.IsDirty && restored.Path == Path && ((FeatureSampleDocument)restored.Document).Version == 42, "Recovery lost saved baseline.");
                 }
                 App.Session.DiscardChanges();
                 var alternate = Root + "/Alternate.json";
                 App.Session.Save(alternate);
                 Require(App.Session.Path == alternate && AssetDatabase.GetAssetPath(App.TextAsset) == alternate && !App.Session.IsDirty, "Save-as did not switch source and baseline.");
                 App.TextAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Path);
-                App.Session.Edit("R10 locked payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 43);
+                App.Session.Edit("R10 locked payload", () => ((FeatureSampleDocument)App.AssetData).Version = 43);
                 using (var locked = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     var refused = false;
@@ -106,25 +106,25 @@ namespace NBC.ActionEditor.Validation
                     Require(refused && App.Session.IsDirty && App.Session.Path == Path && File.ReadAllBytes(Path).SequenceEqual(committed), "Locked save changed bytes or baseline.");
                 }
                 App.SaveAsset(); Require(!App.Session.IsDirty, "Save after unlocking failed.");
-                App.Session.DiscardChanges(); Require(((LegacyExperienceAsset)App.AssetData).Version == 43, "Successful save did not advance baseline.");
+                App.Session.DiscardChanges(); Require(((FeatureSampleDocument)App.AssetData).Version == 43, "Successful save did not advance baseline.");
                 var active = App.Session.BeginEdit(new object());
-                ((LegacyExperienceAsset)App.AssetData).Version = 44;
+                ((FeatureSampleDocument)App.AssetData).Version = 44;
                 var beforeAuto = File.ReadAllBytes(Path);
                 App.TryAutoSave();
                 Require(active.IsActive && File.ReadAllBytes(Path).SequenceEqual(beforeAuto), "Automatic save wrote an active gesture.");
                 active.Cancel();
-                App.Session.Edit("R10 automatic payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 42);
+                App.Session.Edit("R10 automatic payload", () => ((FeatureSampleDocument)App.AssetData).Version = 42);
                 App.AutoSave();
                 Require(!App.Session.IsDirty && File.ReadAllBytes(Path).SequenceEqual(committed), "Automatic save entry did not persist the completed edit.");
                 App.TextAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Path);
-                Require(((LegacyExperienceAsset)App.AssetData).Version == 42 && ((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1]).Count == 17, "Persistent JSON reload lost fields.");
+                Require(((FeatureSampleDocument)App.AssetData).Version == 42 && ((FeatureSampleInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1]).Count == 17, "Persistent JSON reload lost fields.");
                 Require(App.AssetData.RootItems.OfType<TimelineGroup>().Sum(g => g.Tracks.Count) == 7 && App.AssetData.Length == 6, "Persistent graph changed.");
-                var edited = (LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+                var edited = (FeatureSampleInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                 edited.StartTime = 8; edited.Length = 3; edited.Count = 27;
                 Require(App.AssetData.Length == 6, "Stale duration scenario was not reproduced.");
                 App.SaveAsset();
                 App.TextAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Path);
-                Require(App.AssetData.Length == 11 && ((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count == 27, "Public graph edit save/reload failed.");
+                Require(App.AssetData.Length == 11 && ((FeatureSampleInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count == 27, "Public graph edit save/reload failed.");
                 var random = new System.Random(1937);
                 for (var iteration = 0; iteration < 8; iteration++)
                 {

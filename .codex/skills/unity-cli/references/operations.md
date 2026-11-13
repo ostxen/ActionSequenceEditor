@@ -33,6 +33,8 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
+`actioneditor.validation arrange_feature_layout`固定移动四项：Runtime/Samples/LegacyExperience/LegacyExperienceAsset.cs→Runtime/Samples/FeatureSample/FeatureSampleDocument.cs、Editor/Samples/LegacyExperiencePreview.cs→FeatureSamplePreview.cs、Samples/LegacyExperience/README.md→Samples/FeatureSample/README.md、Editor/Core/Properties/JsonFieldDescription.cs→Runtime/Metadata/PropertyDescription.cs。固定GUID和源码/meta哈希，拒绝覆盖，AssetDatabase移动后复核身份/字节并SyncAll；无用户数据写入、无删除、无参数覆盖。独立preview/展示/approve/apply，引用RF24–RF37连续授权。
+
 `actioneditor.validation retire_imgui_timeline_sources`固定删除十一份已替代的IMGUI时间轴源码及meta：TimelineView/Middle/Pointer/TrackItem/Bottom、ClipDragger、ClipDrawer/Basic/Simple/Signal与SplitterView。保留Toolbar、资源及用户数据；固定GUID和源码/meta哈希、拒绝参数覆盖，AssetDatabase批量删除并SyncAll。调用者迁移后独立preview/展示/approve/apply，引用RF24–RF37连续授权。
 
 `actioneditor.validation retire_editing_sources`固定删除Core/Editing中的JsonEditCommand、JsonEditCommands、JsonPropertyEditing三份源码及meta。调用者已直接接入Application用例后才允许执行；固定GUID与源码/meta哈希，preview列清单，apply经AssetDatabase删除并核实不存在、SyncAll。不接受参数/任意路径，不触及用户文档；按RF24–RF37连续授权独立preview/approve/apply。

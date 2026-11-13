@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -88,7 +88,7 @@ namespace NBC.ActionEditor.Tests
         {
             using (var context = new ActionEditorContext(NBC.ActionEditor.Composition.DocumentComposition.Create()))
             {
-                var fixture = new TextAsset(Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
+                var fixture = new TextAsset(Storage.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
                 try
                 {
                     context.Open(fixture); context.Playback.Play(0);

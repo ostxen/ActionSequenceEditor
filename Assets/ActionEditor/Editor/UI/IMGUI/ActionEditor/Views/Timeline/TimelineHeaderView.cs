@@ -1,11 +1,16 @@
 ﻿using UnityEditor;
 using UnityEngine;
+using NBC.ActionEditor.Presentation.Contracts;
+using NBC.ActionEditor.Presentation.Presenters;
 
 namespace NBC.ActionEditor
 {
     public class TimelineHeaderView : ViewBase
     {
+        private PlaybackPresenter Playback => ((ActionEditorWindow)Window).Playback;
         private GUIStyle _customToolbarButtonStyle;
+        private HeaderGUI documentHeader;
+        protected override void OnInit() => documentHeader = new HeaderGUI(((ActionEditorWindow)Window).Binding);
 
         public override void OnDraw()
         {
@@ -36,55 +41,48 @@ namespace NBC.ActionEditor
 
             if (DrawButton(Styles.BackIcon, Lan.BackMenuTips))
             {
-                if (ActionEditorHost.ConfirmDocumentSwitch()) App.TextAsset = null;
-                // GUILayout.EndHorizontal();
-                // return;
+                ((ActionEditorWindow)Window).Documents.Invoke(DocumentIntent.Close);
             }
 
             if (DrawButton(Styles.FirstFrameIcon, Lan.FirstFrame))
             {
-                AssetPlayer.Inst.Sample(0);
+                Playback.Invoke(PlaybackIntent.First);
             }
 
             if (DrawButton(Styles.PrevFrameIcon, Lan.StepBackwardTips))
             {
-                App.StepBackward();
+                Playback.Invoke(PlaybackIntent.Previous);
             }
 
             EditorGUI.BeginChangeCheck();
 
-            var isPlaying = DrawToggle(App.IsPlay, App.IsPlay ? Styles.StopIcon : Styles.PlayIcon,
-                App.IsPlay ? Lan.StopTips : Lan.PlayTips);
+            DrawToggle(Playback.Playing, Playback.Playing ? Styles.StopIcon : Styles.PlayIcon,
+                Playback.Playing ? Lan.StopTips : Lan.PlayTips);
             if (EditorGUI.EndChangeCheck())
             {
-                if (isPlaying)
-                {
-                    App.Play();
-                }
-                else
-                {
-                    App.Stop();
-                }
+                Playback.Invoke(PlaybackIntent.TogglePlay);
             }
 
             EditorGUI.BeginChangeCheck();
-            var isPause = DrawToggle(App.IsPause, Styles.PauseIcon, Lan.PauseTips);
+            DrawToggle(Playback.Paused, Styles.PauseIcon, Lan.PauseTips);
             if (EditorGUI.EndChangeCheck())
             {
-                App.Pause(isPause);
+                Playback.Invoke(PlaybackIntent.TogglePause);
             }
 
             if (DrawButton(Styles.NextFrameIcon, Lan.StepForwardTips))
             {
-                App.StepForward();
+                Playback.Invoke(PlaybackIntent.Next);
             }
 
             if (DrawButton(Styles.LastFrameIcon, Lan.PlayForwardTips))
             {
-                AssetPlayer.Inst.Sample(AssetPlayer.Inst.Length);
+                Playback.Invoke(PlaybackIntent.Last);
             }
 
-            App.IsRange = DrawToggle(App.IsRange, Styles.RangeIcon, Lan.StepBackwardTips);
+            EditorGUI.BeginChangeCheck();
+            DrawToggle(Playback.Range, Styles.RangeIcon, Lan.StepBackwardTips);
+            if (EditorGUI.EndChangeCheck()) Playback.Invoke(PlaybackIntent.ToggleRange);
 
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
@@ -116,7 +114,7 @@ namespace NBC.ActionEditor
                 Position.height - Styles.HeaderHeight);
 
             GUILayout.BeginArea(_headerRect);
-            CustomizedDrawTools.Draw<HeaderGUI>();
+            documentHeader.OnGUI();
             GUILayout.EndArea();
 
 

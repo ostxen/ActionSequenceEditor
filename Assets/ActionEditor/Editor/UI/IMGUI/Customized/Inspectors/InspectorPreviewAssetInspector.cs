@@ -1,186 +1,70 @@
-﻿using NBC.ActionEditor.Domain;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
+﻿using System;
+using NBC.ActionEditor.Presentation.Presenters;
 using UnityEditor;
 using UnityEngine;
 
 namespace NBC.ActionEditor
 {
+    // Inspector桥只拥有本次选中对象的原生适配，图替换后释放旧引用。
     [CustomEditor(typeof(InspectorPreviewAsset))]
     public class InspectorPreviewAssetInspector : Editor
     {
-        private bool _optionsAssetFold = true;
+        private PropertyPresenter presenter;
+        private object document, selected;
+        private InspectorsBase documentView, selectedView;
+        private bool expanded = true;
 
-        private static ActionDocument _lastAsset;
-        private static bool _willResample;
-
-        private static Dictionary<IData, InspectorsBase> directableEditors =
-            new Dictionary<IData, InspectorsBase>();
-
-        private static InspectorsBase _currentDirectableEditor;
-        private static InspectorsBase _currentAssetEditor;
-
-
-        void OnEnable()
+        private void OnEnable() => presenter = ((InspectorPreviewAsset)target).CreatePresenter();
+        private void OnDisable()
         {
-            _currentDirectableEditor = null;
-            _willResample = false;
+            documentView?.CancelInput(); selectedView?.CancelInput(); presenter?.CancelDraft();
+            documentView = selectedView = null; document = selected = null; presenter = null;
         }
-
-        void OnDisable()
-        {
-            _currentDirectableEditor = null;
-            directableEditors.Clear();
-            _willResample = false;
-        }
-
-        protected override void OnHeaderGUI()
-        {
-            GUILayout.Space(18f);
-        }
+        protected override void OnHeaderGUI() => GUILayout.Space(18);
 
         public override void OnInspectorGUI()
         {
-            var ow = target as InspectorPreviewAsset;
-            if (ow == null || App.SelectCount < 1)
+            if (presenter == null || presenter.Selected == null)
             {
-                EditorGUILayout.HelpBox(Lan.NotSelectAsset, MessageType.Info);
-                return;
+                documentView?.CancelInput(); selectedView?.CancelInput();
+                documentView = selectedView = null; document = selected = null;
+                EditorGUILayout.HelpBox(Lan.NotSelectAsset, MessageType.Info); return;
             }
-
-            GUI.skin.GetStyle("label").richText = true;
-
-            GUILayout.Space(5);
-
-            if (_lastAsset != App.AssetData) { directableEditors.Clear(); _currentAssetEditor = null; _currentDirectableEditor = null; _lastAsset = App.AssetData; }
-            var edit = App.Session.BeginEdit(this);
+            if (!ReferenceEquals(document, presenter.Document))
+            {
+                documentView?.CancelInput(); selectedView?.CancelInput();
+                document = presenter.Document;
+                documentView = document is IData data ? EditorCustomFactory.GetInspector(data, presenter) : null;
+                selected = null; selectedView = null;
+            }
+            if (!ReferenceEquals(selected, presenter.Selected))
+            {
+                selectedView?.CancelInput();
+                selected = presenter.Selected;
+                selectedView = selected is IData data ? EditorCustomFactory.GetInspector(data, presenter) : null;
+            }
+            var color = GUI.color;
+            var richText = GUI.skin.label.richText;
             try
             {
-                EditorGUI.BeginDisabledGroup(edit == null || App.FistSelect?.IsLocked == true);
-                try { DoAssetInspector(); DoSelectionInspector(); }
-                finally { EditorGUI.EndDisabledGroup(); }
+                GUI.skin.GetStyle("label").richText = true;
+                GUILayout.Space(5);
+                using (new EditorGUI.DisabledScope(presenter.Locked(selected)))
+                {
+                    expanded = EditorGUILayout.Foldout(expanded, string.Format(Lan.InsBaseInfo, presenter.Title(document)), true);
+                    if (expanded) documentView?.OnInspectorGUI();
+                    EditorTools.BoldSeparator();
+                    if (selected != null)
+                    {
+                        EditorGUILayout.LabelField(presenter.Title(selected), EditorStyles.boldLabel);
+                        var description = presenter.Description(selected);
+                        if (!string.IsNullOrEmpty(description)) EditorGUILayout.HelpBox(description, MessageType.None);
+                    }
+                    selectedView?.OnInspectorGUI();
+                }
             }
-            catch { edit?.Cancel(); throw; }
-            finally { edit?.Commit("Edit properties"); }
-
-
-            if (_willResample)
-            {
-                _willResample = false;
-                EditorApplication.delayCall += () => { Debug.Log("cutscene.ReSample();"); };
-            }
-
+            finally { GUI.color = color; GUI.skin.label.richText = richText; }
             Repaint();
-        }
-
-
-        void DoAssetInspector()
-        {
-            if (App.AssetData == null) return;
-            var assetData = App.AssetData;
-            GUI.color = new Color(0, 0, 0, 0.2f);
-            GUILayout.BeginHorizontal(Styles.HeaderBoxStyle);
-            GUI.color = Color.white;
-            var title = string.Format(Lan.InsBaseInfo, Prefs.GetAssetTypeName(assetData.GetType()));
-            GUILayout.Label(
-                $"<b><size=18>{(_optionsAssetFold ? "▼" : "▶")} {title}</size></b>");
-            GUILayout.EndHorizontal();
-
-            var lastRect = GUILayoutUtility.GetLastRect();
-            EditorGUIUtility.AddCursorRect(lastRect, MouseCursor.Link);
-
-            if (Event.current.type == EventType.MouseDown && lastRect.Contains(Event.current.mousePosition))
-            {
-                _optionsAssetFold = !_optionsAssetFold;
-                Event.current.Use();
-            }
-
-            GUILayout.Space(2);
-            if (_optionsAssetFold)
-            {
-                if (!directableEditors.TryGetValue(assetData, out var newEditor))
-                {
-                    directableEditors[assetData] = newEditor = EditorCustomFactory.GetInspector(assetData);
-                }
-
-                if (_currentAssetEditor != newEditor)
-                {
-                    _currentAssetEditor = newEditor;
-                }
-
-                if (_currentAssetEditor != null)
-                {
-                    _currentAssetEditor.OnInspectorGUI();
-                }
-            }
-        }
-
-        void DoSelectionInspector()
-        {
-            var data = App.FistSelect;
-
-            if (data == null)
-            {
-                _currentDirectableEditor = null;
-                return;
-            }
-
-
-            if (!directableEditors.TryGetValue(data, out var newEditor))
-            {
-                directableEditors[data] =
-                    newEditor = EditorCustomFactory.GetInspector(data);
-            }
-
-            if (_currentDirectableEditor != newEditor)
-            {
-                var enableMethod = newEditor.GetType().GetMethod("OnEnable",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic |
-                    BindingFlags.FlattenHierarchy);
-                if (enableMethod != null)
-                {
-                    enableMethod.Invoke(newEditor, null);
-                }
-
-                _currentDirectableEditor = newEditor;
-            }
-
-            EditorTools.BoldSeparator();
-            GUILayout.Space(4);
-            ShowPreliminaryInspector();
-
-            if (_currentDirectableEditor != null) _currentDirectableEditor.OnInspectorGUI();
-        }
-
-        /// <summary>
-        /// 选中对象基本信息
-        /// </summary>
-        void ShowPreliminaryInspector()
-        {
-            if (App.AssetData == null) return;
-            var type = App.FistSelect.GetType();
-            var nameAtt = type.GetCustomAttributes(typeof(NameAttribute), false).FirstOrDefault() as NameAttribute;
-            var name = nameAtt != null ? nameAtt.name : type.Name.SplitCamelCase();
-
-            GUI.color = new Color(0, 0, 0, 0.2f);
-            GUILayout.BeginHorizontal(Styles.HeaderBoxStyle);
-            GUI.color = Color.white;
-
-            GUILayout.Label($"<b><size=18>{name}</size></b>");
-
-
-            GUILayout.EndHorizontal();
-
-            var desAtt =
-                type.GetCustomAttributes(typeof(DescriptionAttribute), false).FirstOrDefault() as DescriptionAttribute;
-            var description = desAtt != null ? desAtt.description : string.Empty;
-            if (!string.IsNullOrEmpty(description))
-            {
-                EditorGUILayout.HelpBox(description, MessageType.None);
-            }
-
-            GUILayout.Space(2);
         }
     }
 }

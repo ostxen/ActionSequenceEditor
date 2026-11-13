@@ -25,21 +25,24 @@ namespace NBC.ActionEditor.Composition
         }
         private sealed class Dialogs : ITimelineDialogs
         {
+            private readonly ActionEditorContext context;
+            public Dialogs(ActionEditorContext context) { this.context = context; }
             public void Delete(string title, Action confirmed)
             { if (EditorUtility.DisplayDialog(title, title == Lan.GroupDelete ? Lan.GroupDeleteTips : Lan.TrackDeleteTips, Lan.TipsConfirm, Lan.TipsCancel)) confirmed(); }
-            public void Rename(IDirectable item) => RenameItemWindow.Show(item);
+            public void Rename(IDirectable item) => RenameItemWindow.Show(item, context.Structure.Rename);
         }
         public static TimelinePresenter Create(ActionEditorContext context, TimelineWorkspace workspace, ITimelineView view)
         {
             var presenter = new TimelinePresenter(context.Session, context.Selection, context.Structure, context.ClipboardEditing,
                 context.Clips, workspace, new Playhead(context), () => Prefs.Session.Current, view);
             presenter.Menus = new TimelineMenuPresenter(context.Session, context.Structure, context.ClipboardEditing, context.Clipboard,
-                context.Selection, new Catalog(), new Dialogs(), Text);
+                context.Selection, new Catalog(), new Dialogs(context), Text);
             presenter.HostAction += key =>
             {
-                if (key == TimelineKey.Save) App.SaveAsset();
-                else if (key == TimelineKey.Undo) Undo.PerformUndo();
-                else if (key == TimelineKey.Redo) Undo.PerformRedo();
+                var documents = DocumentPresenterComposition.Create(context);
+                if (key == TimelineKey.Save) documents.Invoke(DocumentIntent.Save);
+                else if (key == TimelineKey.Undo) documents.Invoke(DocumentIntent.Undo);
+                else if (key == TimelineKey.Redo) documents.Invoke(DocumentIntent.Redo);
             };
             return presenter;
         }

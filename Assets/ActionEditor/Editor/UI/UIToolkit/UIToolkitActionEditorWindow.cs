@@ -1,5 +1,7 @@
 using NBC.ActionEditor.Domain;
 using NBC.ActionEditor.Presentation.Timeline;
+using NBC.ActionEditor.Presentation.Contracts;
+using NBC.ActionEditor.Presentation.Presenters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,7 +33,10 @@ namespace NBC.ActionEditor.Workbench
         private bool scheduled;
         private double lastTick;
         public string LastError { get; private set; }
-        public ActionEditorContext Context => App.Context;
+        private Composition.WindowBinding binding;
+        public ActionEditorContext Context => binding.Context;
+        public PlaybackPresenter Playback => binding.Playback;
+        public DocumentPresenter Documents => binding.Documents;
         public ActionDocument Document => Context.Document;
         public TimelineWorkspace Workspace { get; } = new TimelineWorkspace();
 
@@ -39,22 +44,21 @@ namespace NBC.ActionEditor.Workbench
         public static void Open() => GetWindow<UIToolkitActionEditorWindow>().Show();
         private void OnEnable()
         {
+            binding?.Dispose(); binding = new Composition.WindowBinding(this, Repaint, Refresh);
             Lan.Load();
             Styles.Load();
             LeftWidth = Styles.TimelineLeftWidth;
             titleContent = new GUIContent(Lan.Title + " · UI Toolkit"); minSize = new Vector2(500, 250);
             if (target != null) DestroyImmediate(target);
             target = CreateInstance<UIToolkitInspectorTarget>(); target.hideFlags = HideFlags.HideAndDontSave; target.Owner = this;
-            App.Views.Attach(this, Repaint, Refresh);
             EditorApplication.update -= Tick;
             EditorApplication.update += Tick;
             lastTick = EditorApplication.timeSinceStartup;
         }
         private void OnDisable()
         {
-            Canvas?.Dispose(); Canvas = null; App.Views.Detach(this); EditorApplication.update -= Tick;
+            Canvas?.Dispose(); Canvas = null; binding?.Dispose(); EditorApplication.update -= Tick;
             if (target != null) DestroyImmediate(target);
-            if (App.Views.Count == 0) App.Stop();
         }
         private void OnLostFocus() => Canvas?.Cancel();
         private void Tick()
@@ -63,7 +67,7 @@ namespace NBC.ActionEditor.Workbench
             var delta = EditorApplication.timeSinceStartup - lastTick;
             lastTick = EditorApplication.timeSinceStartup;
             Canvas?.Tick(delta);
-            Canvas?.Presenter.PlaybackState(App.IsPlay, App.IsRange);
+            Canvas?.Presenter.PlaybackState(Playback.Playing, Playback.Range);
             if (Document != null) SyncView();
         }
         public void CreateGUI()
@@ -87,16 +91,16 @@ namespace NBC.ActionEditor.Workbench
                 }
                 transport.Add(button);
             }
-            Control("‹", "返回资源选择", () => { if (ConfirmSwitch()) App.TextAsset = null; }, Styles.BackIcon);
-            Control("|◀", "开始", () => Seek(0), Styles.FirstFrameIcon); Control("◀", "上一帧", App.StepBackward, Styles.PrevFrameIcon);
-            Control("▶/■", "播放/停止", () => { if (App.IsPlay) App.Stop(); else App.Play(); }, Styles.PlayIcon);
-            Control("Ⅱ", "暂停/继续", () => App.Pause(!App.IsPause), Styles.PauseIcon); Control("▶|", "下一帧", App.StepForward, Styles.NextFrameIcon);
-            Control("▶|", "结束", () => Seek(Document?.Length ?? 0), Styles.LastFrameIcon);
-            Control("↔", "范围循环", () => App.IsRange = !App.IsRange, Styles.RangeIcon);
+            Control("‹", "返回资源选择", () => Documents.Invoke(DocumentIntent.Close), Styles.BackIcon);
+            Control("|◀", "开始", () => Playback.Invoke(PlaybackIntent.First), Styles.FirstFrameIcon); Control("◀", "上一帧", () => Playback.Invoke(PlaybackIntent.Previous), Styles.PrevFrameIcon);
+            Control("▶/■", "播放/停止", () => Playback.Invoke(PlaybackIntent.TogglePlay), Styles.PlayIcon);
+            Control("Ⅱ", "暂停/继续", () => Playback.Invoke(PlaybackIntent.TogglePause), Styles.PauseIcon); Control("▶|", "下一帧", () => Playback.Invoke(PlaybackIntent.Next), Styles.NextFrameIcon);
+            Control("▶|", "结束", () => Playback.Invoke(PlaybackIntent.Last), Styles.LastFrameIcon);
+            Control("↔", "范围循环", () => Playback.Invoke(PlaybackIntent.ToggleRange), Styles.RangeIcon);
             head.Add(transport);
             var right = new VisualElement(); right.style.flexGrow = 1; right.style.minWidth = 0; right.style.marginLeft = Styles.SplitterWidth;
             toolbar = new Toolbar { name = "json-document-toolbar" }; toolbar.style.height = 20;
-            documents = new ToolbarButton(() => Run(() => { if (ConfirmSwitch()) ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, ActionEditorHost.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath); }))
+            documents = new ToolbarButton(() => Run(() => Documents.Invoke(DocumentIntent.Open)))
                 { text = "[]", name = "json-document-picker", tooltip = Lan.SelectAssetTips };
             documents.AddToClassList("unity-toolbar-menu"); toolbar.Add(documents);
             var dropdownArrow = new Label("▼") { pickingMode = PickingMode.Ignore }; dropdownArrow.style.position = Position.Absolute;
@@ -110,10 +114,14 @@ namespace NBC.ActionEditor.Workbench
                 button.style.flexShrink = 0; button.Add(new Image { image = texture, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore }); toolbar.Add(button); return button;
             }
             var saveButton = IconButton("json-save", Styles.SaveIcon, Lan.SaveMenuHint, Save);
-            saveButton.AddManipulator(new ContextualMenuManipulator(e => ActionEditorHost.PopulateSaveMenu((label, action) => e.menu.AppendAction(label, _ => Run(action)))));
-            magnet = new ToolbarToggle { name = "json-magnet", value = Prefs.MagnetSnapping, tooltip = Lan.OpenMagnetSnappingTips };
+            saveButton.AddManipulator(new ContextualMenuManipulator(e => binding.PopulateSaveMenu((label, action) => e.menu.AppendAction(label, _ => Run(action)))));
+            magnet = new ToolbarToggle { name = "json-magnet", value = binding.Preferences.MagnetSnapping, tooltip = Lan.OpenMagnetSnappingTips };
             magnet.style.width = 26; magnet.style.flexShrink = 0; magnet.Add(new Image { image = Styles.MagnetIcon, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore });
-            magnet.RegisterValueChangedCallback(e => Prefs.MagnetSnapping = e.newValue); toolbar.Add(magnet);
+            magnet.RegisterValueChangedCallback(e =>
+            {
+                binding.Settings.Change(magnet: e.newValue);
+                ShowTimelineError(binding.SettingsError);
+            }); toolbar.Add(magnet);
             IconButton("json-settings", Styles.SettingsIcon, Lan.OpenPreferencesTips, () => UIToolkitPreferencesWindow.ShowFor(this));
             right.Add(toolbar); var rulerSpace = new VisualElement(); rulerSpace.style.height = 20; right.Add(rulerSpace); head.Add(right); rootVisualElement.Add(head);
             var body = new VisualElement(); body.style.flexGrow = 1; body.style.minHeight = 0; body.style.flexDirection = FlexDirection.Row;
@@ -131,9 +139,9 @@ namespace NBC.ActionEditor.Workbench
             error = new Label { name = "json-error" }; error.style.display = DisplayStyle.None; rootVisualElement.Add(error);
             Canvas.AttachRuler(); Canvas.RegisterCallback<GeometryChangedEvent>(_ => SyncView()); Refresh();
         }
-        public void Seek(float time) { AssetPlayer.Inst.Sample(time); Canvas?.MarkDirtyRepaint(); }
-        public void CreateDocument() => CreateAssetWindow.Show();
-        public void OpenDocument() => ObjectSelectorWindow.ShowObjectPicker<TextAsset>(null, ActionEditorHost.OnObjectPickerConfig, "Assets/", assetPathFilter: App.IsJsonDocumentPath);
+        public void Seek(float time) { Playback.Seek(time); Canvas?.MarkDirtyRepaint(); }
+        public void CreateDocument() => Documents.Invoke(DocumentIntent.Create);
+        public void OpenDocument() => Documents.Invoke(DocumentIntent.Open);
         public void ShowTimelineError(string message)
         {
             LastError = message;
@@ -154,17 +162,16 @@ namespace NBC.ActionEditor.Workbench
             rootVisualElement.schedule.Execute(() =>
             {
                 scheduled = false; if (Canvas == null) return;
-                hasUnsavedChanges = App.Session.IsDirty;
-                var assetName = App.TextAsset?.name ?? "";
+                hasUnsavedChanges = Documents.Dirty;
+                var assetName = binding.DocumentName;
                 documents.text = "[" + assetName + "]";
-                documents.style.width = Mathf.Max(80, EditorStyles.label.CalcSize(new GUIContent(assetName)).x + 8);
+                documents.style.minWidth = 80;
                 if (headerType != Document?.GetType())
                 {
                     headerType = Document?.GetType(); customHeader.Clear();
-                    var adapter = Document == null ? null : EditorCustomFactory.GetHeader(Document);
+                    var adapter = Document == null ? null : EditorCustomFactory.GetToolkitHeader(Document);
                     var header = adapter?.CreateGUI();
                     if (header != null) customHeader.Add(header);
-                    else if (adapter != null) customHeader.Add(new Label("自定义Header尚未提供Toolkit适配") { tooltip = adapter.GetType().FullName });
                 }
                 Canvas.RefreshVisualState(); SyncView();
                 foreach (var view in inspectors.ToArray()) BuildProperties(view);
@@ -177,11 +184,11 @@ namespace NBC.ActionEditor.Workbench
             footer.style.display = Document == null ? DisplayStyle.None : DisplayStyle.Flex;
             transport.style.width = LeftWidth;
             Canvas.SyncRuler();
-            var playImage = transport.Children().ElementAt(3).Q<Image>(); if (playImage != null) playImage.image = App.IsPlay ? Styles.StopIcon : Styles.PlayIcon;
+            var playImage = transport.Children().ElementAt(3).Q<Image>(); if (playImage != null) playImage.image = Playback.Playing ? Styles.StopIcon : Styles.PlayIcon;
             foreach (var index in new[] { 3, 4, 7 })
-                transport.Children().ElementAt(index).style.backgroundColor = (index == 3 ? App.IsPlay : index == 4 ? App.IsPause : App.IsRange) ? new Color(.22f, .38f, .55f) : StyleKeyword.Null;
-            lastSave.text = string.Format(Lan.HeaderLastSaveTime, App.LastSaveTime.ToString("HH:mm:ss"));
-            magnet.SetValueWithoutNotify(Prefs.MagnetSnapping);
+                transport.Children().ElementAt(index).style.backgroundColor = (index == 3 ? Playback.Playing : index == 4 ? Playback.Paused : Playback.Range) ? new Color(.22f, .38f, .55f) : StyleKeyword.Null;
+            lastSave.text = string.Format(Lan.HeaderLastSaveTime, binding.LastSave.ToString("HH:mm:ss"));
+            magnet.SetValueWithoutNotify(binding.Preferences.MagnetSnapping);
             footer.Q("json-footer-blank").style.width = LeftWidth + 9;
             syncing = true;
             try
@@ -200,7 +207,7 @@ namespace NBC.ActionEditor.Workbench
             finally { syncing = false; }
             Canvas.MarkDirtyRepaint();
         }
-        public void Select(params IDirectable[] items) { Context.Selection.Set(items, false); App.Repaint(); ShowProperties(); }
+        public void Select(params IDirectable[] items) { binding.Select(items); ShowProperties(); }
         public void ShowProperties() { Selection.activeObject = target; Refresh(); }
         public VisualElement CreatePropertyView()
         {
@@ -212,29 +219,27 @@ namespace NBC.ActionEditor.Workbench
         private void BuildProperties(VisualElement root)
         {
             root.Clear();
-            if (App.FistSelect == null) { root.Add(new HelpBox(Lan.NotSelectAsset, HelpBoxMessageType.Info)); return; }
-            var basic = new Foldout { text = string.Format(Lan.InsBaseInfo, Prefs.GetAssetTypeName(Document.GetType())), value = true, viewDataKey = "json-basic-info" };
+            if (binding.Properties.Selected == null) { root.Add(new HelpBox(Lan.NotSelectAsset, HelpBoxMessageType.Info)); return; }
+            var basic = new Foldout { text = string.Format(Lan.InsBaseInfo, binding.Properties.Title(Document)), value = true, viewDataKey = "json-basic-info" };
             basic.Q<Toggle>().style.fontSize = 18; basic.Q<Toggle>().style.unityFontStyleAndWeight = FontStyle.Bold; root.Add(basic);
-            UIToolkitPropertyView.DrawFields(basic, Document, Refresh, 0);
+            var properties = new UIToolkitPropertyView(binding.Properties);
+            basic.Add(new Label("Length: " + binding.Properties.DocumentLength));
+            properties.DrawFields(basic, Document, Refresh, 0);
             basic.contentContainer.style.marginLeft = 0;
             foreach (var field in basic.Query<Label>().ToList().Where(l => l.ClassListContains("unity-base-field__label"))) field.style.minWidth = field.style.width = 150;
-            var panel = new VisualElement(); panel.style.marginTop = 4; root.Add(panel); UIToolkitPropertyView.Populate(panel, App.FistSelect, Refresh);
+            var panel = new VisualElement(); panel.style.marginTop = 4; root.Add(panel); properties.Populate(panel, binding.Properties.Selected, Refresh);
             foreach (var field in panel.Query<Label>().ToList().Where(l => l.ClassListContains("unity-base-field__label"))) field.style.minWidth = field.style.width = 150;
-            root.SetEnabled(!App.FistSelect.IsLocked);
-        }
-        private bool ConfirmSwitch()
-        {
-            return ActionEditorHost.ConfirmDocumentSwitch();
+            root.SetEnabled(!binding.Properties.Locked(binding.Properties.Selected));
         }
         private void Save()
         {
-            App.SaveAsset();
+            Documents.Invoke(DocumentIntent.Save);
         }
-        public override void SaveChanges() { Save(); if (!App.Session.IsDirty) base.SaveChanges(); }
+        public override void SaveChanges() { Save(); if (!Documents.Dirty) base.SaveChanges(); }
         public override void DiscardChanges()
         {
             Canvas?.Cancel();
-            Context.Session.DiscardChanges();
+            Documents.Discard();
             base.DiscardChanges();
         }
     }

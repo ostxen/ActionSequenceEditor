@@ -1,47 +1,49 @@
 using System;
 using System.Linq;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Composition;
 using UnityEditor;
 using UnityEngine;
 
 namespace NBC.ActionEditor
 {
+    // 导出窗口保留显式文档绑定，不在点击时重新取得全局会话。
     public sealed class DocumentExportWindow : EditorWindow
     {
         private int selected;
         private string error;
-        public static void ShowForCurrent()
+        private DocumentDialogComposition binding;
+        public static void ShowFor(ActionEditorContext context)
         {
-            if (App.AssetData == null) throw new InvalidOperationException(Lan.NoDocument);
-            if (App.Session.IsEditing) throw new InvalidOperationException(Lan.FinishEditBeforeExport);
+            var binding = new DocumentDialogComposition(context);
+            binding.Presenter.RequireExport();
             var window = CreateInstance<DocumentExportWindow>();
+            window.binding = binding;
             window.titleContent = new GUIContent(Lan.Export); window.minSize = new Vector2(360, 130); window.ShowUtility();
         }
         private void OnGUI()
         {
-            var formats = DocumentFormats.Registry.Exportable;
+            if (binding == null) { EditorGUILayout.HelpBox(Lan.NotSelectAsset, MessageType.Info); return; }
+            var formats = binding.ExportIds();
             EditorGUILayout.LabelField(Lan.Export, EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(Lan.ExportHint, MessageType.Info);
-            if (formats.Count == 0) { EditorGUILayout.HelpBox(Lan.NoExportFormats, MessageType.Warning); return; }
-            selected = EditorGUILayout.Popup(Lan.FileFormat, Mathf.Clamp(selected, 0, formats.Count - 1), formats.Select(f => f.DisplayName).ToArray());
+            if (formats.Length == 0) { EditorGUILayout.HelpBox(Lan.NoExportFormats, MessageType.Warning); return; }
+            selected = EditorGUILayout.Popup(Lan.FileFormat, Mathf.Clamp(selected, 0, formats.Length - 1), binding.ExportLabels());
             if (!string.IsNullOrEmpty(error)) EditorGUILayout.HelpBox(error, MessageType.Error);
             if (GUILayout.Button(Lan.Export))
             {
                 try
                 {
                     var format = formats[selected];
-                    var target = EditorUtility.SaveFilePanelInProject(Lan.Export, (App.TextAsset != null ? App.TextAsset.name : "Action") + "-Export", format.Extension.TrimStart('.'), Lan.NewPathHint);
-                    if (ExportTo(format.Id, target)) Close();
+                    var target = EditorUtility.SaveFilePanelInProject(Lan.Export, binding.DocumentName + "-Export", binding.ExportExtension(format), Lan.NewPathHint);
+                    if (ExportTo(format, target)) Close();
                 }
                 catch (ExitGUIException) { throw; }
                 catch (Exception exception) { error = exception.Message; }
             }
         }
-        public static bool ExportTo(string formatId, string target)
+        public bool ExportTo(string formatId, string target)
         {
-            var result = App.Context.Lifecycle.Export(target, formatId);
-            if (!result.Succeeded && !result.Cancelled) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(result.Exception).Throw();
-            return result.Succeeded;
+            return binding.Presenter.Export(target, formatId);
         }
     }
 }

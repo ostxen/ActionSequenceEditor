@@ -1,13 +1,29 @@
 ﻿using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using NBC.ActionEditor.Application.Settings;
+using NBC.ActionEditor.Presentation.Contracts;
+using NBC.ActionEditor.Presentation.Presenters;
+using SettingsValue = NBC.ActionEditor.Application.Settings.EditorSettings;
 
 namespace NBC.ActionEditor
 {
-    public class PreferencesWindow : PopupWindowContent
+    // 原生弹窗只绘制偏好快照，经Presenter提交实际变化。
+    public class PreferencesWindow : PopupWindowContent, ISettingsView
     {
         private static Rect _myRect;
         private bool firstPass = true;
+        private SettingsPresenter presenter;
+        private SettingsValue state;
+        private string error;
+        private static readonly float[] Steps = { .001f, .01f, .1f };
+        private static readonly int[] Rates = { 24, 25, 30, 60 };
+        public void Bind(SettingsSession session)
+        { presenter?.Dispose(); presenter = Composition.SettingsComposition.Create(this, session); }
+        public void Render(SettingsValue value) { state = value; editorWindow?.Repaint(); }
+        public void ShowError(string message) { error = message; editorWindow?.Repaint(); }
+        public override void OnOpen() { if (presenter == null) presenter = Composition.SettingsComposition.Create(this); }
+        public override void OnClose() { presenter?.Dispose(); presenter = null; }
 
         public static void Show(Rect rect)
         {
@@ -22,6 +38,15 @@ namespace NBC.ActionEditor
 
         public override void OnGUI(Rect rect)
         {
+            var color = GUI.color;
+            try { DrawPreferences(); }
+            finally { GUI.color = color; }
+        }
+
+        // 控件只提交用户变化，首次绘制不改写偏好。
+        private void DrawPreferences()
+        {
+            if (presenter == null) presenter = Composition.SettingsComposition.Create(this);
             GUILayout.BeginVertical("box");
             GUI.color = new Color(0, 0, 0, 0.3f);
 
@@ -42,45 +67,50 @@ namespace NBC.ActionEditor
             GUILayout.EndVertical();
 
             GUILayout.BeginVertical("box");
-            Prefs.timeStepMode =
-                (Prefs.TimeStepMode)EditorGUILayout.EnumPopup(Lan.PreferencesTimeStepMode, Prefs.timeStepMode);
-            if (Prefs.timeStepMode == Prefs.TimeStepMode.Seconds)
+            var mode = (TimeStepMode)EditorGUILayout.EnumPopup(Lan.PreferencesTimeStepMode, state.TimeStepMode);
+            if (mode != state.TimeStepMode) presenter.Change(mode: mode);
+            if (state.TimeStepMode == TimeStepMode.Seconds)
             {
-                Prefs.SnapInterval = EditorTools.CleanPopup<float>(Lan.PreferencesSnapInterval, Prefs.SnapInterval,
-                    Prefs.snapIntervals.ToList());
+                var step = EditorTools.CleanPopup<float>(Lan.PreferencesSnapInterval, state.SnapInterval, Steps.ToList());
+                if (step != state.SnapInterval) presenter.Change(snap: step);
             }
             else
             {
-                Prefs.FrameRate = EditorTools.CleanPopup<int>(Lan.PreferencesFrameRate, Prefs.FrameRate,
-                    Prefs.frameRates.ToList());
+                var fps = EditorTools.CleanPopup<int>(Lan.PreferencesFrameRate, state.FrameRate, Rates.ToList());
+                if (fps != state.FrameRate) presenter.Change(fps: fps);
             }
 
             GUILayout.EndVertical();
 
             GUILayout.BeginVertical("box");
-            Prefs.MagnetSnapping =
+            var magnet =
                 EditorGUILayout.Toggle(new GUIContent(Lan.PreferencesMagnetSnapping, Lan.PreferencesMagnetSnappingTips),
-                    Prefs.MagnetSnapping);
-            Prefs.scrollWheelZooms =
+                    state.MagnetSnapping);
+            if (magnet != state.MagnetSnapping) presenter.Change(magnet: magnet);
+            var wheel =
                 EditorGUILayout.Toggle(
                     new GUIContent(Lan.PreferencesScrollWheelZooms, Lan.PreferencesScrollWheelZoomsTips),
-                    Prefs.scrollWheelZooms);
+                    state.ScrollWheelZooms);
+            if (wheel != state.ScrollWheelZooms) presenter.Change(wheel: wheel);
             GUILayout.EndVertical();
 
             GUILayout.BeginVertical("box");
 
-            Prefs.savePath = EditorTools.GUILayoutGetFolderPath(Lan.PreferencesSavePath, Lan.PreferencesSavePathTips,
-                Prefs.savePath, true);
+            var path = EditorTools.GUILayoutGetFolderPath(Lan.PreferencesSavePath, Lan.PreferencesSavePathTips, state.SavePath, true);
+            if (path != state.SavePath) presenter.Change(path: path);
 
-            Prefs.autoSaveSeconds = EditorGUILayout.IntSlider(
-                new GUIContent(Lan.PreferencesAutoSaveTime, Lan.PreferencesAutoSaveTimeTips), Prefs.autoSaveSeconds, 5,
+            EditorGUI.BeginChangeCheck();
+            var interval = EditorGUILayout.IntSlider(
+                new GUIContent(Lan.PreferencesAutoSaveTime, Lan.PreferencesAutoSaveTimeTips), state.AutoSaveSeconds, 5,
                 120);
+            if (EditorGUI.EndChangeCheck()) presenter.Change(autoSave: interval);
             GUILayout.EndVertical();
 
 
             GUILayout.EndVertical();
 
             DrawHelpButton();
+            if (!string.IsNullOrEmpty(error)) EditorGUILayout.HelpBox(error, MessageType.Error);
 
             if (firstPass || Event.current.type == EventType.Repaint)
             {

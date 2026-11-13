@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Linq;
 using System.Reflection;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Presentation.Presenters;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -23,65 +23,68 @@ namespace NBC.ActionEditor.Workbench
         public override VisualElement CreateInspectorGUI() => ((UIToolkitInspectorTarget)target).Owner?.CreatePropertyView() ?? new Label("窗口已关闭");
     }
 
-    public static class UIToolkitPropertyView
+    // 原生属性控件绑定显式Presenter，控件不取得全局会话。
+    public sealed class UIToolkitPropertyView
     {
-        public static void Populate(VisualElement root, object value, Action refresh)
+        private readonly PropertyPresenter presenter;
+        private readonly Func<Type, ToolkitPropertyExtension> extensions;
+        public UIToolkitPropertyView(PropertyPresenter presenter, Func<Type, ToolkitPropertyExtension> extensions = null)
+        {
+            this.presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
+            this.extensions = extensions ?? EditorCustomFactory.GetToolkitProperties;
+        }
+        public void Populate(VisualElement root, object value, Action refresh)
         {
             if (value == null) return;
+            // 自定义属性适配也服从共同锁定状态，不能绕过默认面板的禁用范围。
+            root.SetEnabled(!presenter.Locked(value));
             if (value is IData)
             {
-                var adapter = EditorCustomFactory.GetInspectorType(value.GetType());
-                if (adapter != null && adapter != typeof(ActionClipInspector))
-                    root.Add(new HelpBox("自定义Inspector尚未提供Toolkit适配：" + adapter.FullName + "。以下仅显示通用字段。", HelpBoxMessageType.Warning));
+                var extension = extensions(value.GetType());
+                if (extension != null) { extension.Populate(root, value, presenter, refresh); return; }
             }
-            var title = new Label(value.GetType().RTGetAttribute<NameAttribute>(true)?.name ?? value.GetType().Name);
+            var title = new Label(presenter.Title(value));
             title.style.fontSize = 18; title.style.unityFontStyleAndWeight = FontStyle.Bold; title.style.backgroundColor = new Color(0, 0, 0, .2f); root.Add(title);
-            var description = value.GetType().RTGetAttribute<DescriptionAttribute>(true)?.description;
+            var description = presenter.Description(value);
             if (!string.IsNullOrEmpty(description)) root.Add(new HelpBox(description, HelpBoxMessageType.None));
             if (value is IDirectable directable)
             {
-                if (value is TimelineGroup || value is TimelineTrack) Add(root, "Name", directable.Name, next => App.Context.Structure.Rename(directable, next));
+                if (value is TimelineGroup || value is TimelineTrack) Add(root, "Name", directable.Name, next => presenter.Rename(directable, next));
                 if (value is TimelineClip clip)
                 {
                     DrawClipControls(root, clip, refresh);
                 }
-                root.SetEnabled(!directable.IsLocked);
             }
             DrawFields(root, value, refresh, 0);
         }
 
-        private static void Change(Action change) => App.Context.Properties.Change(change);
         private static VisualElement Box(VisualElement root)
         {
             var box = new VisualElement(); box.style.marginTop = box.style.marginBottom = 2;
             box.style.paddingLeft = box.style.paddingRight = box.style.paddingTop = box.style.paddingBottom = 4;
             box.style.backgroundColor = new Color(0, 0, 0, .12f); root.Add(box); return box;
         }
-        private static void DrawClipControls(VisualElement root, TimelineClip clip, Action refresh)
+        private void DrawClipControls(VisualElement root, TimelineClip clip, Action refresh)
         {
-            if (!clip.IsValid) root.Add(new HelpBox("该剪辑无效。 请确保设置了所需的参数。", HelpBoxMessageType.Error));
-            var previous = clip.GetPreviousSibling(); var next = clip.GetNextSibling();
-            var bounds = ClipTimingRules.NeighborBounds(clip, previous, next, true);
-            var minimum = bounds.x; var maximum = bounds.y;
+            var state = presenter.ClipState(clip);
+            if (!state.Valid) root.Add(new HelpBox("该剪辑无效。 请确保设置了所需的参数。", HelpBoxMessageType.Error));
+            var minimum = state.Minimum; var maximum = state.Maximum;
             void Apply(float start, float end)
             {
-                start = Mathf.Round(start / Prefs.SnapInterval) * Prefs.SnapInterval;
-                end = Mathf.Round(end / Prefs.SnapInterval) * Prefs.SnapInterval;
-                start = Mathf.Clamp(start, minimum, end); end = Mathf.Clamp(end, start, next != null ? maximum : float.PositiveInfinity);
-                Change(() => { clip.StartTime = start; clip.EndTime = end; }); refresh();
+                presenter.Timing(clip, start, end); refresh();
             }
             var box = Box(root);
-            if (clip.CanScale())
+            if (state.Scalable)
             {
                 var row = new VisualElement { name = "json-clip-timing" }; row.style.flexDirection = FlexDirection.Row; box.Add(row);
                 void Label(string text, float width) { var label = new Label(text); label.style.width = width; row.Add(label); }
                 void Space() { var space = new VisualElement(); space.style.flexGrow = 1; row.Add(space); }
                 void Field(string name, float value, Action<float> set)
                 {
-                    if (Prefs.timeStepMode == Prefs.TimeStepMode.Frames)
+                    if (presenter.Settings.TimeStepMode == NBC.ActionEditor.Application.Settings.TimeStepMode.Frames)
                     {
-                        var field = new IntegerField { name = name, value = Mathf.RoundToInt(value * Prefs.FrameRate), isDelayed = true }; field.style.width = 80;
-                        field.RegisterValueChangedCallback(e => set((float)e.newValue / Prefs.FrameRate)); row.Add(field);
+                        var field = new IntegerField { name = name, value = Mathf.RoundToInt(value * presenter.Settings.FrameRate), isDelayed = true }; field.style.width = 80;
+                        field.RegisterValueChangedCallback(e => set((float)e.newValue / presenter.Settings.FrameRate)); row.Add(field);
                     }
                     else
                     {
@@ -89,33 +92,32 @@ namespace NBC.ActionEditor.Workbench
                         field.RegisterValueChangedCallback(e => set(e.newValue)); row.Add(field);
                     }
                 }
-                Label("IN", 30); Field("json-clip-in", clip.StartTime, value => Apply(value, clip.EndTime)); Space();
-                Label("◄", 15); Field("json-clip-length", clip.Length, value => Apply(clip.StartTime, clip.StartTime + value)); Label("►", 15); Space();
-                Label("OUT", 30); Field("json-clip-out", clip.EndTime, value => Apply(clip.StartTime, value));
-                if (clip.StartTime >= clip.Parent.StartTime && clip.EndTime <= clip.Parent.EndTime && maximum > minimum)
+                Label("IN", 30); Field("json-clip-in", state.Start, value => Apply(value, state.End)); Space();
+                Label("◄", 15); Field("json-clip-length", state.Length, value => Apply(state.Start, state.Start + value)); Label("►", 15); Space();
+                Label("OUT", 30); Field("json-clip-out", state.End, value => Apply(state.Start, value));
+                if (state.ShowRange)
                 {
-                    var slider = new MinMaxSlider(clip.StartTime, clip.EndTime, minimum, maximum);
+                    var slider = new MinMaxSlider(state.Start, state.End, minimum, maximum);
                     slider.RegisterValueChangedCallback(e => Apply(e.newValue.x, e.newValue.y)); box.Add(slider);
                 }
             }
             else
             {
-                var slider = new Slider("IN", 0, Mathf.Max(0, clip.Parent.EndTime)) { value = clip.StartTime, showInputField = true };
+                var slider = new Slider("IN", 0, state.PointMaximum) { value = state.Start, showInputField = true };
                 slider.RegisterValueChangedCallback(e => Apply(e.newValue, e.newValue)); box.Add(slider);
             }
-            if (clip.StartTime > clip.Parent.EndTime || clip.EndTime < clip.Parent.StartTime) box.Add(new HelpBox(Lan.OverflowInvalid, HelpBoxMessageType.Warning));
-            else if (clip.EndTime > clip.Parent.EndTime) box.Add(new HelpBox(Lan.EndTimeOverflowInvalid, HelpBoxMessageType.Warning));
-            else if (clip.StartTime < clip.Parent.StartTime) box.Add(new HelpBox(Lan.StartTimeOverflowInvalid, HelpBoxMessageType.Warning));
-            if (clip.Length <= 0 || !clip.CanBlendIn() && !clip.CanBlendOut()) return;
+            var warning = PropertyText.Warning(state.Warning);
+            if (warning != null) box.Add(new HelpBox(warning, HelpBoxMessageType.Warning));
+            if (!state.BlendInEnabled && !state.BlendOutEnabled) return;
             var blend = Box(root); blend.name = "json-clip-blending"; blend.style.flexDirection = FlexDirection.Row;
             void Blend(bool incoming)
             {
                 var column = new VisualElement(); column.style.flexGrow = 1; column.style.flexBasis = 0; blend.Add(column);
                 column.Add(new Label(incoming ? "Blend In" : "Blend Out"));
-                var slider = new Slider(0, Mathf.Max(0, clip.Length - (incoming ? clip.BlendOut : clip.BlendIn))) { value = incoming ? clip.BlendIn : clip.BlendOut, showInputField = true };
-                slider.RegisterValueChangedCallback(e => { Change(() => { if (incoming) clip.BlendIn = e.newValue; else clip.BlendOut = e.newValue; }); refresh(); }); column.Add(slider);
+                var slider = new Slider(0, incoming ? state.BlendInMaximum : state.BlendOutMaximum) { value = incoming ? state.BlendIn : state.BlendOut, showInputField = true };
+                slider.RegisterValueChangedCallback(e => { presenter.Blend(clip, incoming, e.newValue); refresh(); }); column.Add(slider);
             }
-            if (clip.CanBlendIn()) Blend(true); if (clip.CanBlendOut()) Blend(false);
+            if (state.BlendInEnabled) Blend(true); if (state.BlendOutEnabled) Blend(false);
         }
         private static void Add<T>(VisualElement root, string label, T value, Action<T> changed)
         {
@@ -126,35 +128,29 @@ namespace NBC.ActionEditor.Workbench
             field.RegisterValueChangedCallback(evt => changed(evt.newValue)); root.Add(field);
         }
 
-        public static void DrawFields(VisualElement root, object obj, Action refresh, int depth, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath = null)
+        public void DrawFields(VisualElement root, object obj, Action refresh, int depth, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath = null)
         {
             if (obj == null || depth > 6) return;
-            propertyPath ??= new NBC.ActionEditor.Application.Editing.PropertyPath(App.Context.Properties, obj);
-            foreach (var description in JsonFieldDescription.For(obj.GetType()))
+            foreach (var state in presenter.CaptureFields(obj, propertyPath))
             {
-                var field = description.Field;
-                if (field.IsInitOnly || !description.Visible(obj)) continue;
-                var label = description.Label ?? field.Name;
-                var current = field.GetValue(obj);
-                var type = field.FieldType;
-                var pathToField = propertyPath.Field(field);
-                void Set(object next) { pathToField.Write(next); refresh(); }
-                var options = description.Options;
-                var path = description.ResourcePath;
-                var range = description.Range;
-                if (range != null && type == typeof(float)) Bind(root, new Slider(label, range.min, range.max) { showInputField = true }, current, Set);
-                else if (range != null && type == typeof(int)) Bind(root, new SliderInt(label, Mathf.CeilToInt(range.min), Mathf.FloorToInt(range.max)) { showInputField = true }, current, Set);
-                else if (options != null && type == typeof(int))
+                var description = state.Description;
+                var label = state.Label;
+                var current = state.Value;
+                var type = state.Type;
+                var pathToField = state.Path;
+                void Set(object next) { presenter.Write(pathToField, next); refresh(); }
+                if (description.HasRange && type == typeof(float)) Bind(root, new Slider(label, description.Minimum, description.Maximum) { showInputField = true }, current, Set);
+                else if (description.HasRange && type == typeof(int)) Bind(root, new SliderInt(label, Mathf.CeilToInt(description.Minimum), Mathf.FloorToInt(description.Maximum)) { showInputField = true }, current, Set);
+                else if (description.OptionType != null && type == typeof(int))
                 {
-                    var constants = description.Constants.ToArray();
-                    var labels = constants.Select(f => f.GetCustomAttribute<MenuNameAttribute>()?.showName ?? f.Name).ToList();
+                    var labels = state.OptionLabels.ToList();
                     if (labels.Count == 0) continue;
-                    var control = new PopupField<string>(label, labels, Math.Max(0, Array.FindIndex(constants, f => Equals(f.GetRawConstantValue(), current))));
-                    control.RegisterValueChangedCallback(e => Set(constants[control.index].GetRawConstantValue())); root.Add(control);
+                    var control = new PopupField<string>(label, labels, Math.Max(0, state.OptionIndex));
+                    control.RegisterValueChangedCallback(e => Set(state.OptionValue(control.index))); root.Add(control);
                 }
-                else if (path != null && type == typeof(string))
+                else if (description.ResourceType != null && type == typeof(string))
                 {
-                    var control = new ObjectField(label) { objectType = path.type, allowSceneObjects = false, value = AssetDatabase.LoadAssetAtPath<Object>(current as string ?? "") };
+                    var control = new ObjectField(label) { objectType = description.ResourceType, allowSceneObjects = false, value = AssetDatabase.LoadAssetAtPath<Object>(current as string ?? "") };
                     control.RegisterValueChangedCallback(e => Set(AssetDatabase.GetAssetPath(e.newValue))); root.Add(control);
                 }
                 else DrawValue(root, label, type, current, Set, refresh, depth, pathToField);
@@ -167,11 +163,12 @@ namespace NBC.ActionEditor.Workbench
             control.RegisterValueChangedCallback(e => set(e.newValue)); root.Add(control);
         }
 
-        private static void DrawValue(VisualElement root, string label, Type type, object value, Action<object> set, Action refresh, int depth, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath)
+        private void DrawValue(VisualElement root, string label, Type type, object value, Action<object> set, Action refresh, int depth, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath)
         {
-            if (type == typeof(string)) Bind(root, new TextField(label) { isDelayed = true }, value, set);
-            else if (type == typeof(float)) Bind(root, new FloatField(label) { isDelayed = true }, value, set);
-            else if (type == typeof(int)) Bind(root, new IntegerField(label) { isDelayed = true }, value, set);
+            if (depth > 6) return;
+            if (type == typeof(string)) BindDelayed(root, new TextField(label) { isDelayed = true }, value, propertyPath, refresh);
+            else if (type == typeof(float)) BindDelayed(root, new FloatField(label) { isDelayed = true }, value, propertyPath, refresh);
+            else if (type == typeof(int)) BindDelayed(root, new IntegerField(label) { isDelayed = true }, value, propertyPath, refresh);
             else if (type == typeof(bool)) Bind(root, new Toggle(label), value, set);
             else if (type == typeof(Color)) Bind(root, new ColorField(label), value, set);
             else if (type == typeof(Vector2)) { root.Add(new Label(label)); Bind(root, new Vector2Field(), value, set); }
@@ -183,7 +180,7 @@ namespace NBC.ActionEditor.Workbench
             else if (type == typeof(RectInt)) Bind(root, new RectIntField(label), value, set);
             else if (type == typeof(Bounds)) Bind(root, new BoundsField(label), value, set);
             else if (type == typeof(BoundsInt)) Bind(root, new BoundsIntField(label), value, set);
-            else if (type == typeof(AnimationCurve)) Bind(root, new CurveField(label), value, set);
+            else if (type == typeof(AnimationCurve)) Bind(root, new CurveField(label), NBC.ActionEditor.Presentation.Contracts.PropertyFieldState.CopyValue(value), set);
             else if (type.IsEnum)
             {
                 var control = new EnumField(label, (Enum)(value ?? Activator.CreateInstance(type)));
@@ -203,24 +200,72 @@ namespace NBC.ActionEditor.Workbench
                 {
                     var index = i;
                     var row = new VisualElement(); row.style.marginLeft = 10; fold.Add(row);
-                    DrawValue(row, "Element " + i, elementType, list[i], next => { propertyPath.Element(index).Write(next); refresh(); }, refresh, depth + 1, propertyPath.Element(index));
+                    DrawValue(row, "Element " + i, elementType, list[i], next => { presenter.Write(propertyPath.Element(index), next); refresh(); }, refresh, depth + 1, propertyPath.Element(index));
                     row.Add(new Button(() =>
                     {
-                        propertyPath.Transform(current => NBC.ActionEditor.Application.Editing.CollectionEditing.Remove(type, (IList)current, index)); refresh();
+                        presenter.Remove(propertyPath, type, index); refresh();
                     }) { text = "删除元素" });
                 }
                 fold.Add(new Button(() =>
                 {
-                    var item = App.Context.Properties.CreateElement(elementType);
-                    propertyPath.Transform(current => NBC.ActionEditor.Application.Editing.CollectionEditing.Append(type, (IList)current, item)); refresh();
+                    presenter.Append(propertyPath, type); refresh();
                 }) { text = "+ 元素" });
             }
             else if (depth < 6)
             {
                 var fold = new Foldout { text = label, value = true }; root.Add(fold);
-                if (value == null) fold.Add(new Button(() => set(App.Context.Properties.CreateElement(type))) { text = "创建 " + type.Name });
+                if (value == null) fold.Add(new Button(() => set(presenter.CreateElement(type))) { text = "创建 " + type.Name });
                 else DrawFields(fold, value, refresh, depth + 1, propertyPath);
             }
+        }
+
+        // 控件负责原生文本缓冲，Presenter负责输入身份、取消和最终作者提交。
+        private void BindDelayed<T>(VisualElement root, BaseField<T> control, object value,
+            NBC.ActionEditor.Application.Editing.PropertyPath path, Action refresh)
+        {
+            NBC.ActionEditor.Presentation.Contracts.PropertyDraft draft = null;
+            HelpBox error = null;
+            void CancelInput()
+            {
+                if (draft != null) presenter.CancelDraft(draft);
+                draft = null;
+            }
+            void Input(Action action)
+            {
+                try
+                {
+                    if (!presenter.CanInput(path)) throw new InvalidOperationException("属性已失效、锁定或正在进行其他编辑，请重新选择。");
+                    action();
+                    error?.RemoveFromHierarchy(); error = null;
+                }
+                catch (Exception exception) when (exception is InvalidOperationException || exception is ArgumentException)
+                {
+                    // 预期冲突作为字段反馈呈现，不把旧文本重新绑定到更新后的作者值。
+                    CancelInput();
+                    control.SetValueWithoutNotify(value is T original ? original : default);
+                    if (error == null) { error = new HelpBox(exception.Message, HelpBoxMessageType.Warning); root.Add(error); }
+                    else error.text = exception.Message;
+                }
+            }
+            control.SetValueWithoutNotify(value is T typed ? typed : default);
+            control.RegisterCallback<FocusInEvent>(_ => Input(() => draft = presenter.BeginDraft(path)));
+            control.RegisterCallback<InputEvent>(e => Input(() =>
+            {
+                if (draft == null) draft = presenter.BeginDraft(path);
+                presenter.PreviewDraft(draft, e.newData);
+            }));
+            control.RegisterCallback<KeyDownEvent>(e =>
+            {
+                if (e.keyCode != KeyCode.Escape) return;
+                CancelInput();
+            }, TrickleDown.TrickleDown);
+            control.RegisterValueChangedCallback(e => Input(() =>
+            {
+                if (draft == null) draft = presenter.BeginDraft(path);
+                presenter.CommitDraft(draft, e.newValue); draft = null; value = e.newValue; refresh();
+            }));
+            control.RegisterCallback<DetachFromPanelEvent>(_ => CancelInput());
+            root.Add(control);
         }
     }
 }

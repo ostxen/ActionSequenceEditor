@@ -1,7 +1,7 @@
 using NBC.ActionEditor.Domain;
 using System;
 using System.Linq;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NBC.ActionEditor.Workbench;
 using NUnit.Framework;
 using UnityEngine;
@@ -20,8 +20,46 @@ namespace NBC.ActionEditor.Tests
         [CustomInspectors(typeof(TimelineClip), false)] private class ExactInspector : InspectorsBase { }
         [CustomInspectors(typeof(TimelineClip), true)] private class InheritedInspector : InspectorsBase { }
         [CustomInspectors(typeof(PointClip), true)] private sealed class SignalInspector : InspectorsBase { }
-        [Unique, Attachable(typeof(LegacyExperienceGroup))] private sealed class UniqueTrack : TimelineTrack { }
+        [Unique, Attachable(typeof(FeatureSampleGroup))] private sealed class UniqueTrack : TimelineTrack { }
         private sealed class DisabledBlend : CrossBlendClip { public override float BlendIn { get => -1; set { } } }
+        [Serializable] public sealed class TestDocument : ActionDocument
+        { public static int Constructors; public TestDocument() { Constructors++; } }
+        [ToolkitHeader(typeof(BaseAsset), true)] private sealed class NativeHeader : ToolkitHeaderView
+        { public override VisualElement CreateGUI() => new Label("native"); }
+        [ToolkitProperties(typeof(BaseAsset))] private class ExactProperties : ToolkitPropertyExtension
+        { public override void Populate(VisualElement root, object target, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter, Action refresh) => root.Add(new Label("exact")); }
+        [ToolkitProperties(typeof(BaseAsset), true)] private class InheritedProperties : ToolkitPropertyExtension
+        { public override void Populate(VisualElement root, object target, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter, Action refresh) => root.Add(new Label("inherited")); }
+        private sealed class DerivedProperties : InheritedProperties { }
+        [ToolkitProperties(typeof(BaseAsset), true)] private sealed class ConflictingProperties : ToolkitPropertyExtension
+        { public override void Populate(VisualElement root, object target, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter, Action refresh) { } }
+
+        [Test] public void NativePropertyBindingsAreIndependentExactOrExplicitlyInheritedAndRejectConflicts()
+        {
+            var binding = typeof(ToolkitPropertiesAttribute);
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(ExactProperties), typeof(InheritedHeader) }, typeof(BaseAsset), binding), Is.EqualTo(typeof(ExactProperties)));
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(ExactProperties) }, typeof(ChildAsset), binding), Is.Null);
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(InheritedProperties), typeof(DerivedProperties) }, typeof(ChildAsset), binding), Is.EqualTo(typeof(DerivedProperties)));
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(DerivedProperties), typeof(InheritedProperties) }, typeof(ChildAsset), binding), Is.EqualTo(typeof(DerivedProperties)));
+            var error = Assert.Throws<InvalidOperationException>(() => ExtensionResolver.ResolveExtension(new[] { typeof(InheritedProperties), typeof(ConflictingProperties) }, typeof(ChildAsset), binding));
+            Assert.That(error.Message, Does.Contain(typeof(InheritedProperties).FullName).And.Contain(typeof(ConflictingProperties).FullName));
+            Assert.That(ActionEditorTypeCatalog.DerivedFrom(typeof(ToolkitPropertyExtension)).Any(i => i.type == typeof(ExactProperties)), Is.False);
+        }
+
+        [Test] public void ProductDiscoveryAndSaveTypesExcludeTestsWithoutCallingConstructors()
+        {
+            var calls = TestDocument.Constructors;
+            Assert.That(ActionEditorTypeCatalog.DerivedFrom(typeof(ActionDocument)).Any(i => i.type == typeof(TestDocument)), Is.False);
+            Prefs.InitializeAssetTypes();
+            Assert.That(Prefs.AssetTypes.Values.Contains(typeof(TestDocument)), Is.False);
+            Assert.Throws<System.IO.InvalidDataException>(() => NBC.ActionEditor.Storage.DocumentFormats.Context.RequireType(typeof(TestDocument), "$"));
+            Assert.That(TestDocument.Constructors, Is.EqualTo(calls));
+            Assert.That(typeof(PropertyDescription).Assembly, Is.SameAs(typeof(ActionDocument).Assembly));
+            Assert.That(typeof(CustomHeader).Assembly, Is.SameAs(typeof(EditorCustomFactory).Assembly));
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(NativeHeader), typeof(InheritedHeader) }, typeof(ChildAsset), typeof(ToolkitHeaderAttribute)), Is.EqualTo(typeof(NativeHeader)));
+            Assert.That(EditorCustomFactory.GetToolkitHeader(new FeatureSampleDocument()), Is.TypeOf<Samples.FeatureSampleToolkitHeader>());
+            Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID("Assets/ActionEditor/Samples/FeatureSample/README.md"), Is.EqualTo("30542892b6cdb57489102ba2218a9a47"));
+        }
 
         [Test] public void SharedFacadeAndSelectionHaveNoConcreteWindowOrInspectorOwnership()
         {
@@ -57,8 +95,8 @@ namespace NBC.ActionEditor.Tests
             Assert.That(Resources.Load<GUISkin>("nbc/StyleSheet"), Is.Not.Null);
             Assert.That(Styles.WhiteTexture, Is.Not.Null);
             Assert.That(Styles.PlayIcon, Is.Not.Null);
-            Assert.That(EditorCustomFactory.GetHeader(new LegacyExperienceAsset()), Is.Not.Null);
-            Assert.That(EditorCustomFactory.GetInspector(new LegacyExperienceInterval()), Is.TypeOf<ActionClipInspector>());
+            Assert.That(EditorCustomFactory.GetHeader(new FeatureSampleDocument()), Is.Not.Null);
+            Assert.That(EditorCustomFactory.GetInspector(new FeatureSampleInterval(), Composition.PropertyComposition.Create(App.Context)), Is.TypeOf<ActionClipInspector>());
             Assert.That(typeof(Prefs).Assembly, Is.SameAs(typeof(App).Assembly));
             Assert.That(typeof(ActionDocument).Assembly.GetReferencedAssemblies().Any(a => a.Name == typeof(App).Assembly.GetName().Name), Is.False);
         }
@@ -68,28 +106,28 @@ namespace NBC.ActionEditor.Tests
             Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(ExactHeader) }, typeof(BaseAsset), false), Is.EqualTo(typeof(ExactHeader)));
             Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(ExactHeader) }, typeof(ChildAsset), false), Is.Null);
             Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(InheritedHeader), typeof(DerivedHeader) }, typeof(ChildAsset), false), Is.EqualTo(typeof(DerivedHeader)));
-            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(ExactInspector) }, typeof(LegacyExperienceMarker), true), Is.Null);
-            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(InheritedInspector), typeof(SignalInspector) }, typeof(LegacyExperienceMarker), true), Is.EqualTo(typeof(SignalInspector)));
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(ExactInspector) }, typeof(FeatureSampleMarker), true), Is.Null);
+            Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(InheritedInspector), typeof(SignalInspector) }, typeof(FeatureSampleMarker), true), Is.EqualTo(typeof(SignalInspector)));
             var error = Assert.Throws<InvalidOperationException>(() => ExtensionResolver.ResolveExtension(new[] { typeof(InheritedHeader), typeof(ConflictingHeader) }, typeof(ChildAsset), false));
             Assert.That(error.Message, Does.Contain(typeof(InheritedHeader).FullName).And.Contain(typeof(ConflictingHeader).FullName));
         }
         [Test] public void MetadataCachePreservesMenuOrderAndDoesNotExposeMutableParents()
         {
-            var original = ReflectionTools.GetImplementationsOf(typeof(TimelineTrack)).Where(t => !t.ContainsGenericParameters && !t.IsDefined(typeof(ObsoleteAttribute), true))
+            var original = ReflectionTools.GetImplementationsOf(typeof(TimelineTrack)).Where(t => Infrastructure.Assets.ProductTypes.Includes(t) && !t.ContainsGenericParameters && !t.IsDefined(typeof(ObsoleteAttribute), true))
                 .Select(t => (type: t, name: t.RTGetAttribute<NameAttribute>(true)?.name ?? t.Name.SplitCamelCase(), category: t.RTGetAttribute<CategoryAttribute>(true)?.category))
                 .OrderBy(t => t.name).ThenBy(t => t.category).Select(t => t.type).ToArray();
             var actual = ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineTrack));
             Assert.That(actual.Select(i => i.type), Is.EqualTo(original));
-            var item = actual.Single(i => i.type == typeof(LegacyIntervalTrack));
+            var item = actual.Single(i => i.type == typeof(FeatureSampleIntervalTrack));
             item.attachableTypes[0] = typeof(ActionDocument); actual.Clear();
-            Assert.That(ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineTrack)).Single(i => i.type == typeof(LegacyIntervalTrack)).attachableTypes, Is.EqualTo(new[] { typeof(LegacyExperienceGroup) }));
-            var info = DirectableTypeInfo.For(typeof(LegacyIntervalTrack));
-            Assert.That(info, Is.SameAs(DirectableTypeInfo.For(typeof(LegacyIntervalTrack))));
+            Assert.That(ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineTrack)).Single(i => i.type == typeof(FeatureSampleIntervalTrack)).attachableTypes, Is.EqualTo(new[] { typeof(FeatureSampleGroup) }));
+            var info = DirectableTypeInfo.For(typeof(FeatureSampleIntervalTrack));
+            Assert.That(info, Is.SameAs(DirectableTypeInfo.For(typeof(FeatureSampleIntervalTrack))));
             Assert.That(info.Color, Is.EqualTo(new Color(.3f, .65f, 1)));
         }
         [Test] public void CapabilitiesRemainIndependentOfLocksAndRespectSignalsAndBlendSentinels()
         {
-            var asset = new LegacyExperienceAsset();
+            var asset = new FeatureSampleDocument();
             var track = asset.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var clip = track.Clips[0];
             Assert.That(clip.CanScale() && clip.CanBlendIn() && clip.CanBlendOut(), Is.True);
             track.IsLocked = true; track.IsActive = false;
@@ -98,13 +136,13 @@ namespace NBC.ActionEditor.Tests
             Assert.That(DirectableTypeInfo.For(marker.GetType()).IsSignal, Is.True);
             Assert.That(marker.CanScale() || marker.CanBlendIn(), Is.False);
             Assert.That(new DisabledBlend().CanBlendIn(), Is.False);
-            Assert.That(EditorCustomFactory.GetInspector(clip), Is.TypeOf<ActionClipInspector>());
-            var root = new VisualElement(); UIToolkitPropertyView.Populate(root, clip, () => { });
+            Assert.That(EditorCustomFactory.GetInspector(clip, Composition.PropertyComposition.Create(App.Context)), Is.TypeOf<ActionClipInspector>());
+            var root = new VisualElement(); new UIToolkitPropertyView(Composition.PropertyComposition.Create(App.Context)).Populate(root, clip, () => { });
             Assert.That(root.Q("json-clip-timing"), Is.Not.Null);
         }
         [Test] public void ParentAndUniqueConstraintsRemainExactAndInstanceAware()
         {
-            var group = new LegacyExperienceGroup();
+            var group = new FeatureSampleGroup();
             Assert.That(DirectableTypeInfo.For(typeof(UniqueTrack)).IsUnique, Is.True);
             Assert.That(group.CanAddTrackOfType(typeof(UniqueTrack)), Is.True);
             group.Tracks.Add(new UniqueTrack());
@@ -114,12 +152,12 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void NeighborPolicyKeepsPropertyCrossBlendSeparateFromStrictEdges()
         {
-            var clip = new LegacyExperienceInterval { StartTime = 2, Length = 2 };
-            var previous = new LegacyExperienceInterval { StartTime = 0, Length = 2 };
-            var next = new LegacyExperienceInterval { StartTime = 4, Length = 4 };
+            var clip = new FeatureSampleInterval { StartTime = 2, Length = 2 };
+            var previous = new FeatureSampleInterval { StartTime = 0, Length = 2 };
+            var next = new FeatureSampleInterval { StartTime = 4, Length = 4 };
             Assert.That(ClipTimingRules.NeighborBounds(clip, previous, next, true), Is.EqualTo(new Vector2(1, 5)));
             Assert.That(ClipTimingRules.NeighborBounds(clip, previous, next, false), Is.EqualTo(new Vector2(2, 4)));
-            Assert.That(ClipTimingRules.NeighborBounds(new LegacyExperienceMarker(), previous, next, true), Is.EqualTo(new Vector2(2, 4)));
+            Assert.That(ClipTimingRules.NeighborBounds(new FeatureSampleMarker(), previous, next, true), Is.EqualTo(new Vector2(2, 4)));
             Assert.That(ClipTimingRules.NeighborBounds(clip, null, null, true).x, Is.Zero);
         }
     }

@@ -1,5 +1,5 @@
 ﻿using NBC.ActionEditor.Domain;
-using NBC.ActionEditor;
+using NBC.ActionEditor.Presentation.Contracts;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,199 +10,60 @@ namespace NBC.ActionEditor
         protected T action => (T)target;
     }
 
+    // 原生片段属性控件只绘制共享快照并上报时间或混合意图。
     [CustomInspectors(typeof(TimelineClip), true)]
     public class ActionClipInspector : InspectorsBase
     {
-        private TimelineClip action => (TimelineClip)target;
-
-        public override void OnInspectorGUI()
-        {
-            ShowCommonInspector();
-        }
-
+        private TimelineClip Clip => (TimelineClip)target;
+        public override void OnInspectorGUI() => ShowCommonInspector();
         protected void ShowCommonInspector(bool showBaseInspector = true)
         {
-            ShowErrors();
-            ShowInOutControls();
-            ShowBlendingControls();
-            if (showBaseInspector)
-            {
-                base.OnInspectorGUI();
-            }
+            var state = Presenter.ClipState(Clip);
+            if (!state.Valid) EditorGUILayout.HelpBox("该剪辑无效。 请确保设置了所需的参数。", MessageType.Error);
+            DrawTiming(state);
+            DrawBlend(state);
+            if (showBaseInspector) base.OnInspectorGUI();
         }
-        
-        void ShowErrors()
+        private float TimeField(float value)
         {
-            if (action.IsValid) return;
-            EditorGUILayout.HelpBox("该剪辑无效。 请确保设置了所需的参数。",
-                MessageType.Error);
-            GUILayout.Space(5);
+            if (Presenter.Settings.TimeStepMode == Application.Settings.TimeStepMode.Frames)
+                return (float)EditorGUILayout.DelayedIntField(Mathf.RoundToInt(value * Presenter.Settings.FrameRate), GUILayout.Width(80)) / Presenter.Settings.FrameRate;
+            return EditorGUILayout.DelayedFloatField(value, GUILayout.Width(80));
         }
-        
-        void ShowInOutControls()
+        private void DrawTiming(ClipPropertyState state)
         {
-            var previousClip = action.GetPreviousSibling();
-            var nextClip = action.GetNextSibling();
-            var bounds = ClipTimingRules.NeighborBounds(action, previousClip, nextClip, true);
-            var previousTime = bounds.x; var nextTime = bounds.y;
-
-            var canScale = action.CanScale();
-            var doFrames = Prefs.timeStepMode == Prefs.TimeStepMode.Frames;
-
             GUILayout.BeginVertical("box");
-            GUILayout.BeginHorizontal();
-
-            var _in = action.StartTime;
-            var _length = action.Length;
-            var _out = action.EndTime;
-
-            if (canScale)
+            EditorGUI.BeginChangeCheck();
+            var start = state.Start; var end = state.End; var length = state.Length;
+            if (state.Scalable)
             {
-                GUILayout.Label("IN", GUILayout.Width(30));
-                if (doFrames)
-                {
-                    _in *= Prefs.FrameRate;
-                    _in = EditorGUILayout.DelayedIntField((int)_in, GUILayout.Width(80));
-                    _in *= (1f / Prefs.FrameRate);
-                }
-                else
-                {
-                    _in = EditorGUILayout.DelayedFloatField(_in, GUILayout.Width(80));
-                }
-
-                GUILayout.FlexibleSpace();
-                GUILayout.Label("◄");
-                if (doFrames)
-                {
-                    _length *= Prefs.FrameRate;
-                    _length = EditorGUILayout.DelayedIntField((int)_length, GUILayout.Width(80));
-                    _length *= (1f / Prefs.FrameRate);
-                }
-                else
-                {
-                    _length = EditorGUILayout.DelayedFloatField(_length, GUILayout.Width(80));
-                }
-
-                GUILayout.Label("►");
-                GUILayout.FlexibleSpace();
-
-                GUILayout.Label("OUT", GUILayout.Width(30));
-                if (doFrames)
-                {
-                    _out *= Prefs.FrameRate;
-                    _out = EditorGUILayout.DelayedIntField((int)_out, GUILayout.Width(80));
-                    _out *= (1f / Prefs.FrameRate);
-                }
-                else
-                {
-                    _out = EditorGUILayout.DelayedFloatField(_out, GUILayout.Width(80));
-                }
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("IN", GUILayout.Width(30)); start = TimeField(start); GUILayout.FlexibleSpace();
+                GUILayout.Label("◄"); length = TimeField(length); GUILayout.Label("►"); GUILayout.FlexibleSpace();
+                GUILayout.Label("OUT", GUILayout.Width(30)); end = TimeField(end);
+                GUILayout.EndHorizontal();
+                if (state.ShowRange) EditorGUILayout.MinMaxSlider(ref start, ref end, state.Minimum, state.Maximum);
             }
-
-            GUILayout.EndHorizontal();
-
-            if (canScale)
-            {
-                if (_in >= action.Parent.StartTime && _out <= action.Parent.EndTime)
-                {
-                    if (_out > _in)
-                    {
-                        EditorGUILayout.MinMaxSlider(ref _in, ref _out, previousTime, nextTime);
-                    }
-                    else
-                    {
-                        _in = EditorGUILayout.Slider(_in, previousTime, nextTime);
-                        _out = _in;
-                    }
-                }
-            }
-            else
-            {
-                GUILayout.Label("IN", GUILayout.Width(30));
-                _in = EditorGUILayout.Slider(_in, 0, action.Parent.EndTime);
-                _out = _in;
-            }
-
-
-            if (GUI.changed)
-            {
-                if (_length != action.Length)
-                {
-                    _out = _in + _length;
-                }
-
-                _in = Mathf.Round(_in / Prefs.SnapInterval) * Prefs.SnapInterval;
-                _out = Mathf.Round(_out / Prefs.SnapInterval) * Prefs.SnapInterval;
-
-                _in = Mathf.Clamp(_in, previousTime, _out);
-                _out = Mathf.Clamp(_out, _in, nextClip != null ? nextTime : float.PositiveInfinity);
-                
-                action.StartTime = _in;
-                action.EndTime = _out;
-                App.Repaint();
-            }
-
-            if (_in > action.Parent.EndTime)
-            {
-                EditorGUILayout.HelpBox(Lan.OverflowInvalid, MessageType.Warning);
-            }
-            else
-            {
-                if (_out > action.Parent.EndTime)
-                {
-                    EditorGUILayout.HelpBox(Lan.EndTimeOverflowInvalid, MessageType.Warning);
-                }
-            }
-
-            if (_out < action.Parent.StartTime)
-            {
-                EditorGUILayout.HelpBox(Lan.OverflowInvalid, MessageType.Warning);
-            }
-            else
-            {
-                if (_in < action.Parent.StartTime)
-                {
-                    EditorGUILayout.HelpBox(Lan.StartTimeOverflowInvalid, MessageType.Warning);
-                }
-            }
-
+            else { start = EditorGUILayout.Slider("IN", start, 0, state.PointMaximum); end = start; }
+            if (EditorGUI.EndChangeCheck()) Presenter.Timing(Clip, start, length != state.Length ? start + length : end);
+            var warning = PropertyText.Warning(state.Warning);
+            if (warning != null) EditorGUILayout.HelpBox(warning, MessageType.Warning);
             GUILayout.EndVertical();
         }
-
-        /// <summary>
-        /// 显示混合输入/输出控件
-        /// </summary>
-        void ShowBlendingControls()
+        private void DrawBlend(ClipPropertyState state)
         {
-            var canBlendIn = action.CanBlendIn();
-            var canBlendOut = action.CanBlendOut();
-            if ((canBlendIn || canBlendOut) && action.Length > 0)
-            {
-                GUILayout.BeginVertical("box");
-                GUILayout.BeginHorizontal();
-                if (canBlendIn)
-                {
-                    GUILayout.BeginVertical();
-                    GUILayout.Label("Blend In");
-                    var max = action.Length - action.BlendOut;
-                    action.BlendIn = EditorGUILayout.Slider(action.BlendIn, 0, max);
-                    action.BlendIn = Mathf.Clamp(action.BlendIn, 0, max);
-                    GUILayout.EndVertical();
-                }
-
-                if (canBlendOut)
-                {
-                    GUILayout.BeginVertical();
-                    GUILayout.Label("Blend Out");
-                    var max = action.Length - action.BlendIn;
-                    action.BlendOut = EditorGUILayout.Slider(action.BlendOut, 0, max);
-                    action.BlendOut = Mathf.Clamp(action.BlendOut, 0, max);
-                    GUILayout.EndVertical();
-                }
-
-                GUILayout.EndHorizontal();
-                GUILayout.EndVertical();
-            }
+            if (!state.BlendInEnabled && !state.BlendOutEnabled) return;
+            GUILayout.BeginHorizontal("box");
+            if (state.BlendInEnabled) DrawBlendSlider(true, state.BlendIn, state.BlendInMaximum);
+            if (state.BlendOutEnabled) DrawBlendSlider(false, state.BlendOut, state.BlendOutMaximum);
+            GUILayout.EndHorizontal();
+        }
+        private void DrawBlendSlider(bool incoming, float value, float maximum)
+        {
+            GUILayout.BeginVertical(); GUILayout.Label(incoming ? "Blend In" : "Blend Out");
+            EditorGUI.BeginChangeCheck(); var next = EditorGUILayout.Slider(value, 0, maximum);
+            if (EditorGUI.EndChangeCheck()) Presenter.Blend(Clip, incoming, next);
+            GUILayout.EndVertical();
         }
     }
 }

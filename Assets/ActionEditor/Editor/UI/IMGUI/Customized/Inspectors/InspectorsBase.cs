@@ -6,22 +6,35 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
+using NBC.ActionEditor.Presentation.Presenters;
 
 namespace NBC.ActionEditor
 {
+    // IMGUI字段布局与折叠状态，不持有可写应用会话。
     public class InspectorsBase
     {
         protected object target;
+        public PropertyPresenter Presenter { get; private set; }
+        public void Bind(PropertyPresenter presenter)
+        {
+            if (presenter == null) throw new ArgumentNullException(nameof(presenter));
+            if (!ReferenceEquals(Presenter, presenter)) CancelInput();
+            Presenter = presenter;
+        }
+        private NBC.ActionEditor.Presentation.Contracts.PropertyDraft input;
+        private NBC.ActionEditor.Application.Editing.PropertyPath inputPath;
+        public string InputError { get; private set; }
 
-        private Dictionary<int, bool> _unfoldDictionary = new Dictionary<int, bool>();
-        private System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<FieldInfo, bool>> _collectionFoldouts =
-            new System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<FieldInfo, bool>>();
+        private int drawDepth;
+        private readonly Dictionary<NBC.ActionEditor.Application.Editing.PropertyPath, bool> collectionFoldouts =
+            new Dictionary<NBC.ActionEditor.Application.Editing.PropertyPath, bool>();
 
         public void SetTarget(object t)
         {
+            CancelInput();
+            InputError = null;
             target = t;
-            _unfoldDictionary.Clear();
-            _collectionFoldouts = new System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<FieldInfo, bool>>();
+            collectionFoldouts.Clear();
         }
 
         public virtual void OnInspectorGUI()
@@ -37,150 +50,45 @@ namespace NBC.ActionEditor
         public void DrawDefaultInspector(object obj, NBC.ActionEditor.Application.Editing.PropertyPath rootPath = null)
         {
             if (obj == null) { EditorGUILayout.LabelField("null"); return; }
-            var descriptions = JsonFieldDescription.For(obj.GetType()).ToArray();
-            Array.Sort(descriptions, (first, second) => FieldsSprtBy(first.Field, second.Field));
-            foreach (var description in descriptions)
-                if (description.Visible(obj)) FieldDefaultInspector(description.Field, obj, rootPath);
+            // 对象引用可能成环；与原生Toolkit相同，最多展开七层字段。
+            if (drawDepth > 6) return;
+            drawDepth++;
+            try
+            {
+                foreach (var state in Presenter.CaptureFields(obj, rootPath)) DrawField(state);
+            }
+            finally { drawDepth--; }
         }
 
         protected void FieldDefaultInspector(FieldInfo field, object obj, NBC.ActionEditor.Application.Editing.PropertyPath rootPath = null)
         {
-            var propertyPath = (rootPath ?? new NBC.ActionEditor.Application.Editing.PropertyPath(App.Context.Properties, obj)).Field(field);
-            var fieldType = field.FieldType;
-            var showType = field.FieldType;
-            var value = field.GetValue(obj);
+            DrawField(Presenter.Field(obj, field, rootPath));
+        }
+
+        // 字段快照已确定可见性和子字段，绘制期间不再反射作者对象。
+        private void DrawField(NBC.ActionEditor.Presentation.Contracts.PropertyFieldState state)
+        {
+            var propertyPath = state.Path;
+            var fieldType = state.Type;
+            var showType = state.Type;
+            var value = state.Value;
             var newValue = value;
 
-            var description = JsonFieldDescription.For(field);
-            var name = description.Label ?? System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.ToTitleCase(field.Name);
+            var description = state.Description;
+            var name = state.Label;
             List<object> args = new List<object>();
-            if (description.Range != null && fieldType == typeof(float)) { showType = typeof(RangeAttribute); args.Add(description.Range.min); args.Add(description.Range.max); }
-            if (description.Options != null) { showType = typeof(OptionParamAttribute); args = new List<object> { description.Options.classType }; }
-            if (description.ResourcePath != null) { showType = typeof(SelectObjectPathAttribute); args = new List<object> { description.ResourcePath.type }; }
+            if (description.HasRange && (fieldType == typeof(float) || fieldType == typeof(int))) { showType = typeof(RangeAttribute); args.Add(description.Minimum); args.Add(description.Maximum); }
+            if (description.OptionType != null) { showType = typeof(OptionParamAttribute); args = new List<object> { description.OptionType }; }
+            if (description.ResourceType != null) { showType = typeof(SelectObjectPathAttribute); args = new List<object> { description.ResourceType }; }
 
-            if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(List<>))
-            {
-                Type elementType = fieldType.GetGenericArguments()[0];
-                IList list = (IList)value;
-                var foldout = EditorGUILayout.Foldout(GetCollectionFoldout(obj, field, value), field.GetShowName());
-                if (foldout)
-                {
-                    GUILayout.Space(6);
-                    GUILayout.BeginVertical(GUI.skin.box);
-                    if (list != null)
-                    {
-                        for (int i = 0; i < list.Count; i++)
-                        {
-                            object listItem = list[i];
-                            EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField($"Element {i}");
-                            if (DrawRemoveButton())
-                            {
-                                EditorGUILayout.EndHorizontal();
-                                propertyPath.Transform(current => NBC.ActionEditor.Application.Editing.CollectionEditing.Remove(fieldType, (IList)current, i));
-                                i--;
-                                continue;
-                            }
-
-                            EditorGUILayout.EndHorizontal();
-                            EditorGUILayout.BeginHorizontal();
-                            GUILayout.Space(12);
-                            EditorGUILayout.BeginVertical();
-                            var updated = DrawElement(elementType, listItem, propertyPath.Element(i));
-                            if (!Equals(listItem, updated)) propertyPath.Element(i).Write(updated);
-                            EditorGUILayout.EndVertical();
-                            EditorGUILayout.EndHorizontal();
-                            DrawDivider();
-                        }
-                    }
-
-                    GUILayout.Space(6);
-                    EditorGUILayout.BeginHorizontal();
-                    GUILayout.FlexibleSpace();
-                    if (DrawAddButton())
-                    {
-                        var added = CreateElement(elementType);
-                        propertyPath.Transform(current => NBC.ActionEditor.Application.Editing.CollectionEditing.Append(fieldType, (IList)current, added));
-                        list = (IList)propertyPath.Read();
-                        SetFoldout(list, true);
-                    }
-
-                    EditorGUILayout.EndHorizontal();
-                    GUILayout.EndVertical();
-                }
-
-                _collectionFoldouts.GetOrCreateValue(obj)[field] = foldout;
-                SetFoldout(value, foldout);
-            }
-            // 处理数组类型
-            else if (fieldType.IsArray)
-            {
-                Type elementType = fieldType.GetElementType();
-
-                Array array = (Array)value;
-                if (array == null)
-                {
-                    array = Array.CreateInstance(elementType, 0);
-                }
-
-                var foldout = EditorGUILayout.Foldout(GetCollectionFoldout(obj, field, value), field.GetShowName());
-                if (foldout)
-                {
-                    GUILayout.Space(6);
-                    GUILayout.BeginVertical(GUI.skin.box);
-                    for (int i = 0; i < array.Length; i++)
-                    {
-                        object listItem = array.GetValue(i);
-                        EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField($"Element {i}");
-                        if (DrawRemoveButton())
-                        {
-                            EditorGUILayout.EndHorizontal();
-                            var newArray = (Array)NBC.ActionEditor.Application.Editing.CollectionEditing.Remove(fieldType, array, i);
-                            RemoveFoldout(value);
-                            array = newArray;
-                            propertyPath.Write(newArray);
-                            SetFoldout(newArray, true);
-                            break; // 退出循环以避免数组长度更改引起的冲突
-                        }
-
-                        EditorGUILayout.EndHorizontal();
-                        EditorGUILayout.BeginHorizontal();
-                        GUILayout.Space(12);
-                        EditorGUILayout.BeginVertical();
-                        var updated = DrawElement(elementType, listItem, propertyPath.Element(i));
-                        if (!Equals(listItem, updated)) propertyPath.Element(i).Write(updated);
-                        EditorGUILayout.EndVertical();
-                        EditorGUILayout.EndHorizontal();
-                        DrawDivider();
-                    }
-
-                    GUILayout.Space(6);
-                    EditorGUILayout.BeginHorizontal();
-                    GUILayout.FlexibleSpace();
-                    if (DrawAddButton())
-                    {
-                        var newArray = (Array)NBC.ActionEditor.Application.Editing.CollectionEditing.Append(fieldType, array, CreateElement(elementType));
-                        RemoveFoldout(value);
-                        array = newArray;
-                        propertyPath.Write(array);
-                        SetFoldout(newArray, true);
-                    }
-
-                    EditorGUILayout.EndHorizontal();
-                    GUILayout.EndVertical();
-                }
-
-                _collectionFoldouts.GetOrCreateValue(obj)[field] = foldout;
-                SetFoldout(value, foldout);
-            }
+            if (IsCollection(fieldType)) DrawCollection(state.Label, fieldType, (IList)value, propertyPath);
             else if (showType == typeof(int))
             {
-                newValue = EditorGUILayout.IntField(name, (int)value);
+                DrawDelayed(name, fieldType, value, propertyPath);
             }
             else if (showType == typeof(float))
             {
-                newValue = EditorGUILayout.FloatField(name, (float)value);
+                DrawDelayed(name, fieldType, value, propertyPath);
             }
             else if (showType == typeof(bool))
             {
@@ -188,13 +96,13 @@ namespace NBC.ActionEditor
             }
             else if (showType == typeof(string))
             {
-                newValue = EditorGUILayout.TextField(name, (string)value);
+                DrawDelayed(name, fieldType, value, propertyPath);
             }
             else if (showType == typeof(Color))
             {
                 newValue = EditorGUILayout.ColorField(name, (Color)value);
             }
-            else if (showType.IsSubclassOf(typeof(Object)))
+            else if (typeof(Object).IsAssignableFrom(showType))
             {
                 newValue = EditorGUILayout.ObjectField(name, (Object)value, fieldType, false);
             }
@@ -204,13 +112,10 @@ namespace NBC.ActionEditor
             }
             else if (showType == typeof(AnimationCurve))
             {
-                AnimationCurve curve = field.GetValue(obj) as AnimationCurve;
-                if (curve == null)
-                {
-                    curve = new AnimationCurve();
-                }
-
-                newValue = EditorGUILayout.CurveField(name, curve);
+                EditorGUI.BeginChangeCheck();
+                var curve = EditorGUILayout.CurveField(name, (AnimationCurve)value ?? new AnimationCurve());
+                if (EditorGUI.EndChangeCheck()) Presenter.Write(propertyPath, curve);
+                return;
             }
             else if (showType == typeof(Vector2))
             {
@@ -244,23 +149,27 @@ namespace NBC.ActionEditor
             {
                 newValue = EditorGUILayout.BoundsField(name, (Bounds)value);
             }
+            else if (showType == typeof(BoundsInt))
+            {
+                newValue = EditorGUILayout.BoundsIntField(name, (BoundsInt)value);
+            }
             else if (showType == typeof(RangeAttribute))
             {
                 if (fieldType == typeof(float))
                 {
                     newValue = EditorGUILayout.Slider(name, (float)value, (float)args[0], (float)args[1]);
                 }
+                else newValue = EditorGUILayout.IntSlider(name, (int)value, Mathf.CeilToInt((float)args[0]), Mathf.FloorToInt((float)args[1]));
             }
             else if (showType == typeof(OptionParamAttribute))
             {
-                var constants = description.Constants;
-                var labels = constants.Select(f => f.GetCustomAttribute<MenuNameAttribute>()?.showName ?? f.Name).ToArray();
+                var labels = state.OptionLabels;
                 if (labels.Length > 0)
                 {
-                    var currentIndex = description.OptionIndex(value);
+                    var currentIndex = state.OptionIndex;
                     EditorGUI.BeginChangeCheck();
                     var selected = EditorGUILayout.Popup(name, Mathf.Max(0, currentIndex), labels);
-                    if (EditorGUI.EndChangeCheck()) newValue = constants[selected].GetRawConstantValue();
+                    if (EditorGUI.EndChangeCheck()) newValue = state.OptionValue(selected);
                 }
             }
             else if (showType == typeof(SelectObjectPathAttribute))
@@ -281,40 +190,94 @@ namespace NBC.ActionEditor
                     }
                 }
             }
-
-            if (!Equals(value, newValue))
-                propertyPath.Write(newValue);
-        }
-
-        private int FieldsSprtBy(FieldInfo f1, FieldInfo f2)
-        {
-            if (f1 == null || f2 == null) return 0;
-            var e1 = f1.DeclaringType == f1.ReflectedType;
-            var e2 = f2.DeclaringType == f2.ReflectedType;
-            if (e1 != e2)
+            else if (value != null)
             {
-                if (e1)
-                {
-                    return 1;
-                }
-
-                return -1;
+                EditorGUILayout.LabelField(name);
+                EditorGUI.indentLevel++;
+                try { DrawDefaultInspector(value, propertyPath); }
+                finally { EditorGUI.indentLevel--; }
+            }
+            else
+            {
+                EditorGUILayout.LabelField(name, "null");
+                if (GUILayout.Button("创建 " + fieldType.Name)) newValue = Presenter.CreateElement(fieldType);
             }
 
-            return 0;
+            if (!Equals(value, newValue))
+                Presenter.Write(propertyPath, newValue);
         }
 
-        public static object CreateElement(Type type) => App.Context.Properties.CreateElement(type);
+        public object CreateElement(Type type) => Presenter.CreateElement(type);
+
+        // 原生控件保留文本与焦点，作者提交和失效检查由Presenter持有。
+        private void DrawDelayed(string label, Type type, object value, NBC.ActionEditor.Application.Editing.PropertyPath path)
+        {
+            // 撤销或换图后旧控件可能仍收到最后一次绘制，不能重新领取失效输入。
+            if (!Presenter.CanInput(path))
+            {
+                if (inputPath != null && inputPath.SameLocation(path)) CancelInput();
+                using (new EditorGUI.DisabledScope(true)) EditorGUILayout.TextField(label, value?.ToString() ?? "");
+                return;
+            }
+            var name = "property-input-" + GUIUtility.GetControlID(FocusType.Passive);
+            var escape = Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape;
+            GUI.SetNextControlName(name);
+            object next;
+            if (type == typeof(int)) next = EditorGUILayout.DelayedIntField(label, value == null ? 0 : (int)value);
+            else if (type == typeof(float)) next = EditorGUILayout.DelayedFloatField(label, value == null ? 0 : (float)value);
+            else next = EditorGUILayout.DelayedTextField(label, value as string ?? "");
+            var focused = GUI.GetNameOfFocusedControl() == name;
+            if (escape && focused) { CancelInput(); return; }
+            try
+            {
+                if (!Equals(next, value))
+                {
+                    if (input == null || !inputPath.SameLocation(path))
+                    { input = Presenter.BeginDraft(path); inputPath = path; }
+                    var committed = input;
+                    input = null; inputPath = null;
+                    Presenter.CommitDraft(committed, next);
+                    InputError = null;
+                }
+                else if (focused && (input == null || !inputPath.SameLocation(path)))
+                { input = Presenter.BeginDraft(path); inputPath = path; }
+            }
+            catch (Exception error) when (error is InvalidOperationException || error is ArgumentException)
+            {
+                CancelInput(); InputError = error.Message;
+            }
+            if (InputError != null) EditorGUILayout.HelpBox(InputError, MessageType.Warning);
+        }
+
+        public void CancelInput()
+        {
+            if (input != null) Presenter?.CancelDraft(input);
+            input = null; inputPath = null;
+        }
 
         private object DrawElement(Type type, object value, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath)
         {
-            if (type == typeof(string)) return EditorGUILayout.TextField(value as string ?? "");
-            if (type == typeof(int)) return EditorGUILayout.IntField(value == null ? 0 : (int)value);
-            if (type == typeof(float)) return EditorGUILayout.FloatField(value == null ? 0 : (float)value);
+            if (IsCollection(type)) { DrawCollection("Items", type, (IList)value, propertyPath); return value; }
+            if (type == typeof(string) || type == typeof(int) || type == typeof(float))
+            { DrawDelayed("", type, value, propertyPath); return value; }
             if (type == typeof(bool)) return EditorGUILayout.Toggle(value != null && (bool)value);
             if (type == typeof(Color)) return EditorGUILayout.ColorField(value == null ? Color.white : (Color)value);
             if (type == typeof(Vector2)) return EditorGUILayout.Vector2Field("", value == null ? Vector2.zero : (Vector2)value);
             if (type == typeof(Vector3)) return EditorGUILayout.Vector3Field("", value == null ? Vector3.zero : (Vector3)value);
+            if (type == typeof(Vector4)) return EditorGUILayout.Vector4Field("", value == null ? Vector4.zero : (Vector4)value);
+            if (type == typeof(Vector2Int)) return EditorGUILayout.Vector2IntField("", value == null ? Vector2Int.zero : (Vector2Int)value);
+            if (type == typeof(Vector3Int)) return EditorGUILayout.Vector3IntField("", value == null ? Vector3Int.zero : (Vector3Int)value);
+            if (type == typeof(Rect)) return EditorGUILayout.RectField(value == null ? default : (Rect)value);
+            if (type == typeof(RectInt)) return EditorGUILayout.RectIntField(value == null ? default : (RectInt)value);
+            if (type == typeof(Bounds)) return EditorGUILayout.BoundsField(value == null ? default : (Bounds)value);
+            if (type == typeof(BoundsInt)) return EditorGUILayout.BoundsIntField(value == null ? default : (BoundsInt)value);
+            if (type == typeof(AnimationCurve))
+            {
+                EditorGUI.BeginChangeCheck();
+                var copy = (AnimationCurve)NBC.ActionEditor.Presentation.Contracts.PropertyFieldState.CopyValue(value);
+                var curve = EditorGUILayout.CurveField(copy ?? new AnimationCurve());
+                return EditorGUI.EndChangeCheck() ? curve : value;
+            }
             if (type.IsEnum) return EditorGUILayout.EnumPopup((Enum)(value ?? Activator.CreateInstance(type)));
             if (typeof(Object).IsAssignableFrom(type)) return EditorGUILayout.ObjectField((Object)value, type, false);
             if (value == null)
@@ -328,34 +291,60 @@ namespace NBC.ActionEditor
 
         protected virtual bool DrawRemoveButton() => GUILayout.Button("X", GUILayout.Width(20));
         protected virtual bool DrawAddButton() => GUILayout.Button("+", GUILayout.Width(30));
+        protected void SetExpanded(NBC.ActionEditor.Application.Editing.PropertyPath path, bool expanded) => collectionFoldouts[path] = expanded;
 
-        private bool GetCollectionFoldout(object owner, FieldInfo field, object value)
-        {
-            var fields = _collectionFoldouts.GetOrCreateValue(owner);
-            return fields.TryGetValue(field, out var expanded) ? expanded : GetFoldout(value);
-        }
+        private static bool IsCollection(Type type) => type.IsArray || type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>);
 
-        private bool GetFoldout(object obj)
+        // 数组与列表共享原生布局，删除后结束本次枚举，递归集合也使用稳定字段路径。
+        private void DrawCollection(string label, Type type, IList values, NBC.ActionEditor.Application.Editing.PropertyPath path)
         {
-            if (obj == null) return false;
-            if (!_unfoldDictionary.TryGetValue(obj.GetHashCode(), out var value))
+            if (drawDepth > 6) return;
+            var expanded = EditorGUILayout.Foldout(GetCollectionFoldout(path), label);
+            collectionFoldouts[path] = expanded;
+            if (!expanded) return;
+            var elementType = type.IsArray ? type.GetElementType() : type.GetGenericArguments()[0];
+            drawDepth++;
+            try
             {
-                _unfoldDictionary[obj.GetHashCode()] = false;
+                GUILayout.Space(6);
+                using (new EditorGUILayout.VerticalScope(GUI.skin.box))
+                {
+                    for (var index = 0; index < (values?.Count ?? 0); index++)
+                    {
+                        bool remove;
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            EditorGUILayout.LabelField("Element " + index);
+                            remove = DrawRemoveButton();
+                        }
+                        if (remove) { Presenter.Remove(path, type, index); break; }
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            GUILayout.Space(12);
+                            using (new EditorGUILayout.VerticalScope())
+                            {
+                                var value = values[index];
+                                var elementPath = path.Element(index);
+                                var updated = DrawElement(elementType, value, elementPath);
+                                if (!Equals(value, updated)) Presenter.Write(elementPath, updated);
+                            }
+                        }
+                        DrawDivider();
+                    }
+                    GUILayout.Space(6);
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        GUILayout.FlexibleSpace();
+                        if (DrawAddButton()) Presenter.Append(path, type);
+                    }
+                }
             }
-
-            return value;
+            finally { drawDepth--; }
         }
 
-        private void SetFoldout(object obj, bool unfold)
+        private bool GetCollectionFoldout(NBC.ActionEditor.Application.Editing.PropertyPath path)
         {
-            if (obj == null) return;
-            _unfoldDictionary[obj.GetHashCode()] = unfold;
-        }
-
-        public void RemoveFoldout(object obj)
-        {
-            if (obj == null) return;
-            _unfoldDictionary.Remove(obj.GetHashCode());
+            return collectionFoldouts.TryGetValue(path, out var expanded) && expanded;
         }
 
         private void DrawDivider()

@@ -6,7 +6,7 @@ using System.Collections;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NBC.ActionEditor.Storage;
 using NBC.ActionEditor.Workbench;
 using NUnit.Framework;
@@ -42,8 +42,13 @@ namespace NBC.ActionEditor.Tests
                 if (Event.current.type == EventType.Repaint && RemoveRect.width == 0) RemoveRect = GUILayoutUtility.GetLastRect();
                 return clicked;
             }
-            public void Expand(object value) => typeof(InspectorsBase).GetMethod("SetFoldout", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(this, new[] { value, (object)true });
-            public void DrawField(CollectionFixture value, string name) => FieldDefaultInspector(typeof(CollectionFixture).GetField(name), value);
+            public void Expand(CollectionFixture value, string name)
+            {
+                if (Presenter == null) Bind(Composition.PropertyComposition.Create(App.Context));
+                SetExpanded(Presenter.Path(value).Field(typeof(CollectionFixture).GetField(name)), true);
+            }
+            public void DrawField(CollectionFixture value, string name)
+            { if (Presenter == null) Bind(Composition.PropertyComposition.Create(App.Context)); FieldDefaultInspector(typeof(CollectionFixture).GetField(name), value); }
         }
         private sealed class CollectionWindow : EditorWindow
         {
@@ -86,7 +91,7 @@ namespace NBC.ActionEditor.Tests
                 foreach (var name in new[] { "Values", "Numbers" })
                 {
                     window.Field = name; var value = typeof(CollectionFixture).GetField(name).GetValue(window.Value);
-                    window.Inspector.Expand(value); window.Inspector.RemoveRect = default;
+                    window.Inspector.Expand(window.Value, name); window.Inspector.RemoveRect = default;
                     window.Focus(); window.Repaint(); yield return null; yield return null; yield return null;
                     var button = window.Inspector.RemoveRect; Assert.That(button.width, Is.GreaterThan(0));
                     var point = button.center + window.ContentOffset;
@@ -391,7 +396,7 @@ namespace NBC.ActionEditor.Tests
         {
             previous = App.TextAsset;
             recovery = App.Session.CaptureRecovery();
-            fixture = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
+            fixture = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
             App.TextAsset = fixture;
             Workspace.Bind(null); Workspace.Bind(App.AssetData); Workspace.SetRange(0, 7);
         }
@@ -513,7 +518,7 @@ namespace NBC.ActionEditor.Tests
         {
             var count = App.Views.Count; var previousWindow = ActionEditorHost.Window;
             ActionEditorWindow original = null; UIToolkitActionEditorWindow native = null;
-            var alternate = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset { Version = 7 }));
+            var alternate = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new FeatureSampleDocument { Version = 7 }));
             try
             {
                 foreach (var nativeFirst in new[] { false, true })
@@ -542,7 +547,7 @@ namespace NBC.ActionEditor.Tests
                     Assert.That(original.Context.Selection.First, Is.SameAs(App.FistSelect));
                     App.TextAsset = alternate;
                     Assert.That(original.Context.Document, Is.SameAs(native.Document));
-                    Assert.That(((LegacyExperienceAsset)native.Document).Version, Is.EqualTo(7));
+                    Assert.That(((FeatureSampleDocument)native.Document).Version, Is.EqualTo(7));
                     Assert.That(App.SelectCount, Is.Zero);
                     App.TextAsset = fixture;
                     if (nativeFirst) { native.Close(); native = null; original.Close(); original = null; }
@@ -568,24 +573,24 @@ namespace NBC.ActionEditor.Tests
                 original.Show(); native.Show(); yield return null; yield return null;
                 foreach (var window in new EditorWindow[] { original, native })
                 {
-                    App.Session.Edit("discard payload", () => ((LegacyExperienceAsset)App.AssetData).Version = 19);
+                    App.Session.Edit("discard payload", () => ((FeatureSampleDocument)App.AssetData).Version = 19);
                     App.Session.BeginEdit();
                     App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime = 1;
                     window.DiscardChanges();
-                    Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+                    Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(1));
                     Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
                     Assert.That(App.Session.IsDirty, Is.False);
                     Assert.That(App.Session.IsEditing, Is.False);
                     Assert.That(native.Document, Is.SameAs(App.AssetData));
                     Undo.PerformUndo(); Undo.PerformRedo();
-                    Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1), "Discarded changes must not return through Undo/Redo.");
+                    Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(1), "Discarded changes must not return through Undo/Redo.");
                     yield return null; yield return null;
                     Assert.That(original.hasUnsavedChanges, Is.False);
                     Assert.That(native.hasUnsavedChanges, Is.False);
                 }
-                App.Session.Edit("new edit", () => ((LegacyExperienceAsset)App.AssetData).Version = 7);
-                Undo.PerformUndo(); Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
-                Undo.PerformRedo(); Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(7));
+                App.Session.Edit("new edit", () => ((FeatureSampleDocument)App.AssetData).Version = 7);
+                Undo.PerformUndo(); Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(1));
+                Undo.PerformRedo(); Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(7));
             }
             finally
             {
@@ -594,9 +599,10 @@ namespace NBC.ActionEditor.Tests
             }
         }
 
-        [UnityTest] public IEnumerator ClosingOriginalStopsSharedPlaybackAndReopeningDoesNotResume()
+        [UnityTest] public IEnumerator ClosingEitherWindowPreservesPlaybackUntilLastViewCloses()
         {
             var previousWindow = ActionEditorHost.Window;
+            var existingViews = App.Views.Count;
             var native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
             var stops = 0;
@@ -608,22 +614,25 @@ namespace NBC.ActionEditor.Tests
                 App.Play(); AssetPlayer.Inst.Sample(1); App.Pause();
                 Assert.That(App.IsPlay && App.IsPause, Is.True);
                 original.Close(); original = null;
-                Assert.That(App.IsPlay, Is.False);
-                Assert.That(App.IsPause, Is.False);
-                Assert.That(AssetPlayer.Inst.CurrentTime, Is.Zero);
-                Assert.That(AssetPlayer.Inst.IsInitialized, Is.False);
-                Assert.That(stops, Is.EqualTo(1));
+                Assert.That(App.IsPlay && App.IsPause, Is.True);
+                Assert.That(AssetPlayer.Inst.CurrentTime, Is.EqualTo(1));
+                Assert.That(AssetPlayer.Inst.IsInitialized, Is.True);
+                Assert.That(stops, Is.Zero);
                 yield return null; yield return null;
-                Assert.That(App.IsPlay, Is.False, "The remaining native window must not resume playback.");
+                Assert.That(App.IsPlay && App.IsPause, Is.True, "The remaining view owns the same paused playback.");
                 original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
                 yield return null; yield return null;
-                Assert.That(App.IsPlay, Is.False);
-                Assert.That(AssetPlayer.Inst.CurrentTime, Is.Zero);
+                Assert.That(App.IsPlay && App.IsPause, Is.True);
+                Assert.That(AssetPlayer.Inst.CurrentTime, Is.EqualTo(1));
                 native.Close(); native = null;
+                Assert.That(App.IsPlay && App.IsPause, Is.True);
                 App.Play(); AssetPlayer.Inst.Sample(1);
                 original.Close(); original = null;
-                Assert.That(App.IsPlay || App.IsPause || AssetPlayer.Inst.IsInitialized, Is.False);
-                Assert.That(AssetPlayer.Inst.CurrentTime, Is.Zero);
+                Assert.That(App.Views.Count, Is.EqualTo(existingViews), "The test must release exactly its own two views.");
+                Assert.That(App.IsPlay, Is.EqualTo(existingViews != 0));
+                Assert.That(AssetPlayer.Inst.IsInitialized, Is.EqualTo(existingViews != 0));
+                Assert.That(AssetPlayer.Inst.CurrentTime, Is.EqualTo(existingViews == 0 ? 0 : 1));
+                Assert.That(stops, Is.EqualTo(existingViews == 0 ? 1 : 0));
             }
             finally
             {
@@ -636,12 +645,12 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void SampleRoundtripContainsAllGroupsTracksClipsAndFields()
         {
-            var sample = (LegacyExperienceAsset)App.AssetData;
+            var sample = (FeatureSampleDocument)App.AssetData;
             Assert.That(sample.RootItems.OfType<TimelineGroup>().Count(), Is.EqualTo(3));
             Assert.That(sample.RootItems.OfType<TimelineGroup>().Sum(g => g.Tracks.Count), Is.EqualTo(7));
             Assert.That(sample.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).Sum(t => t.Clips.Count), Is.EqualTo(13));
             Assert.That(sample.Length, Is.EqualTo(6));
-            var interval = (LegacyExperienceInterval)sample.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1];
+            var interval = (FeatureSampleInterval)sample.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1];
             Assert.That(interval.Offset, Is.EqualTo(new Vector3(2, 1, 0)));
             Assert.That(interval.Parameters.Count, Is.EqualTo(2)); Assert.That(interval.CanScale(), Is.True);
             Assert.That(sample.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[2].Clips[0].CanScale(), Is.False);
@@ -650,7 +659,7 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void SaveSnapshotRefreshesDerivedDurationWithoutDroppingEditedPayload()
         {
-            var clip = (LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+            var clip = (FeatureSampleInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
             clip.StartTime = 8; clip.Length = 3; clip.Count = 27;
             Assert.That(App.AssetData.Length, Is.EqualTo(6), "The public graph can contain a stale derived duration before commit.");
             Assert.That(JsonDocumentCodec.InspectReadbackDifferences(App.AssetData), Is.Empty, "Readback validates an isolated derived snapshot.");
@@ -658,7 +667,7 @@ namespace NBC.ActionEditor.Tests
             var loaded = NBC.ActionEditor.Storage.JsonDocumentCodec.Decode(json);
             Assert.That(App.AssetData.Length, Is.EqualTo(6), "Save snapshot must not mutate source duration.");
             Assert.That(loaded.Length, Is.EqualTo(11));
-            Assert.That(((LegacyExperienceInterval)loaded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(27));
+            Assert.That(((FeatureSampleInterval)loaded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(27));
             Assert.That(JsonDocumentCodec.InspectReadbackDifferences(App.AssetData), Is.Empty);
         }
         [Test] public void ExtractedJsonCodecPreservesFormatAndRejectsPayloadDifferences()
@@ -673,7 +682,7 @@ namespace NBC.ActionEditor.Tests
             Assert.That(JsonDocumentCodec.Content(decoded), Is.EqualTo(JsonDocumentCodec.Content(document)), "Workspace is excluded only from author content.");
             Assert.That(JsonDocumentCodec.ReadbackDifferences(json, decoded), Is.Empty, "Workspace does not enter author snapshots.");
             decoded = JsonDocumentCodec.Decode(json);
-            ((LegacyExperienceInterval)decoded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count = 91;
+            ((FeatureSampleInterval)decoded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count = 91;
             var differences = JsonDocumentCodec.ReadbackDifferences(json, decoded);
             Assert.That(differences, Has.Length.EqualTo(1));
             Assert.That(differences[0], Does.Contain("Count"));
@@ -728,11 +737,11 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void SharedEditsUndoRedoAndCancelKeepWholeJsonGraph()
         {
-            App.Session.Edit("Change payload", () => ((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count = 12);
+            App.Session.Edit("Change payload", () => ((FeatureSampleInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count = 12);
             Assert.That(App.Session.IsDirty, Is.True);
-            Undo.PerformUndo(); Assert.That(((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(3));
+            Undo.PerformUndo(); Assert.That(((FeatureSampleInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(3));
             Assert.That(App.Session.IsDirty, Is.False);
-            Undo.PerformRedo(); Assert.That(((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(12));
+            Undo.PerformRedo(); Assert.That(((FeatureSampleInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(12));
             App.Session.BeginEdit(); App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime = 1.25f; App.Session.CancelEdit();
             Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
         }
@@ -741,7 +750,7 @@ namespace NBC.ActionEditor.Tests
             var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); var track = group.Tracks[0];
             App.Context.ClipboardEditing.Copy(track); var pasted = (TimelineTrack)App.Context.ClipboardEditing.Paste(group);
             Assert.That(pasted, Is.Not.SameAs(track)); Assert.That(pasted.Clips.Count, Is.EqualTo(3));
-            Assert.That(((LegacyExperienceInterval)pasted.Clips[1]).Offset, Is.EqualTo(new Vector3(2, 1, 0)));
+            Assert.That(((FeatureSampleInterval)pasted.Clips[1]).Offset, Is.EqualTo(new Vector3(2, 1, 0)));
             var clip = track.Clips[0]; App.Context.ClipboardEditing.Copy(clip, true); App.Context.ClipboardEditing.Paste(pasted, 6);
             Assert.That(track.Clips.Count, Is.EqualTo(2)); Assert.That(pasted.Clips.Last().StartTime, Is.EqualTo(6));
             Assert.Throws<InvalidOperationException>(() => App.Context.Structure.Delete(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(2).Tracks[0]));
@@ -753,7 +762,7 @@ namespace NBC.ActionEditor.Tests
         [Test] public void StructuralCommandsRevalidateAndRollbackFailuresWithoutEmptyUndo()
         {
             var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); var track = group.Tracks[0];
-            var command = App.Context.Structure.Creation(track, typeof(LegacyExperienceInterval), 8);
+            var command = App.Context.Structure.Creation(track, typeof(FeatureSampleInterval), 8);
             Assert.That(command.CanExecute(out var reason), Is.True, reason);
             track.IsLocked = true;
             Assert.That(command.CanExecute(out reason), Is.False); Assert.That(reason, Is.Not.Empty);
@@ -764,7 +773,7 @@ namespace NBC.ActionEditor.Tests
             Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(App.AssetData), Is.EqualTo(before));
             Assert.That(App.Session.IsEditing, Is.False);
             group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); track = group.Tracks[0];
-            var created = App.Context.Structure.AddClip(track, typeof(LegacyExperienceInterval), 8);
+            var created = App.Context.Structure.AddClip(track, typeof(FeatureSampleInterval), 8);
             Assert.That(created.StartTime, Is.EqualTo(8)); Assert.That(created.Parent, Is.SameAs(track));
             Undo.PerformUndo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Count, Is.EqualTo(3));
             Undo.PerformRedo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Count, Is.EqualTo(4));
@@ -839,7 +848,7 @@ namespace NBC.ActionEditor.Tests
                     Assert.That(buttons.Select(b => b.text), Does.Contain(Lan.CreateAsset).And.Contain(Lan.SelectAsset));
                     var labels = native.rootVisualElement.Q("json-welcome").Query<Label>().ToList();
                     Assert.That(labels.Select(l => l.text), Does.Contain(Lan.WelcomeHint).And.Contain(Lan.WelcomeHelp));
-                    Assert.That(Prefs.GetAssetTypeName(typeof(LegacyExperienceAsset)), Is.EqualTo(Lan.FeatureSample));
+                    Assert.That(Prefs.GetAssetTypeName(typeof(FeatureSampleDocument)), Is.EqualTo(Lan.FeatureSample));
                     var menu = new System.Collections.Generic.List<string>(); ActionEditorHost.PopulateSaveMenu((label, action) => menu.Add(label));
                     Assert.That(menu, Is.EqualTo(new[] { Lan.Save, Lan.SaveAs, Lan.Export }));
                     Assert.That(string.Join(" ", menu) + Lan.WelcomeHint + Lan.CreateSafety + Lan.FeatureSample, Does.Not.Contain("JSON").And.Not.Contain("旧版").And.Not.Contain("新版"));
@@ -861,7 +870,7 @@ namespace NBC.ActionEditor.Tests
             var requests = 0;
             try
             {
-                App.Session.Edit("change", () => ((LegacyExperienceAsset)App.AssetData).Version = 9);
+                App.Session.Edit("change", () => ((FeatureSampleDocument)App.AssetData).Version = 9);
                 var source = App.AssetData; var before = App.Session.CaptureRecovery();
                 App.SavePathRequested = () => { requests++; return null; };
                 original.SaveChanges(); native.SaveChanges();
@@ -879,20 +888,20 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void RecoveryPreservesUnsavedChangesAndBaseline()
         {
-            App.Session.Edit("change", () => ((LegacyExperienceAsset)App.AssetData).Version = 9);
+            App.Session.Edit("change", () => ((FeatureSampleDocument)App.AssetData).Version = 9);
             var recovery = App.Session.CaptureRecovery();
             using var restored = NBC.ActionEditor.Composition.DocumentComposition.Create(); restored.RestoreRecovery(recovery);
-            Assert.That(((LegacyExperienceAsset)restored.Document).Version, Is.EqualTo(9));
+            Assert.That(((FeatureSampleDocument)restored.Document).Version, Is.EqualTo(9));
             Assert.That(restored.IsDirty, Is.True);
         }
         [Test] public void RecoveryKeepsDiscardBaselineIncludingViewStateAndRepeatedDiscard()
         {
             Workspace.ViewTimeMin = 1; Workspace.ViewTimeMax = 10;
-            App.Session.Edit("change", () => ((LegacyExperienceAsset)App.AssetData).Version = 9);
+            App.Session.Edit("change", () => ((FeatureSampleDocument)App.AssetData).Version = 9);
             using var restored = NBC.ActionEditor.Composition.DocumentComposition.Create();
             restored.RestoreRecovery(App.Session.CaptureRecovery());
             restored.DiscardChanges();
-            Assert.That(((LegacyExperienceAsset)restored.Document).Version, Is.EqualTo(1));
+            Assert.That(((FeatureSampleDocument)restored.Document).Version, Is.EqualTo(1));
             Assert.That(Workspace.ViewTimeMin, Is.EqualTo(1));
             Assert.That(Workspace.ViewTimeMax, Is.EqualTo(10));
             Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(restored.Document), Does.Not.Contain("isCollapsed"));
@@ -902,12 +911,12 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void MultipleEditsHaveIndependentUndoStepsAndFailureRollsBack()
         {
-            App.Session.Edit("one", () => ((LegacyExperienceAsset)App.AssetData).Version = 2);
-            App.Session.Edit("two", () => ((LegacyExperienceAsset)App.AssetData).Version = 3);
-            Undo.PerformUndo(); Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(2));
-            Undo.PerformUndo(); Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
-            Assert.Throws<InvalidOperationException>(() => App.Session.Edit("failed", () => { ((LegacyExperienceAsset)App.AssetData).Version = 100; throw new InvalidOperationException(); }));
-            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+            App.Session.Edit("one", () => ((FeatureSampleDocument)App.AssetData).Version = 2);
+            App.Session.Edit("two", () => ((FeatureSampleDocument)App.AssetData).Version = 3);
+            Undo.PerformUndo(); Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(2));
+            Undo.PerformUndo(); Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(1));
+            Assert.Throws<InvalidOperationException>(() => App.Session.Edit("failed", () => { ((FeatureSampleDocument)App.AssetData).Version = 100; throw new InvalidOperationException(); }));
+            Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(1));
         }
         [Test] public void InvalidTimeRollsBackAndProtectedPathsAreRejected()
         {
@@ -966,7 +975,7 @@ namespace NBC.ActionEditor.Tests
         }
         [TestCase(typeof(string), "")]
         [TestCase(typeof(int), 0)]
-        public void CollectionDefaultCreationSupportsPrimitives(Type type, object expected) => Assert.That(InspectorsBase.CreateElement(type), Is.EqualTo(expected));
+        public void CollectionDefaultCreationSupportsPrimitives(Type type, object expected) => Assert.That(Composition.PropertyComposition.Create(App.Context).CreateElement(type), Is.EqualTo(expected));
 
         [UnityTest] public IEnumerator ToolkitUsesSameGraphNativeInspectorAndOriginalGeometry()
         {
@@ -988,9 +997,9 @@ namespace NBC.ActionEditor.Tests
                 var view = window.CreatePropertyView(); window.rootVisualElement.Add(view); yield return null;
                 var count = view.Query<IntegerField>().ToList().First(f => f.label == "次数");
                 count.value = 7; yield return null;
-                Assert.That(((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(7));
+                Assert.That(((FeatureSampleInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(7));
                 Undo.PerformUndo(); yield return null;
-                Assert.That(((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(3));
+                Assert.That(((FeatureSampleInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(3));
                 window.rootVisualElement.Remove(view);
                 window.DiscardChanges();
             }
@@ -1176,7 +1185,7 @@ namespace NBC.ActionEditor.Tests
             Assert.That(token, Is.Not.Null);
             Assert.That(session.BeginEdit(first), Is.SameAs(token));
             Assert.That(session.BeginEdit(other), Is.Null);
-            ((LegacyExperienceAsset)App.AssetData).Version = 5;
+            ((FeatureSampleDocument)App.AssetData).Version = 5;
             session.EndEdit(); session.CancelEdit();
             Assert.That(session.IsEditing, Is.True, "Legacy callers cannot finish another owner's transaction.");
             App.Context.Structure.Rename(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], "nested-owned");
@@ -1184,16 +1193,16 @@ namespace NBC.ActionEditor.Tests
             token.Commit("Owned gesture"); token.Commit(); token.Cancel();
             Assert.That(session.IsEditing, Is.False);
             Undo.PerformUndo();
-            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+            Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(1));
             Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.Not.EqualTo("nested-owned"));
             Undo.PerformRedo();
-            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(5));
+            Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(5));
             var next = session.BeginEdit(other);
-            ((LegacyExperienceAsset)App.AssetData).Version = 6;
+            ((FeatureSampleDocument)App.AssetData).Version = 6;
             token.Cancel(); token.Commit();
             Assert.That(next.IsActive, Is.True);
             next.Cancel(); next.Cancel();
-            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(5));
+            Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(5));
             Assert.That(next.IsActive, Is.False);
             Assert.That(next.Update(() => Assert.Fail("A stale token must not execute a mutation.")), Is.False);
         }
@@ -1275,18 +1284,18 @@ namespace NBC.ActionEditor.Tests
         [Test] public void OwnedTransactionsRollbackNestedFailuresAndDoNotAddEmptyUndoSteps()
         {
             var token = App.Session.BeginEdit(this);
-            ((LegacyExperienceAsset)App.AssetData).Version = 5;
+            ((FeatureSampleDocument)App.AssetData).Version = 5;
             Assert.Throws<InvalidOperationException>(() => App.Session.Edit("Nested failure", () =>
             {
-                ((LegacyExperienceAsset)App.AssetData).Version = 9;
+                ((FeatureSampleDocument)App.AssetData).Version = 9;
                 throw new InvalidOperationException("expected failure");
             }));
             Assert.That(token.IsActive, Is.False);
-            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
-            App.Session.Edit("Real change", () => ((LegacyExperienceAsset)App.AssetData).Version = 2);
+            Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(1));
+            App.Session.Edit("Real change", () => ((FeatureSampleDocument)App.AssetData).Version = 2);
             App.Session.BeginEdit(this).Commit("No change");
             Undo.PerformUndo();
-            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+            Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(1));
             var stale = App.Session.BeginEdit(this);
             App.TextAsset = fixture;
             Assert.That(stale.IsActive, Is.False);
@@ -1297,11 +1306,11 @@ namespace NBC.ActionEditor.Tests
             var partial = App.Session.BeginEdit(this);
             Assert.Throws<InvalidOperationException>(() => partial.Update(() =>
             {
-                ((LegacyExperienceAsset)App.AssetData).Version = 99;
+                ((FeatureSampleDocument)App.AssetData).Version = 99;
                 throw new InvalidOperationException("partial update");
             }));
             Assert.That(partial.IsActive, Is.False);
-            Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+            Assert.That(((FeatureSampleDocument)App.AssetData).Version, Is.EqualTo(1));
             var invalid = App.Session.BeginEdit(this);
             App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Add(null);
             Assert.Throws<System.IO.InvalidDataException>(() => invalid.Commit());

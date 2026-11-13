@@ -29,7 +29,7 @@
 功能预览：https://www.bilibili.com/video/BV1tM4y1q7xg/
 
 # 快速上手
-本工程的唯一入门正文是[功能体验样例：从新建到独立导出](Samples/LegacyExperience/README.md)。请先使用隔离样例练习，包含两套界面入口、属性与拖动、撤销、播放状态、保存重开及导出。上方版本建议和下方更新日志保留为上游历史，不代表当前工程验收结论。
+本工程的唯一入门正文是[功能体验样例：从新建到独立导出](Samples/FeatureSample/README.md)。请先使用隔离样例练习，包含两套界面入口、属性与拖动、撤销、播放状态、保存重开及导出。上方版本建议和下方更新日志保留为上游历史，不代表当前工程验收结论。
 
 ## 【必看】功能示例
 https://github.com/NoBugCn/ActionEditorExample

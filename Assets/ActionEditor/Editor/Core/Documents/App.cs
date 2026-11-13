@@ -59,6 +59,11 @@ namespace NBC.ActionEditor
         {
             var result = Context.Lifecycle.Save(path);
             if (!result.Succeeded) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(result.Exception).Throw();
+            RecordSaved();
+        }
+
+        internal static void RecordSaved()
+        {
             _lastSaveTime = Context.Clock.LocalTime;
             _lastSaveClock = Context.Clock.Now;
         }

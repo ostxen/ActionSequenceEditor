@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NBC.ActionEditor.Storage;
-using NBC.ActionEditor.Samples.LegacyExperience;
+using NBC.ActionEditor.Samples.FeatureSample;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -107,10 +107,10 @@ namespace NBC.ActionEditor.Tests
             var files = new Files(); var imports = 0;
             var store = new JsonDocumentRepository(files, _ => { imports++; throw new InvalidOperationException("Injected import failure"); });
             using var session = NBC.ActionEditor.Composition.DocumentComposition.Create(store);
-            var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
+            var memory = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument()));
             try
             {
-                session.Open(new JsonDocumentRepository().ReadSource(memory)); session.Edit("change", () => ((LegacyExperienceAsset)session.Document).Version = 7);
+                session.Open(new JsonDocumentRepository().ReadSource(memory)); session.Edit("change", () => ((FeatureSampleDocument)session.Document).Version = 7);
                 var source = session.Document;
                 var failure = Assert.Throws<IOException>(() => session.Save(path));
                 Assert.That(failure.Message, Does.Contain("字节已提交")); Assert.That(imports, Is.EqualTo(1));
@@ -118,7 +118,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(session.Document, Is.SameAs(source)); Assert.That(session.IsDirty, Is.False);
                 var committed = files.Data[path].ToArray();
                 using var recovered = NBC.ActionEditor.Composition.DocumentComposition.Create(store); recovered.RestoreRecovery(session.CaptureRecovery());
-                recovered.Edit("change", () => ((LegacyExperienceAsset)recovered.Document).Version = 8);
+                recovered.Edit("change", () => ((FeatureSampleDocument)recovered.Document).Version = 8);
                 files.Data[path] = new byte[] { 42 };
                 Assert.Throws<IOException>(() => recovered.Save());
                 Assert.That(files.Data[path], Is.EqualTo(new byte[] { 42 })); Assert.That(files.Writes, Is.EqualTo(1));
@@ -133,14 +133,14 @@ namespace NBC.ActionEditor.Tests
             var files = new Files(); var store = new JsonDocumentRepository(files, _ => { });
             const string path = "Assets/ActionEditor/RF19-Fake.json";
             files.Data[path + ".meta"] = new byte[] { 1 };
-            Assert.Throws<IOException>(() => store.Commit(path, new LegacyExperienceAsset(), null));
+            Assert.Throws<IOException>(() => store.Commit(path, new FeatureSampleDocument(), null));
             Assert.That(files.Writes, Is.Zero);
             using var session = NBC.ActionEditor.Composition.DocumentComposition.Create(store);
-            var memory = new TextAsset(JsonDocumentCodec.Encode(new LegacyExperienceAsset()));
+            var memory = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument()));
             try
             {
                 session.Open(new JsonDocumentRepository().ReadSource(memory)); var source = session.Document; using var token = session.BeginEdit(this);
-                ((LegacyExperienceAsset)source).Version = 9;
+                ((FeatureSampleDocument)source).Version = 9;
                 Assert.Throws<InvalidOperationException>(() => session.Save(path));
                 Assert.That(token.IsActive, Is.True); Assert.That(session.Document, Is.SameAs(source)); Assert.That(files.Writes, Is.Zero);
             }

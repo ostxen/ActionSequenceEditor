@@ -1,7 +1,5 @@
 ﻿using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
-using NBC.ActionEditor.Storage;
 using NBC.ActionEditor.Presentation.Timeline;
 
 namespace NBC.ActionEditor
@@ -9,7 +7,8 @@ namespace NBC.ActionEditor
     // 窗口拥有逐窗视图和工作区，时间轴编辑只转发给共享Presenter。
     public class ActionEditorWindow : EditorWindow
     {
-        public ActionEditorContext Context => App.Context;
+        internal Composition.WindowBinding Binding { get; private set; }
+        public ActionEditorContext Context => Binding.Context;
         public TimelineWorkspace Workspace { get; } = new TimelineWorkspace();
         [MenuItem("NBC/Action Editor/Open Action Editor", false, 0)]
         public static void OpenDirectorWindow()
@@ -21,6 +20,8 @@ namespace NBC.ActionEditor
         private TimelineHeaderView header;
         public Views.IMGUI.TimelineSurface Timeline { get; private set; }
         public Presentation.Presenters.TimelinePresenter Presenter => Timeline?.Presenter;
+        public Presentation.Presenters.PlaybackPresenter Playback => Binding.Playback;
+        public Presentation.Presenters.DocumentPresenter Documents => Binding.Documents;
         private double lastTick;
         internal Vector2 ContentOffset { get; private set; }
 
@@ -33,7 +34,6 @@ namespace NBC.ActionEditor
             Styles.Load();
             Workspace.LeftWidth = Styles.TimelineLeftWidth;
             Prefs.InitializeAssetTypes();
-            App.OnInitialize?.Invoke();
             _welcomeView = this.CreateView<WelcomeView>();
             header = this.CreateView<TimelineHeaderView>();
             Timeline?.Dispose(); Timeline = new Views.IMGUI.TimelineSurface(this, Context, Workspace);
@@ -44,11 +44,10 @@ namespace NBC.ActionEditor
         #region Lifecycle
         void OnEnable()
         {
+            Binding?.Dispose();
+            Binding = new Composition.WindowBinding(this, Repaint, OnDocumentChanged);
             Workspace.Bind(Context.Document);
             ActionEditorHost.Window = this;
-            App.Views.Attach(this, Repaint, OnDocumentChanged);
-            EditorSceneManager.sceneSaving -= OnWillSaveScene;
-            EditorSceneManager.sceneSaving += OnWillSaveScene;
 
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
@@ -64,28 +63,20 @@ namespace NBC.ActionEditor
         {
             CancelOwnEdit();
             Timeline?.Dispose(); Timeline = null;
-            App.Views.Detach(this);
+            Binding?.Dispose();
             if (ActionEditorHost.Window == this) ActionEditorHost.Window = null;
             this.ReleaseViews();
-            App.Stop();
-            EditorSceneManager.sceneSaving -= OnWillSaveScene;
             EditorApplication.update -= OnEditorUpdate;
-            
-            App.OnDisable?.Invoke();
         }
 
         void OnEditorUpdate()
         {
             var now = EditorApplication.timeSinceStartup;
             Presenter?.Tick(now - lastTick); lastTick = now;
-            Presenter?.PlaybackState(App.IsPlay, App.IsRange);
-            if (App.NeedForceRefresh)
-            {
-                this.Repaint();
-            }
+            Presenter?.PlaybackState(Playback.Playing, Playback.Range);
         }
 
-        private void OnDocumentChanged() { Workspace.Bind(Context.Document); hasUnsavedChanges = Context.Session.IsDirty; App.Refresh(); Repaint(); }
+        private void OnDocumentChanged() { Workspace.Bind(Context.Document); hasUnsavedChanges = Documents.Dirty; Repaint(); }
 
         void OnGUI()
         {
@@ -95,7 +86,7 @@ namespace NBC.ActionEditor
             catch { CancelOwnEdit(); throw; }
             finally
             {
-                hasUnsavedChanges = App.Session.IsDirty;
+                hasUnsavedChanges = Documents.Dirty;
             }
         }
 
@@ -103,7 +94,7 @@ namespace NBC.ActionEditor
         {
             // 关闭/重载已释放表面后，宿主仍可能补发一次GUI事件。
             if (Timeline == null) return;
-            if (App.AssetData == null)
+            if (!Documents.HasDocument)
             {
                 _welcomeView.OnGUI(this.position);
                 return;
@@ -120,14 +111,13 @@ namespace NBC.ActionEditor
                 try { header.OnGUI(new Rect(0, 0, position.width, 40)); }
                 finally { GUILayout.EndArea(); }
             });
-            App.OnGUIEnd();
         }
 
-        public override void SaveChanges() { App.SaveAsset(); if (!App.Session.IsDirty) base.SaveChanges(); }
+        public override void SaveChanges() { Documents.Invoke(Presentation.Contracts.DocumentIntent.Save); if (!Documents.Dirty) base.SaveChanges(); }
         public override void DiscardChanges()
         {
             CancelOwnEdit();
-            Context.Session.DiscardChanges();
+            Documents.Discard();
             base.DiscardChanges();
         }
 
@@ -139,10 +129,6 @@ namespace NBC.ActionEditor
         internal void CancelOwnEdit()
         {
             Presenter?.Cancel();
-        }
-
-        void OnWillSaveScene(UnityEngine.SceneManagement.Scene scene, string path)
-        {
         }
 
         #endregion

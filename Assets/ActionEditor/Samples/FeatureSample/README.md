@@ -27,12 +27,12 @@
 - **导出**只生成独立副本，包含尚未保存但已提交的编辑；不改变当前来源或保存基线。活动拖动/未结束编辑必须先完成或取消。
 - 切换脏文档提示“保存 / 取消 / 放弃”。取消保留当前内容与来源；放弃明确舍弃未保存内容。不要把取消当成放弃，也不要把导出当成保存。
 - 齿轮“偏好设置”中的自动保存间隔按秒计，0 表示关闭；已有来源的脏文档在间隔到达且无活动编辑时尝试保存，无来源不弹出后台保存框。自动保存成功会更新保存基线，不保留无限历史。练习 Undo 时先查看间隔，设置会写个人偏好，自动化重放不修改它。
-- 脚本重载通过 SessionState 恢复快照和来源/基线，但不是磁盘备份。当前采用唯一 `actioneditor.json` v1 格式，旧裸根格式不提供兼容读取或自动迁移；不要拿正式旧文件试覆盖。
+- 脚本重载通过 SessionState 恢复快照和来源/基线，但不是磁盘备份。当前采用唯一 `actioneditor.json` version 2 格式；完整类型身份和全部字段必须匹配，不自动转换或覆盖其他格式的文件。
 
 ## 继续体验哪些内容
 
 - 鼠标悬停时间区或顶部标尺并滚动，悬停的时间位置保持不动，刻度向两侧展开/收缩；靠近零点时可以显示负的视域，这不会产生负时间片段。
-- 左键拖动轨道标题：落在目标轨道上半行插到前面，下半行插到后面；落在分组标题加入该组的第一条。拖到最左20px外侧或所有行下方空白，脱离所有组成为根级独立轨道。根级轨道排在分组之后，可继续排序或拖回分组；内容超出视口时先滚动到目标可见。观察落点提示，松开提交，Esc取消，Undo/Redo恢复顺序与归属。锁定轨道/分组或不兼容类型不能接收移动。
+- 左键拖动组或轨道标题，移动超过3px后出现覆盖主体全宽的插入线。蓝线表示可提交，红线表示拒绝；松开提交，Esc取消。组携带全部子轨移动，根级组和独立轨道可以任意交错排序。轨道目标行的上下半行对应前后边界，分组标题对应组内首位；最左20px区域按整个根级组块定位，底部空白对应根级末尾。拖到视口上下24px边缘会自动滚动。锁定源/目标或不兼容类型不能移动，Undo/Redo恢复顺序与归属。空组保留对齐占位但没有可点击的折叠按钮。
 
 - 第一组第二轨：两个同类片段的交叉混合与渐变。第三轨：零长度点事件，右键空白新增“体验点事件”。
 - 第二组第一轨：内循环周期、倍速、偏移和匹配长度菜单。第二轨“属性练习”：文字、数值、bool、枚举、颜色、向量、曲线、条件字段和参数列表。
@@ -40,7 +40,7 @@
 
 ## 最小业务接入与边界
 
-Runtime 业务 `Asset` 管根字段及分组，`Group` 组织轨道，`Track` 限制可挂载片段，`Clip` 保存时间和业务参数。沿样例使用 `Name`、`MenuName`、`Attachable` 等 Attribute，完整类型/字段身份用于持久化，不要为改显示名称改命名空间或字段键。Editor 扩展负责业务属性视图、Header 和预览；原生 Header 用 `HeaderBase.CreateGUI()`，IMGUI Header 用 `OnGUI()`，不能假定所有自定义界面自动转换。参考源码位于 `Runtime/Samples/LegacyExperience` 和 `Editor/Samples/LegacyExperiencePreview.cs`，类型名中的 Legacy 是已有身份，不是产品版本。
+Runtime 的 `ActionDocument.RootItems` 依次存放 `TimelineGroup` 或 `TimelineTrack`；组持有轨道，轨道持有 `TimelineClip`。沿样例使用 `Name`、`MenuName`、`Attachable` 等业务声明。Editor 的 IMGUI Header 继承 `HeaderBase` 并声明 `CustomHeader`，Toolkit Header 继承 `ToolkitHeaderView` 并声明 `ToolkitHeader`；属性控件扩展分别声明 `CustomInspectors` 和 `ToolkitProperties`。字段描述与提交由共享 `PropertyPresenter` 负责，原生视图只构建控件。参考 `Runtime/Samples/FeatureSample` 和 `Editor/Samples/FeatureSamplePreview.cs`。
 
 样例状态窗口只按播放头求值绘制，不生成场景对象、不播放动画/音频/特效、不执行 Combat 或真实游戏逻辑。资源路径字段只是字符串，不是音频播放能力。受控 Unity Object 引用支持当前工程持久主/子资产的 GUID/localFileId；临时/场景/无有效身份引用不能保存，路径字符串不能冒充持久引用。
 
