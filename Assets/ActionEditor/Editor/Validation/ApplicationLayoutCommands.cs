@@ -92,6 +92,47 @@ namespace NBC.ActionEditor.Validation
 
         private static string Parent(string path) => Path.GetDirectoryName(path).Replace('\\', '/');
 
+        // 固定退役已由共享Presenter替代的时间轴源码，不接受调用者路径。
+        [CliGroupCommand("actioneditor.validation", "Delete eleven retired IMGUI timeline sources after caller migration. Preserve toolbar and user resources.")]
+        public static object RetireImguiTimelineSources(
+            [CliArg("confirm", "Apply the reviewed manifest.")] bool confirm = false,
+            [CliArg("dry-run", "Inspect the exact fixed scope.")] bool dryRun = false)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+                throw new InvalidOperationException("需要空闲的编辑模式。");
+            const string views = Root + "UI/IMGUI/ActionEditor/Views/";
+            var sources = new[]
+            {
+                new { path = views + "Timeline/TimelineView.cs", guid = "29fd0ea77ca6478d9ab79107c1fb2ebb" },
+                new { path = views + "Timeline/TimelineMiddleView.cs", guid = "2e97c5bb04a34c51bb689aad70f74edd" },
+                new { path = views + "Timeline/TimelinePointerView.cs", guid = "c9762e7ccbdf47b8a46444b4688623dd" },
+                new { path = views + "Timeline/TimelineTrackItemView.cs", guid = "9740a024375b47daacb3040efc8ad96d" },
+                new { path = views + "Timeline/TimelineBottomView.cs", guid = "676923ca299c41df89ec985cb81f4ed9" },
+                new { path = views + "Timeline/ClipDragger.cs", guid = "12bd2da2cc7a4f5d9878aedaa4300de5" },
+                new { path = views + "Timeline/ClipDraw/ClipDrawer.cs", guid = "0fee1b9f90e042da9c9d5eb06d858631" },
+                new { path = views + "Timeline/ClipDraw/BasicClipDraw.cs", guid = "8b82fdb4c58e495d9a3a6702e6ccd00a" },
+                new { path = views + "Timeline/ClipDraw/SimpleClipDraw.cs", guid = "778e6bed42084851bd36e57680ad3c92" },
+                new { path = views + "Timeline/ClipDraw/SignalClipDraw.cs", guid = "ea343dc3a2ea4d06b50a8c143520ed2b" },
+                new { path = views + "SplitterView.cs", guid = "30d605475588454cb4d9d8c27773ba32" }
+            };
+            foreach (var source in sources)
+                if (!File.Exists(source.path) || !File.Exists(source.path + ".meta") || AssetDatabase.AssetPathToGUID(source.path) != source.guid)
+                    throw new IOException("退役身份不符：" + source.path);
+            var manifest = sources.Select(source => new { source.path, source.guid, sha256 = Hash(source.path), metaSha256 = Hash(source.path + ".meta") }).ToArray();
+            if (dryRun) return new { deletes = manifest, touchesUserDocuments = false, regenerateProjects = true };
+            if (!confirm) throw new InvalidOperationException("需要预览和真实审批。");
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                foreach (var source in sources)
+                    if (!AssetDatabase.DeleteAsset(source.path) || File.Exists(source.path) || File.Exists(source.path + ".meta"))
+                        throw new IOException("退役失败：" + source.path);
+            }
+            finally { AssetDatabase.StopAssetEditing(); }
+            Unity.CodeEditor.CodeEditor.CurrentEditor.SyncAll();
+            return new { status = "passed", count = manifest.Length, deleted = manifest, projectsRegenerated = true };
+        }
+
         // 调用闭包已切换后，仅退役三份固定旧编辑实现，不接受外部清单。
         [CliGroupCommand("actioneditor.validation", "Delete three retired editing sources after caller migration. No user documents or arbitrary paths.")]
         public static object RetireEditingSources(

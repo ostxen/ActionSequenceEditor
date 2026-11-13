@@ -6,6 +6,7 @@ using NBC.ActionEditor.Presentation.Timeline;
 
 namespace NBC.ActionEditor
 {
+    // 窗口拥有逐窗视图和工作区，时间轴编辑只转发给共享Presenter。
     public class ActionEditorWindow : EditorWindow
     {
         public ActionEditorContext Context => App.Context;
@@ -17,10 +18,10 @@ namespace NBC.ActionEditor
         }
 
         private WelcomeView _welcomeView;
-        private TimelineView _timelineView;
-        public OriginalTimelineGesture Gesture { get; } = new OriginalTimelineGesture();
-        private NBC.ActionEditor.Application.Documents.DocumentEditTransaction guiEdit;
-        internal NBC.ActionEditor.Application.Documents.DocumentEditTransaction CurrentEdit => guiEdit;
+        private TimelineHeaderView header;
+        public Views.IMGUI.TimelineSurface Timeline { get; private set; }
+        public Presentation.Presenters.TimelinePresenter Presenter => Timeline?.Presenter;
+        private double lastTick;
         internal Vector2 ContentOffset { get; private set; }
 
         #region Init
@@ -33,18 +34,9 @@ namespace NBC.ActionEditor
             Workspace.LeftWidth = Styles.TimelineLeftWidth;
             Prefs.InitializeAssetTypes();
             App.OnInitialize?.Invoke();
-            //停止播放
-            if (App.AssetData != null)
-            {
-                if (!UnityEngine.Application.isPlaying)
-                {
-                    // App.Stop(true);
-                }
-            }
-
             _welcomeView = this.CreateView<WelcomeView>();
-            _timelineView = this.CreateView<TimelineView>();
-            // WillRepaint = true;
+            header = this.CreateView<TimelineHeaderView>();
+            Timeline?.Dispose(); Timeline = new Views.IMGUI.TimelineSurface(this, Context, Workspace);
         }
 
         #endregion
@@ -52,7 +44,6 @@ namespace NBC.ActionEditor
         #region Lifecycle
         void OnEnable()
         {
-            Gesture.Workspace = Workspace;
             Workspace.Bind(Context.Document);
             ActionEditorHost.Window = this;
             App.Views.Attach(this, Repaint, OnDocumentChanged);
@@ -65,12 +56,14 @@ namespace NBC.ActionEditor
             minSize = new Vector2(500, 250);
             
             InitializeAll();
+            lastTick = EditorApplication.timeSinceStartup;
             titleContent = new GUIContent(Lan.Title);
         }
 
         void OnDisable()
         {
             CancelOwnEdit();
+            Timeline?.Dispose(); Timeline = null;
             App.Views.Detach(this);
             if (ActionEditorHost.Window == this) ActionEditorHost.Window = null;
             this.ReleaseViews();
@@ -83,7 +76,9 @@ namespace NBC.ActionEditor
 
         void OnEditorUpdate()
         {
-            this.UpdateViews();
+            var now = EditorApplication.timeSinceStartup;
+            Presenter?.Tick(now - lastTick); lastTick = now;
+            Presenter?.PlaybackState(App.IsPlay, App.IsRange);
             if (App.NeedForceRefresh)
             {
                 this.Repaint();
@@ -96,31 +91,20 @@ namespace NBC.ActionEditor
         {
             ContentOffset = GUIUtility.GUIToScreenPoint(Vector2.zero) - position.position;
             if (titleContent.text != Lan.Title) titleContent = new GUIContent(Lan.Title);
-            if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
-            {
-                _timelineView?.CancelNavigation();
-                CancelOwnEdit(); Event.current.Use();
-            }
-            if (App.AssetData != null && Event.current.type != EventType.Layout && Event.current.type != EventType.Repaint)
-            {
-                if (guiEdit?.IsActive != true) guiEdit = Context.Session.BeginEdit(this);
-                if (guiEdit == null) Event.current.Use();
-            }
             try { DrawEditor(); }
             catch { CancelOwnEdit(); throw; }
             finally
             {
-                if (guiEdit?.IsActive == true && Event.current.rawType != EventType.MouseDrag && Gesture.DragType == ItemDragType.None)
-                { guiEdit.Commit(); guiEdit = null; }
                 hasUnsavedChanges = App.Session.IsDirty;
             }
         }
 
         void DrawEditor()
         {
+            // 关闭/重载已释放表面后，宿主仍可能补发一次GUI事件。
+            if (Timeline == null) return;
             if (App.AssetData == null)
             {
-                // Test();
                 _welcomeView.OnGUI(this.position);
                 return;
             }
@@ -130,7 +114,12 @@ namespace NBC.ActionEditor
                 Repaint();
             }
             
-            _timelineView.OnGUI(this.position);
+            Timeline.Draw(new Rect(0, 0, position.width, position.height), () =>
+            {
+                GUILayout.BeginArea(new Rect(0, 0, position.width, 40), EditorStyles.helpBox);
+                try { header.OnGUI(new Rect(0, 0, position.width, 40)); }
+                finally { GUILayout.EndArea(); }
+            });
             App.OnGUIEnd();
         }
 
@@ -144,15 +133,12 @@ namespace NBC.ActionEditor
 
         void OnLostFocus()
         {
-            _timelineView?.CancelNavigation();
             CancelOwnEdit();
         }
 
         internal void CancelOwnEdit()
         {
-            this.ResetPointerStates();
-            if (guiEdit == null) return;
-            Gesture.Cancel(guiEdit); guiEdit.Cancel(); guiEdit = null;
+            Presenter?.Cancel();
         }
 
         void OnWillSaveScene(UnityEngine.SceneManagement.Scene scene, string path)
@@ -161,65 +147,5 @@ namespace NBC.ActionEditor
 
         #endregion
 
-        #region Test
-
-        private bool isDragging = false; // 是否正在拖动
-        private Vector2 dragStartPos; // 拖动起始位置
-        private Rect draggableRect = new Rect(50, 50, 100, 100); // 可拖动区域
-
-        void Test()
-        {
-            // 绘制一个可拖动的矩形
-            EditorGUI.DrawRect(draggableRect, Color.green);
-
-            Event e = Event.current;
-
-            // 检测鼠标事件
-            switch (e.type)
-            {
-                case EventType.MouseDown:
-                    // 如果鼠标在可拖动矩形内，开始拖动
-                    if (draggableRect.Contains(e.mousePosition) && e.button == 0)
-                    {
-                        isDragging = true;
-                        dragStartPos = e.mousePosition;
-                        Debug.Log("Begin Drag");
-                        e.Use(); // 使用事件，防止事件继续传播
-                    }
-
-                    break;
-
-                case EventType.MouseDrag:
-                    // 如果正在拖动，更新矩形位置
-                    if (isDragging)
-                    {
-                        Vector2 dragDelta = e.mousePosition - dragStartPos;
-                        draggableRect.position += dragDelta; // 更新矩形位置
-                        dragStartPos = e.mousePosition; // 更新起始位置
-                        Debug.Log("Dragging: " + dragDelta);
-                        e.Use();
-                    }
-
-                    break;
-
-                case EventType.MouseUp:
-                    // 鼠标抬起，结束拖动
-                    if (isDragging && e.button == 0)
-                    {
-                        isDragging = false;
-                        Debug.Log("End Drag");
-                        e.Use();
-                    }
-
-                    break;
-
-                case EventType.Repaint:
-                    // 额外操作：实时重绘界面
-                    EditorGUI.DrawRect(draggableRect, Color.green);
-                    break;
-            }
-        }
-
-        #endregion
     }
 }

@@ -33,6 +33,8 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
+`actioneditor.validation retire_imgui_timeline_sources`固定删除十一份已替代的IMGUI时间轴源码及meta：TimelineView/Middle/Pointer/TrackItem/Bottom、ClipDragger、ClipDrawer/Basic/Simple/Signal与SplitterView。保留Toolbar、资源及用户数据；固定GUID和源码/meta哈希、拒绝参数覆盖，AssetDatabase批量删除并SyncAll。调用者迁移后独立preview/展示/approve/apply，引用RF24–RF37连续授权。
+
 `actioneditor.validation retire_editing_sources`固定删除Core/Editing中的JsonEditCommand、JsonEditCommands、JsonPropertyEditing三份源码及meta。调用者已直接接入Application用例后才允许执行；固定GUID与源码/meta哈希，preview列清单，apply经AssetDatabase删除并核实不存在、SyncAll。不接受参数/任意路径，不触及用户文档；按RF24–RF37连续授权独立preview/approve/apply。
 
 `actioneditor.validation arrange_application_layout`为固定零参数四项源码移动：Core/Documents/JsonDocumentSession→Application/Documents/DocumentSession，Storage/JsonDocumentStore→Infrastructure/Documents/JsonDocumentRepository，Storage/ReliableFileCommit→Infrastructure/Documents/AtomicFileCommit，Serialization/DocumentExportService→Infrastructure/Documents/DocumentExportService。固定GUID、目标不存在、源码/meta哈希、移动后身份与字节复核并SyncAll；无删除/覆盖/用户文档写入，拒绝参数覆盖。必须独立preview/approve/apply，引用本系列连续授权。

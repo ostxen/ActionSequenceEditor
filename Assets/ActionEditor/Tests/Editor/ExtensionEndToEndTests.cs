@@ -32,19 +32,10 @@ namespace NBC.ActionEditor.Tests
             public Rect Input;
             public Vector2 ContentOffset;
             public string InputTrace;
-            public OriginalTimelineGesture Gesture;
             private readonly FieldInspector inspector = new FieldInspector();
             private void OnGUI()
             {
                 if (Event.current.type == EventType.MouseDown || Event.current.type == EventType.KeyDown) InputTrace += Event.current.type + ":" + Event.current.keyCode + ":" + Event.current.mousePosition + ";";
-                if (Gesture != null)
-                {
-                    ContentOffset = GUIUtility.GUIToScreenPoint(Vector2.zero) - position.position;
-                    var pointer = new NBC.ActionEditor.Events.PointerEventData(Event.current);
-                    if (Event.current.type == EventType.MouseDown) Gesture.OnBeginDrag(pointer);
-                    else if (Event.current.type == EventType.MouseDrag) Gesture.OnDrag(pointer);
-                    else if (Event.current.type == EventType.MouseUp) Gesture.OnEndDrag(pointer);
-                }
                 if (Value == null) return;
                 ContentOffset = GUIUtility.GUIToScreenPoint(Vector2.zero) - position.position;
                 inspector.Draw(Value, Field);
@@ -65,14 +56,22 @@ namespace NBC.ActionEditor.Tests
         private static int RowIndex(UIToolkitTimelineCanvas canvas, IDirectable item) => canvas.State.Rows.ToList().FindIndex(row => row.Key == canvas.Presenter.KeyFor(item));
         private static void OriginalCreate(TimelineTrack track, Type type)
         {
-            var view = new TimelineTrackItemRightView();
-            var menu = (GenericMenu)typeof(TimelineTrackItemRightView).GetMethod("BuildTrackContextMenu", Instance).Invoke(view, new object[] { track, track.Root.SnapTime(6.5f) });
+            var previousWindow = ActionEditorHost.Window;
+            var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            try
+            {
+            var state = window.Presenter.State;
+            var row = state.Rows.Single(r => r.Key == window.Presenter.KeyFor(track));
+            var x = state.ContentLeft + (6.5f - state.Minimum) * (state.Size.WindowWidth - state.ContentLeft) / (state.Maximum - state.Minimum);
+            var menu = window.Timeline.ContextMenu(x, row.Bounds.Y + 13);
             var field = typeof(GenericMenu).GetField("m_MenuItems", Instance);
             var items = (IEnumerable)(field != null ? field.GetValue(menu) : typeof(GenericMenu).GetProperty("menuItems", Instance).GetValue(menu));
             var name = DirectableTypeInfo.For(type).MenuName;
             var item = items.Cast<object>().Single(value => ((GUIContent)value.GetType().GetField("content", Instance).GetValue(value)).text.EndsWith("/" + name));
             var action = (GenericMenu.MenuFunction)item.GetType().GetField("func", Instance).GetValue(item);
             Assert.That(action, Is.Not.Null); action();
+            }
+            finally { UnityEngine.Object.DestroyImmediate(window); ActionEditorHost.Window = previousWindow; }
         }
         private static void NativeCreate(UIToolkitActionEditorWindow window, int track, Type type)
         {
@@ -166,12 +165,11 @@ namespace NBC.ActionEditor.Tests
             var previousWindow = ActionEditorHost.Window; var previousWidth = ActionEditorHost.Width;
             var native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
-            var events = ScriptableObject.CreateInstance<FieldWindow>();
             TextAsset reopened = null;
             try
             {
-                original.Show(); native.Show(); native.position = new Rect(50, 50, 1000, 600);
-                events.Show(); events.position = new Rect(100, 100, 1000, 200);
+                original.position = new Rect(60, 60, 1000, 600); original.Show();
+                native.Show(); native.position = new Rect(50, 50, 1000, 600);
                 yield return null; yield return null;
                 for (var ui = 0; ui < 2; ui++)
                 {
@@ -187,12 +185,13 @@ namespace NBC.ActionEditor.Tests
                     var start = created.StartTime; var spacing = copy.StartTime - start;
                     if (ui == 0)
                     {
-                        ActionEditorHost.Width = 700; events.Gesture = original.Gesture; events.Focus(); events.Repaint(); yield return null;
-                        ClipDrawer.Reset(); ClipDrawer.GetDraw(created).ClipRealRect = new Rect(100, 20, 150, 26);
-                        var down = new Vector2(Styles.TimelineLeftTotalWidth + 120, 30) + events.ContentOffset;
+                        original.Focus(); original.Repaint(); yield return null; yield return null;
+                        var rect = original.Timeline.State.Clips.Single(c => c.Key == original.Presenter.KeyFor(created)).Bounds;
+                        var down = new Vector2(rect.X + rect.Width * .5f, rect.Y + rect.Height * .5f + 40) + (Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", Instance).GetValue(original);
+                        var scale = (original.position.width - original.Timeline.State.ContentLeft) / original.Workspace.ViewTime;
                         foreach (var kind in new[] { EventType.MouseDown, EventType.MouseDrag, EventType.MouseUp })
-                            events.SendEvent(new Event { type = kind, button = 0, shift = true, mousePosition = down + (kind == EventType.MouseDown ? Vector2.zero : new Vector2(ActionEditorHost.Width * .5f / 12, 0)) });
-                        events.Gesture = null;
+                            original.SendEvent(new Event { type = kind, button = 0, shift = true, mousePosition = down + (kind == EventType.MouseDown ? Vector2.zero : new Vector2(scale * .5f, 0)) });
+                        Assert.That(original.Timeline.Error, Is.Null);
                     }
                     else
                     {
@@ -209,13 +208,15 @@ namespace NBC.ActionEditor.Tests
                     native.Select(created); var length = created.Length;
                     if (ui == 0)
                     {
-                        events.Gesture = original.Gesture; events.Focus(); events.Repaint(); yield return null;
-                        var down = new Vector2(Styles.TimelineLeftTotalWidth + original.Workspace.TimeToPos(created.EndTime, ActionEditorHost.Width), 30) + events.ContentOffset;
-                        events.SendEvent(new Event { type = EventType.MouseDown, button = 0, shift = true, mousePosition = down });
-                        Assert.That(original.Gesture.DragType, Is.EqualTo(ItemDragType.StretchEnd));
-                        events.SendEvent(new Event { type = EventType.MouseDrag, button = 0, shift = true, mousePosition = down + new Vector2(ActionEditorHost.Width * .25f / 12, 0) });
-                        events.SendEvent(new Event { type = EventType.MouseUp, button = 0, shift = true, mousePosition = down + new Vector2(ActionEditorHost.Width * .25f / 12, 0) });
-                        events.Gesture = null;
+                        original.Focus(); original.Repaint(); yield return null; yield return null;
+                        var rect = original.Timeline.State.Clips.Single(c => c.Key == original.Presenter.KeyFor(created)).Bounds;
+                        var down = new Vector2(rect.Right - 2, rect.Y + rect.Height * .5f + 40) + (Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", Instance).GetValue(original);
+                        var delta = new Vector2((original.position.width - original.Timeline.State.ContentLeft) / original.Workspace.ViewTime * .25f, 0);
+                        original.SendEvent(new Event { type = EventType.MouseDown, button = 0, shift = true, mousePosition = down });
+                        Assert.That(original.Presenter.Mode, Is.EqualTo(TimelineGestureMode.ResizeRight));
+                        original.SendEvent(new Event { type = EventType.MouseDrag, button = 0, shift = true, mousePosition = down + delta });
+                        original.SendEvent(new Event { type = EventType.MouseUp, button = 0, shift = true, mousePosition = down + delta });
+                        Assert.That(original.Timeline.Error, Is.Null);
                     }
                     else
                     {
@@ -251,8 +252,8 @@ namespace NBC.ActionEditor.Tests
             }
             finally
             {
-                events.Gesture = null; original.Gesture.Cancel(); App.Session.CancelEdit();
-                events.Close(); original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close();
+                original.Presenter?.Cancel(); App.Session.CancelEdit();
+                original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close();
                 ActionEditorHost.Window = previousWindow; ActionEditorHost.Width = previousWidth;
                 if (reopened != null) UnityEngine.Object.DestroyImmediate(reopened);
             }
@@ -296,7 +297,8 @@ namespace NBC.ActionEditor.Tests
                 imgui.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
                 Assert.That(App.FistSelect, Is.SameAs(group));
                 imgui.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
-                Assert.That(imgui.Gesture.DragType, Is.Not.EqualTo(ItemDragType.Track), "Group currently has no structure gesture.");
+                Assert.That(imgui.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
+                Assert.That(imgui.Timeline.State.Insertion.Visible, Is.True);
                 imgui.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
                 imgui.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
                 group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0);
@@ -304,12 +306,12 @@ namespace NBC.ActionEditor.Tests
                 var fold = offset + new Vector2(12, Styles.PlayControlHeight + 12);
                 imgui.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = fold });
                 imgui.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = fold });
-                Assert.That(imgui.Workspace.IsCollapsed(group), Is.Not.EqualTo(wasCollapsed), "Empty group currently exposes a clickable collapse icon.");
+                Assert.That(imgui.Workspace.IsCollapsed(group), Is.EqualTo(wasCollapsed), "Empty fold placeholder must stay passive.");
             }
             finally
             {
                 if (native != null) { native.DiscardChanges(); native.Close(); }
-                if (imgui != null) { imgui.Gesture.Cancel(); imgui.DiscardChanges(); imgui.Close(); }
+                if (imgui != null) { imgui.Presenter.Cancel(); imgui.DiscardChanges(); imgui.Close(); }
                 ActionEditorHost.Window = previousWindow; Styles.TimelineScrollPos = previousScroll;
             }
         }
@@ -380,7 +382,7 @@ namespace NBC.ActionEditor.Tests
             }
         }
 
-        [UnityTest] public IEnumerator ImguiStructureInsertionPaintCurrentlyStopsAtHeaderBoundary()
+        [UnityTest] public IEnumerator ImguiStructureInsertionPaintCoversFullBodyWithoutText()
         {
             var previousWindow = ActionEditorHost.Window;
             var previousScroll = Styles.TimelineScrollPos;
@@ -398,13 +400,14 @@ namespace NBC.ActionEditor.Tests
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = start + Vector2.down * 4 });
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
-                Assert.That(window.Gesture.DragType, Is.EqualTo(ItemDragType.Track));
-                Assert.That(window.Gesture.TrackDrop.IsValid, Is.True);
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
+                Assert.That(window.Timeline.State.Insertion.Visible, Is.True);
+                Assert.That(window.Timeline.State.Insertion.Valid, Is.True);
                 window.Repaint(); yield return null; yield return null;
                 image = ReadWindowPixels(window);
-                System.IO.File.WriteAllBytes(System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/structure-insertion-imgui-baseline.png"), image.EncodeToPNG());
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/structure-insertion-imgui.png"), image.EncodeToPNG());
                 var scale = EditorGUIUtility.pixelsPerPoint;
-                var y = Mathf.RoundToInt((Styles.PlayControlHeight + window.Gesture.TrackDrop.Y) * scale);
+                var y = Mathf.RoundToInt((Styles.PlayControlHeight + window.Timeline.State.Insertion.Y) * scale);
                 bool BlueAt(float x)
                 {
                     var px = Mathf.Clamp(Mathf.RoundToInt(x * scale), 0, image.width - 1);
@@ -416,13 +419,15 @@ namespace NBC.ActionEditor.Tests
                     return false;
                 }
                 Assert.That(BlueAt(60), Is.True, "Actual IMGUI title paint must contain the insertion line.");
-                Assert.That(BlueAt(Styles.TimelineLeftTotalWidth + 200), Is.False, "Current IMGUI insertion paint does not reach the time area.");
+                Assert.That(BlueAt(window.Timeline.State.ContentLeft + 200), Is.True);
+                Assert.That(BlueAt(window.position.width - 4), Is.True);
+                Assert.That(window.Timeline.State.Insertion.Width, Is.EqualTo(window.position.width));
                 window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
             }
             finally
             {
                 if (image != null) UnityEngine.Object.DestroyImmediate(image);
-                window.Gesture.Cancel(); window.DiscardChanges(); window.Close();
+                window.Presenter.Cancel(); window.DiscardChanges(); window.Close();
                 ActionEditorHost.Window = previousWindow; Styles.TimelineScrollPos = previousScroll;
             }
         }
@@ -495,14 +500,14 @@ namespace NBC.ActionEditor.Tests
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
                 Assert.That(App.FistSelect, Is.SameAs(moving), "Header event must reach the intended row; offset=" + offset);
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = start + Vector2.down * 4 });
-                Assert.That(window.Gesture.DragType, Is.EqualTo(ItemDragType.Track));
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
-                Assert.That(window.Gesture.TrackDrop.IsValid, Is.True);
-                Assert.That(window.Gesture.TrackDrop.Index, Is.Zero, "drop=" + window.Gesture.TrackDrop.Row?.Name + ", y=" + window.Gesture.TrackDrop.Y + ", before=" + window.Gesture.TrackDrop.Before);
+                Assert.That(window.Timeline.State.Insertion.Visible && window.Timeline.State.Insertion.Valid, Is.True);
+                Assert.That(window.Timeline.State.Insertion.Y, Is.EqualTo(pitch));
                 window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
-                Assert.That(window.Gesture.DragType, Is.EqualTo(ItemDragType.None), "Release must end the captured gesture.");
-                Assert.That(window.Gesture.TrackDrop.IsValid, Is.True, "Release must remain inside the viewport.");
-                Assert.That(window.Gesture.TrackDrop.Index, Is.Zero, "Release drop=" + window.Gesture.TrackDrop.Row?.Name + ", y=" + window.Gesture.TrackDrop.Y);
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle), "Release must end the captured gesture.");
+                Assert.That(window.Timeline.State.Insertion.Visible, Is.False);
+                Assert.That(window.Timeline.Error, Is.Null);
                 Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(name));
                 Undo.PerformUndo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Name, Is.EqualTo(name));
                 Undo.PerformRedo();
@@ -511,19 +516,16 @@ namespace NBC.ActionEditor.Tests
                 foreach (var type in new[] { EventType.MouseDown, EventType.MouseDrag, EventType.MouseUp })
                     window.SendEvent(new Event { type = type, button = 0, mousePosition = type == EventType.MouseDown ? start : end });
                 Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Single().Name, Is.EqualTo(name));
-                window.Workspace.ScrollY = pitch * 3;
+                window.Presenter.Scroll(0);
                 window.Repaint(); yield return null; yield return null;
                 var rows = TimelineGeometry.VisibleRows(App.AssetData, window.Workspace);
                 start = new Vector2(90, offset + rows.IndexOf(App.AssetData.RootItems.OfType<TimelineTrack>().ElementAt(0)) * pitch + 13 - window.Workspace.ScrollY);
                 end = new Vector2(90, offset + rows.IndexOf(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1)) * pitch + 13 - window.Workspace.ScrollY);
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
                 Assert.That(App.FistSelect, Is.SameAs(App.AssetData.RootItems.OfType<TimelineTrack>().ElementAt(0)), "Root row start=" + start + ", scroll=" + window.Workspace.ScrollY);
-                var timeline = typeof(ActionEditorWindow).GetField("_timelineView", Instance).GetValue(window);
-                var middle = (TimelineMiddleView)typeof(TimelineView).GetField("_middleView", Instance).GetValue(timeline);
-                Assert.That(typeof(ViewBase).GetField("_havePointerDown", Instance).GetValue(middle), Is.True,
-                    "Root press must reach body: start=" + start + ", bounds=" + middle.Position + ", offset=" + offset + ", rows=" + rows.Count + ", scroll=" + window.Workspace.ScrollY);
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
-                Assert.That(window.Gesture.DragType, Is.EqualTo(ItemDragType.Track));
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
                 window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
                 Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Single().Name, Is.EqualTo(name));
@@ -531,7 +533,7 @@ namespace NBC.ActionEditor.Tests
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
                 Assert.That(App.FistSelect, Is.SameAs(App.AssetData.RootItems.OfType<TimelineTrack>().ElementAt(0)), "Root row after cancel start=" + start);
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
-                Assert.That(window.Gesture.DragType, Is.EqualTo(ItemDragType.Track));
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
                 Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>(), Is.Empty);
                 Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1).Tracks[0].Name, Is.EqualTo(name));
@@ -626,7 +628,7 @@ namespace NBC.ActionEditor.Tests
                 var fraction = 100 / (original.position.width - Styles.TimelineLeftTotalWidth);
                 var anchor = 1 + 7 * fraction;
                 original.SendEvent(new Event { type = EventType.ScrollWheel, mousePosition = new Vector2(Styles.TimelineLeftTotalWidth + 100, 30) + offset, delta = Vector2.up });
-                Assert.That(original.Workspace.ViewTime, Is.GreaterThan(7));
+                Assert.That(original.Workspace.ViewTime, Is.EqualTo(Prefs.scrollWheelZooms ? 8.575f : 7).Within(.001f));
                 Assert.That(original.Workspace.ViewTimeMin + fraction * original.Workspace.ViewTime, Is.EqualTo(anchor).Within(.0001f));
                 native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
                 native.position = new Rect(60, 60, 1000, 600); native.Show(); native.Focus();
@@ -702,6 +704,73 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(JsonDocumentCodec.Content(App.AssetData), Is.EqualTo(before));
             }
             finally { window.DiscardChanges(); window.Close(); }
+        }
+
+        [UnityTest] public IEnumerator ImguiEmptyFoldPlaceholderTracksFirstChildUndoRedoAndDoesNotCaptureButtons()
+        {
+            var previousWindow = ActionEditorHost.Window;
+            var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            try
+            {
+                var group = App.AssetData.RootItems.OfType<TimelineGroup>().First(); group.Tracks.Clear(); App.AssetData.Validate();
+                window.position = new Rect(60, 60, 1000, 600); window.Show(); window.Focus(); window.Repaint();
+                yield return null; yield return null;
+                var offset = (Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", Instance).GetValue(window);
+                var fold = offset + new Vector2(12, 53);
+                foreach (var kind in new[] { EventType.MouseDown, EventType.MouseUp })
+                    window.SendEvent(new Event { type = kind, button = 0, mousePosition = fold });
+                Assert.That(window.Workspace.IsCollapsed(group), Is.False);
+                Assert.That(window.Timeline.State.Rows.First().CanFold, Is.False);
+                App.Context.Structure.AddTrack(group, typeof(LegacyIntervalTrack)); window.Repaint();
+                yield return null; yield return null;
+                foreach (var kind in new[] { EventType.MouseDown, EventType.MouseUp })
+                    window.SendEvent(new Event { type = kind, button = 0, mousePosition = fold });
+                Assert.That(window.Workspace.IsCollapsed(group), Is.True);
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
+                Undo.PerformUndo(); yield return null;
+                Assert.That(window.Timeline.State.Rows.First().CanFold, Is.False);
+                Undo.PerformRedo(); yield return null;
+                Assert.That(window.Timeline.State.Rows.First().CanFold, Is.True);
+            }
+            finally { window.DiscardChanges(); window.Close(); ActionEditorHost.Window = previousWindow; }
+        }
+
+        [UnityTest] public IEnumerator ImguiScrolledGroupDragUpdatesEdgesAndCancelsOnUndo()
+        {
+            var previousWindow = ActionEditorHost.Window;
+            var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
+            try
+            {
+                window.position = new Rect(60, 60, 800, 250); window.Show(); window.Focus();
+                yield return null; yield return null;
+                window.Presenter.Scroll(56); window.Repaint(); yield return null; yield return null;
+                var offset = (Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", Instance).GetValue(window);
+                var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1);
+                var before = JsonDocumentCodec.Content(App.AssetData);
+                var row = window.Timeline.State.Rows.Single(r => r.Key == window.Presenter.KeyFor(group));
+                var start = offset + new Vector2(80, row.Bounds.Y + 53);
+                var end = offset + new Vector2(80, 52);
+                window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
+                var scroll = window.Workspace.ScrollY; window.Presenter.Tick(.1);
+                Assert.That(window.Workspace.ScrollY, Is.EqualTo(Mathf.Max(0, scroll - 15)).Within(.001f));
+                Assert.That(window.Timeline.State.Insertion.Width, Is.EqualTo(window.position.width));
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = offset + new Vector2(-1, 52) });
+                Assert.That(window.Timeline.State.Insertion.Visible, Is.False);
+                window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
+                Assert.That(JsonDocumentCodec.Content(App.AssetData), Is.EqualTo(before));
+                App.Session.Edit("sentinel", () => group.Name = "sentinel");
+                row = window.Timeline.State.Rows.Single(r => r.Key == window.Presenter.KeyFor(group));
+                start = offset + new Vector2(80, row.Bounds.Y + 53);
+                window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
+                window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Z, control = true });
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
+                Assert.That(window.Timeline.State.Insertion.Visible, Is.False);
+                Assert.That(JsonDocumentCodec.Content(App.AssetData), Is.EqualTo(before));
+            }
+            finally { window.DiscardChanges(); window.Close(); ActionEditorHost.Window = previousWindow; }
         }
 
         [Test] public void ExistingSampleUsesMetadataAndOptionalAdaptersWithoutBusinessBranches()

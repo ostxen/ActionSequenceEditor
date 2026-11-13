@@ -3,7 +3,7 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF23 `complete`（限执行记录范围，RF23记录GUI输入重放间歇性风险）。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30工程验收278/278，待本地提交；RF26工程验收完成，领域归位、RootItems、逐窗工作区及v2硬切。偏好最小链按RF30–RF32接入产品视图。具体规格以第4.3节及最新执行记录为准。
+- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30本地提交`b12720a`（278/278）；RF31工程验收280/280、待本地提交。领域、RootItems、逐窗工作区及双UI共享时间轴已接线；其余Presenter按RF32继续。具体规格以第4.3节及最新执行记录为准。
 - 下一步：从RF31继续IMGUI被动视图接线，再顺序实施RF32–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
@@ -517,7 +517,7 @@ RF36对最终源码全量复核上述要求，并抽查结构编辑、属性编�
 | complete | RF28 | 共享时间轴Presenter、输入状态机、几何与工作区 | RF27 |
 | complete | RF29 | Group/Track统一结构拖放、排序与指示线状态 | RF28 |
 | complete | RF30 | UI Toolkit被动视图接线与三项反馈修正 | RF29 |
-| implementing | RF31 | IMGUI被动视图接线及统一交互规则 | RF30 |
+| complete | RF31 | IMGUI被动视图接线及统一交互规则 | RF30 |
 | planned | RF32 | 属性/菜单/设置/文档Presenter与业务扩展契约 | RF31 |
 | planned | RF33 | 播放预览、生命周期、Undo/恢复/保存完整闭环 | RF32 |
 | planned | RF34 | 删除旧架构/实验/无用入口与残留命名 | RF33 |
@@ -800,6 +800,18 @@ void ITimelineView.SetCapture(bool requested);
 - 失败证据：`115815Z-9ff9af1c`编译遇UnityEditor.EditorSettings同名，改用明确别名；`115913Z-5c64ced1`实际11/12，Seek故障后的取消再次Seek抛出，修复清理异常隔离；`120204Z-f55b6845`12/12。补充同输入/最小极值后`120953Z-feb41491`测试引用Storage导致实验DocumentSession同名，移除无必要using，`121057Z-5654830b`专项通过。未删业务断言或吞掉失败报告。
 - 最终：`20261113T121314Z-198128f5`Unity编译通过，NBC.ActionEditor.Editor.Tests / editor **250/250，0失败/跳过/不确定**。`121713Z-fae6a348`工作流46/46、真实生成21项目711源码方案构建通过；文档解析器yaml/markdown_it仍缺，整体code profile blocked。git diff --check通过，无asset目标为skipped；不宣称资源/冷进程/性能/人工验收。
 - 接入边界及下一项：当前两个产品窗口仍使用旧内部事件适配/绘制，RF28交付可实际驱动的共享核心，不以之宣称视图已被动化。RF29实现完整Group/Track结构落点、领域释放重验、插入线状态与自动滚动，再由RF30/31一次替换对应UI内部状态机，禁止增加旧名代理或双路fallback。
+### RF31 IMGUI被动时间轴执行记录
+
+- 状态：complete（工程范围，人工H01–H09未代签），2026-11-13；RF30本地提交`b12720a`后顺序推进。用户要求完成RF24–RF37、逐项本地提交且不推送，保护用户场景、JSON、Timeline、个人配置、Combat及包/设置。
+- 实际窗口：ActionEditorWindow不再创建旧TimelineView或包围每个GUI事件的作者事务；逐窗TimelineSurface装配TimelineControls、TimelineInputAdapter与无状态TimelineRenderer。共享Presenter持有交互与事务，原生适配只处理Event、hotControl、焦点与坐标；ViewBase删除第二套指针/拖动状态机。Toolbar与Welcome仍在旧布局注册器，文档/播放/设置的App调用留RF32/33，不冒充整个窗口已被动化。
+- 显示：主体、标题、片段/点、混合区、参考线与标尺使用不可变RenderState；控件先消费折叠/菜单/锁定输入，空组不建立折叠按钮。全宽2px蓝/红线在所有主体与滚动控件后绘制，不输出结构拖动文案。隔离工具栏泄漏GUI.color，修复实际抓屏未见蓝线问题；关闭后宿主补发GUI事件时不访问已释放表面。没有静态行/viewport缓存或Host.Width时间变换依赖。
+- 调用者：ExtensionEndToEndTests的移动/拉伸改为真实ActionEditorWindow.SendEvent，不再借专用窗口调用Gesture；创建菜单通过现行GenericMenu适配，SharedJsonTests的多选移动、磁吸参考更新、非法拉伸、框选取消、双窗owner及外部/错误按钮回归直接迁移到当前Presenter或真实窗口，未删除业务要求。固定教程探针IMGUI输入也改为真实窗口事件，此项未执行持久探针，完整磁盘链留RF33。
+- 固定退役：`retire_imgui_timeline_sources`明确11份源码及meta，GUID/源码/meta哈希与零参数受控；preview `20261113T141107Z-1ed7145e`→approval `141202Z-14593ebc`（引用连续真实授权，展示具体清单）→apply `141227Z-d69935d2`通过11/11、AssetDatabase删除并SyncAll。清单为TimelineView/Middle/Pointer/TrackItem/Bottom、ClipDragger、ClipDrawer/Basic/Simple/Signal与SplitterView；保留工具栏、Welcome、样式/图标。GUID搜索仅清单meta和审计/历史移动源码命中。没有手删资源/meta或保留Gesture兼容壳，已消费命令不重放。
+- 失败证据：`133659Z-777fd1be`9/14主要是旧内部断言与空组缺陷基线；`134825Z-e371d947`测试跨程序集访问internal ContentOffset编译失败，改用既有反射坐标读取；`134959Z-47782b65`13/14暴露工具栏颜色污染绘制，修复而非削弱像素断言；`135737Z-3d313547`275/278为滚轮偏好硬编码与释放表面后绘制，修复默认偏好一致性和生命周期；`141614Z-38cdd291`277/278为残留guiEdit私字段测试，改为真实IMGUI拖动与另一窗失焦/取消，保留owner回滚要求。
+- 最终完整：`verify --profile unity --test-filter NBC.ActionEditor.Editor.Tests --filter-type assembly --test-mode editor --timeout 600`，`20261113T142753Z-ec867eba`编译通过，**280/280，0失败/跳过/不确定**，包含2项新增真实IMGUI空组→首轨→折叠→Undo/Redo及滚动小窗口组拖动→24px边缘时钟→越界→Esc→拖动中Ctrl+Z。已有真实根轨排序/脱组/重入、跨UI同移动/拉伸图、无按下/严格3px/错误按钮/外部释放、全宽像素线两端及当前DPI内容偏移全部通过。此前`140649Z-9cfe981c`278/278，`142225Z-3dfe7133`280/280，最终以职责拆分后的142753结果为准。
+- 离线：`20261113T143304Z-36ed3ec0`workflow46/46、真实生成21项目715源码方案构建0错误39既有警告12.27秒；code整体仍因yaml/markdown_it缺失blocked，未安装。最终测试后仅添加精简用途注释与换行，无行为改变。git diff --check通过。资源验证无目标skipped，不宣称冷进程/多DPI设置切换/完整资源/Player Build/人工验收。
+- 责任审阅：Surface拥有视图生命周期，Controls只发意图，InputAdapter持原生捕获，Renderer只读取值快照；所有作者规则仍在Domain/Application/共享交互，没有复制菜单校验或改名巨型Presenter。后续RF32其他Presenter与样例扩展，RF33统一更新驱动和完整保存生命周期，RF34再清理剩余历史名字/失效接口。
+
 #### RF24 静态职责清点补充
 
 以下按当前真实文件逐项指定目标职责，不代表已经实施、移动或验证。路径均相对`Assets/ActionEditor/`。已逐文件读取源码并提取声明、引用和具体平台API，专项检索混杂职责；此步骤不是完整方法级可读性验收。未读取用户数据。尚待真实调用者闭包和GUID清单复核的删除项不得执行。

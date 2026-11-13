@@ -19,8 +19,7 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class SharedJsonTests
     {
-        private static readonly OriginalTimelineGesture ItemDragger = new OriginalTimelineGesture();
-        private static TimelineWorkspace Workspace => ItemDragger.Workspace;
+        private static readonly TimelineWorkspace Workspace = new TimelineWorkspace();
         private sealed class CollectionFixture
         {
             public System.Collections.Generic.List<string> Values = new System.Collections.Generic.List<string> { "one", "two" };
@@ -71,18 +70,11 @@ namespace NBC.ActionEditor.Tests
             private void OnGUI() { if (Original && inspector != null) inspector.OnInspectorGUI(); }
             private void OnDisable() { if (inspector != null) DestroyImmediate(inspector); if (preview != null) DestroyImmediate(preview); }
         }
-        private sealed class DragEventWindow : EditorWindow
+        private static Vector2 ImguiPoint(ActionEditorWindow window, TimelineClip clip, bool right = false)
         {
-            public Vector2 ContentOffset;
-            private void OnGUI()
-            {
-                ContentOffset = GUIUtility.GUIToScreenPoint(Vector2.zero) - position.position;
-                var ev = Event.current;
-                var pointer = new NBC.ActionEditor.Events.PointerEventData(ev);
-                if (ev.type == EventType.MouseDown) ItemDragger.OnBeginDrag(pointer);
-                else if (ev.type == EventType.MouseDrag) ItemDragger.OnDrag(pointer);
-                else if (ev.type == EventType.MouseUp) ItemDragger.OnEndDrag(pointer);
-            }
+            var rect = window.Timeline.State.Clips.Single(c => c.Key == window.Presenter.KeyFor(clip)).Bounds;
+            var offset = (Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(window);
+            return new Vector2(right ? rect.Right - 2 : rect.X + rect.Width * .5f, rect.Y + rect.Height * .5f + 40) + offset;
         }
         [UnityTest] public IEnumerator OriginalCollectionDeleteClicksKeepGUILayoutBalancedAndNullArrayUnchanged()
         {
@@ -153,45 +145,43 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator OriginalMultiMoveClampsOneDeltaAndKeepsSpacingAtZero()
         {
-            var previousWidth = ActionEditorHost.Width;
-            var window = ScriptableObject.CreateInstance<DragEventWindow>();
+            var previousWindow = ActionEditorHost.Window;
+            var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
             {
                 window.Show(); window.position = new Rect(60, 60, 1000, 600); window.Focus();
                 yield return null; yield return null;
-                ActionEditorHost.Width = 700;
                 var first = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                 var second = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Clips[0];
                 first.StartTime = 1; second.StartTime = 3;
-                App.SelectWithoutInspector(first, second); ClipDrawer.Reset();
-                ClipDrawer.GetDraw(first).ClipRealRect = new Rect(100, 20, 150, 26);
-                var down = new Vector2(Styles.TimelineLeftTotalWidth + 120, 30) + window.ContentOffset;
+                App.SelectWithoutInspector(first, second); window.Presenter.Refresh();
+                var down = ImguiPoint(window, first);
+                var scale = (window.position.width - window.Timeline.State.ContentLeft) / window.Workspace.ViewTime;
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = down, shift = true });
-                Assert.That(ItemDragger.DragType, Is.EqualTo(ItemDragType.Pos));
-                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down - new Vector2(ActionEditorHost.Width * 2 / 7, 0), shift = true });
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Move));
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down - new Vector2(scale * 2, 0), shift = true });
                 Assert.That(first.StartTime, Is.Zero.Within(.0001f));
                 Assert.That(second.StartTime, Is.EqualTo(2).Within(.0001f), "Both items must use the same zero-clamped delta.");
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down - new Vector2(400, 0), shift = true });
                 Assert.That(first.StartTime, Is.Zero.Within(.0001f));
                 Assert.That(second.StartTime, Is.EqualTo(2).Within(.0001f));
-                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down + new Vector2(100, 0), shift = true });
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down + new Vector2(scale, 0), shift = true });
                 Assert.That(first.StartTime, Is.EqualTo(2).Within(.0001f));
                 Assert.That(second.StartTime, Is.EqualTo(4).Within(.0001f));
-                ItemDragger.Cancel();
+                window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
                 Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(1).Within(.0001f));
                 first = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; second = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Clips[0];
-                App.SelectWithoutInspector(first, second); ClipDrawer.Reset();
-                ClipDrawer.GetDraw(first).ClipRealRect = new Rect(100, 20, 150, 26);
+                App.SelectWithoutInspector(first, second); window.Presenter.Refresh(); down = ImguiPoint(window, first);
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = down, shift = true });
-                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down + new Vector2(50, 0), shift = true });
-                window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = down + new Vector2(50, 0), shift = true });
+                window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down + new Vector2(scale * .5f, 0), shift = true });
+                window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = down + new Vector2(scale * .5f, 0), shift = true });
                 Assert.That(first.StartTime, Is.EqualTo(1.5f).Within(.0001f));
                 Assert.That(second.StartTime, Is.EqualTo(3.5f).Within(.0001f));
                 Undo.PerformUndo(); yield return null;
                 Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(1).Within(.0001f));
                 Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Clips[0].StartTime, Is.EqualTo(3).Within(.0001f));
             }
-            finally { ItemDragger.Cancel(); window.Close(); ActionEditorHost.Width = previousWidth; }
+            finally { window.Presenter?.Cancel(); window.DiscardChanges(); window.Close(); ActionEditorHost.Window = previousWindow; }
         }
 
         [Test] public void DocumentPickerFiltersBothDiscoveryPathsWithoutRestrictingGenericResources()
@@ -224,52 +214,56 @@ namespace NBC.ActionEditor.Tests
         [Test] public void CollapsedClipsCannotBeHitThroughRetainedDrawGeometry()
         {
             var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); var track = group.Tracks[0]; var clip = track.Clips[0];
-            ClipDrawer.Reset();
-            var draw = ClipDrawer.GetDraw(clip); draw.ClipRect = draw.ClipRealRect = new Rect(10, 10, 20, 20);
-            Assert.That(ClipDrawer.GetClipByTrackPosition(track, new Vector2(15, 15), Workspace), Is.SameAs(clip));
-            Workspace.SetCollapsed(group, true); ClipDrawer.Reset();
-            Assert.That(ClipDrawer.GetClipByTrackPosition(track, new Vector2(15, 15), Workspace), Is.Null);
-            Assert.That(ClipDrawer.ClipContainsByRealRect(new Vector2(15, 15), Workspace), Is.False);
-            CollectionAssert.DoesNotContain(ClipDrawer.GetClips(new Rect(10, 10, 20, 20), Workspace), clip);
+            var layout = new VisibleTimelineLayout(); var size = new TimelineSize(1000, 500);
+            var state = layout.Build(App.AssetData, App.Context.Selection, Workspace, size, 0, null);
+            var rect = state.Clips.Single(c => c.Key == layout.KeyFor(clip)).Bounds;
+            var x = rect.X + rect.Width * .5f; var y = rect.Y + 8;
+            Assert.That(layout.HitClip(x, y), Is.SameAs(clip));
+            Workspace.SetCollapsed(group, true);
+            state = layout.Build(App.AssetData, App.Context.Selection, Workspace, size, 0, null);
+            Assert.That(layout.HitClip(x, y), Is.Not.SameAs(clip));
+            Assert.That(state.Clips.Any(c => c.Key == layout.KeyFor(clip)), Is.False);
+            CollectionAssert.DoesNotContain(layout.In(rect), clip);
         }
 
         [Test] public void StretchRefreshesMagnetReferencesWithoutPreviousMoveGesture()
         {
-            var oldEvent = Event.current; var oldWidth = ActionEditorHost.Width;
+            var gesture = new ClipGesture(App.Session, App.Context.Clips);
+            var settings = new NBC.ActionEditor.Application.Settings.EditorSettings(NBC.ActionEditor.Application.Settings.TimeStepMode.Seconds, .01f, 30, true, true, 0, "Assets/");
+            var transform = new TimeTransform(0, 7, 700);
             try
             {
-                ActionEditorHost.Width = 700;
                 var clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
-                typeof(OriginalTimelineGesture).GetField("magnetSnapTimesCache", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(ItemDragger, new[] { 12345f });
-                var source = new Event { type = EventType.MouseDrag, button = 0,
-                    mousePosition = new Vector2(Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth + Workspace.TimeToPos(clip.EndTime, ActionEditorHost.Width) - 2, 30) };
-                Event.current = source;
-                var pointer = new NBC.ActionEditor.Events.PointerEventData(); pointer.SetEvent(source);
-                ItemDragger.OnBeginDrag(pointer);
-                Assert.That(ItemDragger.DragType, Is.EqualTo(ItemDragType.StretchEnd));
-                Assert.That(ItemDragger.HasMagnetSnapTime(2.5f), Is.True);
-                Assert.That(ItemDragger.HasMagnetSnapTime(12345), Is.False);
-                Assert.That(ItemDragger.HasMagnetSnapTime(clip.StartTime), Is.False, "The selected item is not a snap reference.");
+                Assert.That(gesture.Begin(this, clip, new[] { clip }, 1, 175, 12345), Is.True);
+                gesture.Cancel();
+                clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+                Assert.That(gesture.Begin(this, clip, new[] { clip }, 1, 175, 0), Is.True);
+                gesture.Move(247, false, transform, settings);
+                Assert.That(clip.EndTime, Is.EqualTo(2.5f), "First resize must use the current unselected clip references.");
+                Assert.That(gesture.Guides.Any(g => g.Time == 2.5f && g.Solid), Is.True);
+                Assert.That(gesture.Guides.Any(g => g.Time == 12345), Is.False);
             }
-            finally { ItemDragger.Cancel(); Event.current = oldEvent; ActionEditorHost.Width = oldWidth; }
+            finally { gesture.Cancel(); }
         }
 
         [Test] public void OriginalGestureReadsShiftFromReceivedPointerWithoutGlobalGuiEvent()
         {
-            var width = ActionEditorHost.Width; var gesture = new OriginalTimelineGesture();
+            var previousWindow = ActionEditorHost.Window; var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
             {
-                ActionEditorHost.Width = 700;
                 var clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
-                var down = new Vector2(Styles.TimelineLeftTotalWidth + Workspace.TimeToPos(.75f, 700), 30);
-                gesture.OnBeginDrag(new NBC.ActionEditor.Events.PointerEventData(new Event { type = EventType.MouseDown, button = 0, shift = true, mousePosition = down }));
-                gesture.OnDrag(new NBC.ActionEditor.Events.PointerEventData(new Event { type = EventType.MouseDrag, button = 0, shift = true, mousePosition = down + new Vector2(25, 0) }));
-                gesture.OnEndDrag(new NBC.ActionEditor.Events.PointerEventData(new Event { type = EventType.MouseUp, button = 0, shift = true, mousePosition = down + new Vector2(25, 0) }));
+                var presenter = window.Presenter; presenter.Resize(new TimelineSize(1000, 500));
+                var rect = presenter.State.Clips.Single(c => c.Key == presenter.KeyFor(clip)).Bounds;
+                var x = rect.X + rect.Width * .5f; var y = rect.Y + 8;
+                var delta = (1000 - presenter.State.ContentLeft) / 7 * .25f;
+                presenter.Pointer(new PointerInput(PointerAction.Down, x, y, shift: true));
+                presenter.Pointer(new PointerInput(PointerAction.Move, x + delta, y, shift: true));
+                presenter.Pointer(new PointerInput(PointerAction.Up, x + delta, y, shift: true));
                 Assert.That(clip.StartTime, Is.EqualTo(.5f).Within(.00001f));
                 Assert.That(App.Session.IsEditing, Is.False);
                 Assert.That(new NBC.ActionEditor.Events.PointerEventData(new Event { shift = false }).Shift, Is.False);
             }
-            finally { gesture.Cancel(); ActionEditorHost.Width = width; }
+            finally { window.Presenter?.Cancel(); window.DiscardChanges(); UnityEngine.Object.DestroyImmediate(window); ActionEditorHost.Window = previousWindow; }
         }
 
         [UnityTest] public IEnumerator OriginalMiddlePanReleaseOutsideDoesNotConsumeLaterLeftDrag()
@@ -310,17 +304,22 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void OriginalMarqueeCancelCannotApplyThePreviousRectangleOnRelease()
         {
-            var view = new TimelineMiddleView { Position = new Rect(0, 0, 1000, 500) };
-            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
-            typeof(TimelineMiddleView).GetField("_pointerDown", flags).SetValue(view, true);
-            typeof(TimelineMiddleView).GetField("_preMultipleResult", flags).SetValue(view, true);
-            typeof(TimelineMiddleView).GetField("_multipleRect", flags).SetValue(view, new Rect(250, 0, 500, 200));
+            var previousWindow = ActionEditorHost.Window;
+            var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
             var clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
-            view.CancelMarquee();
-            Assert.That(App.FistSelect, Is.SameAs(clip));
-            Assert.That((bool)typeof(TimelineMiddleView).GetField("_pointerDown", flags).GetValue(view), Is.False);
-            Assert.That((bool)typeof(TimelineMiddleView).GetField("_preMultipleResult", flags).GetValue(view), Is.False);
-            Assert.That((Rect)typeof(TimelineMiddleView).GetField("_multipleRect", flags).GetValue(view), Is.EqualTo(default(Rect)));
+            try
+            {
+                var presenter = window.Presenter; presenter.Resize(new TimelineSize(1000, 500));
+                presenter.Pointer(new PointerInput(PointerAction.Down, 900, 400));
+                presenter.Pointer(new PointerInput(PointerAction.Move, 300, 30));
+                Assert.That(presenter.State.Marquee.HasValue, Is.True);
+                presenter.Key(new KeyInput(TimelineKey.Escape));
+                presenter.Pointer(new PointerInput(PointerAction.Up, 300, 30));
+                Assert.That(App.FistSelect, Is.SameAs(clip));
+                Assert.That(presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
+                Assert.That(presenter.State.Marquee.HasValue, Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(window); ActionEditorHost.Window = previousWindow; }
         }
         [UnityTest] public IEnumerator NativeTextFocusDoesNotRunTimelineShortcutsAndWheelCancelsOwnedDrag()
         {
@@ -363,7 +362,7 @@ namespace NBC.ActionEditor.Tests
             var second = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
             {
-                Assert.That(first.Gesture, Is.Not.SameAs(second.Gesture));
+                Assert.That(first.Presenter, Is.Not.SameAs(second.Presenter));
                 Assert.That(first.Workspace, Is.Not.SameAs(second.Workspace));
                 first.Workspace.SetRange(-1, 12); first.Workspace.ScrollY = 55; first.Workspace.LeftWidth = 310;
                 first.Workspace.SetCollapsed(App.AssetData.RootItems.OfType<TimelineGroup>().First(), true);
@@ -373,16 +372,19 @@ namespace NBC.ActionEditor.Tests
                 first.Workspace.SetCollapsed(App.AssetData.RootItems.OfType<TimelineGroup>().First(), false);
                 var clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                 App.SelectWithoutInspector(clip);
-                first.Gesture.DragType = ItemDragType.Pos;
-                second.Gesture.Cancel();
-                Assert.That(first.Gesture.DragItems, Is.EqualTo(new[] { clip }));
-                Assert.That(first.Gesture.DragType, Is.EqualTo(ItemDragType.Pos));
-                Assert.That(second.Gesture.DragItems, Is.Empty);
-                first.Gesture.Cancel();
-                Assert.That(first.Gesture.DragItems, Is.Empty);
-                Assert.That(first.Gesture.MoveToItem, Is.Null);
+                first.Presenter.Resize(new TimelineSize(1000, 500));
+                var rect = first.Timeline.State.Clips.Single(c => c.Key == first.Presenter.KeyFor(clip)).Bounds;
+                first.Presenter.Pointer(new PointerInput(PointerAction.Down, rect.X + rect.Width * .5f, rect.Y + 8));
+                second.Presenter.Cancel();
+                Assert.That(first.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Move));
+                Assert.That(App.Session.IsEditing, Is.True);
+                Assert.That(second.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
+                first.Presenter.Cancel();
+                Assert.That(first.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
+                Assert.That(first.Timeline.State.Guides, Is.Empty);
+                Assert.That(App.Session.IsEditing, Is.False);
             }
-            finally { first.Gesture.Cancel(); second.Gesture.Cancel(); first.DiscardChanges(); second.DiscardChanges(); UnityEngine.Object.DestroyImmediate(first); UnityEngine.Object.DestroyImmediate(second); ActionEditorHost.Window = previousWindow; }
+            finally { first.Presenter?.Cancel(); second.Presenter?.Cancel(); first.DiscardChanges(); second.DiscardChanges(); UnityEngine.Object.DestroyImmediate(first); UnityEngine.Object.DestroyImmediate(second); ActionEditorHost.Window = previousWindow; }
         }
         private string recovery;
         [SetUp] public void Setup()
@@ -928,9 +930,12 @@ namespace NBC.ActionEditor.Tests
         [Test] public void OriginalInvalidStretchRestoresLengthAndTrackReorderIsUndoable()
         {
             var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); var track = group.Tracks[0]; var clip = track.Clips[0];
-            App.Select(clip); ItemDragger.DragType = ItemDragType.StretchEnd;
-            clip.Length = 10; ItemDragger.DragType = ItemDragType.None;
-            Assert.That(clip.Length, Is.EqualTo(1.5f));
+            var gesture = new ClipGesture(App.Session, App.Context.Clips);
+            Assert.That(gesture.Begin(this, clip, new[] { clip }, 1, 175, 0), Is.True);
+            gesture.Move(1025, true, new TimeTransform(0, 7, 700), new NBC.ActionEditor.Application.Settings.EditorSettings(NBC.ActionEditor.Application.Settings.TimeStepMode.Seconds, .01f, 30, false, true, 0, "Assets/"));
+            gesture.Finish();
+            group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); track = group.Tracks[0];
+            Assert.That(track.Clips[0].Length, Is.EqualTo(1.5f));
             App.Context.Structure.MoveTrack(track, group, 3);
             Assert.That(group.Tracks[2], Is.SameAs(track));
             Undo.PerformUndo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(track.Name));
@@ -1038,8 +1043,8 @@ namespace NBC.ActionEditor.Tests
                 originalWindow.SendEvent(new Event { type = EventType.ScrollWheel, mousePosition = point, delta = new Vector2(0, 120) });
                 baseline.OriginalWheelMax = originalWindow.Workspace.ViewTimeMax;
                 var originalFraction = 100 / (1000 - Styles.TimelineLeftTotalWidth);
-                Assert.That(baseline.OriginalWheelMax, Is.EqualTo(9.575f - 1.575f * originalFraction).Within(.001f));
-                Assert.That(originalWindow.Workspace.ViewTimeMin, Is.EqualTo(1 - 1.575f * originalFraction).Within(.001f));
+                Assert.That(baseline.OriginalWheelMax, Is.EqualTo(Prefs.scrollWheelZooms ? 9.575f - 1.575f * originalFraction : 8).Within(.001f));
+                Assert.That(originalWindow.Workspace.ViewTimeMin, Is.EqualTo(Prefs.scrollWheelZooms ? 1 - 1.575f * originalFraction : 1).Within(.001f));
                 Assert.That(originalWindow.Workspace.ViewTimeMin + originalWindow.Workspace.ViewTime * originalFraction, Is.EqualTo(1 + 7 * originalFraction).Within(.001f), "Hovered time must remain fixed.");
                 originalWindow.Workspace.ViewTimeMax = 8; originalWindow.Workspace.ViewTimeMin = 1;
                 originalWindow.SendEvent(new Event { type = EventType.MouseDown, mousePosition = point, button = 2 });
@@ -1240,19 +1245,24 @@ namespace NBC.ActionEditor.Tests
             const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             try
             {
-                original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
+                original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.position = new Rect(60, 60, 1000, 600); original.Show();
                 native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>(); native.Show();
                 yield return null; yield return null;
-                var token = App.Session.BeginEdit(original);
-                typeof(ActionEditorWindow).GetField("guiEdit", flags).SetValue(original, token);
-                ((LegacyExperienceAsset)App.AssetData).Version = 17;
+                original.Focus(); original.Repaint(); yield return null; yield return null;
+                var clip = App.AssetData.AllTracks.First().Clips[0]; var down = ImguiPoint(original, clip);
+                original.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = down });
+                original.SendEvent(new Event { type = EventType.MouseDrag, button = 0, shift = true, mousePosition = down + Vector2.right * 30 });
+                var moved = clip.StartTime;
+                Assert.That(moved, Is.GreaterThan(.25f));
                 native.Canvas.Cancel();
                 typeof(UIToolkitActionEditorWindow).GetMethod("OnLostFocus", flags).Invoke(native, null);
-                Assert.That(token.IsActive, Is.True);
-                Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(17));
+                Assert.That(App.Session.IsEditing, Is.True);
+                Assert.That(original.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Move));
+                Assert.That(clip.StartTime, Is.EqualTo(moved));
                 typeof(ActionEditorWindow).GetMethod("OnLostFocus", flags).Invoke(original, null);
-                Assert.That(token.IsActive, Is.False);
-                Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(1));
+                Assert.That(App.Session.IsEditing, Is.False);
+                Assert.That(original.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
+                Assert.That(App.AssetData.AllTracks.First().Clips[0].StartTime, Is.EqualTo(.25f));
             }
             finally
             {
@@ -1567,7 +1577,7 @@ namespace NBC.ActionEditor.Tests
             {
                 window.Show(); window.Focus(); App.Refresh(); window.Repaint(); yield return null; yield return null;
                 window.Repaint(); yield return null; yield return null;
-                Assert.That(window.RegisteredViewCount(), Is.EqualTo(7 + App.AssetData.RootItems.OfType<TimelineGroup>().Sum(g => 1 + (window.Workspace.IsCollapsed(g) ? 0 : g.Tracks.Count)) * 2));
+                Assert.That(window.RegisteredViewCount(), Is.EqualTo(2), "Only the welcome page and toolbar remain in the old view registry.");
                 var baseline = window.RegisteredViewCount();
                 for (var i = 0; i < 5; i++) { App.Refresh(); window.Repaint(); yield return null; yield return null; }
                 Assert.That(window.RegisteredViewCount(), Is.EqualTo(baseline));
@@ -1577,30 +1587,35 @@ namespace NBC.ActionEditor.Tests
             Assert.That(window.RegisteredViewCount(), Is.Zero);
         }
 
-        private sealed class PointerView : ViewBase, NBC.ActionEditor.Events.IDragBeginHandler, NBC.ActionEditor.Events.IDragEndHandler
+        [UnityTest] public IEnumerator OriginalInputNeedsPressAndEndsOutside()
         {
-            public int Started, Ended;
-            public override void OnDraw() { }
-            public void OnDragBegin(NBC.ActionEditor.Events.PointerEventData e) => Started++;
-            public void OnDragEnd(NBC.ActionEditor.Events.PointerEventData e) => Ended++;
-            public void Send(Event e) { Position = new Rect(0, 0, 100, 100); CheckPointerEvent(e); }
-        }
-        [Test] public void OriginalInputNeedsPressAndEndsOutside()
-        {
-            var old = Event.current; var view = new PointerView();
+            var previousWindow = ActionEditorHost.Window;
+            var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
             {
-                view.Send(new Event { type = EventType.MouseDrag, mousePosition = new Vector2(20, 20), button = 0 }); Assert.That(view.Started, Is.Zero);
-                view.Send(new Event { type = EventType.MouseDown, mousePosition = new Vector2(20, 20), button = 0 });
-                view.Send(new Event { type = EventType.MouseDrag, mousePosition = new Vector2(21, 20), button = 0 }); Assert.That(view.Started, Is.Zero, "One pixel is not yet a drag.");
-                view.Send(new Event { type = EventType.MouseDrag, mousePosition = new Vector2(150, 20), button = 0 }); Assert.That(view.Started, Is.EqualTo(1));
-                view.Send(new Event { type = EventType.MouseUp, mousePosition = new Vector2(150, 20), button = 1 }); Assert.That(view.Ended, Is.Zero);
-                view.Send(new Event { type = EventType.MouseUp, mousePosition = new Vector2(150, 20), button = 0 }); Assert.That(view.Ended, Is.EqualTo(1));
-                view.Send(new Event { type = EventType.MouseDown, mousePosition = new Vector2(20, 20), button = 0 });
-                typeof(ViewBase).GetMethod("ResetPointerState", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(view, null);
-                view.Send(new Event { type = EventType.MouseDrag, mousePosition = new Vector2(150, 20), button = 0 }); Assert.That(view.Started, Is.EqualTo(1));
+                window.position = new Rect(60, 60, 1000, 600); window.Show(); window.Focus();
+                yield return null; yield return null;
+                var offset = (Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(window);
+                var start = offset + new Vector2(90, 53);
+                window.SendEvent(new Event { type = EventType.MouseDrag, mousePosition = start, button = 0 });
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
+                window.SendEvent(new Event { type = EventType.MouseDown, mousePosition = start, button = 0 });
+                window.SendEvent(new Event { type = EventType.MouseDrag, mousePosition = start + Vector2.down * 3, button = 0 });
+                Assert.That(window.Timeline.State.Insertion.Visible, Is.False, "Exactly three pixels is not yet a structure drag.");
+                window.SendEvent(new Event { type = EventType.MouseDrag, mousePosition = start + Vector2.down * 4, button = 0 });
+                Assert.That(window.Timeline.State.Insertion.Visible, Is.True);
+                window.SendEvent(new Event { type = EventType.MouseUp, mousePosition = start, button = 1 });
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
+                window.SendEvent(new Event { type = EventType.MouseUp, mousePosition = offset + new Vector2(-10, 53), button = 0 });
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
+                Assert.That(window.Timeline.State.Insertion.Visible, Is.False);
+                Assert.That(App.Session.IsDirty || App.Session.IsEditing, Is.False);
+                window.SendEvent(new Event { type = EventType.MouseDown, mousePosition = start, button = 0 });
+                window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
+                window.SendEvent(new Event { type = EventType.MouseDrag, mousePosition = start + Vector2.down * 4, button = 0 });
+                Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
             }
-            finally { Event.current = old; }
+            finally { window.DiscardChanges(); window.Close(); ActionEditorHost.Window = previousWindow; }
         }
     }
 }

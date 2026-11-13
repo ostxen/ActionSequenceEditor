@@ -2,6 +2,7 @@ using NBC.ActionEditor.Domain;
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using UnityEngine.UIElements;
@@ -214,11 +215,15 @@ namespace NBC.ActionEditor.Validation
                         }
                         else
                         {
-                            var down = new Vector2(Styles.TimelineLeftTotalWidth + original.Workspace.TimeToPos(resize == 0 ? clip.StartTime + .5f : clip.EndTime, ActionEditorHost.Width) - (resize == 0 ? 0 : 2), 30);
-                            var up = down + new Vector2(ActionEditorHost.Width * (resize == 0 ? .25f : -.25f) / original.Workspace.ViewTime, 0);
-                            TutorialOriginalPointer(original.Gesture, EventType.MouseDown, down);
-                            TutorialOriginalPointer(original.Gesture, EventType.MouseDrag, up);
-                            TutorialOriginalPointer(original.Gesture, EventType.MouseUp, up);
+                            original.Focus(); original.Repaint(); await TutorialFrames();
+                            var state = original.Timeline.State;
+                            var rect = state.Clips.Single(c => c.Key == original.Presenter.KeyFor(clip)).Bounds;
+                            var offset = (Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(original);
+                            var down = new Vector2(resize == 0 ? rect.X + rect.Width * .5f : rect.Right - 2, rect.Y + rect.Height * .5f + 40) + offset;
+                            var up = down + new Vector2((state.Size.WindowWidth - state.ContentLeft) * (resize == 0 ? .25f : -.25f) / original.Workspace.ViewTime, 0);
+                            foreach (var kind in new[] { EventType.MouseDown, EventType.MouseDrag, EventType.MouseUp })
+                                original.SendEvent(new Event { type = kind, button = 0, shift = true, mousePosition = kind == EventType.MouseDown ? down : up });
+                            if (original.Timeline.Error != null) throw new InvalidOperationException(original.Timeline.Error);
                         }
                         clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                         if (Mathf.Abs(clip.StartTime - .5f) > .0001f || Mathf.Abs(clip.Length - (resize == 0 ? 1.5f : 1.25f)) > .0001f)
@@ -275,13 +280,6 @@ namespace NBC.ActionEditor.Validation
                 EditorApplication.update += tick;
                 try { await done.Task; } finally { EditorApplication.update -= tick; }
             }
-        }
-        private static void TutorialOriginalPointer(OriginalTimelineGesture gesture, EventType type, Vector2 point)
-        {
-            var pointer = new Events.PointerEventData(new Event { type = type, button = 0, shift = true, mousePosition = point });
-            if (type == EventType.MouseDown) gesture.OnBeginDrag(pointer);
-            else if (type == EventType.MouseDrag) gesture.OnDrag(pointer);
-            else gesture.OnEndDrag(pointer);
         }
         private static void TutorialPointer(VisualElement target, EventType type, Vector2 point)
         {

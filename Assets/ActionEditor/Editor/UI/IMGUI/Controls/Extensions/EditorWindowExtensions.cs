@@ -44,11 +44,6 @@ namespace NBC.ActionEditor
         {
             if (_views.TryGetValue(window, out var list)) list.Remove(view);
         }
-        public static void ResetPointerStates(this EditorWindow window)
-        {
-            if (_views.TryGetValue(window, out var list))
-                foreach (var view in list) view.ResetPointerState();
-        }
         public static void ReleaseViews(this EditorWindow window) => _views.Remove(window);
         public static int RegisteredViewCount(this EditorWindow window) => _views.TryGetValue(window, out var list) ? list.Count : 0;
     }

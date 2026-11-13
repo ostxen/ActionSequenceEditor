@@ -51,12 +51,11 @@ namespace NBC.ActionEditor.Tests
                 window.Repaint(); yield return null; yield return null;
                 Assert.That(App.TextAsset, Is.SameAs(json));
                 Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo("Events"));
-                var timeline = (TimelineView)typeof(ActionEditorWindow).GetField("_timelineView", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(window);
-                Assert.That(timeline.Position.width, Is.EqualTo(window.position.width).Within(1), "Original OnGUI must draw using the actual window geometry.");
-                Assert.That(timeline.Position.height, Is.GreaterThan(200));
-                var middle = (TimelineMiddleView)typeof(TimelineView).GetField("_middleView", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(timeline);
-                Assert.That(middle.Position.height, Is.GreaterThan(200));
-                Assert.That(TimelineMiddleView.GetLastItem(), Is.Not.Null);
+                var timeline = window.Timeline.State;
+                Assert.That(timeline.Size.Width, Is.EqualTo(window.position.width).Within(1), "IMGUI must use the actual window geometry.");
+                Assert.That(timeline.Size.Height, Is.GreaterThan(200));
+                Assert.That(timeline.Rows.Count, Is.EqualTo(2));
+                Assert.That(timeline.Rows[1].Title, Is.EqualTo("Events"));
                 Assert.That(Resources.FindObjectsOfTypeAll<ActionWorkbench>(), Is.EquivalentTo(workbenches));
                 Assert.DoesNotThrow(() => App.SaveAsset(), "Canceling the save path leaves the in-memory fixture unchanged.");
                 Assert.That(App.TextAsset, Is.SameAs(json));
@@ -102,7 +101,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(Resources.FindObjectsOfTypeAll<ActionEditorWindow>(), Is.Not.Empty);
                 Assert.That(Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>(), Is.EquivalentTo(workbenches));
                 var legacy = Resources.FindObjectsOfTypeAll<ActionEditorWindow>().First();
-                Assert.That(typeof(ActionEditorWindow).GetField("_timelineView", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(legacy), Is.TypeOf<TimelineView>());
+                Assert.That(legacy.Timeline, Is.TypeOf<NBC.ActionEditor.Views.IMGUI.TimelineSurface>());
                 Assert.That(typeof(ActionEditorWindow).GetField("_welcomeView", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(legacy), Is.TypeOf<WelcomeView>());
                 Assert.DoesNotThrow(UIToolkitActionEditorWindow.Open);
                 Assert.That(Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>(), Is.Not.Empty);
