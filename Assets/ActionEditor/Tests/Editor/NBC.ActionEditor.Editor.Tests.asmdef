@@ -1,6 +1,6 @@
 {
     "name": "NBC.ActionEditor.Editor.Tests",
-    "references": ["NBC.ActionEditor", "NBC.ActionEditor.Editor", "NBC.ActionEditor.Application", "NBC.ActionEditor.Presentation"],
+    "references": ["NBC.ActionEditor.Domain", "NBC.ActionEditor.Serialization", "NBC.ActionEditor.Editor", "NBC.ActionEditor.Application", "NBC.ActionEditor.Presentation"],
     "includePlatforms": ["Editor"],
     "optionalUnityReferences": ["TestAssemblies"],
     "autoReferenced": false

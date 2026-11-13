@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -19,7 +20,7 @@ namespace NBC.ActionEditor.Tests
             public override void Update(float time, float previousTime) { Updates++; if (ThrowUpdate) throw new InvalidOperationException("preview failure"); }
             public override void Dispose() { Disposals++; }
         }
-        private class Target : Clip { }
+        private class Target : TimelineClip { }
         private class DerivedTarget : Target { }
         [CustomPreview(typeof(Target))] private class First : Probe { }
         [CustomPreview(typeof(Target))] private class Override : First { }

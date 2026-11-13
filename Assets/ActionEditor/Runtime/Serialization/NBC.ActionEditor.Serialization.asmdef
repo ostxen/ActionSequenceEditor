@@ -1,0 +1,7 @@
+{
+    "name": "NBC.ActionEditor.Serialization",
+    "references": ["NBC.ActionEditor.Domain"],
+    "overrideReferences": true,
+    "precompiledReferences": [],
+    "autoReferenced": true
+}

@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using UnityEngine;
 
 namespace NBC.ActionEditor
@@ -13,12 +14,9 @@ namespace NBC.ActionEditor
             var nextMin = anchor - nextSpan * fraction;
             return new Vector2(nextMin, nextMin + nextSpan);
         }
-        public static void SetRange(Asset asset, Vector2 range)
+        public static void SetRange(NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace workspace, Vector2 range)
         {
-            // Expand first so the independently clamped setters cannot truncate a translated range.
-            asset.ViewTimeMax = Mathf.Max(asset.ViewTimeMax, range.y);
-            asset.ViewTimeMin = range.x;
-            asset.ViewTimeMax = range.y;
+            workspace.SetRange(range.x, range.y);
         }
         public static float ZoomMaximum(float minimum, float maximum, float wheel, float windowWidth, bool enabled)
         {

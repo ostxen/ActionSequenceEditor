@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -83,7 +84,7 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void AuthoredPathsUseOneUndoCancelAndRejectStaleOrLockedRoots()
         {
-            LegacyExperienceInterval Clip() => (LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0];
+            LegacyExperienceInterval Clip() => (LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
             JsonPropertyPath Path(LegacyExperienceInterval clip) => new JsonPropertyPath(clip).Field(typeof(LegacyExperienceInterval).GetField("Parameters")).Element(0).Field(typeof(LegacyExperienceParameter).GetField("Value"));
             var path = Path(Clip()); var token = App.Session.BeginEdit(this);
             path.Write(4f); path.Write(6f); token.Commit();
@@ -94,7 +95,7 @@ namespace NBC.ActionEditor.Tests
             Assert.That(Clip().Parameters[0].Value, Is.EqualTo(6));
             token = App.Session.BeginEdit(this); Path(Clip()).Write(12f); token.Cancel();
             Assert.That(Clip().Parameters[0].Value, Is.EqualTo(6));
-            App.AssetData.groups[0].Tracks[0].IsLocked = true;
+            App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].IsLocked = true;
             Assert.Throws<InvalidOperationException>(() => Path(Clip()).Write(15f));
             Assert.That(Clip().Parameters[0].Value, Is.EqualTo(6));
         }
@@ -124,7 +125,7 @@ namespace NBC.ActionEditor.Tests
             {
                 window.Show(); window.Focus(); yield return null; yield return null;
                 var root = new VisualElement(); window.rootVisualElement.Add(root);
-                var clip = (LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0];
+                var clip = (LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                 UIToolkitPropertyView.DrawFields(root, clip, () => { }, 0);
                 var field = root.Query<IntegerField>().ToList().Single(f => f.label == "次数");
                 Assert.That(field.isDelayed, Is.True);
@@ -145,8 +146,8 @@ namespace NBC.ActionEditor.Tests
                 window.Canvas.Focus(); yield return null;
                 Assert.That(clip.Count, Is.EqualTo(9), "Escape must restore committed input instead of committing the pending text on blur.");
                 Undo.PerformUndo(); yield return null;
-                Assert.That(((LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0]).Count, Is.EqualTo(3));
-                root.Clear(); clip = (LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0];
+                Assert.That(((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(3));
+                root.Clear(); clip = (LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                 UIToolkitPropertyView.DrawFields(root, clip, () => { }, 0);
                 field = root.Query<IntegerField>().ToList().Single(f => f.label == "次数");
                 yield return null; input = field.Q("unity-text-input").Q<TextElement>(); input.Focus(); yield return null;
@@ -155,7 +156,7 @@ namespace NBC.ActionEditor.Tests
                 window.Canvas.Focus(); yield return null;
                 Assert.That(clip.Count, Is.EqualTo(5), "Blur commits delayed text once.");
                 Undo.PerformUndo(); yield return null;
-                Assert.That(((LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0]).Count, Is.EqualTo(3));
+                Assert.That(((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(3));
                 LogAssert.NoUnexpectedReceived();
             }
             finally { window.DiscardChanges(); window.Close(); }

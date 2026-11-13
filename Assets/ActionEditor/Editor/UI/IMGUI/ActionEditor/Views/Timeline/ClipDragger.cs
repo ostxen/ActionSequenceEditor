@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NBC.ActionEditor.Domain;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NBC.ActionEditor.Events;
@@ -22,20 +23,21 @@ namespace NBC.ActionEditor
         public float Length;
         public float BlendIn;
         public float BlendOut;
-        public Track Parent;
+        public TimelineTrack Parent;
 
-        public DragBeginInfo(Clip clip)
+        public DragBeginInfo(TimelineClip clip)
         {
             StartTime = clip.StartTime;
             Length = clip.Length;
             BlendIn = clip.BlendIn;
             BlendOut = clip.BlendOut;
-            Parent = clip.Parent as Track;
+            Parent = clip.Parent as TimelineTrack;
         }
     }
 
     public sealed class OriginalTimelineGesture
     {
+        public NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace Workspace { get; set; } = new NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace();
         private ItemDragType _dragType = ItemDragType.None;
         private JsonEditTransaction edit;
         private readonly object editOwner = new object();
@@ -43,7 +45,7 @@ namespace NBC.ActionEditor
         public IDirectable MoveToItem { get; private set; }
         public bool MoveBefore { get; private set; }
         public TrackDropTarget TrackDrop { get; private set; }
-        private Track movingTrack;
+        private TimelineTrack movingTrack;
 
         public ItemDragType DragType
         {
@@ -72,7 +74,7 @@ namespace NBC.ActionEditor
             _tracks.Clear();
             var assets = App.AssetData;
             if (assets == null) return;
-            _tracks.AddRange(TimelineGeometry.VisibleRows(assets));
+            _tracks.AddRange(TimelineGeometry.VisibleRows(assets, Workspace));
         }
 
         #endregion
@@ -82,10 +84,10 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 开始拖动时的位置
         /// </summary>
-        private readonly Dictionary<Clip, DragBeginInfo> _dragBeginStartTime =
-            new Dictionary<Clip, DragBeginInfo>();
+        private readonly Dictionary<TimelineClip, DragBeginInfo> _dragBeginStartTime =
+            new Dictionary<TimelineClip, DragBeginInfo>();
 
-        public readonly List<Clip> DragItems = new List<Clip>();
+        public readonly List<TimelineClip> DragItems = new List<TimelineClip>();
 
         private void CacheDragClipInfo()
         {
@@ -93,7 +95,7 @@ namespace NBC.ActionEditor
             _dragBeginStartTime.Clear();
             foreach (var select in App.SelectItems)
             {
-                if (select is Clip clip)
+                if (select is TimelineClip clip)
                 {
                     DragItems.Add(clip);
                     _dragBeginStartTime[clip] = new DragBeginInfo(clip);
@@ -142,15 +144,15 @@ namespace NBC.ActionEditor
             if (!eventData.IsLeft() || App.SelectItems.Any(i => i.IsLocked)) return;
             var asset = App.AssetData;
             if (asset == null) return;
-            Clip stretchClip = null;
+            TimelineClip stretchClip = null;
             var dragType = ItemDragType.Pos;
             if (App.SelectCount == 1)
             {
-                if (App.FistSelect is Clip clip && clip.CanScale())
+                if (App.FistSelect is TimelineClip clip && clip.CanScale())
                 {
-                    var x = eventData.MousePosition.x - Styles.TimelineLeftTotalWidth;
-                    var time = asset.PosToTime(x, ActionEditorHost.Width);
-                    var gapTime = asset.WidthToTime(Styles.ClipScaleRectWidth, ActionEditorHost.Width);
+                    var x = eventData.MousePosition.x - (Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth);
+                    var time = Workspace.PosToTime(x, ActionEditorHost.Width);
+                    var gapTime = Workspace.WidthToTime(Styles.ClipScaleRectWidth, ActionEditorHost.Width);
                     if (time >= clip.StartTime && time <= clip.StartTime + gapTime)
                     {
                         dragType = ItemDragType.StretchStart;
@@ -162,9 +164,9 @@ namespace NBC.ActionEditor
 
                     stretchClip = clip;
                 }
-                else if (App.FistSelect is Track track)
+                else if (App.FistSelect is TimelineTrack track)
                 {
-                    if (eventData.MousePosition.x < Styles.TimelineLeftWidth)
+                    if (eventData.MousePosition.x < Workspace.LeftWidth)
                     {
                         dragType = ItemDragType.Track;
                     }
@@ -172,9 +174,9 @@ namespace NBC.ActionEditor
             }
             else
             {
-                var pos = new Vector2(eventData.MousePosition.x - Styles.TimelineLeftTotalWidth,
+                var pos = new Vector2(eventData.MousePosition.x - (Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth),
                     eventData.MousePosition.y);
-                if (!ClipDrawer.ClipContainsByRealRect(pos)) return;
+                if (!ClipDrawer.ClipContainsByRealRect(pos, Workspace)) return;
             }
 
             edit = transaction?.IsActive == true ? transaction : App.Session.BeginEdit(editOwner);
@@ -253,10 +255,10 @@ namespace NBC.ActionEditor
 
         #region Drag position
 
-        private readonly List<Clip> NowDragClips = new List<Clip>();
+        private readonly List<TimelineClip> NowDragClips = new List<TimelineClip>();
 
-        private readonly Dictionary<Clip, float> DragOffsetDictionary =
-            new Dictionary<Clip, float>();
+        private readonly Dictionary<TimelineClip, float> DragOffsetDictionary =
+            new Dictionary<TimelineClip, float>();
 
         private void ReloadClipItems(IDirectable[] selectItems)
         {
@@ -265,7 +267,7 @@ namespace NBC.ActionEditor
             if (selectItems == null || selectItems.Length < 1) return;
             foreach (var item in selectItems)
             {
-                if (item is not Clip clip) continue;
+                if (item is not TimelineClip clip) continue;
                 NowDragClips.Add(clip);
             }
 
@@ -279,7 +281,7 @@ namespace NBC.ActionEditor
         private void CacheDragOffset(Vector2 vector2)
         {
             var asset = App.AssetData;
-            var dragX = asset.PosToTime(vector2.x, ActionEditorHost.Width);
+            var dragX = Workspace.PosToTime(vector2.x, ActionEditorHost.Width);
             foreach (var clipItem in NowDragClips)
             {
                 var offset = dragX - clipItem.StartTime;
@@ -306,7 +308,7 @@ namespace NBC.ActionEditor
             {
                 if (DragOffsetDictionary.TryGetValue(clipItem, out var offsetTime))
                 {
-                    var cursorTime = asset.SnapTime(asset.PosToTime(nowPos.x, ActionEditorHost.Width) - offsetTime);
+                    var cursorTime = asset.SnapTime(Workspace.PosToTime(nowPos.x, ActionEditorHost.Width) - offsetTime);
                     cursorTime = CheckMagnetSnapTime(cursorTime, clipItem.Length);
                     var delta = cursorTime - _dragBeginStartTime[clipItem].StartTime;
                     subTimes.Add(NowDragClips.Count == 1 ? delta : asset.SnapTime(delta));
@@ -325,7 +327,7 @@ namespace NBC.ActionEditor
         }
 
 
-        #region Clip Jump Track
+        #region TimelineClip Jump Track
 
         //Todo:Add clip jump to other track
 
@@ -341,14 +343,14 @@ namespace NBC.ActionEditor
         private float _dragStretchTime;
         private float _dragStretchLength;
 
-        private void CacheDragStretchOffset(Clip clip, Vector2 vector2)
+        private void CacheDragStretchOffset(TimelineClip clip, Vector2 vector2)
         {
             _dragStretchOffset = vector2.x;
             _dragStretchTime = clip.StartTime;
             _dragStretchLength = clip.Length;
         }
 
-        private void OnBeginDragLength(PointerEventData eventData, Clip clip, bool isStart)
+        private void OnBeginDragLength(PointerEventData eventData, TimelineClip clip, bool isStart)
         {
             DragType = isStart ? ItemDragType.StretchStart : ItemDragType.StretchEnd;
             TryResetTracks();
@@ -382,12 +384,12 @@ namespace NBC.ActionEditor
             if (DragType < ItemDragType.StretchStart) return;
 
             var asset = App.AssetData;
-            var clipData = App.FistSelect as Clip;
+            var clipData = App.FistSelect as TimelineClip;
             if (clipData == null) return;
 
             var nowOffset = eventData.MousePosition.x;
             var offsetX = nowOffset - _dragStretchOffset; //Mathf.Abs(nowOffset - _dragStretchOffset);
-            var offsetTime = asset.SnapTime(asset.WidthToTime(offsetX, ActionEditorHost.Width));
+            var offsetTime = asset.SnapTime(Workspace.WidthToTime(offsetX, ActionEditorHost.Width));
 
             var newTime = _dragStretchTime + offsetTime;
             if (DragType == ItemDragType.StretchEnd)
@@ -407,11 +409,11 @@ namespace NBC.ActionEditor
 
         #endregion
 
-        #region Drag Track
+        #region Drag TimelineTrack
 
         private void OnBeginDragTrack(PointerEventData eventData)
         {
-            movingTrack = App.FistSelect as Track;
+            movingTrack = App.FistSelect as TimelineTrack;
             TrackDrop = default;
             DragType = ItemDragType.Track;
         }
@@ -430,7 +432,7 @@ namespace NBC.ActionEditor
         {
             var track = movingTrack;
             if (track == null) return;
-            var drop = TimelineMiddleView.TrackDrop(track, eventData.MousePosition);
+            var drop = TimelineMiddleView.TrackDrop(track, eventData.MousePosition, Workspace);
             TrackDrop = drop;
             var allowed = drop.IsValid && JsonEditCommands.Reorder(track, drop.Group, drop.Index).CanExecute(out _);
             MoveToItem = allowed ? drop.Row : null; MoveBefore = drop.Before;
@@ -465,9 +467,9 @@ namespace NBC.ActionEditor
 
         private void CacheMagnetSnapInfo(IDirectable[] selectItems)
         {
-            magnetSnapInterval = App.AssetData.ViewTime * 0.01f;
-            magnetSnapTimesCache = TimelineCandidates.References(_tracks.OfType<Track>().SelectMany(track => track.Clips),
-                selectItems.OfType<Clip>(), AssetPlayer.Inst.Length, AssetPlayer.Inst.CurrentTime, true);
+            magnetSnapInterval = Workspace.ViewTime * 0.01f;
+            magnetSnapTimesCache = TimelineCandidates.References(_tracks.OfType<TimelineTrack>().SelectMany(track => track.Clips),
+                selectItems.OfType<TimelineClip>(), AssetPlayer.Inst.Length, AssetPlayer.Inst.CurrentTime, true);
         }
 
 
@@ -481,7 +483,7 @@ namespace NBC.ActionEditor
 
         #region 融合检测
 
-        public void CheckBlendInOut(Clip clip)
+        public void CheckBlendInOut(TimelineClip clip)
         {
             // if (!clip.CanCrossBlend) return;
 
@@ -577,9 +579,9 @@ namespace NBC.ActionEditor
             // }
         }
 
-        private void GetPreviousCrossBlends(Clip clip, List<Clip> list)
+        private void GetPreviousCrossBlends(TimelineClip clip, List<TimelineClip> list)
         {
-            var previous = clip.GetPreviousSibling<Clip>();
+            var previous = clip.GetPreviousSibling<TimelineClip>();
             if (previous == null)
             {
                 Debug.LogError("没有更前的Clip");
@@ -593,9 +595,9 @@ namespace NBC.ActionEditor
             }
         }
 
-        private void GetNextCrossBlends(Clip clip, List<Clip> list)
+        private void GetNextCrossBlends(TimelineClip clip, List<TimelineClip> list)
         {
-            var nextSibling = clip.GetNextSibling<Clip>();
+            var nextSibling = clip.GetNextSibling<TimelineClip>();
             if (nextSibling == null) return;
             if (nextSibling.StartTime > clip.StartTime && nextSibling.StartTime < clip.EndTime)
             {
@@ -604,14 +606,14 @@ namespace NBC.ActionEditor
             }
         }
 
-        private void GetCoincideCrossBlends(Clip clip, List<Clip> list)
+        private void GetCoincideCrossBlends(TimelineClip clip, List<TimelineClip> list)
         {
             var pick = clip.GetCoincideSibling();
             if (pick != null && pick.Length > 0)
             {
                 foreach (var cDirectable in pick)
                 {
-                    if (cDirectable is Clip c)
+                    if (cDirectable is TimelineClip c)
                     {
                         list.Add(c);
                     }

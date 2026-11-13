@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.IO;
 using System.Linq;
@@ -38,7 +39,7 @@ namespace NBC.ActionEditor.Validation
             return new { status = "passed", guid = Guid, bytesPreserved = true, projectsRegenerated = true };
         }
         private const string Root = "Assets/ActionEditorValidationRF18";
-        [Serializable] private sealed class ReferenceAsset : Asset { public Texture2D Main, Sub; }
+        [Serializable] private sealed class ReferenceAsset : ActionDocument { public Texture2D Main, Sub; }
         [CliGroupCommand("actioneditor.validation", "RF18 isolated main/subasset reference persistence. Only creates a new fixed fixture folder; always cleans owned fixtures. No current-session changes.")]
         public static object Rf18ReferenceProbe([CliArg("confirm", "Apply fixed isolated fixture.")] bool confirm = false,
             [CliArg("dry-run", "Read-only preview.")] bool dryRun = false)
@@ -113,7 +114,7 @@ namespace NBC.ActionEditor.Validation
                 for (var dirty = 0; dirty < 2; dirty++)
                 {
                     if (dirty != 0) App.Session.Edit("RF20 business", () => ((Samples.LegacyExperience.LegacyExperienceAsset)App.AssetData).Version = 9);
-                    App.SelectWithoutInspector(App.AssetData.groups[0].Tracks[0].Clips[0]);
+                    App.SelectWithoutInspector(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]);
                     App.Context.Player.Sample(.5f); App.Play(); App.Pause();
                     var source = App.AssetData; var selection = App.FistSelect; var before = App.Session.CaptureRecovery(); var path = App.Session.Path;
                     Action open = null;
@@ -187,11 +188,11 @@ namespace NBC.ActionEditor.Validation
                     var path = root + (toolkit ? "/Toolkit.json" : "/IMGUI.json");
                     CreateAssetWindow.CreateAndOpen(typeof(LegacyExperienceAsset), path, toolkit);
                     await TutorialFrames();
-                    if (App.Session.Path != path || App.AssetData.groups.Count != 3 || App.AssetData.groups.Sum(g => g.Tracks.Count) != 7
-                        || App.AssetData.groups.SelectMany(g => g.Tracks).Sum(t => t.Clips.Count) != 13 || App.Session.IsDirty
+                    if (App.Session.Path != path || App.AssetData.RootItems.OfType<TimelineGroup>().Count() != 3 || App.AssetData.RootItems.OfType<TimelineGroup>().Sum(g => g.Tracks.Count) != 7
+                        || App.AssetData.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).Sum(t => t.Clips.Count) != 13 || App.Session.IsDirty
                         || (toolkit ? Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Length != 0 : Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>().Length != 0))
                         throw new InvalidOperationException("Preset graph or originating view differs.");
-                    var clip = App.AssetData.groups[0].Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
+                    var clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
                     if (toolkit)
                     {
                         native.Select(clip); var properties = native.CreatePropertyView(); native.rootVisualElement.Add(properties);
@@ -203,7 +204,7 @@ namespace NBC.ActionEditor.Validation
                     await TutorialFrames();
                     for (var resize = 0; resize < 2; resize++)
                     {
-                        clip = App.AssetData.groups[0].Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
+                        clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
                         if (toolkit)
                         {
                             var rect = native.Canvas.ClipRect(clip, 1);
@@ -213,20 +214,20 @@ namespace NBC.ActionEditor.Validation
                         }
                         else
                         {
-                            var down = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(resize == 0 ? clip.StartTime + .5f : clip.EndTime, ActionEditorHost.Width) - (resize == 0 ? 0 : 2), 30);
-                            var up = down + new Vector2(ActionEditorHost.Width * (resize == 0 ? .25f : -.25f) / App.AssetData.ViewTime, 0);
+                            var down = new Vector2(Styles.TimelineLeftTotalWidth + original.Workspace.TimeToPos(resize == 0 ? clip.StartTime + .5f : clip.EndTime, ActionEditorHost.Width) - (resize == 0 ? 0 : 2), 30);
+                            var up = down + new Vector2(ActionEditorHost.Width * (resize == 0 ? .25f : -.25f) / original.Workspace.ViewTime, 0);
                             TutorialOriginalPointer(original.Gesture, EventType.MouseDown, down);
                             TutorialOriginalPointer(original.Gesture, EventType.MouseDrag, up);
                             TutorialOriginalPointer(original.Gesture, EventType.MouseUp, up);
                         }
-                        clip = App.AssetData.groups[0].Tracks[0].Clips[0];
+                        clip = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                         if (Mathf.Abs(clip.StartTime - .5f) > .0001f || Mathf.Abs(clip.Length - (resize == 0 ? 1.5f : 1.25f)) > .0001f)
                             throw new InvalidOperationException("Tutorial move/resize differs: " + (toolkit ? "Toolkit" : "IMGUI") + ", step=" + resize + ", start=" + clip.StartTime + ", length=" + clip.Length);
                         await TutorialFrames();
                     }
-                    var editedLength = App.AssetData.groups[0].Tracks[0].Clips[0].Length;
-                    Undo.PerformUndo(); if (App.AssetData.groups[0].Tracks[0].Clips[0].Length != 1.5f) throw new InvalidOperationException("Undo failed.");
-                    Undo.PerformRedo(); if (App.AssetData.groups[0].Tracks[0].Clips[0].Length != editedLength) throw new InvalidOperationException("Redo failed.");
+                    var editedLength = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length;
+                    Undo.PerformUndo(); if (App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length != 1.5f) throw new InvalidOperationException("Undo failed.");
+                    Undo.PerformRedo(); if (App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length != editedLength) throw new InvalidOperationException("Redo failed.");
                     preview = ScriptableObject.CreateInstance<Samples.LegacyExperiencePreview>(); preview.Show(); preview.Repaint();
                     var now = (float)EditorApplication.timeSinceStartup; App.Context.Playback.Play(now); App.Context.Playback.Update(now + .1f, 1);
                     if (!App.IsPlay || App.Context.Player.CurrentTime <= 0) throw new InvalidOperationException("Playback failed.");

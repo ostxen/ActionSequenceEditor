@@ -8,6 +8,7 @@ namespace NBC.ActionEditor
     public abstract class ViewBase
     {
         protected EditorWindow Window;
+        protected NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace Workspace => ((ActionEditorWindow)Window).Workspace;
 
         public Rect Position;
 

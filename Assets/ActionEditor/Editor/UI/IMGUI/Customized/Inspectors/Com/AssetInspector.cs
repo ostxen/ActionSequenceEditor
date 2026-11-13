@@ -1,11 +1,12 @@
-﻿using UnityEditor;
+﻿using NBC.ActionEditor.Domain;
+using UnityEditor;
 
 namespace NBC.ActionEditor
 {
-    [CustomInspectors(typeof(Asset), true)]
+    [CustomInspectors(typeof(ActionDocument), true)]
     public class AssetInspector : InspectorsBase
     {
-        private Asset action => (Asset)target;
+        private ActionDocument action => (ActionDocument)target;
 
         public override void OnInspectorGUI()
         {

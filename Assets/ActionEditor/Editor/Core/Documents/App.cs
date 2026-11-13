@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NBC.ActionEditor.Domain;
+using System;
 using UnityEditor;
 using UnityEngine;
 using NBC.ActionEditor.Storage;
@@ -7,7 +8,7 @@ namespace NBC.ActionEditor
 {
     public delegate void CallbackFunction();
 
-    public delegate void OpenAssetFunction(Asset asset);
+    public delegate void OpenAssetFunction(ActionDocument asset);
 
     public static class App
     {
@@ -18,7 +19,7 @@ namespace NBC.ActionEditor
         public static ActionEditorContext Context { get; } = new ActionEditorContext(new JsonDocumentSession());
         public static ActionEditorViews Views { get; } = new ActionEditorViews();
         public static JsonDocumentSession Session => Context.Session;
-        public static Asset AssetData => Context.Document;
+        public static ActionDocument AssetData => Context.Document;
         public static event Action DocumentChanged;
 
         static App()

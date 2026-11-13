@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,7 +13,7 @@ namespace NBC.ActionEditor
         private readonly List<IDirectableTimePointer> starts = new List<IDirectableTimePointer>();
         public bool IsInitialized { get; private set; }
         public ActionEditorPreviewSession(Func<Type, PreviewBase> factory) => this.factory = factory ?? throw new ArgumentNullException(nameof(factory));
-        public void Initialize(Asset asset)
+        public void Initialize(ActionDocument asset)
         {
             Dispose();
             if (asset == null) return;

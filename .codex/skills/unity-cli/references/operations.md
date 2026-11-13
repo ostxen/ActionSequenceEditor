@@ -33,6 +33,8 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
+`actioneditor.validation arrange_domain_layout`为固定零参数领域归位命令：只移动Runtime/Assets的Asset、Group、Track、Clip至Runtime/Domain的ActionDocument、TimelineGroup、TimelineTrack、TimelineClip；Runtime根asmdef改名NBC.ActionEditor.Domain；CreateUtilities移入Editor/Infrastructure/Assets、InspectorPreviewAsset移入Editor/Composition；Serialization/FullSerializerExtensions改名DocumentNumber。八项固定GUID，拒绝目标存在及未登记目录；preview列源码/meta哈希和缺失目录，AssetDatabase移动后复核身份与字节并SyncAll。无删除/覆盖/用户文档写入，不接受任意路径或代码；独立preview/approve/apply，引用第4.3节连续授权，超时先核查。
+
 `actioneditor.validation rename_toolkit_ui`是本轮UI命名整理的固定零参数命令：只将UI/UIToolkit中的JsonActionWorkbench、JsonTimelineCanvas、JsonPropertyView、JsonPreferencesWindow四个cs依次改为UIToolkitActionEditorWindow、UIToolkitTimelineCanvas、UIToolkitPropertyView、UIToolkitPreferencesWindow。核对固定GUID、目标不存在，preview绑定源码/meta哈希；AssetDatabase批量移动后验证GUID和字节保留，并SyncAll生成真实项目。不接受路径/代码覆盖，不写用户文档，不移动样式资源；独立preview/approve/apply，超时先检查。
 
 `actioneditor.validation rf22_tutorial_probe`为固定零参数双UI教程连续重放，只创建不存在的Assets/ActionEditorValidationRF22下IMGUI.json、Toolkit.json及各自-Export.json；开始前拒绝已有产品/预览/导出窗口及活动编辑/播放，逐一调用真实菜单方法打开本次窗口，经创建弹窗共用确认动作创建预置样例，验证属性、各UI手势适配器移动/拉伸、Undo/Redo、播放状态窗口、窗口SaveChanges保存、关闭重开和独立导出读回。原生属性与指针事件走真实控件，IMGUI属性使用共享字段路径，手势调用实际窗口适配器；OS保存框/确认输入仅用固定批准新路径替代，不宣称全桌面点击。finally恢复原会话，仅关闭本次窗口并删除本次目录，不写个人偏好。独立preview/approve/apply，不接受路径/代码/force参数；超时先检查，不自动重放。

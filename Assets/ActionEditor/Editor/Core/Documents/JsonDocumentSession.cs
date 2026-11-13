@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using UnityEditor;
 using UnityEngine;
@@ -29,7 +30,7 @@ namespace NBC.ActionEditor.Storage
     /// <summary>One document shared by both renderers. Undo owns serialized snapshots, not Inspector proxies.</summary>
     public sealed class JsonDocumentSession : IDisposable
     {
-        public Asset Document { get; private set; }
+        public ActionDocument Document { get; private set; }
         public string Path { get; private set; }
         public TextAsset Source => store.Load(Path);
         public bool IsDirty => Document != null && Content(Document) != saved;
@@ -42,13 +43,13 @@ namespace NBC.ActionEditor.Storage
         }
         public string CaptureRecovery() => Document == null ? "" : JsonUtility.ToJson(new Recovery
         {
-            Version = 1, FormatId = "actioneditor.json", Json = Encode(Document), Path = Path, Saved = saved, SavedJson = savedJson, Revision = revision == null ? null : Convert.ToBase64String(revision)
+            Version = 2, FormatId = "actioneditor.recovery.v2", Json = Encode(Document), Path = Path, Saved = saved, SavedJson = savedJson, Revision = revision == null ? null : Convert.ToBase64String(revision)
         });
         public void RestoreRecovery(string json)
         {
             if (string.IsNullOrEmpty(json)) { Open(null); return; }
             var data = JsonUtility.FromJson<Recovery>(json);
-            if (data == null || data.Version != 1 || data.FormatId != "actioneditor.json" || data.SavedJson == null || data.Saved == null)
+            if (data == null || data.Version != 2 || data.FormatId != "actioneditor.recovery.v2" || data.SavedJson == null || data.Saved == null)
                 throw new System.IO.InvalidDataException("Unsupported recovery contract.");
             var document = Decode(data.Json);
             var baseline = Decode(data.SavedJson);
@@ -69,9 +70,9 @@ namespace NBC.ActionEditor.Storage
         private readonly object legacyOwner = new object();
         public JsonDocumentSession(JsonDocumentStore store = null) { this.store = store ?? new JsonDocumentStore(); Undo.undoRedoPerformed += UndoRedo; }
 
-        public static string Encode(Asset asset) => JsonDocumentCodec.Encode(asset);
-        public static Asset Decode(string json) => JsonDocumentCodec.Decode(json);
-        public static void RequireValid(Asset asset) => JsonDocumentCodec.RequireValid(asset);
+        public static string Encode(ActionDocument asset) => JsonDocumentCodec.Encode(asset);
+        public static ActionDocument Decode(string json) => JsonDocumentCodec.Decode(json);
+        public static void RequireValid(ActionDocument asset) => JsonDocumentCodec.RequireValid(asset);
 
         public void Open(TextAsset text)
         {
@@ -172,7 +173,7 @@ namespace NBC.ActionEditor.Storage
         public string CreateSaveSnapshot() => JsonDocumentCodec.CreateSaveSnapshot(Document);
         public static string ValidatePath(string path) => JsonDocumentStore.ValidatePath(path);
         private void ReleaseState() { transaction = null; pending = null; if (state != null) { Undo.ClearUndo(state); UnityEngine.Object.DestroyImmediate(state); } state = null; }
-        private static string Content(Asset asset) => JsonDocumentCodec.Content(asset);
+        private static string Content(ActionDocument asset) => JsonDocumentCodec.Content(asset);
         public string[] InspectReadbackDifferences() => JsonDocumentCodec.InspectReadbackDifferences(Document);
         public void Dispose() { Undo.undoRedoPerformed -= UndoRedo; ReleaseState(); Document = null; }
     }

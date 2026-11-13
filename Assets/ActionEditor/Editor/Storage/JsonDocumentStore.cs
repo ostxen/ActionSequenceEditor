@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.IO;
 using System.Linq;
@@ -26,7 +27,7 @@ namespace NBC.ActionEditor.Storage
         public TextAsset Load(string path) => string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<TextAsset>(path);
         public byte[] ReadRevision(string path) => !string.IsNullOrEmpty(path) && files.Exists(path) ? files.Read(path) : null;
 
-        public (string Json, byte[] Revision) Commit(string path, Asset document, byte[] expectedCurrent)
+        public (string Json, byte[] Revision) Commit(string path, ActionDocument document, byte[] expectedCurrent)
         {
             path = ValidatePath(path);
             if (expectedCurrent == null) ValidateNewPath(path);

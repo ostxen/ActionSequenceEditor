@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.IO;
 using System.Linq;
@@ -10,30 +11,30 @@ namespace NBC.ActionEditor.Storage
     public static class JsonDocumentCodec
     {
         private static IActionDocumentFormat Format => DocumentFormats.Registry.ById("actioneditor.json");
-        public static string Encode(Asset asset) => Encoding.UTF8.GetString(Format.Serialize(
+        public static string Encode(ActionDocument asset) => Encoding.UTF8.GetString(Format.Serialize(
             DocumentSnapshots.Capture(asset, false), new DocumentFormatOptions(false), DocumentFormats.Context));
-        public static Asset Decode(string json) => Format.Deserialize(new UTF8Encoding(false, true).GetBytes(json ?? ""), DocumentFormats.Context);
-        public static void RequireValid(Asset asset)
+        public static ActionDocument Decode(string json) => Format.Deserialize(new UTF8Encoding(false, true).GetBytes(json ?? ""), DocumentFormats.Context);
+        public static void RequireValid(ActionDocument asset)
         {
             ActionDocumentGraph.RequireValid(asset);
-            DocumentValueConverter.Capture(asset, typeof(Asset), DocumentFormats.Context);
+            DocumentValueConverter.Capture(asset, typeof(ActionDocument), DocumentFormats.Context);
         }
-        public static string CreateSaveSnapshot(Asset document) => Encoding.UTF8.GetString(Format.Serialize(
+        public static string CreateSaveSnapshot(ActionDocument document) => Encoding.UTF8.GetString(Format.Serialize(
             DocumentSnapshots.Capture(document, true), new DocumentFormatOptions(false), DocumentFormats.Context));
-        public static string Content(Asset asset) => DocumentSnapshots.Content(asset);
+        public static string Content(ActionDocument asset) => DocumentSnapshots.Content(asset);
         public static string ContentOfSnapshot(string snapshot) => Content(Decode(snapshot));
-        public static string[] InspectReadbackDifferences(Asset asset)
+        public static string[] InspectReadbackDifferences(ActionDocument asset)
         {
             if (asset == null) return Array.Empty<string>();
             var snapshot = CreateSaveSnapshot(asset);
             return ReadbackDifferences(snapshot, Decode(snapshot));
         }
-        public static string[] ReadbackDifferences(string source, Asset decoded)
+        public static string[] ReadbackDifferences(string source, ActionDocument decoded)
         {
-            var before = (Asset)DocumentValueConverter.Restore(DocumentJson.Parse(source).Members["document"], typeof(Asset), DocumentFormats.Context);
+            var before = (ActionDocument)DocumentValueConverter.Restore(DocumentJson.Parse(source).Members["document"], typeof(ActionDocument), DocumentFormats.Context);
             var changes = new System.Collections.Generic.List<string>();
-            FindDifferences(DocumentValueConverter.Capture(before, typeof(Asset), DocumentFormats.Context),
-                DocumentValueConverter.Capture(decoded, typeof(Asset), DocumentFormats.Context), "$", changes);
+            FindDifferences(DocumentValueConverter.Capture(before, typeof(ActionDocument), DocumentFormats.Context),
+                DocumentValueConverter.Capture(decoded, typeof(ActionDocument), DocumentFormats.Context), "$", changes);
             return changes.ToArray();
         }
         private static void FindDifferences(DocumentValue before, DocumentValue after, string path, System.Collections.Generic.List<string> changes)

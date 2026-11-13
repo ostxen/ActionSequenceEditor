@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using UnityEngine;
 
 namespace NBC.ActionEditor
@@ -5,7 +6,7 @@ namespace NBC.ActionEditor
     public static class ClipTimingRules
     {
         /// <summary>Existing property editors allow half-length cross blends; edge drags do not.</summary>
-        public static Vector2 NeighborBounds(Clip clip, IDirectable previous, IDirectable next, bool allowCrossBlend)
+        public static Vector2 NeighborBounds(TimelineClip clip, IDirectable previous, IDirectable next, bool allowCrossBlend)
         {
             var minimum = previous?.EndTime ?? clip.Parent?.StartTime ?? 0;
             var maximum = next?.StartTime ?? clip.Parent?.EndTime ?? float.PositiveInfinity;

@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,7 +8,7 @@ namespace NBC.ActionEditor.Samples.LegacyExperience
     [Serializable]
     [Name("功能体验样例（预置轨道）")]
     [Description("独立功能样例，不依赖 Combat。创建后已有分组、轨道、点事件、区间和内循环。")]
-    public sealed class LegacyExperienceAsset : Asset
+    public sealed class LegacyExperienceAsset : ActionDocument
     {
         [MenuName("样例说明")] public string Notes = "选择片段查看属性，拖动时间轴或片段边缘；顶部按钮打开状态预览。修改后可保存与撤销。";
         [MenuName("版本")] public int Version = 1;
@@ -37,31 +38,31 @@ namespace NBC.ActionEditor.Samples.LegacyExperience
             properties.Clips.Add(new LegacyExperienceInterval { Name = "属性练习", Caption = "修改 Inspector 字段", StartTime = 1, Length = 4, Mode = 1, Gain = 0.8f });
             extended.Tracks.Add(loops); extended.Tracks.Add(properties);
 
-            var states = new LegacyExperienceGroup { Name = "03 折叠与锁定：展开后右键解锁", IsCollapsed = true };
+            var states = new LegacyExperienceGroup { Name = "03 折叠与锁定：右键解锁" };
             var locked = new LegacyIntervalTrack { Name = "锁定轨道", IsLocked = true };
             locked.Clips.Add(new LegacyExperienceInterval { Name = "锁定区间", Caption = "解锁后可拖动", StartTime = 1, Length = 2 });
             var inactive = new LegacyMarkerTrack { Name = "未激活轨道", IsActive = false };
             inactive.Clips.Add(new LegacyExperienceMarker { Name = "未激活点", StartTime = 4, Message = "激活轨道后参与状态显示" });
             states.Tracks.Add(locked); states.Tracks.Add(inactive);
-            groups.Add(main); groups.Add(extended); groups.Add(states);
-            Init(); ViewTimeMin = 0; ViewTimeMax = 7; RangeMin = 0; RangeMax = 6;
+            AddRoot(main); AddRoot(extended); AddRoot(states);
+            Init(); RangeMin = 0; RangeMax = 6;
         }
     }
 
     [Serializable, Name("体验分组"), Attachable(typeof(LegacyExperienceAsset))]
-    public sealed class LegacyExperienceGroup : Group { }
+    public sealed class LegacyExperienceGroup : TimelineGroup { }
 
     [Serializable, Name("体验/区间轨道"), Attachable(typeof(LegacyExperienceGroup)), NBC.ActionEditor.Color(0.3f, 0.65f, 1)]
-    public sealed class LegacyIntervalTrack : Track
+    public sealed class LegacyIntervalTrack : TimelineTrack
     {
         [MenuName("轨道备注")] public string Notes = "右键空白新增区间；选中片段后查看 Inspector";
     }
 
     [Serializable, Name("体验/点事件轨道"), Attachable(typeof(LegacyExperienceGroup)), NBC.ActionEditor.Color(1, 0.7f, 0.25f)]
-    public sealed class LegacyMarkerTrack : Track { }
+    public sealed class LegacyMarkerTrack : TimelineTrack { }
 
     [Serializable, Name("体验/内循环轨道"), Attachable(typeof(LegacyExperienceGroup)), NBC.ActionEditor.Color(0.45f, 0.85f, 0.5f)]
-    public sealed class LegacyLoopTrack : Track { }
+    public sealed class LegacyLoopTrack : TimelineTrack { }
 
     public static class LegacyExperienceModes
     {
@@ -80,7 +81,7 @@ namespace NBC.ActionEditor.Samples.LegacyExperience
     public enum LegacyExperienceDirection { Forward, Backward, Both }
 
     [Serializable, Name("体验区间"), Category("体验区间"), Attachable(typeof(LegacyIntervalTrack)), NBC.ActionEditor.Color(0.3f, 0.65f, 1)]
-    public sealed class LegacyExperienceInterval : ClipCrossBlend
+    public sealed class LegacyExperienceInterval : CrossBlendClip
     {
         [MenuName("标题")] public string Caption = "新建区间";
         [MenuName("显示模式"), OptionParam(typeof(LegacyExperienceModes))] public int Mode;
@@ -106,7 +107,7 @@ namespace NBC.ActionEditor.Samples.LegacyExperience
     }
 
     [Serializable, Name("体验点事件"), Category("体验标记"), Attachable(typeof(LegacyMarkerTrack)), NBC.ActionEditor.Color(1, 0.7f, 0.25f)]
-    public sealed class LegacyExperienceMarker : ClipSignal
+    public sealed class LegacyExperienceMarker : PointClip
     {
         [MenuName("消息")] public string Message = "新建标记";
         [MenuName("事件编号")] public int EventCode;
@@ -116,7 +117,7 @@ namespace NBC.ActionEditor.Samples.LegacyExperience
     }
 
     [Serializable, Name("体验循环片段"), Category("体验循环"), Attachable(typeof(LegacyLoopTrack)), NBC.ActionEditor.Color(0.45f, 0.85f, 0.5f)]
-    public sealed class LegacyExperienceLoop : ClipCrossBlend, ISubClipContainable
+    public sealed class LegacyExperienceLoop : CrossBlendClip, ISubClipContainable
     {
         [MenuName("标题")] public string Caption = "循环片段";
         [MenuName("源片段周期（秒）")] public float Period = 0.75f;

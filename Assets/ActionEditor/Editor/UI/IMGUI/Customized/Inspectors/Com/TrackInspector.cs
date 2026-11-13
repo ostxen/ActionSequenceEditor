@@ -1,18 +1,19 @@
-﻿using NBC.ActionEditor;
+﻿using NBC.ActionEditor.Domain;
+using NBC.ActionEditor;
 using UnityEditor;
 using UnityEngine;
 
 namespace NBC.ActionEditor
 {
-    public abstract class TrackInspector<T> : TrackInspector where T : Track
+    public abstract class TrackInspector<T> : TrackInspector where T : TimelineTrack
     {
         protected T action => (T)target;
     }
 
-    [CustomInspectors(typeof(Track), true)]
+    [CustomInspectors(typeof(TimelineTrack), true)]
     public class TrackInspector : InspectorsBase
     {
-        private Track action => (Track)target;
+        private TimelineTrack action => (TimelineTrack)target;
 
         public override void OnInspectorGUI()
         {

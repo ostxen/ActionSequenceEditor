@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,6 +8,7 @@ using Object = UnityEngine.Object;
 
 namespace NBC.ActionEditor.Serialization
 {
+    // 定义格式转换能力，不承担文件提交或编辑会话职责。
     public interface IActionDocumentFormat
     {
         string Id { get; }
@@ -15,8 +17,8 @@ namespace NBC.ActionEditor.Serialization
         bool CanRead { get; }
         bool CanWrite { get; }
         bool CanExport { get; }
-        byte[] Serialize(Asset document, DocumentFormatOptions options, DocumentFormatContext context);
-        Asset Deserialize(byte[] bytes, DocumentFormatContext context);
+        byte[] Serialize(ActionDocument document, DocumentFormatOptions options, DocumentFormatContext context);
+        ActionDocument Deserialize(byte[] bytes, DocumentFormatContext context);
     }
 
     public readonly struct DocumentFormatOptions
@@ -38,7 +40,7 @@ namespace NBC.ActionEditor.Serialization
         public DocumentReference(string guid, long localFileId) { Guid = guid; LocalFileId = localFileId; }
     }
 
-    /// <summary>Exact identities from explicitly trusted, already loaded types. Never loads an assembly.</summary>
+    // 仅解析显式信任且已加载的精确类型身份，不加载外部程序集。
     public sealed class DocumentFormatContext
     {
         private readonly Dictionary<string, Type> types;

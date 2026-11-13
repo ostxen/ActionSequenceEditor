@@ -1,4 +1,5 @@
-﻿#if UNITY_EDITOR
+﻿using NBC.ActionEditor.Domain;
+#if UNITY_EDITOR
 
 using System;
 using System.Collections.Generic;
@@ -184,7 +185,7 @@ namespace NBC.ActionEditor
         {
             AssetTypes.Clear();
             AssetNames.Clear();
-            var types = ReflectionTools.GetImplementationsOf(typeof(Asset));
+            var types = ReflectionTools.GetImplementationsOf(typeof(ActionDocument));
             foreach (var t in types)
             {
                 var typeName = t.GetCustomAttributes(typeof(NameAttribute), false).FirstOrDefault() is NameAttribute nameAtt ? nameAtt.name : t.Name.SplitCamelCase();

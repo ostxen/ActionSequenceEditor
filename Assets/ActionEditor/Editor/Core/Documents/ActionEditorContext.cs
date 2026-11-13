@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +11,7 @@ namespace NBC.ActionEditor
     public sealed class ActionEditorContext : IDisposable
     {
         public JsonDocumentSession Session { get; }
-        public Asset Document => Session.Document;
+        public ActionDocument Document => Session.Document;
         private TextAsset source;
         public TextAsset Source => string.IsNullOrEmpty(Session.Path) ? source : Session.Source;
         public ActionEditorSelection Selection { get; } = new ActionEditorSelection();
@@ -73,15 +74,15 @@ namespace NBC.ActionEditor
             var changed = next.Length != items.Count || next.Any(item => !items.Contains(item));
             if (allowMultiple && !changed) return false;
             items.Clear(); items.AddRange(next);
-            CanMultipleSelect = allowMultiple && items.Count == 1 && items[0] is not Clip;
+            CanMultipleSelect = allowMultiple && items.Count == 1 && items[0] is not TimelineClip;
             if (allowMultiple && changed && selected != null) InspectorRequested?.Invoke();
             return changed;
         }
 
-        internal void Retain(Asset document)
+        internal void Retain(ActionDocument document)
         {
             items.RemoveAll(item => document == null || !document.directables.Contains(item));
-            if (items.Count != 1 || items[0] is Clip) CanMultipleSelect = false;
+            if (items.Count != 1 || items[0] is TimelineClip) CanMultipleSelect = false;
         }
     }
 

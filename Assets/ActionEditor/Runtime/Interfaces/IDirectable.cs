@@ -13,7 +13,6 @@ namespace NBC.ActionEditor
         string Name { get; }
 
         bool IsActive { get; set; }
-        bool IsCollapsed { get; set; }
         bool IsLocked { get; set; }
 
         float StartTime { get; }

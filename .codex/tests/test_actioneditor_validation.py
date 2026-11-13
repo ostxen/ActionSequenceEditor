@@ -26,7 +26,7 @@ class ActionEditorValidationTests(unittest.TestCase):
         unity.raw.assert_not_called()
 
     def test_rf18_operations_reject_target_or_code_overrides(self):
-        for name in ("rename_toolkit_ui", "rf18_move", "rf18_reference_probe", "sync_projects", "rf20_export_probe", "rf22_tutorial_probe"):
+        for name in ("arrange_domain_layout", "rename_toolkit_ui", "rf18_move", "rf18_reference_probe", "sync_projects", "rf20_export_probe", "rf22_tutorial_probe"):
             command = "actioneditor.validation " + name
             self.assertNotIn(command, READ_ONLY)
             self.assertEqual(MUTATIONS[command], {"dry_run": True, "confirm": True, "poll": None})

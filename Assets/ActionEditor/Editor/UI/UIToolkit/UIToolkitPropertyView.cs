@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections;
 using System.Linq;
@@ -39,8 +40,8 @@ namespace NBC.ActionEditor.Workbench
             if (!string.IsNullOrEmpty(description)) root.Add(new HelpBox(description, HelpBoxMessageType.None));
             if (value is IDirectable directable)
             {
-                if (value is Group || value is Track) Add(root, "Name", directable.Name, next => JsonEditCommands.Rename(directable, next));
-                if (value is Clip clip)
+                if (value is TimelineGroup || value is TimelineTrack) Add(root, "Name", directable.Name, next => JsonEditCommands.Rename(directable, next));
+                if (value is TimelineClip clip)
                 {
                     DrawClipControls(root, clip, refresh);
                 }
@@ -56,7 +57,7 @@ namespace NBC.ActionEditor.Workbench
             box.style.paddingLeft = box.style.paddingRight = box.style.paddingTop = box.style.paddingBottom = 4;
             box.style.backgroundColor = new Color(0, 0, 0, .12f); root.Add(box); return box;
         }
-        private static void DrawClipControls(VisualElement root, Clip clip, Action refresh)
+        private static void DrawClipControls(VisualElement root, TimelineClip clip, Action refresh)
         {
             if (!clip.IsValid) root.Add(new HelpBox("该剪辑无效。 请确保设置了所需的参数。", HelpBoxMessageType.Error));
             var previous = clip.GetPreviousSibling(); var next = clip.GetNextSibling();

@@ -1,3 +1,5 @@
+using System.Linq;
+using NBC.ActionEditor.Domain;
 using System;
 using NUnit.Framework;
 
@@ -6,20 +8,20 @@ namespace NBC.ActionEditor.Tests
     public class LegacyBaselineTests
     {
         [Serializable]
-        public sealed class BaselineAsset : Asset { }
+        public sealed class BaselineAsset : ActionDocument { }
 
         [Serializable]
-        public sealed class BaselineTrack : Track { }
+        public sealed class BaselineTrack : TimelineTrack { }
 
         [Serializable]
-        public sealed class BaselineClip : Clip
+        public sealed class BaselineClip : TimelineClip
         {
             public string Message = "baseline";
             public int Amount = 7;
         }
 
         [Serializable]
-        public sealed class BaselineSignal : ClipSignal { }
+        public sealed class BaselineSignal : PointClip { }
 
         private sealed class RecordingPreview : PreviewBase
         {
@@ -35,12 +37,12 @@ namespace NBC.ActionEditor.Tests
         private static BaselineAsset CreateSample()
         {
             var asset = new BaselineAsset();
-            var group = new Group { Name = "Reference" };
+            var group = new TimelineGroup { Name = "Reference" };
             var track = new BaselineTrack { Name = "Events" };
             track.Clips.Add(new BaselineClip { StartTime = 0.25f, Length = 0.5f });
             track.Clips.Add(new BaselineSignal { StartTime = 1.25f });
             group.Tracks.Add(track);
-            asset.groups.Add(group);
+            asset.AddRoot(group);
             asset.Init();
             return asset;
         }
@@ -49,7 +51,7 @@ namespace NBC.ActionEditor.Tests
         public void ObjectGraph_RebuildsParentsAndDuration()
         {
             var asset = CreateSample();
-            var group = asset.groups[0];
+            var group = asset.RootItems.OfType<TimelineGroup>().ElementAt(0);
             var track = group.Tracks[0];
             Assert.That(track.Parent, Is.SameAs(group));
             Assert.That(track.Clips[0].Parent, Is.SameAs(track));
@@ -70,13 +72,13 @@ namespace NBC.ActionEditor.Tests
             var loaded = format.Deserialize(json, context) as BaselineAsset;
             Assert.That(loaded, Is.Not.Null);
             loaded.Init();
-            var clip = loaded.groups[0].Tracks[0].Clips[0] as BaselineClip;
+            var clip = loaded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0] as BaselineClip;
             Assert.That(clip, Is.Not.Null);
             Assert.That(clip.StartTime, Is.EqualTo(0.25f));
             Assert.That(clip.Length, Is.EqualTo(0.5f));
             Assert.That(clip.Message, Is.EqualTo("baseline"));
             Assert.That(clip.Amount, Is.EqualTo(7));
-            Assert.That(loaded.groups[0].Tracks[0].Clips[1], Is.TypeOf<BaselineSignal>());
+            Assert.That(loaded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1], Is.TypeOf<BaselineSignal>());
         }
 
         [Test]
@@ -97,7 +99,7 @@ namespace NBC.ActionEditor.Tests
         [Test]
         public void PreviewPointers_ForwardEndAndRewindHaveObservableCallbacks()
         {
-            var clip = CreateSample().groups[0].Tracks[0].Clips[0];
+            var clip = CreateSample().RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
             var preview = new RecordingPreview();
             preview.SetTarget(clip);
             IDirectableTimePointer start = new StartTimePointer(preview);

@@ -1,18 +1,19 @@
-﻿using NBC.ActionEditor;
+﻿using NBC.ActionEditor.Domain;
+using NBC.ActionEditor;
 using UnityEditor;
 using UnityEngine;
 
 namespace NBC.ActionEditor
 {
-    public abstract class ActionClipInspector<T> : ActionClipInspector where T : Clip
+    public abstract class ActionClipInspector<T> : ActionClipInspector where T : TimelineClip
     {
         protected T action => (T)target;
     }
 
-    [CustomInspectors(typeof(Clip), true)]
+    [CustomInspectors(typeof(TimelineClip), true)]
     public class ActionClipInspector : InspectorsBase
     {
-        private Clip action => (Clip)target;
+        private TimelineClip action => (TimelineClip)target;
 
         public override void OnInspectorGUI()
         {

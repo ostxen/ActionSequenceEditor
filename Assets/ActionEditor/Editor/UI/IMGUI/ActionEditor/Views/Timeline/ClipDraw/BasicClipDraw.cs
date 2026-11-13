@@ -1,12 +1,13 @@
-﻿using UnityEditor;
+﻿using NBC.ActionEditor.Domain;
+using UnityEditor;
 using UnityEngine;
 
 namespace NBC.ActionEditor
 {
     public abstract class ClipDrawBase
     {
-        public Clip PreviousClip;
-        public Clip NextClip;
+        public TimelineClip PreviousClip;
+        public TimelineClip NextClip;
 
         public Rect ClipRect;
         public Rect ClipRealRect;
@@ -17,11 +18,11 @@ namespace NBC.ActionEditor
 
         protected GUIStyle NameStyle;
         protected EditorWindow Window;
-        private Clip _clip;
+        private TimelineClip _clip;
         private float _overlapIn;
         private float _overlapOut;
 
-        public void Draw(EditorWindow window, Rect trackRect, Rect trackRightRect, Clip clip, bool select)
+        public void Draw(EditorWindow window, Rect trackRect, Rect trackRightRect, TimelineClip clip, bool select)
         {
             if (NameStyle == null)
             {
@@ -35,7 +36,8 @@ namespace NBC.ActionEditor
             _clip = clip;
             Select = select;
             TrackRect = trackRect;
-            var transform = new JsonTimelineTransform(clip.Root.ViewTimeMin, clip.Root.ViewTime, ActionEditorHost.Width, trackRect.x);
+            var workspace = ((ActionEditorWindow)window).Workspace;
+            var transform = new JsonTimelineTransform(workspace.ViewTimeMin, workspace.ViewTime, ActionEditorHost.Width, trackRect.x);
             StartPosX = transform.X(clip.StartTime); EndPosX = transform.X(clip.EndTime);
             ClipRect = transform.ClipRect(clip, TrackRect.y, Styles.LineHeight, 0, 0);
             ClipRealRect = new Rect(ClipRect.x, trackRightRect.y, ClipRect.width, Styles.LineHeight);

@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using FullSerializer;
 using UnityEngine;
 
-namespace NBC.ActionEditor
+namespace NBC.ActionEditor.Domain
 {
+    // 保存有序片段及作者状态，可直接归文档或归分组。
     [Serializable]
-    [Attachable(typeof(Group))]
-    public abstract class Track : IDirectable
+    [Attachable(typeof(TimelineGroup))]
+    public abstract class TimelineTrack : TimelineRootItem, IDirectable
     {
-        [SerializeField] private List<Clip> actionClips = new();
+        [SerializeField] private List<TimelineClip> actionClips = new();
 
         [SerializeField] [HideInInspector] private string name;
         [SerializeField] [HideInInspector] private bool active = true;
@@ -22,7 +22,7 @@ namespace NBC.ActionEditor
 
         public virtual string info => string.Empty;
 
-        public List<Clip> Clips
+        public List<TimelineClip> Clips
         {
             get => actionClips;
             set => actionClips = value;
@@ -38,10 +38,10 @@ namespace NBC.ActionEditor
         }
 
         private IDirector root;
-        [fsIgnore] public IDirector Root => Parent?.Root ?? root;
-        [fsIgnore] public IDirectable Parent { get; private set; }
+        public IDirector Root => Parent?.Root ?? root;
+        public IDirectable Parent { get; private set; }
 
-        [fsIgnore] public Group Group => Parent as Group;
+        public TimelineGroup Group => Parent as TimelineGroup;
         
         public string Name
         {
@@ -52,12 +52,6 @@ namespace NBC.ActionEditor
         IEnumerable<IDirectable> IDirectable.Children => Clips;
 
         public GameObject Actor => Parent?.Actor;
-
-        public virtual bool IsCollapsed
-        {
-            get => Parent != null && Parent.IsCollapsed;
-            set { }
-        }
 
         public virtual bool IsActive
         {
@@ -118,7 +112,6 @@ namespace NBC.ActionEditor
         public void Validate(IDirector root, IDirectable parent)
         {
             this.root = root;
-            // Debug.Log($"设置轨道的父节点==={parent}");
             Parent = parent;
             OnAfterValidate();
         }
@@ -139,24 +132,22 @@ namespace NBC.ActionEditor
         }
 
 
-        public T AddClip<T>(float time) where T : Clip
+        public T AddClip<T>(float time) where T : TimelineClip
         {
             return (T)AddClip(typeof(T), time);
         }
 
-        public Clip AddClip(Type type, float time)
+        public TimelineClip AddClip(Type type, float time)
         {
             var catAtt =
                 type.GetCustomAttributes(typeof(CategoryAttribute), true).FirstOrDefault() as CategoryAttribute;
             if (catAtt != null && Clips.Count == 0) Name = catAtt.category + " Track";
 
-            var newAction = Activator.CreateInstance(type) as Clip;
+            var newAction = Activator.CreateInstance(type) as TimelineClip;
 
-            Debug.Log($"type={type} newAction={newAction}");
 
             if (newAction != null)
             {
-                // if (!newAction.CanAdd(this)) return null;
 
                 newAction.StartTime = time;
                 newAction.Name = type.Name;
@@ -167,18 +158,16 @@ namespace NBC.ActionEditor
                 if (nextAction != null) newAction.EndTime = Mathf.Min(newAction.EndTime, nextAction.StartTime);
 
                 Root.Validate();
-                // DirectorUtility.selectedObject = newAction;
             }
 
             return newAction;
         }
 
-        public Clip AddClip(Clip clip)
+        public TimelineClip AddClip(TimelineClip clip)
         {
             if (clip != null && clip.CanValidTime(this, clip.StartTime, clip.EndTime))
             {
-                // if (!clip.CanAdd(this)) return null;
-                if (clip.Parent != null && clip.Parent is Track track)
+                if (clip.Parent != null && clip.Parent is TimelineTrack track)
                 {
                     track.DeleteAction(clip);
                 }
@@ -190,7 +179,7 @@ namespace NBC.ActionEditor
             return clip;
         }
 
-        public void DeleteAction(Clip action)
+        public void DeleteAction(TimelineClip action)
         {
             Clips.Remove(action);
             Root.Validate();

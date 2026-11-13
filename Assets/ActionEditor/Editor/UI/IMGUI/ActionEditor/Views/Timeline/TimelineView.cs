@@ -1,4 +1,5 @@
-﻿using UnityEditor;
+﻿using NBC.ActionEditor.Domain;
+using UnityEditor;
 using UnityEngine;
 
 namespace NBC.ActionEditor
@@ -12,7 +13,7 @@ namespace NBC.ActionEditor
         private TimelinePointerView _pointerView;
         private TimelineBottomView _bottomView;
 
-        public Asset asset => App.AssetData;
+        public ActionDocument asset => App.AssetData;
 
         private Rect _pointerRect;
 
@@ -54,7 +55,7 @@ namespace NBC.ActionEditor
             _bottomView.OnGUI(new Rect(0, 0, bottomRect.width, bottomRect.height));
             GUILayout.EndArea();
 
-            // var leftOffset = Styles.TimelineLeftWidth + Styles.SplitterWidth;
+            // var leftOffset = Workspace.LeftWidth + Styles.SplitterWidth;
             // var pointerWidth = Position.width - leftOffset;
             // Styles.TimelineRightWidth = pointerWidth - Styles.RightGapWidth;
             // var pointerRect = new Rect(leftOffset, Styles.HeaderHeight, pointerWidth,
@@ -64,7 +65,7 @@ namespace NBC.ActionEditor
             // _pointerView.OnGUI(new Rect(0, 0, pointerRect.width, pointerRect.height));
             // GUILayout.EndArea();
 
-            var leftOffset = Styles.TimelineLeftWidth + Styles.SplitterWidth + Styles.RightGapWidth;
+            var leftOffset = Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth;
             Styles.TimelineRightWidth = Position.width - leftOffset;
             var pointerRect = new Rect(leftOffset, Styles.HeaderHeight, Styles.TimelineRightWidth,
                 Position.height - Styles.BottomHeight - Styles.HeaderHeight);
@@ -73,11 +74,11 @@ namespace NBC.ActionEditor
             _pointerView.OnGUI(new Rect(0, 0, pointerRect.width, pointerRect.height));
             GUILayout.EndArea();
 
-            var leftWidth = Styles.TimelineLeftWidth;
+            var leftWidth = Workspace.LeftWidth;
             leftWidth = _splitterView.OnSplit(Position, leftWidth);
-            if (!leftWidth.Equals(Styles.TimelineLeftWidth))
+            if (!leftWidth.Equals(Workspace.LeftWidth))
             {
-                Styles.TimelineLeftWidth = leftWidth;
+                Workspace.LeftWidth = leftWidth;
             }
         }
 
@@ -123,7 +124,7 @@ namespace NBC.ActionEditor
 
             if (e.type == EventType.ScrollWheel)
             {
-                TimelineNavigation.SetRange(asset, TimelineNavigation.ZoomAt(asset.ViewTimeMin, asset.ViewTimeMax,
+                TimelineNavigation.SetRange(Workspace, TimelineNavigation.ZoomAt(Workspace.ViewTimeMin, Workspace.ViewTimeMax,
                     e.delta.y, Position.width, (e.mousePosition.x - _pointerRect.x) / Mathf.Max(1, _pointerRect.width), true));
 
                 Window.Repaint();
@@ -141,8 +142,8 @@ namespace NBC.ActionEditor
                 if (e.button == 2 && (e.type == EventType.MouseDrag || e.type == EventType.MouseDown || e.type == EventType.MouseUp))
                 {
                     var offset = e.mousePosition.x - _lastZoomX;
-                    var range = TimelineNavigation.Pan(asset.ViewTimeMin, asset.ViewTimeMax, offset, ActionEditorHost.Width, false);
-                    asset.ViewTimeMin = range.x; asset.ViewTimeMax = range.y;
+                    var range = TimelineNavigation.Pan(Workspace.ViewTimeMin, Workspace.ViewTimeMax, offset, ActionEditorHost.Width, false);
+                    Workspace.ViewTimeMin = range.x; Workspace.ViewTimeMax = range.y;
 
                     _lastZoomX = e.mousePosition.x;
 

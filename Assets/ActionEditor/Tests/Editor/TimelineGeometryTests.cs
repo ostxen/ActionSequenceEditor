@@ -1,3 +1,5 @@
+using NBC.ActionEditor.Presentation.Timeline;
+using NBC.ActionEditor.Domain;
 using System.Linq;
 using NBC.ActionEditor.Samples.LegacyExperience;
 using NUnit.Framework;
@@ -7,6 +9,8 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class TimelineGeometryTests
     {
+        private readonly TimelineWorkspace workspace = new TimelineWorkspace();
+        [SetUp] public void ResetWorkspace() { workspace.SetRange(0, 7); }
         [TestCase(0f)] [TestCase(.25f)] [TestCase(.75f)] [TestCase(1f)]
         public void ZoomKeepsHoveredTimeFixedAtEveryAnchorAndMinimumSpan(float fraction)
         {
@@ -20,24 +24,24 @@ namespace NBC.ActionEditor.Tests
             Assert.That(min.y - min.x, Is.EqualTo(.25f));
             Assert.That(TimelineNavigation.ZoomAt(1, 8, 1, 1000, fraction, false), Is.EqualTo(new Vector2(1, 8)));
             var asset = new LegacyExperienceAsset();
-            TimelineNavigation.SetRange(asset, new Vector2(-1, 9));
-            Assert.That(asset.ViewTimeMin, Is.EqualTo(-1)); Assert.That(asset.ViewTimeMax, Is.EqualTo(9));
+            TimelineNavigation.SetRange(workspace, new Vector2(-1, 9));
+            Assert.That(workspace.ViewTimeMin, Is.EqualTo(-1)); Assert.That(workspace.ViewTimeMax, Is.EqualTo(9));
         }
 
         [Test] public void TrackDropResolvesBeforeAfterGroupAndRootFromScrolledCoordinates()
         {
-            var asset = new LegacyExperienceAsset(); var moving = asset.groups[0].Tracks[1];
-            var before = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 31), 0, 1000, 600, 28);
-            var after = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 53), 0, 1000, 600, 28);
-            Assert.That(before.Group, Is.SameAs(asset.groups[0])); Assert.That(before.Index, Is.Zero);
+            var asset = new LegacyExperienceAsset(); var moving = asset.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
+            var before = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 31), 0, 1000, 600, 28, workspace);
+            var after = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 53), 0, 1000, 600, 28, workspace);
+            Assert.That(before.Group, Is.SameAs(asset.RootItems.OfType<TimelineGroup>().ElementAt(0))); Assert.That(before.Index, Is.Zero);
             Assert.That(after.Index, Is.EqualTo(1));
-            var scrolled = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 3), 28, 1000, 600, 28);
+            var scrolled = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 3), 28, 1000, 600, 28, workspace);
             Assert.That(scrolled.Index, Is.Zero); Assert.That(scrolled.Y, Is.Zero);
-            var root = TimelineGeometry.TrackDrop(asset, moving, new Vector2(5, 31), 0, 1000, 600, 28);
+            var root = TimelineGeometry.TrackDrop(asset, moving, new Vector2(5, 31), 0, 1000, 600, 28, workspace);
             Assert.That(root.IsValid, Is.True); Assert.That(root.Group, Is.Null);
-            Assert.That(root.Y, Is.EqualTo(TimelineGeometry.VisibleRows(asset).Count * 28));
-            Assert.That(TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 601), 0, 1000, 600, 28).IsValid, Is.False);
-            Assert.That(TimelineGeometry.TrackDrop(asset, moving, new Vector2(-1, 31), 0, 1000, 600, 28).IsValid, Is.False);
+            Assert.That(root.Y, Is.EqualTo(TimelineGeometry.VisibleRows(asset, workspace).Count * 28));
+            Assert.That(TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 601), 0, 1000, 600, 28, workspace).IsValid, Is.False);
+            Assert.That(TimelineGeometry.TrackDrop(asset, moving, new Vector2(-1, 31), 0, 1000, 600, 28, workspace).IsValid, Is.False);
         }
         [TestCase(120, 9.575f)]
         [TestCase(1, 9.575f)]
@@ -71,9 +75,9 @@ namespace NBC.ActionEditor.Tests
         {
             var first = new LegacyExperienceInterval { StartTime = 1, Length = 2 };
             var second = new LegacyExperienceMarker { StartTime = 4 };
-            Assert.That(TimelineCandidates.References(new Clip[] { first, second }, new[] { first }, 7, 2, true), Is.EqualTo(new[] { 0f, 7, 2, 4 }));
+            Assert.That(TimelineCandidates.References(new TimelineClip[] { first, second }, new[] { first }, 7, 2, true), Is.EqualTo(new[] { 0f, 7, 2, 4 }));
             second.StartTime = 5;
-            Assert.That(TimelineCandidates.References(new Clip[] { first, second }, new[] { first }, 7, 2, false), Is.EqualTo(new[] { 5f, 0, 7, 2 }));
+            Assert.That(TimelineCandidates.References(new TimelineClip[] { first, second }, new[] { first }, 7, 2, false), Is.EqualTo(new[] { 5f, 0, 7, 2 }));
             Assert.That(first.StartTime, Is.EqualTo(1));
         }
         [TestCase(500, 232, 0, 7)]
@@ -93,14 +97,15 @@ namespace NBC.ActionEditor.Tests
         [Test] public void VisibleRowsHideCollapsedTracksWithoutChangingDocument()
         {
             var asset = new LegacyExperienceAsset();
+            workspace.Bind(asset); workspace.SetCollapsed(asset.RootItems.OfType<TimelineGroup>().ElementAt(2), true);
             var json = Storage.JsonDocumentSession.Encode(asset);
-            var rows = TimelineGeometry.VisibleRows(asset);
+            var rows = TimelineGeometry.VisibleRows(asset, workspace);
             Assert.That(rows.Count, Is.EqualTo(8));
-            Assert.That(rows.Take(4), Is.EqualTo(new IDirectable[] { asset.groups[0], asset.groups[0].Tracks[0], asset.groups[0].Tracks[1], asset.groups[0].Tracks[2] }));
-            Assert.That(TimelineGeometry.IsVisible(asset.groups[2].Tracks[0].Clips[0]), Is.False);
+            Assert.That(rows.Take(4), Is.EqualTo(new IDirectable[] { asset.RootItems.OfType<TimelineGroup>().ElementAt(0), asset.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], asset.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1], asset.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[2] }));
+            Assert.That(TimelineGeometry.IsVisible(asset.RootItems.OfType<TimelineGroup>().ElementAt(2).Tracks[0].Clips[0], workspace), Is.False);
             Assert.That(Storage.JsonDocumentSession.Encode(asset), Is.EqualTo(json));
-            asset.groups[0].IsCollapsed = true;
-            Assert.That(TimelineGeometry.VisibleRows(asset).Count, Is.EqualTo(5));
+            workspace.SetCollapsed(asset.RootItems.OfType<TimelineGroup>().ElementAt(0), true);
+            Assert.That(TimelineGeometry.VisibleRows(asset, workspace).Count, Is.EqualTo(5));
         }
         [Test] public void ShortClipsPointsScrollAndHandlePriorityAreExplicit()
         {

@@ -27,7 +27,7 @@ namespace NBC.ActionEditor
                 };
             }
 
-            var rect = new Rect(0, 0, Styles.TimelineLeftWidth, Styles.PlayControlHeight);
+            var rect = new Rect(0, 0, Workspace.LeftWidth, Styles.PlayControlHeight);
             GUILayout.BeginArea(rect);
 
             _buttonWidth = rect.width / 8;
@@ -110,7 +110,7 @@ namespace NBC.ActionEditor
 
         private void DrawPlayHeader()
         {
-            var gap = Styles.TimelineLeftWidth + Styles.SplitterWidth;
+            var gap = Workspace.LeftWidth + Styles.SplitterWidth;
             _headerRect = new Rect(Position.x + gap, Position.y,
                 Position.width - gap,
                 Position.height - Styles.HeaderHeight);

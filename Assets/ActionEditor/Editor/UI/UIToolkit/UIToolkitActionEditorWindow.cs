@@ -1,3 +1,5 @@
+using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Presentation.Timeline;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,8 +13,8 @@ namespace NBC.ActionEditor.Workbench
     public sealed class UIToolkitActionEditorWindow : EditorWindow
     {
         public const float HeaderHeight = 40, RowHeight = 28, BottomHeight = 16;
-        public float LeftWidth = 240;
-        public float ScrollY;
+        public float LeftWidth { get => Workspace.LeftWidth; set => Workspace.LeftWidth = value; }
+        public float ScrollY { get => Workspace.ScrollY; set => Workspace.ScrollY = value; }
         public UIToolkitTimelineCanvas Canvas { get; private set; }
         private VisualElement transport, toolbar, footer;
         private ToolbarButton documents;
@@ -30,7 +32,8 @@ namespace NBC.ActionEditor.Workbench
         private double lastTick;
         public string LastError { get; private set; }
         public ActionEditorContext Context => App.Context;
-        public Asset Document => Context.Document;
+        public ActionDocument Document => Context.Document;
+        public TimelineWorkspace Workspace { get; } = new TimelineWorkspace();
 
         [MenuItem("NBC/Action Editor/Open Workbench", false, -10)]
         public static void Open() => GetWindow<UIToolkitActionEditorWindow>().Show();
@@ -118,9 +121,9 @@ namespace NBC.ActionEditor.Workbench
             footer = new VisualElement { name = "json-footer" }; footer.style.height = BottomHeight; footer.style.flexShrink = 0; footer.style.flexDirection = FlexDirection.Row;
             var blank = new VisualElement { name = "json-footer-blank" }; blank.style.width = LeftWidth + 9; blank.style.flexShrink = 0; footer.Add(blank);
             range = new MinMaxSlider(0, 7, 0, 7) { name = "json-view-range" }; range.style.flexGrow = 1;
-            range.RegisterValueChangedCallback(e => { if (syncing || Document == null) return; Document.ViewTimeMax = e.newValue.y; Document.ViewTimeMin = e.newValue.x; Canvas.MarkDirtyRepaint(); });
+            range.RegisterValueChangedCallback(e => { if (syncing || Document == null) return; Workspace.ViewTimeMax = e.newValue.y; Workspace.ViewTimeMin = e.newValue.x; Canvas.MarkDirtyRepaint(); });
             range.style.marginLeft = 0; range.style.marginRight = 5; range.style.marginTop = 0; range.style.height = 18;
-            range.RegisterCallback<PointerDownEvent>(e => { if (e.clickCount == 2 && Document != null) { Document.ViewTimeMin = 0; Document.ViewTimeMax = Document.Length; SyncView(); } });
+            range.RegisterCallback<PointerDownEvent>(e => { if (e.clickCount == 2 && Document != null) { Workspace.ViewTimeMin = 0; Workspace.ViewTimeMax = Document.Length; SyncView(); } });
             footer.Add(range); rootVisualElement.Add(footer);
             error = new Label { name = "json-error" }; error.style.display = DisplayStyle.None; rootVisualElement.Add(error);
             Canvas.AttachRuler(); Canvas.RegisterCallback<GeometryChangedEvent>(_ => SyncView()); Refresh();
@@ -134,6 +137,7 @@ namespace NBC.ActionEditor.Workbench
         }
         public void Refresh()
         {
+            Workspace.Bind(Document);
             if (Canvas == null || scheduled) return;
             scheduled = true;
             rootVisualElement.schedule.Execute(() =>
@@ -179,7 +183,7 @@ namespace NBC.ActionEditor.Workbench
                 if (Document != null)
                 {
                     range.highLimit = Mathf.Max(.001f, Document.Length);
-                    range.SetValueWithoutNotify(new Vector2(Document.ViewTimeMin, Document.ViewTimeMax));
+                    range.SetValueWithoutNotify(new Vector2(Workspace.ViewTimeMin, Workspace.ViewTimeMax));
                 }
             }
             finally { syncing = false; }

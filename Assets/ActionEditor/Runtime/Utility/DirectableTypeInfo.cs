@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -28,14 +29,14 @@ namespace NBC.ActionEditor
             var parents = type.GetCustomAttribute<AttachableAttribute>(true)?.Types;
             AttachableTypes = parents == null ? null : Array.AsReadOnly((Type[])parents.Clone());
             IsUnique = type.IsDefined(typeof(UniqueAttribute), true);
-            IsSignal = typeof(ClipSignal).IsAssignableFrom(type);
+            IsSignal = typeof(PointClip).IsAssignableFrom(type);
             CanScale = WritableOverride(type, "Length");
             HasBlendIn = WritableOverride(type, "BlendIn"); HasBlendOut = WritableOverride(type, "BlendOut");
         }
         private static bool WritableOverride(Type type, string name)
         {
             var property = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public);
-            return property != null && property.CanWrite && property.DeclaringType != typeof(Clip);
+            return property != null && property.CanWrite && property.DeclaringType != typeof(TimelineClip);
         }
         public static DirectableTypeInfo For(Type type)
         {

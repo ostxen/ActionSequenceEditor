@@ -1,4 +1,5 @@
-﻿using NBC.ActionEditor.Events;
+﻿using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Events;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
@@ -16,7 +17,7 @@ namespace NBC.ActionEditor
     public class TimelinePointerView : ViewBase, IPointerClickHandler,
         IPointerDragHandler, IDragBeginHandler, IDragEndHandler
     {
-        public Asset asset => App.AssetData;
+        public ActionDocument asset => App.AssetData;
 
         private Rect _playPointerHandler;
         private Rect _pointerTextRect;
@@ -45,7 +46,7 @@ namespace NBC.ActionEditor
             if (asset == null) return;
             var width = ActionEditorHost.Width;
 
-            var x = asset.TimeToPos(asset.Length, width);
+            var x = Workspace.TimeToPos(asset.Length, width);
             var stepRect = new Rect(Position.x, Position.y + (Styles.HeaderHeight - 4), x, 4);
             GUI.color = Styles.TimeStepRectColor;
             GUI.DrawTexture(stepRect, Styles.WhiteTexture);
@@ -58,7 +59,7 @@ namespace NBC.ActionEditor
                 { 0.01f, 0.1f, 0.5f, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 250000, 500000 };
             for (var i = 0; i < modulos.Length; i++)
             {
-                var count = asset.ViewTime / modulos[i];
+                var count = Workspace.ViewTime / modulos[i];
                 if (width / count > 50)
                 {
                     timeInfoInterval = modulos[i];
@@ -68,15 +69,15 @@ namespace NBC.ActionEditor
             }
 
             var timeStep = lowMod;
-            var timeInfoStart = Mathf.FloorToInt(asset.ViewTimeMin / timeInfoInterval) * timeInfoInterval;
-            var timeInfoEnd = Mathf.CeilToInt(asset.ViewTimeMax / timeInfoInterval) * timeInfoInterval;
+            var timeInfoStart = Mathf.FloorToInt(Workspace.ViewTimeMin / timeInfoInterval) * timeInfoInterval;
+            var timeInfoEnd = Mathf.CeilToInt(Workspace.ViewTimeMax / timeInfoInterval) * timeInfoInterval;
 
             //时间步长间隔 time step interval
-            if (width / (asset.ViewTime / timeStep) > 6)
+            if (width / (Workspace.ViewTime / timeStep) > 6)
             {
                 for (var i = timeInfoStart; i <= timeInfoEnd; i += timeStep)
                 {
-                    var posX = asset.TimeToPos(i, width);
+                    var posX = Workspace.TimeToPos(i, width);
                     if (posX > Position.width) continue;
                     GUI.DrawTexture(new Rect(posX, Position.y + (Styles.HeaderHeight - 4), 1, 4), Styles.WhiteTexture);
                 }
@@ -85,7 +86,7 @@ namespace NBC.ActionEditor
             //时间文字间隔 time text interval
             for (var i = timeInfoStart; i <= timeInfoEnd; i += timeInfoInterval)
             {
-                var posX = asset.TimeToPos(i, width);
+                var posX = Workspace.TimeToPos(i, width);
                 var rounded = Mathf.Round(i * 10) / 10;
                 if (posX > Position.width) continue;
                 GUI.DrawTexture(new Rect(posX, Position.y + (Styles.HeaderHeight - 12), 1, 12), Styles.WhiteTexture);
@@ -105,7 +106,7 @@ namespace NBC.ActionEditor
         {
             var width = ActionEditorHost.Width;
             var height = Styles.PlayControlHeight - Styles.HeaderHeight;
-            var x = asset.TimeToPos(asset.Length, width);
+            var x = Workspace.TimeToPos(asset.Length, width);
             GUI.color = Styles.EndPointerColor;
             GUI.DrawTexture(new Rect(x - 2, Position.y, 5, height), Styles.WhiteTexture);
             GUI.DrawTexture(new Rect(x, Position.y, 1, Position.height), Styles.WhiteTexture);
@@ -113,7 +114,7 @@ namespace NBC.ActionEditor
 
             if (App.IsPlay)
             {
-                var playX = asset.TimeToPos(AssetPlayer.Inst.CurrentTime, width);
+                var playX = Workspace.TimeToPos(AssetPlayer.Inst.CurrentTime, width);
                 _playPointerHandler = new Rect(playX - 5, Position.y, 11, height);
                 _pointerTextRect = new Rect(Position.x, Position.y, width, height);
 
@@ -130,14 +131,14 @@ namespace NBC.ActionEditor
         {
             if (!App.IsRange) return;
 
-            var startX = asset.TimeToPos(asset.RangeMin, ActionEditorHost.Width);
+            var startX = Workspace.TimeToPos(asset.RangeMin, ActionEditorHost.Width);
             var rect1 = new Rect(startX - Styles.TimelineStartPlaybackIcon.width, Position.y,
                 Styles.TimelineStartPlaybackIcon.width,
                 Styles.TimelineStartPlaybackIcon.height);
             GUI.DrawTexture(rect1, Styles.TimelineStartPlaybackIcon);
             GUI.DrawTexture(new Rect(startX, Position.y, 1, Position.height), Styles.WhiteTexture);
 
-            var endX = asset.TimeToPos(asset.RangeMax, ActionEditorHost.Width);
+            var endX = Workspace.TimeToPos(asset.RangeMax, ActionEditorHost.Width);
             var rect2 = new Rect(endX, Position.y, Styles.TimelineEndPlaybackIcon.width,
                 Styles.TimelineEndPlaybackIcon.height);
             GUI.DrawTexture(rect2, Styles.TimelineEndPlaybackIcon);
@@ -183,7 +184,7 @@ namespace NBC.ActionEditor
 
         private void DrawDragLine(float time)
         {
-            var x = asset.TimeToPos(time, ActionEditorHost.Width);
+            var x = Workspace.TimeToPos(time, ActionEditorHost.Width);
             var magnet = ((ActionEditorWindow)Window).Gesture.HasMagnetSnapTime(time);
             if (magnet)
             {
@@ -215,7 +216,7 @@ namespace NBC.ActionEditor
 
         private void CheckDrag()
         {
-            asset.PosToTime(0, ActionEditorHost.Width);
+            Workspace.PosToTime(0, ActionEditorHost.Width);
         }
 
         public void OnPointerClick(PointerEventData eventData)
@@ -254,7 +255,7 @@ namespace NBC.ActionEditor
 
         private void ChangeCurrentTime(Vector2 mousePosition)
         {
-            var time = asset.PosToTime(mousePosition.x, ActionEditorHost.Width);
+            var time = Workspace.PosToTime(mousePosition.x, ActionEditorHost.Width);
             AssetPlayer.Inst.CurrentTime = asset.SnapTime(time);
             AssetPlayer.Inst.CurrentTime =
                 Mathf.Clamp(AssetPlayer.Inst.CurrentTime, 0 + float.Epsilon, asset.Length - float.Epsilon);

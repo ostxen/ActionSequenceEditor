@@ -4,7 +4,7 @@ using System.IO;
 
 namespace NBC.ActionEditor.Serialization
 {
-    // JSON number transport only, not a second serializer or document format.
+    // 保留有限 Single 的原始位和负零，不参与文档结构转换。
     public static class DocumentNumber
     {
         public static string Single(float value, string path)

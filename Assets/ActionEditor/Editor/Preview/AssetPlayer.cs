@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NBC.ActionEditor.Domain;
+using System;
 using UnityEngine;
 
 namespace NBC.ActionEditor
@@ -8,19 +9,19 @@ namespace NBC.ActionEditor
     public class AssetPlayer
     {
         public static AssetPlayer Inst => App.Context.Player;
-        private readonly Func<Asset> document;
+        private readonly Func<ActionDocument> document;
         private readonly ActionEditorPreviewSession preview;
         private float currentTime;
         public event Action Faulted;
         public float previousTime { get; private set; }
         public bool IsInitialized => preview.IsInitialized;
         public AssetPlayer() : this(() => App.AssetData) { }
-        public AssetPlayer(Func<Asset> document, Func<Type, PreviewBase> factory = null)
+        public AssetPlayer(Func<ActionDocument> document, Func<Type, PreviewBase> factory = null)
         {
             this.document = document ?? throw new ArgumentNullException(nameof(document));
             preview = new ActionEditorPreviewSession(factory ?? ActionEditorTypeCatalog.CreatePreview);
         }
-        public Asset Asset => document();
+        public ActionDocument Asset => document();
         public float CurrentTime { get => currentTime; set => currentTime = Mathf.Clamp(value, 0, Length); }
         public float Length => Asset?.Length ?? 0;
         public void Reset() { preview.Dispose(); previousTime = 0; }

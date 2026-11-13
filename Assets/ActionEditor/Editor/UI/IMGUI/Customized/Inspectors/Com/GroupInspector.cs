@@ -1,18 +1,19 @@
-﻿using NBC.ActionEditor;
+﻿using NBC.ActionEditor.Domain;
+using NBC.ActionEditor;
 using UnityEditor;
 using UnityEngine;
 
 namespace NBC.ActionEditor.Design.Editor.Inspectors
 {
-    public abstract class GroupInspector<T> : ActionClipInspector where T : Group
+    public abstract class GroupInspector<T> : ActionClipInspector where T : TimelineGroup
     {
         protected T action => (T)target;
     }
 
-    [CustomInspectors(typeof(Group), true)]
+    [CustomInspectors(typeof(TimelineGroup), true)]
     public class GroupInspector : InspectorsBase
     {
-        private Group action => (Group)target;
+        private TimelineGroup action => (TimelineGroup)target;
 
         public override void OnInspectorGUI()
         {

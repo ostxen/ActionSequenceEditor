@@ -1,30 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using FullSerializer;
 using UnityEngine;
 
-namespace NBC.ActionEditor
+namespace NBC.ActionEditor.Domain
 {
+    // 保存一组有序轨道及其作者状态，不允许嵌套分组。
     [Name("Default Group")]
     [Serializable]
-    public class Group : IDirectable
+    public class TimelineGroup : TimelineRootItem, IDirectable
     {
         [SerializeField] [HideInInspector] private string name;
-        [SerializeField] private List<Track> tracks = new();
-        [SerializeField] [HideInInspector] private bool isCollapsed;
+        [SerializeField] private List<TimelineTrack> tracks = new();
         [SerializeField] [HideInInspector] private bool active = true;
         [SerializeField] [HideInInspector] private bool isLocked;
 
         public int ActorId;
 
-        public List<Track> Tracks
+        public List<TimelineTrack> Tracks
         {
             get => tracks;
             set => tracks = value;
         }
 
-        [fsIgnore] public IDirector Root { get; private set; }
+        public IDirector Root { get; private set; }
         IDirectable IDirectable.Parent => null;
 
         IEnumerable<IDirectable> IDirectable.Children => Tracks;
@@ -37,16 +36,6 @@ namespace NBC.ActionEditor
             set
             {
                 _actor = value;
-                // var key = _actor.GetComponent<ObjectKey>();
-                // if ((key == null))
-                // {
-                //     _actor.AddComponent<ObjectKey>();
-                //     ActorId = _actor.GetInstanceID();
-                // }
-                // else
-                // {
-                //     ActorId = key.ObjectId;
-                // }
             }
         }
 
@@ -69,10 +58,6 @@ namespace NBC.ActionEditor
             set { }
         }
 
-        // float IDirectable.BlendIn => 0f;
-        //
-        // float IDirectable.BlendOut => 0f;
-
         bool IDirectable.CanCrossBlend => false;
 
         public string Name
@@ -90,12 +75,6 @@ namespace NBC.ActionEditor
                 active = value;
                 if (Root != null) Root?.Validate();
             }
-        }
-
-        public bool IsCollapsed
-        {
-            get => isCollapsed;
-            set => isCollapsed = value;
         }
 
         public bool IsLocked
@@ -124,14 +103,14 @@ namespace NBC.ActionEditor
         }
 
 
-        public bool CanAddTrack(Track track)
+        public bool CanAddTrack(TimelineTrack track)
         {
             return track != null && CanAddTrackOfType(track.GetType());
         }
 
         public bool CanAddTrackOfType(Type type)
         {
-            if (type == null || !type.IsSubclassOf(typeof(Track)) || type.IsAbstract) return false;
+            if (type == null || !type.IsSubclassOf(typeof(TimelineTrack)) || type.IsAbstract) return false;
 
             if (type.IsDefined(typeof(UniqueAttribute), true) &&
                 Tracks.FirstOrDefault(t => t.GetType() == type) != null)
@@ -143,21 +122,19 @@ namespace NBC.ActionEditor
             return true;
         }
 
-        public T AddTrack<T>(string _name = null) where T : Track
+        public T AddTrack<T>(string _name = null) where T : TimelineTrack
         {
             return (T)AddTrack(typeof(T), _name);
         }
 
-        public Track AddTrack(Type type, string _name = null)
+        public TimelineTrack AddTrack(Type type, string _name = null)
         {
             var newTrack = Activator.CreateInstance(type);
-            if (newTrack is Track track)
+            if (newTrack is TimelineTrack track)
             {
-                // if (!track.CanAdd(this)) return null;
                 track.Name = type.Name;
                 Tracks.Add(track);
 
-                Debug.Log("tracks.count=" + Tracks.Count);
                 Root?.Validate();
 
                 return track;
@@ -166,7 +143,7 @@ namespace NBC.ActionEditor
             return null;
         }
 
-        public int InsertTrack<T>(T track, int index) where T : Track
+        public int InsertTrack<T>(T track, int index) where T : TimelineTrack
         {
             if (tracks.Contains(track))
             {
@@ -188,19 +165,14 @@ namespace NBC.ActionEditor
             return index;
         }
 
-        public void DeleteTrack(Track track)
+        public void DeleteTrack(TimelineTrack track)
         {
-            // Undo.RegisterCompleteObjectUndo(this, "Delete Track");
             Tracks.Remove(track);
-            // if (ReferenceEquals(DirectorUtility.selectedObject, track))
-            // {
-            //     DirectorUtility.selectedObject = null;
-            // }
 
             Root?.Validate();
         }
 
-        public int GetTrackIndex(Track track)
+        public int GetTrackIndex(TimelineTrack track)
         {
             return tracks.FindIndex(t => t == track);
         }

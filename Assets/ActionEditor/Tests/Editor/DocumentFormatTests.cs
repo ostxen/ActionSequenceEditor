@@ -1,3 +1,5 @@
+using NBC.ActionEditor.Presentation.Timeline;
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -31,26 +33,26 @@ namespace NBC.ActionEditor.Tests
         [Serializable] public sealed class DerivedBusiness : Business { public string Text; }
         [Serializable] public class CollisionBase { public int Same; }
         [Serializable] public sealed class Collision : CollisionBase { public new int Same; }
-        [Serializable] public sealed class RewritingGroup : Group
+        [Serializable] public sealed class RewritingGroup : TimelineGroup
         {
             public int Counter;
             public override void OnAfterDeserialize() { Counter++; }
         }
-        [Serializable] public sealed class PayloadAsset : Asset
+        [Serializable] public sealed class PayloadAsset : ActionDocument
         {
             public Values Payload;
             public PayloadAsset() { ConstructorCalls++; }
             [NonSerialized] public static int ConstructorCalls;
         }
-        [Serializable] public sealed class CallbackGroup : Group
+        [Serializable] public sealed class CallbackGroup : TimelineGroup
         {
             public int Counter;
             public override void OnBeforeSerialize() { Counter++; }
         }
         private static DocumentFormatContext Context => DocumentFormats.CreateContext(typeof(Values), typeof(Nested), typeof(PayloadAsset), typeof(CallbackGroup), typeof(DerivedBusiness));
         private static readonly ActionDocumentJsonFormat Format = new ActionDocumentJsonFormat();
-        private static string Text(Asset asset, bool compressed = true) => Encoding.UTF8.GetString(Format.Serialize(asset, new DocumentFormatOptions(compressed), Context));
-        private static Asset Read(string json) => Format.Deserialize(Encoding.UTF8.GetBytes(json), Context);
+        private static string Text(ActionDocument asset, bool compressed = true) => Encoding.UTF8.GetString(Format.Serialize(asset, new DocumentFormatOptions(compressed), Context));
+        private static ActionDocument Read(string json) => Format.Deserialize(Encoding.UTF8.GetBytes(json), Context);
         private static int Bits(float value) => BitConverter.ToInt32(BitConverter.GetBytes(value), 0);
 
         [Test] public void IndependentContractFixturesReplaceConstructorDefaultsAndPreserveSignalStorage()
@@ -59,16 +61,16 @@ namespace NBC.ActionEditor.Tests
             var fixtures = System.Text.RegularExpressions.Regex.Matches(contract, "```json\\s*([\\s\\S]*?)```").Cast<System.Text.RegularExpressions.Match>().Take(2).Select(m => m.Groups[1].Value).ToArray();
             Assert.That(fixtures.Length, Is.EqualTo(2));
             var empty = (LegacyExperienceAsset)Read(fixtures[0]);
-            Assert.That(empty.groups, Is.Empty); Assert.That(empty.Notes, Is.Null);
+            Assert.That(empty.RootItems.OfType<TimelineGroup>(), Is.Empty); Assert.That(empty.Notes, Is.Null);
             Assert.That(Bits(empty.Length), Is.EqualTo(unchecked((int)0x3dcccccd)));
-            Assert.That(empty.ViewTimeMax, Is.EqualTo(7)); Assert.That(empty.RangeMax, Is.EqualTo(6));
+            Assert.That(empty.RangeMax, Is.EqualTo(6));
             var point = (LegacyExperienceAsset)Read(fixtures[1]);
-            Assert.That(point.groups.Count, Is.EqualTo(1)); Assert.That(point.groups[0].Tracks.Count, Is.EqualTo(1));
-            var track = point.groups[0].Tracks[0]; Assert.That(track.Clips.Count, Is.EqualTo(1));
+            Assert.That(point.RootItems.OfType<TimelineGroup>().Count(), Is.EqualTo(1)); Assert.That(point.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks.Count, Is.EqualTo(1));
+            var track = point.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; Assert.That(track.Clips.Count, Is.EqualTo(1));
             var marker = (LegacyExperienceMarker)track.Clips[0];
             Assert.That(marker.EventCode, Is.EqualTo(7)); Assert.That(marker.Notes, Is.Null);
             Assert.That(Bits(marker.StartTime), Is.EqualTo(unchecked((int)0x3f000000)));
-            Assert.That(marker.Length, Is.Zero); Assert.That((float)typeof(Clip).GetField("length", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(marker), Is.EqualTo(1));
+            Assert.That(marker.Length, Is.Zero); Assert.That((float)typeof(TimelineClip).GetField("length", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(marker), Is.EqualTo(1));
             Assert.That(marker.Parent, Is.SameAs(track)); Assert.That(marker.Root, Is.SameAs(point));
         }
         [Test] public void CompleteProductionSampleAndBothOutputsKeepAllFieldsAndHierarchy()
@@ -79,10 +81,10 @@ namespace NBC.ActionEditor.Tests
                 var json = Text(source, compressed);
                 Assert.That(json, Does.Contain("actioneditor.json"));
                 var loaded = (LegacyExperienceAsset)Read(json);
-                Assert.That(loaded.groups.Count, Is.EqualTo(3));
-                Assert.That(loaded.groups.Sum(g => g.Tracks.Count), Is.EqualTo(7));
-                Assert.That(loaded.groups.SelectMany(g => g.Tracks).Sum(t => t.Clips.Count), Is.EqualTo(13));
-                Assert.That(DocumentValueConverter.Capture(loaded, typeof(Asset), Context).ContentKey(), Is.EqualTo(DocumentValueConverter.Capture(source, typeof(Asset), Context).ContentKey()));
+                Assert.That(loaded.RootItems.OfType<TimelineGroup>().Count(), Is.EqualTo(3));
+                Assert.That(loaded.RootItems.OfType<TimelineGroup>().Sum(g => g.Tracks.Count), Is.EqualTo(7));
+                Assert.That(loaded.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).Sum(t => t.Clips.Count), Is.EqualTo(13));
+                Assert.That(DocumentValueConverter.Capture(loaded, typeof(ActionDocument), Context).ContentKey(), Is.EqualTo(DocumentValueConverter.Capture(source, typeof(ActionDocument), Context).ContentKey()));
             }
         }
         [Test] public void FiniteFloatBitsIncludeNegativeZeroSubnormalsExtremesAndRandomPayloads()
@@ -113,7 +115,7 @@ namespace NBC.ActionEditor.Tests
         [Test] public void InvalidEnvelopeTypesMembersAndNumbersFailBeforeBusinessConstruction()
         {
             var json = Text(new PayloadAsset { Payload = new Values { Numbers = new[] { .1f } } });
-            var variants = new[] { "{}", json.Replace("\"version\":1", "\"version\":2"), json.Replace("\"version\":1", "\"version\":1,\"version\":1"),
+            var variants = new[] { "{}", json.Replace("\"version\":2", "\"version\":1"), json.Replace("\"version\":2", "\"version\":2,\"version\":2"),
                 json.Replace("\"Payload\":", "\"Unknown\":"), json.Replace("\"Nullable\":null,", ""),
                 json.Replace(DocumentFormatContext.Identity(typeof(PayloadAsset)), "Unknown, Missing"),
                 json.Replace("\"Numbers\":[0.10000000149011612]", "\"Numbers\":[1e999]"), json + "x" };
@@ -132,15 +134,16 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void SnapshotCallbacksAndAuthorContentNeverMutateSourceOrDropWorkspace()
         {
-            var source = new PayloadAsset(); var group = new CallbackGroup { IsCollapsed = false }; source.groups.Add(group); source.Init();
-            source.ViewTimeMax = 7;
+            var source = new PayloadAsset(); var group = new CallbackGroup(); source.AddRoot(group); source.Init();
+            var workspace = new TimelineWorkspace(); workspace.Bind(source); workspace.ViewTimeMax = 7;
             var clone = DocumentSnapshots.Capture(source, true, Context);
-            Assert.That(group.Counter, Is.Zero); Assert.That(((CallbackGroup)clone.groups[0]).Counter, Is.EqualTo(1));
+            Assert.That(group.Counter, Is.Zero); Assert.That(((CallbackGroup)clone.RootItems.OfType<TimelineGroup>().ElementAt(0)).Counter, Is.EqualTo(1));
             var before = DocumentSnapshots.Content(source, Context);
-            source.ViewTimeMax = 9; source.groups[0].IsCollapsed = true;
+            workspace.ViewTimeMax = 9; workspace.SetCollapsed(group, true);
             Assert.That(DocumentSnapshots.Content(source, Context), Is.EqualTo(before));
             var restored = DocumentSnapshots.Capture(source, false, Context);
-            Assert.That(restored.ViewTimeMax, Is.EqualTo(9)); Assert.That(restored.groups[0].IsCollapsed, Is.True);
+            Assert.That(workspace.ViewTimeMax, Is.EqualTo(9)); Assert.That(workspace.IsCollapsed(group), Is.True);
+            Assert.That(Text(restored), Does.Not.Contain("viewTime").And.Not.Contain("isCollapsed"));
             group.Counter = 7; Assert.That(DocumentSnapshots.Content(source, Context), Is.Not.EqualTo(before));
         }
         [Test] public void ProductionContextRejectsTestTypesAndUnresolvedTemporaryReferences()
@@ -158,19 +161,19 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void InvalidStructuralGraphAndNegativeRawTimingAreNotRepaired()
         {
-            var source = new LegacyExperienceAsset(); source.groups.Add(source.groups[0]);
-            Assert.Throws<InvalidDataException>(() => Text(source)); source.groups.RemoveAt(source.groups.Count - 1);
-            source.groups[0].Tracks[0].Clips.Add(null); Assert.Throws<InvalidDataException>(() => Text(source));
+            var source = new LegacyExperienceAsset(); source.AddRoot(source.RootItems.OfType<TimelineGroup>().ElementAt(0));
+            Assert.Throws<InvalidDataException>(() => Text(source)); source.RemoveRoot(source.RootItems.Last());
+            source.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Add(null); Assert.Throws<InvalidDataException>(() => Text(source));
             var json = Text(new LegacyExperienceAsset());
             var mutated = json.Replace("\"startTime\":0.25", "\"startTime\":-1");
             Assert.That(mutated, Is.Not.EqualTo(json)); Assert.Throws<InvalidDataException>(() => Read(mutated));
         }
         [Test] public void ClipboardUsesSameConverterAndPreservesNestedPayload()
         {
-            var source = new LegacyExperienceAsset(); var track = source.groups[0].Tracks[0];
-            var restored = (Track)DocumentSnapshots.RestoreFragment(track.GetType(), DocumentSnapshots.CaptureFragment(track));
+            var source = new LegacyExperienceAsset(); var track = source.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0];
+            var restored = (TimelineTrack)DocumentSnapshots.RestoreFragment(track.GetType(), DocumentSnapshots.CaptureFragment(track));
             Assert.That(restored.Clips.Count, Is.EqualTo(3));
-            Assert.That(DocumentValueConverter.Capture(restored, typeof(Track), Context).ContentKey(), Is.EqualTo(DocumentValueConverter.Capture(track, typeof(Track), Context).ContentKey()));
+            Assert.That(DocumentValueConverter.Capture(restored, typeof(TimelineTrack), Context).ContentKey(), Is.EqualTo(DocumentValueConverter.Capture(track, typeof(TimelineTrack), Context).ContentKey()));
         }
         [Test] public void NestedValuesPolymorphicFieldsAndBasePrivateMembersUseOneContract()
         {
@@ -189,7 +192,7 @@ namespace NBC.ActionEditor.Tests
             Assert.Throws<InvalidDataException>(() => DocumentValueConverter.Capture(new Collision(), typeof(Collision), DocumentFormats.CreateContext(typeof(Collision))));
             Assert.Throws<InvalidDataException>(() => DocumentValueConverter.Capture((LegacyExperienceDirection)90, typeof(LegacyExperienceDirection), Context));
             var json = Text(new LegacyExperienceAsset());
-            foreach (var variant in new[] { json.Replace("\"Direction\":0", "\"Direction\":99"), json.Replace("\"groups\":[", "\"$id\":1,\"groups\":["), json.Replace("\"startTime\":0.25", "\"startTime\":3.4028236e38") })
+            foreach (var variant in new[] { json.Replace("\"Direction\":0", "\"Direction\":99"), json.Replace("\"rootItems\":[", "\"$id\":1,\"rootItems\":["), json.Replace("\"startTime\":0.25", "\"startTime\":3.4028236e38") })
             {
                 Assert.That(variant, Is.Not.EqualTo(json)); Assert.Throws<InvalidDataException>(() => Read(variant));
             }
@@ -200,8 +203,8 @@ namespace NBC.ActionEditor.Tests
             public string DisplayName => "Test export only";
             public string Extension => ".test";
             public bool CanRead => false; public bool CanWrite => true; public bool CanExport => true;
-            public byte[] Serialize(Asset asset, DocumentFormatOptions options, DocumentFormatContext context) => throw new NotSupportedException();
-            public Asset Deserialize(byte[] bytes, DocumentFormatContext context) => throw new NotSupportedException();
+            public byte[] Serialize(ActionDocument asset, DocumentFormatOptions options, DocumentFormatContext context) => throw new NotSupportedException();
+            public ActionDocument Deserialize(byte[] bytes, DocumentFormatContext context) => throw new NotSupportedException();
         }
         [Test] public void RegistryIsAtomicAndReadWriteExportCapabilitiesAreIndependent()
         {
@@ -217,16 +220,16 @@ namespace NBC.ActionEditor.Tests
         [Test] public void StoredSignalDurationAndInitializationChangesCannotBeSilentlyRepaired()
         {
             var source = new LegacyExperienceAsset();
-            var marker = source.groups.SelectMany(g => g.Tracks).SelectMany(t => t.Clips).OfType<ClipSignal>().First();
-            var length = typeof(Clip).GetField("length", BindingFlags.Instance | BindingFlags.NonPublic);
+            var marker = source.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).SelectMany(t => t.Clips).OfType<PointClip>().First();
+            var length = typeof(TimelineClip).GetField("length", BindingFlags.Instance | BindingFlags.NonPublic);
             length.SetValue(marker, -1f);
             Assert.That(marker.Length, Is.Zero);
             Assert.Throws<InvalidDataException>(() => Text(source));
-            var candidate = new PayloadAsset(); candidate.groups.Add(new RewritingGroup());
+            var candidate = new PayloadAsset(); candidate.AddRoot(new RewritingGroup());
             var context = DocumentFormats.CreateContext(typeof(PayloadAsset), typeof(RewritingGroup));
             var bytes = Format.Serialize(candidate, default, context);
             Assert.Throws<InvalidDataException>(() => Format.Deserialize(bytes, context));
-            Assert.That(((RewritingGroup)candidate.groups[0]).Counter, Is.Zero);
+            Assert.That(((RewritingGroup)candidate.RootItems.OfType<TimelineGroup>().ElementAt(0)).Counter, Is.Zero);
         }
         [Test] public void ReadbackComparesRawSnapshotRatherThanTwoNormalizedCopies()
         {

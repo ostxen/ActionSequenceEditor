@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using NUnit.Framework;
 using UnityEngine;
@@ -39,7 +40,7 @@ namespace NBC.ActionEditor.Tests
             var sample = new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceAsset();
             var group = new NBC.ActionEditor.Samples.LegacyExperience.LegacyExperienceGroup { Name = "Reference" };
             group.Tracks.Add(new NBC.ActionEditor.Samples.LegacyExperience.LegacyIntervalTrack { Name = "Events" });
-            sample.groups.Clear(); sample.groups.Add(group); sample.Init();
+            sample.ClearRoots(); sample.AddRoot(group); sample.Init();
             var json = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentSession.Encode(sample));
             var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
@@ -49,7 +50,7 @@ namespace NBC.ActionEditor.Tests
                 ActionEditorHost.OnObjectPickerConfig(json);
                 window.Repaint(); yield return null; yield return null;
                 Assert.That(App.TextAsset, Is.SameAs(json));
-                Assert.That(App.AssetData.groups[0].Tracks[0].Name, Is.EqualTo("Events"));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo("Events"));
                 var timeline = (TimelineView)typeof(ActionEditorWindow).GetField("_timelineView", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(window);
                 Assert.That(timeline.Position.width, Is.EqualTo(window.position.width).Within(1), "Original OnGUI must draw using the actual window geometry.");
                 Assert.That(timeline.Position.height, Is.GreaterThan(200));

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using NBC.ActionEditor.Domain;
+using System.Collections.Generic;
 using System.Linq;
 using NBC.ActionEditor.Events;
 using UnityEditor;
@@ -31,10 +32,10 @@ namespace NBC.ActionEditor
             GUI.color = App.IsSelect(Data) ? Color.blue : Color.gray;
             GUI.Box(Position, "");
 
-            _leftRect = new Rect(Position.x, Position.y, Styles.TimelineLeftWidth, Position.height);
+            _leftRect = new Rect(Position.x, Position.y, Workspace.LeftWidth, Position.height);
             DrawLeft(_leftRect);
-            var rightRect = new Rect(Position.x + Styles.TimelineLeftTotalWidth, Position.y,
-                Position.width - Styles.TimelineLeftTotalWidth, Position.height);
+            var rightRect = new Rect(Position.x + (Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth), Position.y,
+                Position.width - (Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth), Position.height);
 
             GUI.BeginClip(rightRect);
             _rightView.OnGUI(rightRect);
@@ -43,7 +44,7 @@ namespace NBC.ActionEditor
             if (Data == ((ActionEditorWindow)Window).Gesture.MoveToItem)
             {
                 GUI.color = Color.white.WithAlpha(0.5f);
-                GUI.DrawTexture(new Rect(Position.x, ((ActionEditorWindow)Window).Gesture.MoveBefore ? Position.y : Position.y + Position.height - 2, Styles.TimelineLeftWidth, 2),
+                GUI.DrawTexture(new Rect(Position.x, ((ActionEditorWindow)Window).Gesture.MoveBefore ? Position.y : Position.y + Position.height - 2, Workspace.LeftWidth, 2),
                     Styles.WhiteTexture);
                 GUI.color = Color.white;
             }
@@ -103,7 +104,7 @@ namespace NBC.ActionEditor
 
             var size = NameStyle.CalcSize(new GUIContent(overlayLabel));
             var showY = Position.y + (Position.height - Styles.ClipBottomRectHeight) * 0.5f - size.y * 0.5f;
-            var showX = Position.x + Styles.TimelineLeftTotalWidth + Styles.TimelineRightWidth * 0.5f -
+            var showX = Position.x + (Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth) + Styles.TimelineRightWidth * 0.5f -
                         size.x * 0.5f;
 
             var stampRect = new Rect(showX, showY, size.x, size.y);
@@ -120,22 +121,22 @@ namespace NBC.ActionEditor
 
             NBLayout.Space(4);
             bool isTrack = false;
-            if (Data is Group group)
+            if (Data is TimelineGroup group)
             {
                 GUI.color = Color.white.WithAlpha(0.5f);
 
                 var collapseAllRect = NBLayout.GetHRect(16, 16);
 
-                if (GUI.Button(collapseAllRect, Data.IsCollapsed ? Styles.CollapsedIcon : Styles.ExpandedIcon,
+                if (GUI.Button(collapseAllRect, Workspace.IsCollapsed(Data) ? Styles.CollapsedIcon : Styles.ExpandedIcon,
                         GUIStyle.none))
                 {
                     Debug.Log("click Expanded");
-                    group.IsCollapsed = !Data.IsCollapsed;
+                    Workspace.SetCollapsed(group, !Workspace.IsCollapsed(Data));
                     App.Refresh();
                     Event.current.Use();
                 }
             }
-            else if (Data is Track track)
+            else if (Data is TimelineTrack track)
             {
                 isTrack = true;
                 NBLayout.Space(18);
@@ -231,21 +232,21 @@ namespace NBC.ActionEditor
 
         public void OnGroupContextMenu()
         {
-            if (Data is Track track)
+            if (Data is TimelineTrack track)
             {
                 OnTrackLeftContextMenu(track);
             }
-            else if (Data is Group group)
+            else if (Data is TimelineGroup group)
             {
                 OnGroupContextMenu(group);
             }
         }
 
-        private void OnGroupContextMenu(Group group)
+        private void OnGroupContextMenu(TimelineGroup group)
         {
             var genericMenu = new GenericMenu();
 
-            var trackTypes = ActionEditorTypeCatalog.DerivedFrom(typeof(Track));
+            var trackTypes = ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineTrack));
             foreach (var metaInfo in trackTypes)
             {
                 var info = metaInfo;
@@ -279,7 +280,7 @@ namespace NBC.ActionEditor
             genericMenu.AddSeparator("");
 
 
-            if (App.CopyAsset is Track copyTrack)
+            if (App.CopyAsset is TimelineTrack copyTrack)
             {
                 if (JsonEditCommands.CanPaste(group))
                 {
@@ -308,7 +309,7 @@ namespace NBC.ActionEditor
             genericMenu.ShowAsContext();
         }
 
-        private void OnTrackLeftContextMenu(Track track)
+        private void OnTrackLeftContextMenu(TimelineTrack track)
         {
             var menu = new GenericMenu();
             menu.AddItem(new GUIContent(Lan.TrackDisable), !track.IsActive, ActiveContextMenuCmd);
@@ -363,7 +364,7 @@ namespace NBC.ActionEditor
 
         private void DeleteContextMenu()
         {
-            if (Data is Group group)
+            if (Data is TimelineGroup group)
             {
                 if (EditorUtility.DisplayDialog(Lan.GroupDelete, Lan.GroupDeleteTips, Lan.TipsConfirm,
                         Lan.TipsCancel))
@@ -371,7 +372,7 @@ namespace NBC.ActionEditor
                     JsonEditCommands.Delete(group);
                 }
             }
-            else if (Data is Track track)
+            else if (Data is TimelineTrack track)
             {
                 if (EditorUtility.DisplayDialog(Lan.TrackDelete, Lan.TrackDeleteTips, Lan.TipsConfirm,
                         Lan.TipsCancel))
@@ -411,20 +412,20 @@ namespace NBC.ActionEditor
 
         public override void OnDraw()
         {
-            if (Data is Group group)
+            if (Data is TimelineGroup group)
             {
                 DrawClips(group);
             }
-            else if (Data is Track track)
+            else if (Data is TimelineTrack track)
             {
                 DrawClips(track);
             }
         }
 
 
-        private void DrawClips(Group group)
+        private void DrawClips(TimelineGroup group)
         {
-            if (!group.IsCollapsed) return;
+            if (!Workspace.IsCollapsed(group)) return;
             foreach (var track in group.Tracks)
             {
                 foreach (var clip in track.Clips)
@@ -434,7 +435,7 @@ namespace NBC.ActionEditor
             }
         }
 
-        private void DrawClips(Track track)
+        private void DrawClips(TimelineTrack track)
         {
             var ordered = track.Clips.OrderBy(c => c.StartTime).ToList();
             for (int clipIndex = 0; clipIndex < ordered.Count; clipIndex++)
@@ -452,7 +453,7 @@ namespace NBC.ActionEditor
             }
         }
 
-        private void TrySortClips(Track track)
+        private void TrySortClips(TimelineTrack track)
         {
             var preTime = -1f;
             bool needSort = false;
@@ -481,7 +482,7 @@ namespace NBC.ActionEditor
         {
             if (ev.IsRight())
             {
-                var clip = ClipDrawer.GetClipByTrackPosition(Data, ev.MousePosition);
+                var clip = ClipDrawer.GetClipByTrackPosition(Data, ev.MousePosition, Workspace);
                 if (clip != null)
                 {
                     ClickClip(clip);
@@ -490,7 +491,7 @@ namespace NBC.ActionEditor
                     return;
                 }
 
-                if (Position.Contains(ev.MousePosition) && Data is Track track)
+                if (Position.Contains(ev.MousePosition) && Data is TimelineTrack track)
                 {
                     OnTrackRightContextMenu(track, ev);
                     ev.StopPropagation();
@@ -502,7 +503,7 @@ namespace NBC.ActionEditor
         {
             if (ev.IsLeft())
             {
-                var clip = ClipDrawer.GetClipByTrackPosition(Data, ev.MousePosition);
+                var clip = ClipDrawer.GetClipByTrackPosition(Data, ev.MousePosition, Workspace);
                 if (clip != null)
                 {
                     if (App.SelectCount > 1)
@@ -519,22 +520,22 @@ namespace NBC.ActionEditor
 
         #endregion
 
-        private void ClickClip(Clip clip)
+        private void ClickClip(TimelineClip clip)
         {
             App.Select(App.Context.Selection.ClickCandidate(clip, false, false));
         }
 
         #region ContextMenu
 
-        private void OnTrackRightContextMenu(Track track, PointerEventData ev)
+        private void OnTrackRightContextMenu(TimelineTrack track, PointerEventData ev)
         {
             if (track.IsLocked) return;
-            var time = track.Root.PosToTime(ev.MousePosition.x - Position.x, Position.width);
+            var time = Workspace.PosToTime(ev.MousePosition.x - Position.x, Position.width);
             var menu = BuildTrackContextMenu(track, track.Root.SnapTime(time));
             if (menu.GetItemCount() > 0) menu.ShowAsContext();
         }
 
-        private GenericMenu BuildTrackContextMenu(Track track, float cursorTime)
+        private GenericMenu BuildTrackContextMenu(TimelineTrack track, float cursorTime)
         {
             var menu = new GenericMenu();
             if (track.IsLocked) return menu;
@@ -545,7 +546,7 @@ namespace NBC.ActionEditor
                 existing?.GetType().GetCustomAttributes(typeof(CategoryAttribute), true).FirstOrDefault() as
                     CategoryAttribute;
 
-            foreach (var clip in ActionEditorTypeCatalog.DerivedFrom(typeof(Clip)))
+            foreach (var clip in ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineClip)))
             {
                 if (clip.attachableTypes != null && !clip.attachableTypes.Contains(track.GetType()))
                 {
@@ -578,7 +579,7 @@ namespace NBC.ActionEditor
                     else menu.AddDisabledItem(new GUIContent(category + tName, reason));
                 }
 
-                if (App.CopyAsset != null && App.CopyAsset is Clip copyClip)
+                if (App.CopyAsset != null && App.CopyAsset is TimelineClip copyClip)
                 {
                     var copyType = copyClip.GetType();
                     if (attachableTypeInfos.Select(i => i.type).Contains(copyType))
@@ -596,7 +597,7 @@ namespace NBC.ActionEditor
             return menu;
         }
 
-        private void OnClipContextMenu(Clip clip)
+        private void OnClipContextMenu(TimelineClip clip)
         {
             var menu = new GenericMenu();
             if (clip.IsLocked) { menu.AddDisabledItem(new GUIContent("片段已锁定，请先解锁轨道")); menu.ShowAsContext(); return; }

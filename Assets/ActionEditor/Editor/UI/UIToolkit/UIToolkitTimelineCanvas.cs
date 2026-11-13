@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,24 +20,24 @@ namespace NBC.ActionEditor.Workbench
         private readonly Button create, open, addGroup;
         private readonly VisualElement welcome, rowHeaders;
         private readonly VisualElement clipLabels;
-        private readonly Dictionary<Clip, Label> labels = new Dictionary<Clip, Label>();
+        private readonly Dictionary<TimelineClip, Label> labels = new Dictionary<TimelineClip, Label>();
         private int pointer = -1;
         private JsonEditTransaction edit;
         private Vector2 down, last;
-        private Clip hit;
-        private Track movingTrack;
+        private TimelineClip hit;
+        private TimelineTrack movingTrack;
         private TrackDropTarget trackDrop;
         private enum GestureMode { None, Move, ResizeLeft, ResizeRight, Pan, Splitter, Marquee, Seek, Track }
         private GestureMode mode;
         private static bool EditsClips(GestureMode value) => value == GestureMode.Move || value == GestureMode.ResizeLeft || value == GestureMode.ResizeRight;
         private float seekBefore;
-        private readonly Dictionary<Clip, Vector2> original = new Dictionary<Clip, Vector2>();
+        private readonly Dictionary<TimelineClip, Vector2> original = new Dictionary<TimelineClip, Vector2>();
         private Rect? marquee;
         private Vector2 hoverPosition;
         private bool hasHoverPosition;
         public float Left => owner.LeftWidth + 9;
-        private Asset Asset => owner.Document;
-        private JsonTimelineTransform Transform => new JsonTimelineTransform(Asset?.ViewTimeMin ?? 0, Asset?.ViewTime ?? 7, owner.rootVisualElement.contentRect.width - Left, Left);
+        private ActionDocument Asset => owner.Document;
+        private JsonTimelineTransform Transform => new JsonTimelineTransform(owner.Workspace.ViewTimeMin, owner.Workspace.ViewTime, owner.rootVisualElement.contentRect.width - Left, Left);
         public float Scale => Transform.Scale;
         public float X(float time) => Transform.X(time);
         public float TimeAt(float x) => Transform.Time(x);
@@ -141,7 +142,7 @@ namespace NBC.ActionEditor.Workbench
             ruler.style.display = Asset == null ? DisplayStyle.None : DisplayStyle.Flex;
             RebuildHeaders();
             labels.Clear(); clipLabels.Clear();
-            foreach (var clip in Rows().OfType<Track>().SelectMany(t => t.Clips).Where(c => c.Length > 0))
+            foreach (var clip in Rows().OfType<TimelineTrack>().SelectMany(t => t.Clips).Where(c => c.Length > 0))
             {
                 var label = new Label(clip.GetName()) { pickingMode = PickingMode.Ignore }; label.style.position = Position.Absolute;
                 label.style.unityFontStyleAndWeight = FontStyle.Bold; label.style.unityTextAlign = TextAnchor.MiddleCenter; label.style.fontSize = 12;
@@ -190,24 +191,24 @@ namespace NBC.ActionEditor.Workbench
         public void SyncRuler() { ruler.style.left = Left; ruler.MarkDirtyRepaint(); }
         public List<IDirectable> Rows()
         {
-            return TimelineGeometry.VisibleRows(Asset);
+            return TimelineGeometry.VisibleRows(Asset, owner.Workspace);
         }
-        public Rect ClipRect(Clip clip, int row)
+        public Rect ClipRect(TimelineClip clip, int row)
         {
             return Transform.ClipRect(clip, row * 28 - owner.ScrollY, 26, 8, 4);
         }
-        public Clip Hit(Vector2 p)
+        public TimelineClip Hit(Vector2 p)
         {
             if (p.x < Left) return null;
             var rows = Rows(); var row = TimelineGeometry.RowAt(p.y, owner.ScrollY, 28);
-            return row >= 0 && row < rows.Count && rows[row] is Track track ? track.Clips.LastOrDefault(c => ClipRect(c, row).Contains(p)) : null;
+            return row >= 0 && row < rows.Count && rows[row] is TimelineTrack track ? track.Clips.LastOrDefault(c => ClipRect(c, row).Contains(p)) : null;
         }
         private float Snap(float time)
         {
             var step = Prefs.timeStepMode == Prefs.TimeStepMode.Frames ? 1f / Mathf.Max(1, Prefs.FrameRate) : Prefs.SnapInterval;
             return Mathf.Max(0, Prefs.MagnetSnapping && step > 0 ? Mathf.Round(time / step) * step : time);
         }
-        private GestureMode ResizeMode(Clip clip, Vector2 position)
+        private GestureMode ResizeMode(TimelineClip clip, Vector2 position)
         {
             if (clip == null || clip.IsLocked || !clip.CanScale()) return GestureMode.None;
             var row = TimelineGeometry.RowAt(position.y, owner.ScrollY, 28);
@@ -236,11 +237,11 @@ namespace NBC.ActionEditor.Workbench
             {
                 if (row >= 0 && row < rows.Count)
                 {
-                    if (rows[row] is Group group && down.x < 20) { group.IsCollapsed = !group.IsCollapsed; owner.SyncView(); MarkDirtyRepaint(); }
+                    if (rows[row] is TimelineGroup group && down.x < 20) { owner.Workspace.SetCollapsed(group, !owner.Workspace.IsCollapsed(group)); owner.SyncView(); MarkDirtyRepaint(); }
                     else
                     {
                         owner.Select(rows[row]);
-                        if (rows[row] is Track track && !track.IsLocked)
+                        if (rows[row] is TimelineTrack track && !track.IsLocked)
                         { movingTrack = track; dragMoved = false; trackDrop = default; mode = GestureMode.Track; pointer = e.pointerId; this.CapturePointer(pointer); e.StopPropagation(); }
                     }
                 }
@@ -251,7 +252,7 @@ namespace NBC.ActionEditor.Workbench
                 if (!App.IsSelect(hit)) owner.Select(owner.Context.Selection.ClickCandidate(hit, e.ctrlKey, true));
                 if (hit.IsLocked) return;
                 mode = ResizeMode(hit, down); if (mode == GestureMode.None) mode = GestureMode.Move;
-                original.Clear(); foreach (var clip in App.SelectItems.OfType<Clip>().Where(c => !c.IsLocked)) original[clip] = new Vector2(clip.StartTime, clip.Length);
+                original.Clear(); foreach (var clip in App.SelectItems.OfType<TimelineClip>().Where(c => !c.IsLocked)) original[clip] = new Vector2(clip.StartTime, clip.Length);
                 snapTimes = TimelineCandidates.References(Asset.AllTracks.SelectMany(t => t.Clips),
                     original.Keys, Asset.Length, AssetPlayer.Inst.CurrentTime, false);
                 dragMoved = false;
@@ -269,14 +270,14 @@ namespace NBC.ActionEditor.Workbench
             var p = (Vector2)e.localPosition;
             if (mode == GestureMode.Pan)
             {
-                var range = TimelineNavigation.Pan(Asset.ViewTimeMin, Asset.ViewTimeMax, p.x - last.x, owner.rootVisualElement.contentRect.width - Left, true);
-                Asset.ViewTimeMax = range.y; Asset.ViewTimeMin = range.x;
+                var range = TimelineNavigation.Pan(owner.Workspace.ViewTimeMin, owner.Workspace.ViewTimeMax, p.x - last.x, owner.rootVisualElement.contentRect.width - Left, true);
+                owner.Workspace.ViewTimeMax = range.y; owner.Workspace.ViewTimeMin = range.x;
             }
             else if (mode == GestureMode.Splitter) { owner.LeftWidth = Mathf.Clamp(owner.LeftWidth + p.x - last.x, 120, Mathf.Max(120, contentRect.width - 120)); Styles.TimelineLeftWidth = owner.LeftWidth; }
             else if (mode == GestureMode.Track)
             {
                 dragMoved |= (p - down).sqrMagnitude > 9;
-                trackDrop = TimelineGeometry.TrackDrop(Asset, movingTrack, p, owner.ScrollY, contentRect.width, contentRect.height, 28);
+                trackDrop = TimelineGeometry.TrackDrop(Asset, movingTrack, p, owner.ScrollY, contentRect.width, contentRect.height, 28, owner.Workspace);
             }
             else if (mode == GestureMode.Marquee) marquee = Rect.MinMaxRect(Mathf.Max(Left, Mathf.Min(down.x, p.x)), Mathf.Min(down.y, p.y), Mathf.Max(down.x, p.x), Mathf.Max(down.y, p.y));
             else if (hit != null)
@@ -309,12 +310,12 @@ namespace NBC.ActionEditor.Workbench
             if (e.button != (mode == GestureMode.Pan ? 2 : 0)) { e.PreventDefault(); e.StopImmediatePropagation(); return; }
             if (mode == GestureMode.Track && movingTrack != null && dragMoved)
             {
-                trackDrop = TimelineGeometry.TrackDrop(Asset, movingTrack, this.WorldToLocal(e.position), owner.ScrollY, contentRect.width, contentRect.height, 28);
+                trackDrop = TimelineGeometry.TrackDrop(Asset, movingTrack, this.WorldToLocal(e.position), owner.ScrollY, contentRect.width, contentRect.height, 28, owner.Workspace);
                 if (trackDrop.IsValid) owner.Run(() => JsonEditCommands.MoveTrack(movingTrack, trackDrop.Group, trackDrop.Index));
             }
             if (mode == GestureMode.Marquee && marquee.HasValue)
             {
-                var rows = Rows(); owner.Select(rows.SelectMany((r, i) => r is Track t ? t.Clips.Where(c => TimelineGeometry.Overlaps(ClipRect(c, i), marquee.Value)) : Enumerable.Empty<Clip>()).Cast<IDirectable>().ToArray());
+                var rows = Rows(); owner.Select(rows.SelectMany((r, i) => r is TimelineTrack t ? t.Clips.Where(c => TimelineGeometry.Overlaps(ClipRect(c, i), marquee.Value)) : Enumerable.Empty<TimelineClip>()).Cast<IDirectable>().ToArray());
             }
             var captured = pointer; var wasEdit = EditsClips(mode); pointer = -1; mode = GestureMode.None; marquee = null; movingTrack = null;
             dragMoved = false; trackDrop = default; SyncDragGuides();
@@ -343,14 +344,14 @@ namespace NBC.ActionEditor.Workbench
             else if (e.ctrlKey && e.keyCode == KeyCode.C) owner.Run(() => JsonEditCommands.Copy(App.FistSelect));
             else if (e.ctrlKey && e.keyCode == KeyCode.X) owner.Run(() => JsonEditCommands.Copy(App.FistSelect, true));
             else if (e.ctrlKey && e.keyCode == KeyCode.D) owner.Run(() => JsonEditCommands.Duplicate(App.FistSelect));
-            else if (e.ctrlKey && e.keyCode == KeyCode.V) owner.Run(() => JsonEditCommands.Paste(App.FistSelect is Clip c ? c.Parent : App.FistSelect, AssetPlayer.Inst.CurrentTime));
+            else if (e.ctrlKey && e.keyCode == KeyCode.V) owner.Run(() => JsonEditCommands.Paste(App.FistSelect is TimelineClip c ? c.Parent : App.FistSelect, AssetPlayer.Inst.CurrentTime));
             else if (e.ctrlKey && e.keyCode == KeyCode.S) owner.Run(App.SaveAsset);
             else if (e.ctrlKey && e.keyCode == KeyCode.Z) { if (e.shiftKey) Undo.PerformRedo(); else Undo.PerformUndo(); e.StopPropagation(); }
         }
         private float Magnet(float start, float length, bool bypass)
         {
             if (!Prefs.MagnetSnapping || bypass) return start;
-            return TimelineCandidates.Magnet(start, length, snapTimes, Asset.ViewTime * .01f, false);
+            return TimelineCandidates.Magnet(start, length, snapTimes, owner.Workspace.ViewTime * .01f, false);
         }
         private void Wheel(WheelEvent e)
         {
@@ -361,7 +362,7 @@ namespace NBC.ActionEditor.Workbench
         }
         private void Zoom(float x, float wheel)
         {
-            TimelineNavigation.SetRange(Asset, TimelineNavigation.ZoomAt(Asset.ViewTimeMin, Asset.ViewTimeMax, wheel,
+            TimelineNavigation.SetRange(owner.Workspace, TimelineNavigation.ZoomAt(owner.Workspace.ViewTimeMin, owner.Workspace.ViewTimeMax, wheel,
                 owner.rootVisualElement.contentRect.width, (x - Left) / Mathf.Max(1, owner.rootVisualElement.contentRect.width - Left), Prefs.scrollWheelZooms));
         }
         private void RulerWheel(WheelEvent e)
@@ -374,7 +375,7 @@ namespace NBC.ActionEditor.Workbench
         {
             if (Asset == null) return;
             var menu = new GenericMenu();
-            foreach (var info in ActionEditorTypeCatalog.DerivedFrom(typeof(Group)).Where(t => !t.type.IsAbstract && (t.attachableTypes == null || t.attachableTypes.Contains(Asset.GetType()))))
+            foreach (var info in ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineGroup)).Where(t => !t.type.IsAbstract && (t.attachableTypes == null || t.attachableTypes.Contains(Asset.GetType()))))
             {
                 var type = info.type; var command = JsonEditCommands.Creation(Asset, type);
                 if (command.CanExecute(out var reason)) menu.AddItem(new GUIContent(info.name), false, () => owner.Run(() => JsonEditCommands.AddGroup(type)));
@@ -401,10 +402,10 @@ namespace NBC.ActionEditor.Workbench
                     element.style.backgroundColor = Color.clear; element.style.opacity = opacity;
                     var image = new Image { image = texture, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore }; image.style.flexGrow = 1; element.Add(image); row.Add(element);
                 }
-                if (item is Group group) Icon(group.IsCollapsed ? Styles.CollapsedIcon : Styles.ExpandedIcon, 4, () => { group.IsCollapsed = !group.IsCollapsed; RefreshVisualState(); owner.SyncView(); }, .5f);
-                else if (item is Track track) Icon(track.GetIcon(), 28);
-                if (item is Group) Icon(Styles.MenuIcon, -.001f, () => ShowHeaderMenu(item), .5f);
-                var right = item is Group ? 34 : 18;
+                if (item is TimelineGroup group) Icon(owner.Workspace.IsCollapsed(group) ? Styles.CollapsedIcon : Styles.ExpandedIcon, 4, () => { owner.Workspace.SetCollapsed(group, !owner.Workspace.IsCollapsed(group)); RefreshVisualState(); owner.SyncView(); }, .5f);
+                else if (item is TimelineTrack track) Icon(track.GetIcon(), 28);
+                if (item is TimelineGroup) Icon(Styles.MenuIcon, -.001f, () => ShowHeaderMenu(item), .5f);
+                var right = item is TimelineGroup ? 34 : 18;
                 if (item.IsLocked) { Icon(Styles.LockIcon, -(right - 16), () => JsonEditCommands.ToggleLock(item), .5f); right += 18; }
                 if (!item.IsActive) Icon(Styles.EyeIcon, -(right - 16), () => JsonEditCommands.ToggleActive(item), .5f);
             }
@@ -415,18 +416,18 @@ namespace NBC.ActionEditor.Workbench
             var menu = new GenericMenu();
             void Entry(string text, Action action, bool enabled = true, bool check = false)
             { if (enabled) menu.AddItem(new GUIContent(text), check, () => owner.Run(action)); else menu.AddDisabledItem(new GUIContent(text)); }
-            if (item is Group group)
+            if (item is TimelineGroup group)
             {
-                foreach (var info in ActionEditorTypeCatalog.DerivedFrom(typeof(Track)).Where(t => !t.type.IsAbstract && t.attachableTypes?.Contains(group.GetType()) == true))
+                foreach (var info in ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineTrack)).Where(t => !t.type.IsAbstract && t.attachableTypes?.Contains(group.GetType()) == true))
                 { var type = info.type; Entry(Lan.MenuAddTrack + "/" + (string.IsNullOrEmpty(info.category) ? "" : info.category + "/") + info.name, () => JsonEditCommands.AddTrack(group, type), JsonEditCommands.Creation(group, type).CanExecute(out _)); }
                 menu.AddSeparator("");
-                if (App.CopyAsset is Track) Entry(Lan.MenuPasteTrack, () => JsonEditCommands.Paste(group), JsonEditCommands.CanPaste(group));
+                if (App.CopyAsset is TimelineTrack) Entry(Lan.MenuPasteTrack, () => JsonEditCommands.Paste(group), JsonEditCommands.CanPaste(group));
                 Entry(Lan.GroupDisable, () => JsonEditCommands.ToggleActive(group), !group.IsLocked, !group.IsActive);
                 Entry(Lan.GroupLocked, () => JsonEditCommands.ToggleLock(group), item.Parent?.IsLocked != true, group.IsLocked);
                 Entry(Lan.Rename, () => RenameItemWindow.Show(group), !group.IsLocked); menu.AddSeparator("");
                 Entry(Lan.GroupDelete, () => { if (EditorUtility.DisplayDialog(Lan.GroupDelete, Lan.GroupDeleteTips, Lan.TipsConfirm, Lan.TipsCancel)) JsonEditCommands.Delete(group); }, !group.IsLocked);
             }
-            else if (item is Track track)
+            else if (item is TimelineTrack track)
             {
                 Entry(Lan.TrackDisable, () => JsonEditCommands.ToggleActive(track), !track.IsLocked, !track.IsActive);
                 Entry(Lan.TrackLocked, () => JsonEditCommands.ToggleLock(track), track.Parent?.IsLocked != true, track.IsLocked); menu.AddSeparator("");
@@ -459,12 +460,12 @@ namespace NBC.ActionEditor.Workbench
                 }
                 e.menu.AppendSeparator(); Action(Lan.ClipDelete, () => JsonEditCommands.Delete(clip)); return;
             }
-            if (item is Track track && !track.IsLocked)
+            if (item is TimelineTrack track && !track.IsLocked)
             {
                 var category = track.Clips.FirstOrDefault()?.GetType().RTGetAttribute<CategoryAttribute>(true)?.category;
-                foreach (var info in ActionEditorTypeCatalog.DerivedFrom(typeof(Clip)).Where(t => !t.type.IsAbstract && (t.attachableTypes == null || t.attachableTypes.Contains(track.GetType())) && (category == null || category == t.category)))
+                foreach (var info in ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineClip)).Where(t => !t.type.IsAbstract && (t.attachableTypes == null || t.attachableTypes.Contains(track.GetType())) && (category == null || category == t.category)))
                 { var type = info.type; Action((string.IsNullOrEmpty(info.category) ? "" : info.category + "/") + info.name, () => JsonEditCommands.AddClip(track, type, Snap(TimeAt(p.x))), JsonEditCommands.Creation(track, type, Snap(TimeAt(p.x))).CanExecute(out _)); }
-                if (App.CopyAsset is Clip copied && JsonEditCommands.CanPaste(track))
+                if (App.CopyAsset is TimelineClip copied && JsonEditCommands.CanPaste(track))
                 { e.menu.AppendSeparator(); Action(string.Format(Lan.ClipPaste, copied.GetType().Name), () => JsonEditCommands.Paste(track, Snap(TimeAt(p.x)))); }
             }
         }
@@ -478,7 +479,7 @@ namespace NBC.ActionEditor.Workbench
                 var y = i * 28 - owner.ScrollY; if (y + 28 < 0 || y > contentRect.height) continue;
                 var item = rows[i];
                 Fill(p, new Rect(0, y, contentRect.width, 26), App.IsSelect(item) ? new Color(.2f, .32f, .48f) : new Color(.18f, .18f, .18f));
-                if (item is Track track)
+                if (item is TimelineTrack track)
                 {
                     foreach (var clip in track.Clips.OrderBy(clip => clip.StartTime))
                     {
@@ -508,7 +509,7 @@ namespace NBC.ActionEditor.Workbench
                     }
                     Fill(p, new Rect(22, y + 3, 4, 20), track.GetColor());
                 }
-                Text(c, item.Name, item is Group ? 20 : 48, y + 5, owner.LeftWidth - (item is Group ? 50 : 78), item is Group ? new Color(1, 1, 1, .5f) : Color.white);
+                Text(c, item.Name, item is TimelineGroup ? 20 : 48, y + 5, owner.LeftWidth - (item is TimelineGroup ? 50 : 78), item is TimelineGroup ? new Color(1, 1, 1, .5f) : Color.white);
                 if (item.IsLocked || !item.IsActive)
                 {
                     var stamp = !item.IsActive && item.IsLocked ? "禁用 & 锁定" : item.IsLocked ? "锁定" : "禁用";
@@ -543,9 +544,9 @@ namespace NBC.ActionEditor.Workbench
             var step = TickStep();
             var index = Array.IndexOf(TickModulos, step); var minor = index > 0 ? TickModulos[index - 1] : .01f;
             Fill(p, new Rect(0, 16, Mathf.Clamp(X(Asset.Length) - Left, 0, ruler.contentRect.width), 4), Styles.TimeStepRectColor);
-            if (minor * Scale > 6) for (var t = Mathf.Ceil(Asset.ViewTimeMin / minor) * minor; t <= Asset.ViewTimeMax; t += minor)
+            if (minor * Scale > 6) for (var t = Mathf.Ceil(owner.Workspace.ViewTimeMin / minor) * minor; t <= owner.Workspace.ViewTimeMax; t += minor)
             { var x = X(t) - Left; Line(p, new Vector2(x, 16), new Vector2(x, 20), Color.white); }
-            for (var t = Mathf.Ceil(Asset.ViewTimeMin / step) * step; t <= Asset.ViewTimeMax; t += step)
+            for (var t = Mathf.Ceil(owner.Workspace.ViewTimeMin / step) * step; t <= owner.Workspace.ViewTimeMax; t += step)
             {
                 var x = X(t) - Left; if (x < 0) continue;
                 var label = (Mathf.Round(t * 10) / 10).ToString("0.00");

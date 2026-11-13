@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using NBC.ActionEditor.Domain;
+using System.Collections.Generic;
 using System.Linq;
 using NBC.ActionEditor.Events;
 using UnityEditor;
@@ -9,15 +10,15 @@ namespace NBC.ActionEditor
     public class TimelineMiddleView : ViewBase, IPointerDragHandler, IDragBeginHandler, IDragEndHandler,
         IPointerDownHandler, IPointerUpHandler
     {
-        public Asset asset => App.AssetData;
+        public ActionDocument asset => App.AssetData;
 
 
         #region Static
 
         private static readonly List<TimelineTrackItemView> _itemViews = new List<TimelineTrackItemView>();
         private static Rect viewport;
-        public static TrackDropTarget TrackDrop(Track track, Vector2 point) => TimelineGeometry.TrackDrop(
-            App.AssetData, track, point - viewport.position, Styles.TimelineScrollPos.y, viewport.width, viewport.height, Styles.LineHeight + Styles.Space);
+        public static TrackDropTarget TrackDrop(TimelineTrack track, Vector2 point, NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace workspace) => TimelineGeometry.TrackDrop(
+            App.AssetData, track, point - viewport.position, workspace.ScrollY, viewport.width, viewport.height, Styles.LineHeight + Styles.Space, workspace);
 
         public static TimelineTrackItemView GetItem(Vector2 pos)
         {
@@ -68,8 +69,8 @@ namespace NBC.ActionEditor
             if (gesture.DragType != ItemDragType.Track || !drop.IsValid) return;
             var color = gesture.MoveToItem != null ? new Color(.3f, .75f, 1) : Color.red;
             var y = Mathf.Clamp(drop.Y, 2, Position.height - 2);
-            EditorGUI.DrawRect(new Rect(drop.Group == null ? 0 : 22, y, Styles.TimelineLeftWidth - 22, 2), color);
-            GUI.Label(new Rect(24, Mathf.Max(0, y - 20), Styles.TimelineLeftWidth - 24, 20),
+            EditorGUI.DrawRect(new Rect(drop.Group == null ? 0 : 22, y, Workspace.LeftWidth - 22, 2), color);
+            GUI.Label(new Rect(24, Mathf.Max(0, y - 20), Workspace.LeftWidth - 24, 20),
                 gesture.MoveToItem == null ? "不能放置" : drop.Group == null ? "移到根级" : "加入组：" + drop.Group.Name);
         }
         
@@ -88,7 +89,7 @@ namespace NBC.ActionEditor
             foreach (var item in _itemViews) item.Release();
             _itemViews.Clear();
             if (asset == null) return;
-            foreach (var item in TimelineGeometry.VisibleRows(asset)) AddView(item);
+            foreach (var item in TimelineGeometry.VisibleRows(asset, Workspace)) AddView(item);
         }
 
 
@@ -101,7 +102,8 @@ namespace NBC.ActionEditor
 
             // 左侧列表部分
             GUILayout.BeginVertical();
-            Styles.TimelineScrollPos = EditorGUILayout.BeginScrollView(Styles.TimelineScrollPos);
+            var scroll = EditorGUILayout.BeginScrollView(new Vector2(0, Workspace.ScrollY));
+            Workspace.ScrollY = scroll.y;
 
             var maxHeight = _itemViews.Count * Styles.LineHeight + _itemViews.Count * Styles.Space;
 
@@ -131,12 +133,12 @@ namespace NBC.ActionEditor
         {
             GUILayout.BeginHorizontal();
             GUILayout.Space(15);
-            var width = Styles.TimelineLeftWidth - 30;
+            var width = Workspace.LeftWidth - 30;
             if (GUILayout.Button(Lan.GroupAdd, GUILayout.Width(width), GUILayout.Height(24)))
             {
                 List<TypeMetaInfo> list = new List<TypeMetaInfo>();
 
-                var ts = ActionEditorTypeCatalog.DerivedFrom(typeof(Group));
+                var ts = ActionEditorTypeCatalog.DerivedFrom(typeof(TimelineGroup));
                 foreach (var typeMetaInfo in ts)
                 {
                     var info = typeMetaInfo;
@@ -228,7 +230,7 @@ namespace NBC.ActionEditor
             var rect = new Rect();
             var bigEnough = false;
             var start = _pointerDownPos;
-            if (start.x < Styles.TimelineLeftWidth) return;
+            if (start.x < Workspace.LeftWidth) return;
             if (_pointerDown && App.SelectCount <= 1)
             {
                 if ((start - mousePosition).magnitude > 10)
@@ -238,10 +240,10 @@ namespace NBC.ActionEditor
                     rect.xMax = Mathf.Min(Mathf.Max(start.x, mousePosition.x), Position.width);
                     rect.yMin = Mathf.Min(start.y, mousePosition.y);
                     rect.yMax = Mathf.Max(start.y, mousePosition.y);
-                    if (rect.x < Styles.TimelineLeftTotalWidth)
+                    if (rect.x < (Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth))
                     {
-                        var offsetX = Styles.TimelineLeftTotalWidth - rect.x;
-                        rect.x = Styles.TimelineLeftTotalWidth;
+                        var offsetX = (Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth) - rect.x;
+                        rect.x = (Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth);
                         rect.width -= offsetX;
                     }
 
@@ -267,11 +269,11 @@ namespace NBC.ActionEditor
             //check select clips
             if (!_pointerDown && _preMultipleResult)
             {
-                var yOffset = Styles.TimelineScrollPos.y;
-                var relaRect = new Rect(_multipleRect.x - Styles.TimelineLeftTotalWidth, _multipleRect.y + yOffset,
+                var yOffset = Workspace.ScrollY;
+                var relaRect = new Rect(_multipleRect.x - (Workspace.LeftWidth + Styles.SplitterWidth + Styles.RightGapWidth), _multipleRect.y + yOffset,
                     _multipleRect.width,
                     _multipleRect.height);
-                var clips = ClipDrawer.GetClips(relaRect);
+                var clips = ClipDrawer.GetClips(relaRect, Workspace);
                 // ClipDrawer.GetClipByTrackPosition();
                 App.Select(clips.ToArray());
             }

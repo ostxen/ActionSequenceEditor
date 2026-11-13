@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NBC.ActionEditor.Domain;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -10,7 +11,7 @@ namespace NBC.ActionEditor
     {
         // private static Dictionary<Type, ClipDrawBase> _clipDrawDictionary = new Dictionary<Type, ClipDrawBase>();
 
-        private static Dictionary<Clip, ClipDrawBase> _clipDraws = new Dictionary<Clip, ClipDrawBase>();
+        private static Dictionary<TimelineClip, ClipDrawBase> _clipDraws = new Dictionary<TimelineClip, ClipDrawBase>();
 
         static ClipDrawer()
         {
@@ -21,10 +22,10 @@ namespace NBC.ActionEditor
 
         #region Get
 
-        public static List<IDirectable> GetClips(Rect rect)
+        public static List<IDirectable> GetClips(Rect rect, NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace workspace)
         {
             List<IDirectable> list = new List<IDirectable>();
-            foreach (var clip in _clipDraws.Keys.Where(IsVisible))
+            foreach (var clip in _clipDraws.Keys.Where(clip => TimelineGeometry.IsVisible(clip, workspace)))
             {
                 var draw = _clipDraws[clip];
                 if (TimelineGeometry.Overlaps(rect, draw.ClipRealRect))
@@ -36,9 +37,9 @@ namespace NBC.ActionEditor
             return list;
         }
 
-        public static bool ClipContainsByRealRect(Vector2 pos)
+        public static bool ClipContainsByRealRect(Vector2 pos, NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace workspace)
         {
-            foreach (var clip in _clipDraws.Keys.Where(IsVisible))
+            foreach (var clip in _clipDraws.Keys.Where(clip => TimelineGeometry.IsVisible(clip, workspace)))
             {
                 var draw = _clipDraws[clip];
                 if (draw.ClipRealRect.Contains(pos))
@@ -50,9 +51,9 @@ namespace NBC.ActionEditor
             return false;
         }
 
-        public static Clip GetClipByTrackPosition(IDirectable track, Vector2 mousePosition)
+        public static TimelineClip GetClipByTrackPosition(IDirectable track, Vector2 mousePosition, NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace workspace)
         {
-            foreach (var clip in _clipDraws.Keys.Where(IsVisible))
+            foreach (var clip in _clipDraws.Keys.Where(clip => TimelineGeometry.IsVisible(clip, workspace)))
             {
                 if (clip.Parent != track) continue;
                 var draw = _clipDraws[clip];
@@ -69,16 +70,14 @@ namespace NBC.ActionEditor
 
         #region Draw
 
-        private static bool IsVisible(Clip clip) => TimelineGeometry.IsVisible(clip);
-
         public static void Reset()
         {
-            List<Clip> clips = new List<Clip>();
+            List<TimelineClip> clips = new List<TimelineClip>();
             var asset = App.AssetData;
             if (asset == null) return;
             foreach (var track in asset.AllTracks) clips.AddRange(track.Clips);
 
-            List<Clip> invalidClips = _clipDraws.Keys.Where(clip => !clips.Contains(clip)).ToList();
+            List<TimelineClip> invalidClips = _clipDraws.Keys.Where(clip => !clips.Contains(clip)).ToList();
             foreach (var clip in invalidClips)
             {
                 _clipDraws.Remove(clip);
@@ -89,7 +88,7 @@ namespace NBC.ActionEditor
                 if (!_clipDraws.ContainsKey(clip))
                 {
                     var type = typeof(BasicClipDraw);
-                    if (clip is ClipSignal)
+                    if (clip is PointClip)
                     {
                         type = typeof(SignalClipDraw);
                     }
@@ -99,7 +98,7 @@ namespace NBC.ActionEditor
             }
         }
 
-        public static ClipDrawBase GetDraw<T>(T clip) where T : Clip
+        public static ClipDrawBase GetDraw<T>(T clip) where T : TimelineClip
         {
             return _clipDraws.GetValueOrDefault(clip);
         }

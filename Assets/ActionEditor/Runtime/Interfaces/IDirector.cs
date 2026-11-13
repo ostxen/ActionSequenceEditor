@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using NBC.ActionEditor.Domain;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace NBC.ActionEditor
@@ -7,15 +8,10 @@ namespace NBC.ActionEditor
     {
         float Length { get; }
 
-        public float ViewTimeMin { get; set; }
-        public float ViewTimeMax { get; set; }
-
-        public float ViewTime { get; }
-
         public float RangeMin { get; set; }
         public float RangeMax { get; set; }
 
-        void DeleteGroup(Group group);
+        void DeleteGroup(TimelineGroup group);
 
         void UpdateMaxTime();
         void Validate();

@@ -14,22 +14,22 @@ namespace NBC.ActionEditor
         {
             var asset = App.AssetData;
             if(asset == null) return;
-            var left = Styles.TimelineLeftWidth + Styles.RightGapWidth;
+            var left = Workspace.LeftWidth + Styles.RightGapWidth;
             var rect = new Rect(Position.x + left, Position.y, Position.width - left, Position.height);
             GUILayout.BeginArea(rect);
-            var _timeMin = asset.ViewTimeMin;
-            var _timeMax = asset.ViewTimeMax;
+            var _timeMin = Workspace.ViewTimeMin;
+            var _timeMax = Workspace.ViewTimeMax;
             
             GUI.color = Color.gray;
             
             var sliderRect = new Rect(5, 0, rect.width - 10, 18);
             EditorGUI.MinMaxSlider(sliderRect, ref _timeMin, ref _timeMax, 0, asset.Length);
-            asset.ViewTimeMin = _timeMin;
-            asset.ViewTimeMax = _timeMax;
+            Workspace.ViewTimeMin = _timeMin;
+            Workspace.ViewTimeMax = _timeMax;
             if (sliderRect.Contains(Event.current.mousePosition) && Event.current.clickCount == 2)
             {
-                asset.ViewTimeMin = 0;
-                asset.ViewTimeMax = asset.Length;
+                Workspace.ViewTimeMin = 0;
+                Workspace.ViewTimeMax = asset.Length;
             }
 
             GUILayout.EndArea();

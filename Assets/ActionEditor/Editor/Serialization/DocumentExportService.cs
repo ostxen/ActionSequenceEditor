@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.IO;
 using NBC.ActionEditor.Serialization;
@@ -24,14 +25,14 @@ namespace NBC.ActionEditor.Storage
                 throw new IOException(Lan.ExportSourceTarget);
             store.ValidateNewPath(target, format);
             var snapshot = DocumentSnapshots.Capture(session.Document, true);
-            var expected = DocumentValueConverter.Capture(snapshot, typeof(Asset), DocumentFormats.Context).ContentKey();
+            var expected = DocumentValueConverter.Capture(snapshot, typeof(ActionDocument), DocumentFormats.Context).ContentKey();
             new ReliableFileCommit(files).Save(target, () => format.Serialize(snapshot, new DocumentFormatOptions(false), DocumentFormats.Context), bytes =>
             {
                 if (format.CanRead)
                 {
                     var loaded = format.Deserialize(bytes, DocumentFormats.Context);
                     if (loaded == null || loaded.GetType() != snapshot.GetType()
-                        || DocumentValueConverter.Capture(loaded, typeof(Asset), DocumentFormats.Context).ContentKey() != expected)
+                        || DocumentValueConverter.Capture(loaded, typeof(ActionDocument), DocumentFormats.Context).ContentKey() != expected)
                         throw new InvalidDataException(Lan.ExportReadbackFailed);
                 }
                 store.ValidateNewPath(target, format);

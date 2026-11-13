@@ -9,17 +9,17 @@ namespace NBC.ActionEditor
             return Mathf.Round(time / Prefs.SnapInterval) * Prefs.SnapInterval;
         }
 
-        public static float TimeToPos(this IDirector asset, float time, float width)
+        public static float TimeToPos(this NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace asset, float time, float width)
         {
             return new JsonTimelineTransform(asset.ViewTimeMin, asset.ViewTime, width).X(time);
         }
 
-        public static float PosToTime(this IDirector asset, float pos, float width)
+        public static float PosToTime(this NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace asset, float pos, float width)
         {
             return new JsonTimelineTransform(asset.ViewTimeMin, asset.ViewTime, width).Time(pos);
         }
         
-        public static float WidthToTime(this IDirector asset, float pos, float width)
+        public static float WidthToTime(this NBC.ActionEditor.Presentation.Timeline.TimelineWorkspace asset, float pos, float width)
         {
             return new JsonTimelineTransform(asset.ViewTimeMin, asset.ViewTime, width).Duration(pos);
         }

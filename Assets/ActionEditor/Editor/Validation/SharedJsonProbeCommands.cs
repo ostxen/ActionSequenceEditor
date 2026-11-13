@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.IO;
 using System.Linq;
@@ -53,7 +54,7 @@ namespace NBC.ActionEditor.Validation
                 App.Session.Edit("R10 payload", () =>
                 {
                     ((LegacyExperienceAsset)App.AssetData).Version = 42;
-                    ((LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[1]).Count = 17;
+                    ((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1]).Count = 17;
                 });
                 App.SaveAsset();
                 var committed = File.ReadAllBytes(Path);
@@ -115,32 +116,32 @@ namespace NBC.ActionEditor.Validation
                 App.AutoSave();
                 Require(!App.Session.IsDirty && File.ReadAllBytes(Path).SequenceEqual(committed), "Automatic save entry did not persist the completed edit.");
                 App.TextAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Path);
-                Require(((LegacyExperienceAsset)App.AssetData).Version == 42 && ((LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[1]).Count == 17, "Persistent JSON reload lost fields.");
-                Require(App.AssetData.groups.Sum(g => g.Tracks.Count) == 7 && App.AssetData.Length == 6, "Persistent graph changed.");
-                var edited = (LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0];
+                Require(((LegacyExperienceAsset)App.AssetData).Version == 42 && ((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1]).Count == 17, "Persistent JSON reload lost fields.");
+                Require(App.AssetData.RootItems.OfType<TimelineGroup>().Sum(g => g.Tracks.Count) == 7 && App.AssetData.Length == 6, "Persistent graph changed.");
+                var edited = (LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                 edited.StartTime = 8; edited.Length = 3; edited.Count = 27;
                 Require(App.AssetData.Length == 6, "Stale duration scenario was not reproduced.");
                 App.SaveAsset();
                 App.TextAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Path);
-                Require(App.AssetData.Length == 11 && ((LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0]).Count == 27, "Public graph edit save/reload failed.");
+                Require(App.AssetData.Length == 11 && ((LegacyExperienceInterval)App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count == 27, "Public graph edit save/reload failed.");
                 var random = new System.Random(1937);
                 for (var iteration = 0; iteration < 8; iteration++)
                 {
                     App.Session.Edit("R10 fractional timeline", () =>
                     {
-                        foreach (var clip in App.AssetData.groups.SelectMany(g => g.Tracks).SelectMany(t => t.Clips))
+                        foreach (var clip in App.AssetData.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).SelectMany(t => t.Clips))
                         {
                             clip.StartTime = (float)(random.NextDouble() * 17);
                             if (clip.CanScale()) clip.Length = (float)(random.NextDouble() * 4 + .01);
                         }
                     });
-                    var times = App.AssetData.groups.SelectMany(g => g.Tracks).SelectMany(t => t.Clips)
+                    var times = App.AssetData.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).SelectMany(t => t.Clips)
                         .SelectMany(c => new[] { c.StartTime, c.Length }).ToArray();
                     var duration = App.AssetData.Length;
                     App.SaveAsset();
                     Require(!App.Session.IsDirty, "Fractional save is dirty.");
                     App.TextAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(Path);
-                    Require(App.AssetData.Length == duration && times.SequenceEqual(App.AssetData.groups.SelectMany(g => g.Tracks)
+                    Require(App.AssetData.Length == duration && times.SequenceEqual(App.AssetData.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks)
                         .SelectMany(t => t.Clips).SelectMany(c => new[] { c.StartTime, c.Length })), "Fractional save/reload changed time values.");
                 }
                 File.AppendAllText(Path, "\n ");

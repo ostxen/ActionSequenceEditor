@@ -1,3 +1,6 @@
+using NBC.ActionEditor.Presentation.Timeline;
+using System.Linq;
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -29,8 +32,8 @@ namespace NBC.ActionEditor.Tests
             public string DisplayName => "Test export";
             public string Extension => ".test";
             public bool CanRead => false; public bool CanWrite => true; public bool CanExport => true;
-            public byte[] Serialize(Asset asset, DocumentFormatOptions options, DocumentFormatContext context) => new byte[] { 1, 2, 3 };
-            public Asset Deserialize(byte[] bytes, DocumentFormatContext context) => throw new AssertionException("Write-only export must not deserialize.");
+            public byte[] Serialize(ActionDocument asset, DocumentFormatOptions options, DocumentFormatContext context) => new byte[] { 1, 2, 3 };
+            public ActionDocument Deserialize(byte[] bytes, DocumentFormatContext context) => throw new AssertionException("Write-only export must not deserialize.");
         }
         [Test] public void WriteOnlyFormatDoesNotNeedReadbackOrEnterProductionRegistry()
         {
@@ -70,7 +73,7 @@ namespace NBC.ActionEditor.Tests
             try
             {
                 session.Open(memory);
-                session.Document.ViewTimeMax = 12; session.Document.groups[0].IsCollapsed = true;
+                var workspace = new TimelineWorkspace(); workspace.Bind(session.Document); workspace.ViewTimeMax = 12; workspace.SetCollapsed(session.Document.RootItems.OfType<TimelineGroup>().ElementAt(0), true);
                 if (dirty) session.Edit("business", () => ((LegacyExperienceAsset)session.Document).Version = 9);
                 var source = session.Document; var before = session.CaptureRecovery();
                 var files = new Files(); var service = new DocumentExportService(files);
@@ -80,7 +83,8 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(session.Document, Is.SameAs(source)); Assert.That(session.CaptureRecovery(), Is.EqualTo(before));
                 Assert.That(session.IsDirty, Is.EqualTo(dirty));
                 var loaded = JsonDocumentCodec.Decode(System.Text.Encoding.UTF8.GetString(files.Data[path]));
-                Assert.That(loaded.ViewTimeMax, Is.EqualTo(12)); Assert.That(loaded.groups[0].IsCollapsed, Is.True);
+                Assert.That(workspace.ViewTimeMax, Is.EqualTo(12)); Assert.That(workspace.IsCollapsed(session.Document.RootItems.OfType<TimelineGroup>().ElementAt(0)), Is.True);
+                Assert.That(System.Text.Encoding.UTF8.GetString(files.Data[path]), Does.Not.Contain("viewTime").And.Not.Contain("isCollapsed"));
                 Assert.That(((LegacyExperienceAsset)loaded).Version, Is.EqualTo(dirty ? 9 : 1));
                 Assert.Throws<IOException>(() => service.Export(session, "actioneditor.json", path));
                 Assert.That(files.Data.Count, Is.EqualTo(1)); Assert.That(session.CaptureRecovery(), Is.EqualTo(before));

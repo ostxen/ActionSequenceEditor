@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using FullSerializer;
 using UnityEngine;
 
-namespace NBC.ActionEditor
+namespace NBC.ActionEditor.Domain
 {
+    // 保存片段作者参数，时间候选的编辑规则由领域校验统一处理。
     [Serializable]
-    public abstract class Clip : IClip
+    public abstract class TimelineClip : IClip
     {
         [SerializeField] private float startTime;
         [SerializeField] [HideInInspector] protected float length = 1f;
@@ -36,9 +36,9 @@ namespace NBC.ActionEditor
 
         public virtual bool IsValid => false;
 
-        [fsIgnore] public IDirector Root => Parent?.Root;
+        public IDirector Root => Parent?.Root;
 
-        [fsIgnore] public IDirectable Parent { get; private set; }
+        public IDirectable Parent { get; private set; }
 
         IEnumerable<IDirectable> IDirectable.Children => null;
 
@@ -58,12 +58,8 @@ namespace NBC.ActionEditor
             set
             {
                 if (float.IsNaN(value) || float.IsInfinity(value)) throw new System.IO.InvalidDataException("开始时间必须为有限数值。");
-                if (Math.Abs(startTime - value) > 0.0001f)
-                {
-                    startTime = Mathf.Max(value, 0);
-                    // BlendIn = Mathf.Clamp(BlendIn, 0, Length - BlendOut);
-                    // BlendOut = Mathf.Clamp(BlendOut, 0, Length - BlendIn);
-                }
+                // 仅处理负起点，不用显示精度阈值丢弃有效位或负零。
+                startTime = value < 0 ? 0 : value;
             }
         }
 
@@ -73,24 +69,16 @@ namespace NBC.ActionEditor
             get => StartTime + Length;
             set
             {
-                if (Math.Abs(StartTime + Length - value) > 0.0001f)
-                {
-                    Length = Mathf.Max(value - StartTime, 0);
-                    BlendOut = Mathf.Clamp(BlendOut, 0, Length - BlendIn);
-                    BlendIn = Mathf.Clamp(BlendIn, 0, Length - BlendOut);
-                }
+                if (float.IsNaN(value) || float.IsInfinity(value)) throw new System.IO.InvalidDataException("结束时间必须为有限数值。");
+                Length = Mathf.Max(value - StartTime, 0);
+                BlendOut = Mathf.Clamp(BlendOut, 0, Length - BlendIn);
+                BlendIn = Mathf.Clamp(BlendIn, 0, Length - BlendOut);
             }
         }
 
         public bool IsActive
         {
             get => Parent?.IsActive ?? false;
-            set { }
-        }
-
-        public bool IsCollapsed
-        {
-            get { return Parent != null && Parent.IsCollapsed; }
             set { }
         }
 
@@ -131,17 +119,14 @@ namespace NBC.ActionEditor
         public void Validate(IDirector root, IDirectable parent)
         {
             Parent = parent;
-            // hideFlags = HideFlags.HideInHierarchy;
-            // ValidateAnimParams();
-            // OnAfterValidate();
         }
 
 
         public object AnimatedParametersTarget { get; }
 
-        public Clip GetNextClip()
+        public TimelineClip GetNextClip()
         {
-            return this.GetNextSibling<Clip>();
+            return this.GetNextSibling<TimelineClip>();
         }
 
         public float GetClipWeight(float time)
@@ -199,24 +184,23 @@ namespace NBC.ActionEditor
         public void PostCreate(IDirectable parent)
         {
             Parent = parent;
-            // CreateAnimationDataCollection();
-            // OnCreate();
         }
     }
 
 
+    // 点事件的有效时长固定为零，基类存储字段仍原样保留。
     [Serializable]
-    public abstract class ClipSignal : Clip
+    public abstract class PointClip : TimelineClip
     {
         public override float Length
         {
             get => 0;
-            //set => TimeCache();
         }
     }
 
+    // 区分作者渐变参数与邻接片段计算出的交叉混合参数。
     [Serializable]
-    public abstract class ClipCrossBlend : Clip
+    public abstract class CrossBlendClip : TimelineClip
     {
         [SerializeField] [HideInInspector] protected float blendIn = 0f;
         [SerializeField] [HideInInspector] protected float blendOut = 0f;

@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,7 +6,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using FullSerializer;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -23,15 +23,15 @@ namespace NBC.ActionEditor.Serialization
             var result = new List<FieldInfo>();
             for (var current = type; current != null && current != typeof(object); current = current.BaseType)
                 result.AddRange(current.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                    .Where(f => !f.IsStatic && !f.IsNotSerialized && !f.IsDefined(typeof(fsIgnoreAttribute), true)
+                    .Where(f => !f.IsStatic && !f.IsNotSerialized
                         && (f.IsPublic || f.IsDefined(typeof(SerializeField), true))));
             if (result.Any(f => f.Name.StartsWith("$", StringComparison.Ordinal)) || result.GroupBy(f => f.Name, StringComparer.Ordinal).Any(g => g.Count() != 1))
                 throw Error("$", "conflicting field keys on " + DocumentFormatContext.Identity(type));
             found = result.OrderBy(f => f.Name, StringComparer.Ordinal).ToArray(); fields.Add(type, found);
             return (FieldInfo[])found.Clone();
         }
-        private static bool Node(Type type) => typeof(Asset).IsAssignableFrom(type) || typeof(Group).IsAssignableFrom(type)
-            || typeof(Track).IsAssignableFrom(type) || typeof(Clip).IsAssignableFrom(type);
+        private static bool Node(Type type) => typeof(ActionDocument).IsAssignableFrom(type) || typeof(TimelineGroup).IsAssignableFrom(type)
+            || typeof(TimelineTrack).IsAssignableFrom(type) || typeof(TimelineClip).IsAssignableFrom(type);
         private static bool Components(Type type) => type == typeof(Vector2) || type == typeof(Vector3) || type == typeof(Vector4)
             || type == typeof(Quaternion) || type == typeof(Color) || type == typeof(Keyframe);
         private static string[] ComponentNames(Type type)
@@ -106,9 +106,6 @@ namespace NBC.ActionEditor.Serialization
                 if (Node(type) || type != declaration || declaration.IsAbstract || declaration.IsInterface) members.Add("$type", DocumentValue.String(DocumentFormatContext.Identity(type)));
                 foreach (var field in Fields(type))
                 {
-                    if (field.DeclaringType == typeof(Asset) && field.Name == "rootTracks" && ((Asset)value).rootTracks?.Count == 0) continue;
-                    if (content && (field.DeclaringType == typeof(Asset) && (field.Name == "viewTimeMin" || field.Name == "viewTimeMax")
-                        || field.DeclaringType == typeof(Group) && field.Name == "isCollapsed")) continue;
                     members.Add(field.Name, Capture(field.GetValue(value), field.FieldType, context, content, path + "." + field.Name, active));
                 }
                 return DocumentValue.Object(members);
@@ -236,7 +233,7 @@ namespace NBC.ActionEditor.Serialization
                 type = context.ResolveType(Scalar(tag, DocumentValue.ValueKind.String, path + ".$type"), declaration, path);
             }
             RequireBusinessType(type, context, path);
-            var members = Fields(type).Where(f => !(f.DeclaringType == typeof(Asset) && f.Name == "rootTracks" && !value.Members.ContainsKey(f.Name))).ToArray();
+            var members = Fields(type);
             Keys(value, members.Select(f => f.Name).Concat(tagged ? new[] { "$type" } : Array.Empty<string>()), path);
             var memberPlans = members.Select(f => Prepare(value.Members[f.Name], f.FieldType, context, path + "." + f.Name)).ToArray();
             return () =>
@@ -244,7 +241,6 @@ namespace NBC.ActionEditor.Serialization
                 object result;
                 try { result = Activator.CreateInstance(type, true); }
                 catch { throw Error(path, "trusted constructor failed for " + DocumentFormatContext.Identity(type)); }
-                if (result is Asset asset && !value.Members.ContainsKey("rootTracks")) asset.rootTracks = new List<Track>();
                 for (var i = 0; i < members.Length; i++) members[i].SetValue(result, memberPlans[i]());
                 return result;
             };

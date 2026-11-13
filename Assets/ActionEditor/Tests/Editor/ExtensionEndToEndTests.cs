@@ -1,3 +1,5 @@
+using NBC.ActionEditor.Presentation.Timeline;
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections;
 using System.Linq;
@@ -58,8 +60,8 @@ namespace NBC.ActionEditor.Tests
             App.Session.CancelEdit(); App.Stop(); App.TextAsset = source; App.Session.RestoreRecovery(recovery);
             UnityEngine.Object.DestroyImmediate(fixture);
         }
-        private static Clip Last(int track) => App.AssetData.groups[0].Tracks[track].Clips.Last();
-        private static void OriginalCreate(Track track, Type type)
+        private static TimelineClip Last(int track) => App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track].Clips.Last();
+        private static void OriginalCreate(TimelineTrack track, Type type)
         {
             var view = new TimelineTrackItemRightView();
             var menu = (GenericMenu)typeof(TimelineTrackItemRightView).GetMethod("BuildTrackContextMenu", Instance).Invoke(view, new object[] { track, track.Root.SnapTime(6.5f) });
@@ -72,7 +74,7 @@ namespace NBC.ActionEditor.Tests
         }
         private static void NativeCreate(UIToolkitActionEditorWindow window, int track, Type type)
         {
-            var canvas = window.Canvas; var rows = canvas.Rows(); var target = App.AssetData.groups[0].Tracks[track];
+            var canvas = window.Canvas; var rows = canvas.Rows(); var target = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track];
             var row = rows.IndexOf(target);
             var position = canvas.LocalToWorld(new Vector2(canvas.X(6.5f), row * 28 + 13 - window.ScrollY));
             var menu = new DropdownMenu();
@@ -106,8 +108,7 @@ namespace NBC.ActionEditor.Tests
                     foreach (var track in new[] { 0, 2 })
                     {
                         var type = track == 0 ? typeof(LegacyExperienceInterval) : typeof(LegacyExperienceMarker);
-                        LogAssert.Expect(LogType.Log, "type=" + type + " newAction=" + type);
-                        if (ui == 0) OriginalCreate(App.AssetData.groups[0].Tracks[track], type);
+                        if (ui == 0) OriginalCreate(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track], type);
                         else NativeCreate(window, track, type);
                         var clip = Last(track);
                         Assert.That(clip.GetType(), Is.EqualTo(type)); Assert.That(clip.StartTime, Is.EqualTo(6.5f).Within(.0001f));
@@ -141,8 +142,8 @@ namespace NBC.ActionEditor.Tests
                     }
                     var encoded = JsonDocumentCodec.CreateSaveSnapshot(App.AssetData);
                     var reopened = JsonDocumentCodec.Decode(encoded);
-                    Assert.That(reopened.groups[0].Tracks[0].Clips.Last(), Is.TypeOf<LegacyExperienceInterval>());
-                    Assert.That(reopened.groups[0].Tracks[2].Clips.Last().Length, Is.Zero);
+                    Assert.That(reopened.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(), Is.TypeOf<LegacyExperienceInterval>());
+                    Assert.That(reopened.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[2].Clips.Last().Length, Is.Zero);
                     if (ui == 0) expected = JsonDocumentCodec.Content(reopened);
                     else Assert.That(JsonDocumentCodec.Content(reopened), Is.EqualTo(expected));
                     original.Value = null;
@@ -174,13 +175,12 @@ namespace NBC.ActionEditor.Tests
                 {
                     App.TextAsset = fixture;
                     var type = typeof(LegacyExperienceInterval);
-                    LogAssert.Expect(LogType.Log, "type=" + type + " newAction=" + type);
-                    if (ui == 0) OriginalCreate(App.AssetData.groups[0].Tracks[0], type);
+                    if (ui == 0) OriginalCreate(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], type);
                     else NativeCreate(native, 0, type);
                     var created = Last(0); JsonEditCommands.Copy(created);
-                    var copy = (Clip)JsonEditCommands.Paste(created.Parent, 9);
+                    var copy = (TimelineClip)JsonEditCommands.Paste(created.Parent, 9);
                     Assert.That(copy, Is.Not.SameAs(created));
-                    App.AssetData.ViewTimeMax = 12; native.SyncView();
+                    native.Workspace.ViewTimeMax = 12; original.Workspace.ViewTimeMax = 12; native.SyncView();
                     native.Select(created, copy); yield return null;
                     var start = created.StartTime; var spacing = copy.StartTime - start;
                     if (ui == 0)
@@ -201,14 +201,14 @@ namespace NBC.ActionEditor.Tests
                     }
                     Assert.That(created.StartTime, Is.EqualTo(start + .5f).Within(.001));
                     Assert.That(copy.StartTime - created.StartTime, Is.EqualTo(spacing).Within(.001));
-                    Undo.PerformUndo(); created = App.AssetData.groups[0].Tracks[0].Clips.Last(c => c.StartTime < 8);
+                    Undo.PerformUndo(); created = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8);
                     Assert.That(created.StartTime, Is.EqualTo(start).Within(.001));
-                    Undo.PerformRedo(); created = App.AssetData.groups[0].Tracks[0].Clips.Last(c => c.StartTime < 8);
+                    Undo.PerformRedo(); created = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8);
                     native.Select(created); var length = created.Length;
                     if (ui == 0)
                     {
                         events.Gesture = original.Gesture; events.Focus(); events.Repaint(); yield return null;
-                        var down = new Vector2(Styles.TimelineLeftTotalWidth + App.AssetData.TimeToPos(created.EndTime, ActionEditorHost.Width), 30) + events.ContentOffset;
+                        var down = new Vector2(Styles.TimelineLeftTotalWidth + original.Workspace.TimeToPos(created.EndTime, ActionEditorHost.Width), 30) + events.ContentOffset;
                         events.SendEvent(new Event { type = EventType.MouseDown, button = 0, shift = true, mousePosition = down });
                         Assert.That(original.Gesture.DragType, Is.EqualTo(ItemDragType.StretchEnd));
                         events.SendEvent(new Event { type = EventType.MouseDrag, button = 0, shift = true, mousePosition = down + new Vector2(ActionEditorHost.Width * .25f / 12, 0) });
@@ -224,7 +224,7 @@ namespace NBC.ActionEditor.Tests
                     Assert.That(created.Length, Is.EqualTo(length + .25f).Within(.001));
                     var field = type.GetField("Caption"); var initial = field.GetValue(created);
                     var token = App.Session.BeginEdit(this); new JsonPropertyPath(created).Field(field).Write("cancelled"); token.Cancel();
-                    created = App.AssetData.groups[0].Tracks[0].Clips.Last(c => c.StartTime < 8);
+                    created = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8);
                     Assert.That(field.GetValue(created), Is.EqualTo(initial));
                     token = App.Session.BeginEdit(this); new JsonPropertyPath(created).Field(field).Write("RF15"); token.Commit();
                     Undo.PerformUndo(); Undo.PerformRedo();
@@ -240,7 +240,7 @@ namespace NBC.ActionEditor.Tests
                     native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>(); native.Show(); yield return null;
                     Assert.That(original.Context.Document, Is.SameAs(native.Document));
                     Assert.That(JsonDocumentCodec.Content(native.Document), Is.EqualTo(expected));
-                    Assert.That(((LegacyExperienceInterval)native.Document.groups[0].Tracks[0].Clips.Last(c => c.StartTime < 8)).Caption, Is.EqualTo("RF15"));
+                    Assert.That(((LegacyExperienceInterval)native.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8)).Caption, Is.EqualTo("RF15"));
                     var now = (float)EditorApplication.timeSinceStartup; App.Context.Playback.Play(now); App.Context.Playback.Update(now + .1f, 1);
                     Assert.That(App.Context.Playback.IsPlaying, Is.True); Assert.That(App.Context.Player.CurrentTime, Is.GreaterThan(0));
                     App.Stop(); Assert.That(App.Context.Player.IsInitialized, Is.False); Assert.That(App.Context.Player.CurrentTime, Is.Zero);
@@ -264,7 +264,7 @@ namespace NBC.ActionEditor.Tests
             ActionEditorWindow imgui = null;
             try
             {
-                var group = App.AssetData.groups[0];
+                var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0);
                 group.Tracks.Clear(); App.AssetData.Init();
                 native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
                 native.position = new Rect(60, 60, 1000, 600); native.Show(); native.Focus();
@@ -277,10 +277,10 @@ namespace NBC.ActionEditor.Tests
                 Pointer(canvas, EventType.MouseDrag, new Vector2(90, 90));
                 Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", Instance).GetValue(canvas).ToString(), Is.EqualTo("None"), "Group header currently does not enter structure capture.");
                 Pointer(canvas, EventType.MouseUp, new Vector2(90, 90));
-                Assert.That(App.AssetData.groups[0], Is.SameAs(group));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0), Is.SameAs(group));
                 native.DiscardChanges(); native.Close(); native = null;
 
-                group = App.AssetData.groups[0];
+                group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0);
                 group.Tracks.Clear(); App.AssetData.Init();
                 Styles.TimelineScrollPos = Vector2.zero;
                 imgui = ScriptableObject.CreateInstance<ActionEditorWindow>();
@@ -295,12 +295,12 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(imgui.Gesture.DragType, Is.Not.EqualTo(ItemDragType.Track), "Group currently has no structure gesture.");
                 imgui.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
                 imgui.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
-                group = App.AssetData.groups[0];
-                var wasCollapsed = group.IsCollapsed;
+                group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0);
+                var wasCollapsed = imgui.Workspace.IsCollapsed(group);
                 var fold = offset + new Vector2(12, Styles.PlayControlHeight + 12);
                 imgui.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = fold });
                 imgui.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = fold });
-                Assert.That(group.IsCollapsed, Is.Not.EqualTo(wasCollapsed), "Empty group currently exposes a clickable collapse icon.");
+                Assert.That(imgui.Workspace.IsCollapsed(group), Is.Not.EqualTo(wasCollapsed), "Empty group currently exposes a clickable collapse icon.");
             }
             finally
             {
@@ -428,7 +428,7 @@ namespace NBC.ActionEditor.Tests
             {
                 window.position = new Rect(60, 60, 1000, 600); window.Show(); yield return null; yield return null;
                 var canvas = window.Canvas;
-                var group = App.AssetData.groups[0]; var moving = group.Tracks[1]; var first = group.Tracks[0];
+                var group = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0); var moving = group.Tracks[1]; var first = group.Tracks[0];
                 var start = new Vector2(90, canvas.Rows().IndexOf(moving) * 28 + 13);
                 var end = new Vector2(90, canvas.Rows().IndexOf(first) * 28 + 3);
                 Pointer(canvas, EventType.MouseDown, start);
@@ -441,30 +441,30 @@ namespace NBC.ActionEditor.Tests
                 Pointer(canvas, EventType.MouseUp, end);
                 Assert.That(window.LastError, Is.Null);
                 Assert.That(group.Tracks[0], Is.SameAs(moving), "Dropping on the upper half must insert before the target.");
-                Undo.PerformUndo(); Assert.That(App.AssetData.groups[0].Tracks[0].Name, Is.EqualTo(first.Name));
-                Undo.PerformRedo(); Assert.That(App.AssetData.groups[0].Tracks[0].Name, Is.EqualTo(moving.Name));
-                moving = App.AssetData.groups[0].Tracks[0];
+                Undo.PerformUndo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(first.Name));
+                Undo.PerformRedo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(moving.Name));
+                moving = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0];
                 start = new Vector2(90, canvas.Rows().IndexOf(moving) * 28 + 13);
                 end = new Vector2(5, start.y + 10);
                 Pointer(canvas, EventType.MouseDown, start); Pointer(canvas, EventType.MouseDrag, end);
                 Pointer(canvas, EventType.MouseUp, end);
                 Assert.That(window.LastError, Is.Null); Assert.That(moving.Group, Is.Null);
-                Assert.That(App.AssetData.rootTracks.Single(), Is.SameAs(moving));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
                 Assert.That(moving.Root, Is.SameAs(App.AssetData)); Assert.That(moving.Clips, Is.Not.Empty);
                 Assert.That(canvas.Rows().Last(), Is.SameAs(moving));
                 start = new Vector2(90, canvas.Rows().IndexOf(moving) * 28 + 13);
-                end = new Vector2(90, canvas.Rows().IndexOf(App.AssetData.groups[1]) * 28 + 13);
+                end = new Vector2(90, canvas.Rows().IndexOf(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1)) * 28 + 13);
                 Pointer(canvas, EventType.MouseDown, start); Pointer(canvas, EventType.MouseDrag, end);
                 Key(canvas, KeyCode.Escape); Pointer(canvas, EventType.MouseUp, end);
-                Assert.That(App.AssetData.rootTracks.Single(), Is.SameAs(moving));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
                 Pointer(canvas, EventType.MouseDown, start); Pointer(canvas, EventType.MouseDrag, end);
                 var outside = new Vector2(-10, end.y);
                 Pointer(canvas, EventType.MouseUp, outside);
-                Assert.That(App.AssetData.rootTracks.Single(), Is.SameAs(moving));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
                 Pointer(canvas, EventType.MouseDown, start); Pointer(canvas, EventType.MouseDrag, end);
                 Pointer(canvas, EventType.MouseUp, end);
-                Assert.That(window.LastError, Is.Null); Assert.That(App.AssetData.rootTracks, Is.Empty);
-                Assert.That(App.AssetData.groups[1].Tracks[0], Is.SameAs(moving));
+                Assert.That(window.LastError, Is.Null); Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>(), Is.Empty);
+                Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1).Tracks[0], Is.SameAs(moving));
                 var encoded = JsonDocumentCodec.CreateSaveSnapshot(App.AssetData);
                 Assert.That(JsonDocumentCodec.Content(JsonDocumentCodec.Decode(encoded)), Is.EqualTo(JsonDocumentCodec.Content(App.AssetData)));
             }
@@ -477,10 +477,10 @@ namespace NBC.ActionEditor.Tests
             var window = ScriptableObject.CreateInstance<ActionEditorWindow>();
             try
             {
-                Styles.TimelineScrollPos = Vector2.zero;
+                window.Workspace.ScrollY = 0;
                 window.position = new Rect(60, 60, 1000, 600); window.Show(); window.Focus(); window.Repaint();
                 yield return null; yield return null; yield return null;
-                var moving = App.AssetData.groups[0].Tracks[1];
+                var moving = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
                 var name = moving.Name;
                 var pitch = Styles.LineHeight + Styles.Space;
                 var offset = Styles.PlayControlHeight + ((Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", Instance).GetValue(window)).y;
@@ -497,91 +497,91 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(window.Gesture.DragType, Is.EqualTo(ItemDragType.None), "Release must end the captured gesture.");
                 Assert.That(window.Gesture.TrackDrop.IsValid, Is.True, "Release must remain inside the viewport.");
                 Assert.That(window.Gesture.TrackDrop.Index, Is.Zero, "Release drop=" + window.Gesture.TrackDrop.Row?.Name + ", y=" + window.Gesture.TrackDrop.Y);
-                Assert.That(App.AssetData.groups[0].Tracks[0].Name, Is.EqualTo(name));
-                Undo.PerformUndo(); Assert.That(App.AssetData.groups[0].Tracks[1].Name, Is.EqualTo(name));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(name));
+                Undo.PerformUndo(); Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Name, Is.EqualTo(name));
                 Undo.PerformRedo();
                 window.Repaint(); yield return null; yield return null;
                 start = new Vector2(90, offset + pitch + 13); end = new Vector2(5, start.y + 10);
                 foreach (var type in new[] { EventType.MouseDown, EventType.MouseDrag, EventType.MouseUp })
                     window.SendEvent(new Event { type = type, button = 0, mousePosition = type == EventType.MouseDown ? start : end });
-                Assert.That(App.AssetData.rootTracks.Single().Name, Is.EqualTo(name));
-                Styles.TimelineScrollPos = new Vector2(0, pitch * 3);
+                Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Single().Name, Is.EqualTo(name));
+                window.Workspace.ScrollY = pitch * 3;
                 window.Repaint(); yield return null; yield return null;
-                var rows = TimelineGeometry.VisibleRows(App.AssetData);
-                start = new Vector2(90, offset + rows.IndexOf(App.AssetData.rootTracks[0]) * pitch + 13 - Styles.TimelineScrollPos.y);
-                end = new Vector2(90, offset + rows.IndexOf(App.AssetData.groups[1]) * pitch + 13 - Styles.TimelineScrollPos.y);
+                var rows = TimelineGeometry.VisibleRows(App.AssetData, window.Workspace);
+                start = new Vector2(90, offset + rows.IndexOf(App.AssetData.RootItems.OfType<TimelineTrack>().ElementAt(0)) * pitch + 13 - window.Workspace.ScrollY);
+                end = new Vector2(90, offset + rows.IndexOf(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1)) * pitch + 13 - window.Workspace.ScrollY);
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
-                Assert.That(App.FistSelect, Is.SameAs(App.AssetData.rootTracks[0]), "Root row start=" + start + ", scroll=" + Styles.TimelineScrollPos);
+                Assert.That(App.FistSelect, Is.SameAs(App.AssetData.RootItems.OfType<TimelineTrack>().ElementAt(0)), "Root row start=" + start + ", scroll=" + window.Workspace.ScrollY);
                 var timeline = typeof(ActionEditorWindow).GetField("_timelineView", Instance).GetValue(window);
                 var middle = (TimelineMiddleView)typeof(TimelineView).GetField("_middleView", Instance).GetValue(timeline);
                 Assert.That(typeof(ViewBase).GetField("_havePointerDown", Instance).GetValue(middle), Is.True,
-                    "Root press must reach body: start=" + start + ", bounds=" + middle.Position + ", offset=" + offset + ", rows=" + rows.Count + ", scroll=" + Styles.TimelineScrollPos);
+                    "Root press must reach body: start=" + start + ", bounds=" + middle.Position + ", offset=" + offset + ", rows=" + rows.Count + ", scroll=" + window.Workspace.ScrollY);
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
                 Assert.That(window.Gesture.DragType, Is.EqualTo(ItemDragType.Track));
                 window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
                 window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
-                Assert.That(App.AssetData.rootTracks.Single().Name, Is.EqualTo(name));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Single().Name, Is.EqualTo(name));
                 window.Repaint(); yield return null; yield return null;
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
-                Assert.That(App.FistSelect, Is.SameAs(App.AssetData.rootTracks[0]), "Root row after cancel start=" + start);
+                Assert.That(App.FistSelect, Is.SameAs(App.AssetData.RootItems.OfType<TimelineTrack>().ElementAt(0)), "Root row after cancel start=" + start);
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
                 Assert.That(window.Gesture.DragType, Is.EqualTo(ItemDragType.Track));
                 window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
-                Assert.That(App.AssetData.rootTracks, Is.Empty);
-                Assert.That(App.AssetData.groups[1].Tracks[0].Name, Is.EqualTo(name));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>(), Is.Empty);
+                Assert.That(App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1).Tracks[0].Name, Is.EqualTo(name));
             }
             finally { window.DiscardChanges(); window.Close(); ActionEditorHost.Window = previousWindow; Styles.TimelineScrollPos = previousScroll; }
         }
 
         [Test] public void RootTracksPersistUndoPreviewAndRejectDuplicateOwnership()
         {
-            var track = App.AssetData.groups[0].Tracks[0]; var clip = track.Clips[0];
+            var track = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var clip = track.Clips[0];
             JsonEditCommands.MoveTrack(track, null, 0);
             Assert.That(track.Parent, Is.Null); Assert.That(track.Root, Is.SameAs(App.AssetData));
             Assert.That(track.IsActive, Is.True); Assert.That(clip.Parent, Is.SameAs(track));
-            Assert.That(TimelineGeometry.IsVisible(clip), Is.True);
+            Assert.That(TimelineGeometry.IsVisible(clip, new TimelineWorkspace()), Is.True);
             var encoded = JsonDocumentCodec.CreateSaveSnapshot(App.AssetData);
             var decoded = JsonDocumentCodec.Decode(encoded);
-            Assert.That(decoded.rootTracks.Single().Clips[0].StartTime, Is.EqualTo(.25f));
-            Assert.That(decoded.rootTracks[0].Root, Is.SameAs(decoded));
+            Assert.That(decoded.RootItems.OfType<TimelineTrack>().Single().Clips[0].StartTime, Is.EqualTo(.25f));
+            Assert.That(decoded.RootItems.OfType<TimelineTrack>().ElementAt(0).Root, Is.SameAs(decoded));
             App.Context.Player.Sample(.75f); Assert.That(App.Context.Player.IsInitialized, Is.True); App.Stop();
-            Undo.PerformUndo(); Assert.That(App.AssetData.rootTracks, Is.Empty);
-            Undo.PerformRedo(); Assert.That(App.AssetData.rootTracks.Count, Is.EqualTo(1));
-            var moved = App.AssetData.rootTracks[0]; moved.IsLocked = true;
-            Assert.That(JsonEditCommands.Reorder(moved, App.AssetData.groups[0], 0).CanExecute(out _), Is.False);
+            Undo.PerformUndo(); Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>(), Is.Empty);
+            Undo.PerformRedo(); Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Count(), Is.EqualTo(1));
+            var moved = App.AssetData.RootItems.OfType<TimelineTrack>().ElementAt(0); moved.IsLocked = true;
+            Assert.That(JsonEditCommands.Reorder(moved, App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0), 0).CanExecute(out _), Is.False);
             moved.IsLocked = false;
-            App.AssetData.groups[0].Tracks.Add(moved);
+            App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks.Add(moved);
             Assert.Throws<System.IO.InvalidDataException>(() => JsonDocumentCodec.CreateSaveSnapshot(App.AssetData));
-            App.AssetData.groups[0].Tracks.Remove(moved);
+            App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks.Remove(moved);
         }
 
         [Test] public void RootTrackOrderingCopyCutLocksAndRecoveryKeepOneOwner()
         {
-            var first = App.AssetData.groups[0].Tracks[0]; var second = App.AssetData.groups[0].Tracks[1];
+            var first = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var second = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
             JsonEditCommands.MoveTrack(first, null, 0); JsonEditCommands.MoveTrack(second, null, 1);
             JsonEditCommands.MoveTrack(second, null, 0);
-            Assert.That(App.AssetData.rootTracks, Is.EqualTo(new[] { second, first }));
+            Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>(), Is.EqualTo(new[] { second, first }));
             JsonEditCommands.MoveTrack(second, null, 2);
-            Assert.That(App.AssetData.rootTracks, Is.EqualTo(new[] { first, second }));
+            Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>(), Is.EqualTo(new[] { first, second }));
             JsonEditCommands.Copy(first, true); first.IsLocked = true;
             Assert.That(JsonEditCommands.CanPaste(null), Is.False);
             Assert.Throws<InvalidOperationException>(() => JsonEditCommands.Paste(null));
             first.IsLocked = false; JsonEditCommands.Duplicate(first);
-            Assert.That(App.AssetData.rootTracks.Count, Is.EqualTo(3));
-            Assert.That(App.AssetData.rootTracks.Last().Clips[0], Is.Not.SameAs(first.Clips[0]));
+            Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Count(), Is.EqualTo(3));
+            Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Last().Clips[0], Is.Not.SameAs(first.Clips[0]));
             var restored = App.Session.CaptureRecovery(); var expected = JsonDocumentCodec.Content(App.AssetData);
             JsonEditCommands.Delete(second); App.Session.RestoreRecovery(restored);
             Assert.That(JsonDocumentCodec.Content(App.AssetData), Is.EqualTo(expected));
-            var lockedGroup = App.AssetData.groups[1]; lockedGroup.IsLocked = true;
-            Assert.That(JsonEditCommands.Reorder(App.AssetData.rootTracks[0], lockedGroup, 0).CanExecute(out _), Is.False);
+            var lockedGroup = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(1); lockedGroup.IsLocked = true;
+            Assert.That(JsonEditCommands.Reorder(App.AssetData.RootItems.OfType<TimelineTrack>().ElementAt(0), lockedGroup, 0).CanExecute(out _), Is.False);
             lockedGroup.IsLocked = false;
-            JsonEditCommands.MoveTrack(App.AssetData.rootTracks[0], lockedGroup, 1);
+            JsonEditCommands.MoveTrack(App.AssetData.RootItems.OfType<TimelineTrack>().ElementAt(0), lockedGroup, 1);
             Assert.That(lockedGroup.Tracks[1].Group, Is.SameAs(lockedGroup));
         }
 
         [Test] public void RootTrackDiskSnapshotReopensWithClipsAndExactOrder()
         {
-            var first = App.AssetData.groups[0].Tracks[0]; var second = App.AssetData.groups[0].Tracks[1];
+            var first = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var second = App.AssetData.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
             JsonEditCommands.MoveTrack(first, null, 0); JsonEditCommands.MoveTrack(second, null, 0);
             var expected = JsonDocumentCodec.Content(App.AssetData);
             var directory = System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/RootTrack-" + Guid.NewGuid().ToString("N"));
@@ -593,9 +593,9 @@ namespace NBC.ActionEditor.Tests
                     bytes => Assert.That(JsonDocumentCodec.Content(JsonDocumentCodec.Decode(System.Text.Encoding.UTF8.GetString(bytes))), Is.EqualTo(expected)), createOnly: true);
                 reopened = new TextAsset(System.IO.File.ReadAllText(path)); App.TextAsset = reopened;
                 Assert.That(JsonDocumentCodec.Content(App.AssetData), Is.EqualTo(expected));
-                Assert.That(App.AssetData.rootTracks.Select(t => t.Name), Is.EqualTo(new[] { second.Name, first.Name }));
-                Assert.That(App.AssetData.rootTracks[1].Clips[0].StartTime, Is.EqualTo(.25f));
-                Assert.That(App.AssetData.rootTracks.All(t => t.Parent == null && t.Root == App.AssetData), Is.True);
+                Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().Select(t => t.Name), Is.EqualTo(new[] { second.Name, first.Name }));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().ElementAt(1).Clips[0].StartTime, Is.EqualTo(.25f));
+                Assert.That(App.AssetData.RootItems.OfType<TimelineTrack>().All(t => t.Parent == null && t.Root == App.AssetData), Is.True);
             }
             finally
             {
@@ -615,22 +615,22 @@ namespace NBC.ActionEditor.Tests
             {
                 original.position = new Rect(60, 60, 1000, 600); original.Show(); original.Focus(); original.Repaint();
                 yield return null; yield return null; yield return null;
-                TimelineNavigation.SetRange(App.AssetData, new Vector2(1, 8));
+                TimelineNavigation.SetRange(original.Workspace, new Vector2(1, 8));
                 var offset = (Vector2)typeof(ActionEditorWindow).GetProperty("ContentOffset", Instance).GetValue(original);
                 var fraction = 100 / (original.position.width - Styles.TimelineLeftTotalWidth);
                 var anchor = 1 + 7 * fraction;
                 original.SendEvent(new Event { type = EventType.ScrollWheel, mousePosition = new Vector2(Styles.TimelineLeftTotalWidth + 100, 30) + offset, delta = Vector2.up });
-                Assert.That(App.AssetData.ViewTime, Is.GreaterThan(7));
-                Assert.That(App.AssetData.ViewTimeMin + fraction * App.AssetData.ViewTime, Is.EqualTo(anchor).Within(.0001f));
+                Assert.That(original.Workspace.ViewTime, Is.GreaterThan(7));
+                Assert.That(original.Workspace.ViewTimeMin + fraction * original.Workspace.ViewTime, Is.EqualTo(anchor).Within(.0001f));
                 native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
                 native.position = new Rect(60, 60, 1000, 600); native.Show(); native.Focus();
                 yield return null; yield return null;
-                TimelineNavigation.SetRange(App.AssetData, new Vector2(1, 8));
+                TimelineNavigation.SetRange(native.Workspace, new Vector2(1, 8));
                 var root = native.rootVisualElement; fraction = 100 / (root.contentRect.width - native.Canvas.Left); anchor = 1 + 7 * fraction;
                 using (var wheel = WheelEvent.GetPooled(new Event { type = EventType.ScrollWheel, mousePosition = root.LocalToWorld(new Vector2(native.Canvas.Left + 100, 30)), delta = Vector2.up }))
                 { wheel.target = root; root.SendEvent(wheel); }
-                Assert.That(App.AssetData.ViewTime, Is.EqualTo(Prefs.scrollWheelZooms ? 8.575f : 7).Within(.001f));
-                Assert.That(App.AssetData.ViewTimeMin + fraction * App.AssetData.ViewTime, Is.EqualTo(anchor).Within(.0001f));
+                Assert.That(native.Workspace.ViewTime, Is.EqualTo(Prefs.scrollWheelZooms ? 8.575f : 7).Within(.001f));
+                Assert.That(native.Workspace.ViewTimeMin + fraction * native.Workspace.ViewTime, Is.EqualTo(anchor).Within(.0001f));
                 Assert.That(App.Session.IsDirty || App.Session.IsEditing, Is.False);
             }
             finally

@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,29 +7,34 @@ using System.Reflection;
 
 namespace NBC.ActionEditor.Serialization
 {
+    // 在初始化前检查结构所有权、挂载能力和原始时间字段。
     public static class ActionDocumentGraph
     {
-        private static readonly FieldInfo StoredClipLength = typeof(Clip).GetField("length", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo StoredClipLength = typeof(TimelineClip).GetField("length", BindingFlags.Instance | BindingFlags.NonPublic);
         private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
         private static void Require(bool condition, string path, string reason)
         { if (!condition) throw new InvalidDataException(path + ": " + reason); }
-        public static void RequireValid(Asset document)
+        public static void RequireValid(ActionDocument document)
         {
             Require(document != null, "$.document", "missing document.");
-            Require(document.groups != null, "$.groups", "null structural collection.");
-            Require(document.rootTracks != null, "$.rootTracks", "null structural collection.");
+            Require(document.RootItems != null, "$.rootItems", "null structural collection.");
             var seen = new HashSet<object>(DocumentValueConverter.ReferenceComparer.Instance) { document };
-            foreach (var group in document.groups)
+            foreach (var item in document.RootItems)
             {
-                Require(group != null && seen.Add(group), "$.groups", "null/shared group.");
-                ParentType(group.GetType(), document.GetType(), "$.groups");
-                Unique(group, document.groups.Cast<object>(), "$.groups");
-                Require(group.Tracks != null, "$.groups.tracks", "null structural collection.");
-                foreach (var track in group.Tracks) ValidateTrack(track, group.Tracks, group.GetType(), "$.groups.tracks", seen);
+                if (item is TimelineGroup group)
+                {
+                    Require(seen.Add(group), "$.rootItems", "shared group.");
+                    ParentType(group.GetType(), document.GetType(), "$.rootItems");
+                    Unique(group, document.RootItems.Cast<object>(), "$.rootItems");
+                    Require(group.Tracks != null, "$.rootItems.tracks", "null structural collection.");
+                    foreach (var track in group.Tracks) ValidateTrack(track, group.Tracks, group.GetType(), "$.rootItems.tracks", seen);
+                }
+                else if (item is TimelineTrack track)
+                    ValidateTrack(track, document.RootItems.OfType<TimelineTrack>(), null, "$.rootItems", seen);
+                else Require(false, "$.rootItems", "only groups and tracks are allowed.");
             }
-            foreach (var track in document.rootTracks) ValidateTrack(track, document.rootTracks, null, "$.rootTracks", seen);
         }
-        private static void ValidateTrack(Track track, IEnumerable<Track> siblings, Type parent, string path, HashSet<object> seen)
+        private static void ValidateTrack(TimelineTrack track, IEnumerable<TimelineTrack> siblings, Type parent, string path, HashSet<object> seen)
         {
             Require(track != null && seen.Add(track), path, "null/shared track.");
             if (parent != null) ParentType(track.GetType(), parent, path);
@@ -44,17 +50,17 @@ namespace NBC.ActionEditor.Serialization
                 Require(Finite(storedLength) && storedLength >= 0, clipsPath + ".length", "invalid stored duration.");
                 Require(Finite(clip.StartTime) && clip.StartTime >= 0 && Finite(clip.Length) && clip.Length >= 0
                     && Finite(clip.EndTime) && Finite(clip.BlendIn) && Finite(clip.BlendOut), clipsPath, "invalid clip timing.");
-                if (clip is ClipSignal) Require(clip.Length == 0, clipsPath, "point effective duration must be zero.");
+                if (clip is PointClip) Require(clip.Length == 0, clipsPath, "point effective duration must be zero.");
             }
         }
-        public static void Initialize(Asset document, DocumentFormatContext context)
+        public static void Initialize(ActionDocument document, DocumentFormatContext context)
         {
             RequireValid(document);
-            var before = DocumentValueConverter.Capture(document, typeof(Asset), context);
+            var before = DocumentValueConverter.Capture(document, typeof(ActionDocument), context);
             document.Init();
             RequireValid(document);
-            var after = DocumentValueConverter.Capture(document, typeof(Asset), context);
-            // Init may rebuild the derived root duration, but must not silently rewrite stored author/workspace values.
+            var after = DocumentValueConverter.Capture(document, typeof(ActionDocument), context);
+            // 初始化只允许重建派生时长，不能修复或改写其他作者字段。
             var expected = before.Members.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
             expected["length"] = after.Members["length"];
             Require(DocumentValue.Object(expected).ContentKey() == after.ContentKey(), "$", "initialization changed stored fields.");

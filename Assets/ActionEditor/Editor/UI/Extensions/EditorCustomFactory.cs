@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NBC.ActionEditor.Domain;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -13,7 +14,7 @@ namespace NBC.ActionEditor
         public static void InitInspectorDic() { if (inspectors == null) inspectors = Discover(typeof(InspectorsBase)); }
         private static Type[] Discover(Type type) => ActionEditorTypeCatalog.DerivedFrom(type).Select(i => i.type).ToArray();
 
-        public static HeaderBase GetHeader(Asset asset)
+        public static HeaderBase GetHeader(ActionDocument asset)
         {
             if (asset == null) return null;
             InitHeaderDic();

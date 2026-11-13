@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using NBC.ActionEditor.Storage;
 using UnityEngine;
@@ -10,10 +11,10 @@ namespace NBC.ActionEditor
         {
             var store = new JsonDocumentStore();
             path = store.ValidateNewPath(path);
-            if (type == null || !typeof(Asset).IsAssignableFrom(type) || type.IsAbstract || type.ContainsGenericParameters
+            if (type == null || !typeof(ActionDocument).IsAssignableFrom(type) || type.IsAbstract || type.ContainsGenericParameters
                 || type.GetConstructor(Type.EmptyTypes) == null) throw new ArgumentException("无效的资源类型。");
             DocumentFormats.Context.RequireType(type, "$.document");
-            var asset = (Asset)Activator.CreateInstance(type);
+            var asset = (ActionDocument)Activator.CreateInstance(type);
             store.Commit(path, asset, null);
             store.Import(path);
             return store.Load(path);

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NBC.ActionEditor.Domain;
+using System;
 using System.IO;
 using System.Linq;
 using NBC.ActionEditor.Storage;
@@ -31,7 +32,7 @@ namespace NBC.ActionEditor
         public override void OnOpen()
         {
             Prefs.InitializeAssetTypes();
-            types = ReflectionTools.GetImplementationsOf(typeof(Asset)).Distinct()
+            types = ReflectionTools.GetImplementationsOf(typeof(ActionDocument)).Distinct()
                 .Where(t => !t.IsAbstract && !t.ContainsGenericParameters && t.GetConstructor(Type.EmptyTypes) != null
                     && !t.Assembly.GetName().Name.EndsWith(".Tests", StringComparison.Ordinal))
                 .OrderBy(t => t.FullName, StringComparer.Ordinal).ToArray();

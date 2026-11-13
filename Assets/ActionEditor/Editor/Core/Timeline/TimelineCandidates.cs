@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,10 +9,10 @@ namespace NBC.ActionEditor
     public static class TimelineCandidates
     {
         public static float ClampMoveDelta(float requested, IEnumerable<float> starts) => Mathf.Max(requested, -starts.Min());
-        public static bool Valid(IEnumerable<Clip> clips) => clips.All(clip => clip == null || clip.CanValidTime());
-        public static float[] References(IEnumerable<Clip> clips, IEnumerable<Clip> selected, float length, float playhead, bool seedsFirst)
+        public static bool Valid(IEnumerable<TimelineClip> clips) => clips.All(clip => clip == null || clip.CanValidTime());
+        public static float[] References(IEnumerable<TimelineClip> clips, IEnumerable<TimelineClip> selected, float length, float playhead, bool seedsFirst)
         {
-            var excluded = new HashSet<Clip>(selected);
+            var excluded = new HashSet<TimelineClip>(selected);
             var edges = clips.Where(clip => !excluded.Contains(clip)).SelectMany(clip => new[] { clip.StartTime, clip.EndTime });
             var seeds = new[] { 0f, length, playhead };
             return (seedsFirst ? seeds.Concat(edges) : edges.Concat(seeds)).Distinct().ToArray();

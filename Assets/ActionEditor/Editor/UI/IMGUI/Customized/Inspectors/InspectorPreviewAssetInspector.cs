@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using NBC.ActionEditor.Domain;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
@@ -11,7 +12,7 @@ namespace NBC.ActionEditor
     {
         private bool _optionsAssetFold = true;
 
-        private static Asset _lastAsset;
+        private static ActionDocument _lastAsset;
         private static bool _willResample;
 
         private static Dictionary<IData, InspectorsBase> directableEditors =

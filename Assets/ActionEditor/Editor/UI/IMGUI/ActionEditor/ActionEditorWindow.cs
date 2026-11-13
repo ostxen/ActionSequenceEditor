@@ -2,12 +2,14 @@
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Presentation.Timeline;
 
 namespace NBC.ActionEditor
 {
     public class ActionEditorWindow : EditorWindow
     {
         public ActionEditorContext Context => App.Context;
+        public TimelineWorkspace Workspace { get; } = new TimelineWorkspace();
         [MenuItem("NBC/Action Editor/Open Action Editor", false, 0)]
         public static void OpenDirectorWindow()
         {
@@ -28,6 +30,7 @@ namespace NBC.ActionEditor
             this.ReleaseViews();
             Lan.Load();
             Styles.Load();
+            Workspace.LeftWidth = Styles.TimelineLeftWidth;
             Prefs.InitializeAssetTypes();
             App.OnInitialize?.Invoke();
             //停止播放
@@ -49,6 +52,8 @@ namespace NBC.ActionEditor
         #region Lifecycle
         void OnEnable()
         {
+            Gesture.Workspace = Workspace;
+            Workspace.Bind(Context.Document);
             ActionEditorHost.Window = this;
             App.Views.Attach(this, Repaint, OnDocumentChanged);
             EditorSceneManager.sceneSaving -= OnWillSaveScene;
@@ -85,7 +90,7 @@ namespace NBC.ActionEditor
             }
         }
 
-        private void OnDocumentChanged() { hasUnsavedChanges = Context.Session.IsDirty; App.Refresh(); Repaint(); }
+        private void OnDocumentChanged() { Workspace.Bind(Context.Document); hasUnsavedChanges = Context.Session.IsDirty; App.Refresh(); Repaint(); }
 
         void OnGUI()
         {

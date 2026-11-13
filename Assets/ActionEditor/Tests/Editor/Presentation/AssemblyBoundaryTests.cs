@@ -9,6 +9,19 @@ namespace NBC.ActionEditor.Tests.Presentation
 {
     public sealed class AssemblyBoundaryTests
     {
+        [Test] public void DomainAndSerializationKeepOneWayRuntimeDependencies()
+        {
+            var domain = typeof(NBC.ActionEditor.Domain.ActionDocument).Assembly;
+            var serialization = typeof(NBC.ActionEditor.Serialization.ActionDocumentJsonFormat).Assembly;
+            Assert.That(domain.GetName().Name, Is.EqualTo("NBC.ActionEditor.Domain"));
+            Assert.That(serialization.GetName().Name, Is.EqualTo("NBC.ActionEditor.Serialization"));
+            foreach (var assembly in new[] { domain, serialization })
+                Assert.That(assembly.GetReferencedAssemblies().Where(reference => reference.Name.StartsWith("UnityEditor", StringComparison.Ordinal)
+                    || reference.Name == "FullSerializer" || reference.Name == "NBC.ActionEditor.Editor"), Is.Empty);
+            Assert.That(domain.GetReferencedAssemblies().Any(reference => reference.Name == serialization.GetName().Name), Is.False);
+            Assert.That(serialization.GetReferencedAssemblies().Any(reference => reference.Name == domain.GetName().Name), Is.True);
+        }
+
         [Test] public void ApplicationAndPresentationReferencesExcludeEditorAndControls()
         {
             var application = typeof(SettingsSession).Assembly;
