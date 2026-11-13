@@ -4,6 +4,14 @@ A02 定案，2026-11-09。实施进度仅记录在[唯一任务清单](../.codex
 
 ## 当前产品入口与阅读范围（2026-11-12）
 
+本轮交互补充覆盖下方RF10的历史“左端固定”：两UI在时间区及标尺滚轮缩放时，以鼠标所在时间为锚点向两侧展开/收缩，保留原缩放步长及偏好作用域，最小跨度0.25秒。为保持锚点，视域左端允许为负；片段时间仍不得为负。
+
+两UI拖动轨道标题支持上半行前插、下半行后插、跨组及脱离所有组。组标题接收为首条，最左20px外侧或所有行下方空白接收为根级；根级轨道显示在所有组之后，可独立排序，不是隐藏分组。锁定/挂载/Unique约束在释放时重验，拖动不修改片段参数，一次释放对应一次Undo；Esc取消，视口外释放不移动。
+
+当前v1结构新增唯一可省略成员`Asset.rootTracks`：省略明确表示空列表，不采用业务构造器预置轨道；空列表编码时省略，非空时完整编码。显式null拒绝，其余成员仍必须存在。该附加成员没有版本回退、类型别名或旧裸根迁移。根级Track的Parent为null、Root仍为文档，组/根集合共享所有权校验；根级Unique限根列表，重新入组仍须符合Attachable。根轨道参与派生时长、预览、快照、保存/导出、Recovery与Undo。
+
+UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目录时间轴、属性视图与设置弹窗分别为`UIToolkitTimelineCanvas`、`UIToolkitPropertyView`、`UIToolkitPreferencesWindow`。去掉历史Json前缀仅区分界面职责，不改变存储格式或菜单；下方历史记录中的旧类型名按对应日期理解。
+
 `NBC > Action Editor > Open Action Editor`（IMGUI）和`Open Workbench`（UI Toolkit）共用唯一会话及float业务图。入门只看[功能体验样例教程](../Assets/ActionEditor/Samples/LegacyExperience/README.md)，不按下方历史实验方案创建`.asset`文档。当前生产格式为本文件RF16节的`actioneditor.json` v1封套，Runtime严格转换器已替代旧任意Json入口，无旧裸根回退、迁移或双写；FullSerializer仅保留相关忽略标记等依赖，不再决定生产读写规则。
 
 创建、两UI保存/SaveChanges、自动保存、另存均由`DocumentCreationService`/`JsonDocumentSession`进入同一个`JsonDocumentStore.Commit → ReliableFileCommit`，字节提交后推进来源与基线，再导入。独立导出由`DocumentExportService`使用同一格式目录与隔离快照，仅写新目标，不切来源、不清脏。新建/另存/导出拒绝已有目标及meta，保存检查外部磁盘版本；导入失败明确字节已提交，不重放。保存图标右键提供保存、另存为、导出；实际格式选项只有`JSON (.json)`。

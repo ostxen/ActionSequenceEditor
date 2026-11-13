@@ -156,6 +156,50 @@ namespace NBC.ActionEditor.Validation
             return new { status = "passed", count = Moves.Length, moves = before, createdFolders = folders,
                 guidAndBytesPreserved = true, projectsRegenerated = true };
         }
+        [CliGroupCommand("actioneditor.validation", "Rename only the four reviewed UI Toolkit scripts; preserve GUID and bytes and regenerate Unity projects. No user document writes or overwrite.")]
+        public static object RenameToolkitUi(
+            [CliArg("confirm", "Apply the reviewed UI naming manifest.")] bool confirm = false,
+            [CliArg("dry-run", "Read-only exact naming preview.")] bool dryRun = false)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+                throw new InvalidOperationException("Requires ready EditMode.");
+            var moves = new[] {
+                new Move("Editor/UI/UIToolkit/JsonActionWorkbench.cs", "Editor/UI/UIToolkit/UIToolkitActionEditorWindow.cs", "bd2bd6eded8ebf14687952b313d079d9"),
+                new Move("Editor/UI/UIToolkit/JsonTimelineCanvas.cs", "Editor/UI/UIToolkit/UIToolkitTimelineCanvas.cs", "f7548d331bc116c4ba695eb4b55bdf0f"),
+                new Move("Editor/UI/UIToolkit/JsonPropertyView.cs", "Editor/UI/UIToolkit/UIToolkitPropertyView.cs", "947256fa11135cc43b04ba402a1f03c9"),
+                new Move("Editor/UI/UIToolkit/JsonPreferencesWindow.cs", "Editor/UI/UIToolkit/UIToolkitPreferencesWindow.cs", "69c0eced166ee5a45ad033187ae1070e"),
+            };
+            foreach (var move in moves)
+            {
+                if (!File.Exists(move.source) || !File.Exists(move.source + ".meta")
+                    || AssetDatabase.AssetPathToGUID(move.source) != move.guid)
+                    throw new IOException("Source identity changed: " + move.source);
+                if (File.Exists(move.destination) || Directory.Exists(move.destination) || File.Exists(move.destination + ".meta"))
+                    throw new IOException("Destination exists: " + move.destination);
+                var error = AssetDatabase.ValidateMoveAsset(move.source, move.destination);
+                if (!string.IsNullOrEmpty(error)) throw new IOException(move.source + ": " + error);
+            }
+            var before = moves.Select(m => new { m.source, m.destination, m.guid, sha256 = Hash(m.source), metaSha256 = Hash(m.source + ".meta") }).ToArray();
+            if (dryRun) return new { count = moves.Length, moves = before, overwrite = false, touchesUserDocuments = false };
+            if (!confirm) throw new InvalidOperationException("Preview and explicit approval required.");
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                foreach (var move in moves)
+                {
+                    var error = AssetDatabase.MoveAsset(move.source, move.destination);
+                    if (!string.IsNullOrEmpty(error)) throw new IOException(move.source + ": " + error);
+                }
+            }
+            finally { AssetDatabase.StopAssetEditing(); }
+            foreach (var item in before)
+                if (File.Exists(item.source) || File.Exists(item.source + ".meta")
+                    || AssetDatabase.AssetPathToGUID(item.destination) != item.guid
+                    || Hash(item.destination) != item.sha256 || Hash(item.destination + ".meta") != item.metaSha256)
+                    throw new IOException("Post-move identity/byte verification failed: " + item.destination);
+            Unity.CodeEditor.CodeEditor.CurrentEditor.SyncAll();
+            return new { status = "passed", count = moves.Length, guidAndBytesPreserved = true, projectsRegenerated = true, moves = before };
+        }
         private static string[] MissingFolders(string folder)
         {
             if (AssetDatabase.IsValidFolder(folder)) return Array.Empty<string>();

@@ -7,11 +7,11 @@ using UnityEngine.UIElements;
 
 namespace NBC.ActionEditor.Workbench
 {
-    public sealed class JsonPreferencesWindow : EditorWindow
+    public sealed class UIToolkitPreferencesWindow : EditorWindow
     {
         public static void ShowFor(EditorWindow owner)
         {
-            var window = CreateInstance<JsonPreferencesWindow>();
+            var window = CreateInstance<UIToolkitPreferencesWindow>();
             window.ShowAsDropDown(new Rect(owner.position.xMax - 405, owner.position.y + 20, 400, 5), new Vector2(400, 310));
         }
 

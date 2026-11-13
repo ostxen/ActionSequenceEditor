@@ -28,12 +28,12 @@ namespace NBC.ActionEditor.Validation
             {
                 focusedType = focused == null ? null : focused.GetType().FullName,
                 windows = Resources.FindObjectsOfTypeAll<EditorWindow>()
-                    .Where(w => w is ActionEditorWindow || w is ActionWorkbench || w is JsonActionWorkbench)
+                    .Where(w => w is ActionEditorWindow || w is ActionWorkbench || w is UIToolkitActionEditorWindow)
                     .Select(w => new
                     {
                         type = w.GetType().FullName, title = w.titleContent.text, focused = w == focused,
                         width = w.position.width, height = w.position.height,
-                        nativeTimeline = w.rootVisualElement.Q<TimelineCanvas>() != null || w.rootVisualElement.Q<JsonTimelineCanvas>() != null,
+                        nativeTimeline = w.rootVisualElement.Q<TimelineCanvas>() != null || w.rootVisualElement.Q<UIToolkitTimelineCanvas>() != null,
                         legacyView = w is ActionEditorWindow ? (App.AssetData == null ? "welcome" : "timeline") : null
                     }).ToArray(),
                 menuBindings = TypeCache.GetMethodsWithAttribute<MenuItem>()

@@ -37,7 +37,8 @@ namespace NBC.ActionEditor
         {
         }
 
-        [fsIgnore] public IDirector Root => Parent?.Root;
+        private IDirector root;
+        [fsIgnore] public IDirector Root => Parent?.Root ?? root;
         [fsIgnore] public IDirectable Parent { get; private set; }
 
         [fsIgnore] public Group Group => Parent as Group;
@@ -60,7 +61,7 @@ namespace NBC.ActionEditor
 
         public virtual bool IsActive
         {
-            get => Parent != null && Parent.IsActive && active;
+            get => (Parent == null || Parent.IsActive) && active;
             set
             {
                 if (active != value)
@@ -73,7 +74,7 @@ namespace NBC.ActionEditor
 
         public virtual bool IsLocked
         {
-            get => Parent != null && (Parent.IsLocked || isLocked);
+            get => isLocked || Parent?.IsLocked == true;
             set => isLocked = value;
         }
 
@@ -90,7 +91,7 @@ namespace NBC.ActionEditor
 
         public virtual float EndTime
         {
-            get => Parent?.EndTime ?? 0;
+            get => Parent?.EndTime ?? Root?.Length ?? 0;
             set { }
         }
 
@@ -116,6 +117,7 @@ namespace NBC.ActionEditor
 
         public void Validate(IDirector root, IDirectable parent)
         {
+            this.root = root;
             // Debug.Log($"设置轨道的父节点==={parent}");
             Parent = parent;
             OnAfterValidate();

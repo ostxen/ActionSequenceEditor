@@ -59,7 +59,7 @@ namespace NBC.ActionEditor.Tests
             public bool Original;
             private Editor inspector;
             private InspectorPreviewAsset preview;
-            public void Initialize(JsonActionWorkbench owner)
+            public void Initialize(UIToolkitActionEditorWindow owner)
             {
                 if (!Original) rootVisualElement.Add(owner.CreatePropertyView());
                 else { preview = CreateInstance<InspectorPreviewAsset>(); inspector = Editor.CreateEditor(preview); }
@@ -320,7 +320,7 @@ namespace NBC.ActionEditor.Tests
         }
         [UnityTest] public IEnumerator NativeTextFocusDoesNotRunTimelineShortcutsAndWheelCancelsOwnedDrag()
         {
-            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             try
             {
                 window.Show(); window.position = new Rect(50, 50, 1000, 600); yield return null; yield return null;
@@ -499,7 +499,7 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator BothWindowOpenOrdersShareContextAndRebuildWithoutRegistrationLeaks()
         {
             var count = App.Views.Count; var previousWindow = ActionEditorHost.Window;
-            ActionEditorWindow original = null; JsonActionWorkbench native = null;
+            ActionEditorWindow original = null; UIToolkitActionEditorWindow native = null;
             var alternate = new TextAsset(JsonDocumentSession.Encode(new LegacyExperienceAsset { Version = 7 }));
             try
             {
@@ -507,13 +507,13 @@ namespace NBC.ActionEditor.Tests
                 {
                     if (nativeFirst)
                     {
-                        native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show();
+                        native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>(); native.Show();
                         original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
                     }
                     else
                     {
                         original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
-                        native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show();
+                        native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>(); native.Show();
                     }
                     yield return null; yield return null;
                     Assert.That(App.Views.Count, Is.EqualTo(count + 2));
@@ -522,7 +522,7 @@ namespace NBC.ActionEditor.Tests
                     native.CreateGUI(); native.CreateGUI();
                     Assert.That(App.Views.Count, Is.EqualTo(count + 2));
                     const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
-                    typeof(JsonActionWorkbench).GetMethod("OnEnable", flags).Invoke(native, null);
+                    typeof(UIToolkitActionEditorWindow).GetMethod("OnEnable", flags).Invoke(native, null);
                     typeof(ActionEditorWindow).GetMethod("OnEnable", flags).Invoke(original, null);
                     Assert.That(App.Views.Count, Is.EqualTo(count + 2), "Repeated enable must replace registrations rather than duplicate them.");
                     native.Select(App.AssetData.groups[0].Tracks[0].Clips[0]);
@@ -549,7 +549,7 @@ namespace NBC.ActionEditor.Tests
         {
             var previousWindow = ActionEditorHost.Window;
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
-            var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             try
             {
                 original.Show(); native.Show(); yield return null; yield return null;
@@ -584,7 +584,7 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator ClosingOriginalStopsSharedPlaybackAndReopeningDoesNotResume()
         {
             var previousWindow = ActionEditorHost.Window;
-            var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
             var stops = 0;
             CallbackFunction stopped = () => stops++;
@@ -793,14 +793,14 @@ namespace NBC.ActionEditor.Tests
             var fields = typeof(Lan).GetFields(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public).Where(f => f.FieldType == typeof(string)).ToArray();
             var previousTerms = fields.Select(f => f.GetValue(null)).ToArray();
             var previousHost = ActionEditorHost.Window;
-            ActionEditorWindow original = null; JsonActionWorkbench native = null;
+            ActionEditorWindow original = null; UIToolkitActionEditorWindow native = null;
             try
             {
                 foreach (var language in new[] { typeof(LanCHS), typeof(LanEN) })
                 {
                     App.TextAsset = null;
                     original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
-                    native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show();
+                    native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>(); native.Show();
                     foreach (var field in fields)
                     {
                         var translated = language.GetField(field.Name);
@@ -834,7 +834,7 @@ namespace NBC.ActionEditor.Tests
         {
             var previousRequest = App.SavePathRequested;
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
-            var native = ScriptableObject.CreateInstance<NBC.ActionEditor.Workbench.JsonActionWorkbench>();
+            var native = ScriptableObject.CreateInstance<NBC.ActionEditor.Workbench.UIToolkitActionEditorWindow>();
             var requests = 0;
             try
             {
@@ -945,7 +945,7 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator ToolkitUsesSameGraphNativeInspectorAndOriginalGeometry()
         {
             var oldWindow = ActionEditorHost.Window;
-            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             try
             {
                 window.position = new Rect(50, 50, 1000, 600); window.Show();
@@ -994,7 +994,7 @@ namespace NBC.ActionEditor.Tests
             var previousWindow = ActionEditorHost.Window;
             var previousScroll = Styles.TimelineScrollPos;
             var originalWindow = ScriptableObject.CreateInstance<ActionEditorWindow>();
-            JsonActionWorkbench nativeWindow = null;
+            UIToolkitActionEditorWindow nativeWindow = null;
             var baseline = new InteractionBaseline
             {
                 CapturedUtc = DateTime.UtcNow.ToString("O"), UnityVersion = Application.unityVersion,
@@ -1014,8 +1014,10 @@ namespace NBC.ActionEditor.Tests
                 var point = new Vector2(Styles.TimelineLeftTotalWidth + 100, 100);
                 originalWindow.SendEvent(new Event { type = EventType.ScrollWheel, mousePosition = point, delta = new Vector2(0, 120) });
                 baseline.OriginalWheelMax = App.AssetData.ViewTimeMax;
-                Assert.That(baseline.OriginalWheelMax, Is.EqualTo(9.575f).Within(.001f), "RF10 uses the user-selected Toolkit225 step, preserving the left boundary.");
-                Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1));
+                var originalFraction = 100 / (1000 - Styles.TimelineLeftTotalWidth);
+                Assert.That(baseline.OriginalWheelMax, Is.EqualTo(9.575f - 1.575f * originalFraction).Within(.001f));
+                Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1 - 1.575f * originalFraction).Within(.001f));
+                Assert.That(App.AssetData.ViewTimeMin + App.AssetData.ViewTime * originalFraction, Is.EqualTo(1 + 7 * originalFraction).Within(.001f), "Hovered time must remain fixed.");
                 App.AssetData.ViewTimeMax = 8; App.AssetData.ViewTimeMin = 1;
                 originalWindow.SendEvent(new Event { type = EventType.MouseDown, mousePosition = point, button = 2 });
                 originalWindow.SendEvent(new Event { type = EventType.MouseDrag, mousePosition = point + new Vector2(20, 0), button = 2 });
@@ -1024,7 +1026,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(baseline.OriginalPanMin, Is.EqualTo(1 - 20 * 7 / (1000 - Styles.TimelineLeftTotalWidth)).Within(.002f));
                 Assert.That(App.AssetData.ViewTime, Is.EqualTo(7).Within(.001f));
 
-                nativeWindow = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+                nativeWindow = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
                 nativeWindow.Show(); nativeWindow.position = new Rect(60, 60, 1000, 600);
                 nativeWindow.Focus(); yield return null; yield return null;
                 baseline.NativeMinSize = nativeWindow.minSize;
@@ -1035,8 +1037,9 @@ namespace NBC.ActionEditor.Tests
                     mousePosition = canvas.LocalToWorld(point), delta = new Vector2(0, 120) }))
                 { wheel.target = canvas; canvas.SendEvent(wheel); }
                 baseline.NativeWheelMax = App.AssetData.ViewTimeMax;
-                Assert.That(baseline.NativeWheelMax, Is.EqualTo(Prefs.scrollWheelZooms ? 9.575f : 8).Within(.001f), "Both views use the selected225 increment; native keeps its preference scope.");
-                Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(1));
+                var nativeFraction = 100 / (1000 - canvas.Left);
+                Assert.That(baseline.NativeWheelMax, Is.EqualTo(Prefs.scrollWheelZooms ? 9.575f - 1.575f * nativeFraction : 8).Within(.001f));
+                Assert.That(App.AssetData.ViewTimeMin, Is.EqualTo(Prefs.scrollWheelZooms ? 1 - 1.575f * nativeFraction : 1).Within(.001f));
                 App.AssetData.ViewTimeMax = 8; App.AssetData.ViewTimeMin = 1;
                 baseline.NativeScale = canvas.Scale;
                 Pointer(canvas, EventType.MouseDown, point, 2);
@@ -1068,7 +1071,7 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator NativeDragResizeCancelAndCaptureLossUseRealPointerEvents()
         {
-            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             try
             {
                 window.position = new Rect(50, 50, 1000, 600); window.Show(); yield return null; yield return null;
@@ -1086,7 +1089,7 @@ namespace NBC.ActionEditor.Tests
                 rect = canvas.ClipRect(item, 1); center = rect.center;
                 Pointer(canvas, EventType.MouseDown, center); Pointer(canvas, EventType.MouseDrag, center + new Vector2(30, 0));
                 yield return null;
-                var captured = (int)typeof(JsonTimelineCanvas).GetField("pointer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas);
+                var captured = (int)typeof(UIToolkitTimelineCanvas).GetField("pointer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas);
                 Assert.That(captured, Is.GreaterThanOrEqualTo(0));
                 Assert.That(App.Session.IsEditing, Is.True, "An open original window must not commit the native drag during repaint.");
                 canvas.ReleasePointer(captured);
@@ -1106,11 +1109,11 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator InactiveOriginalLifecycleDoesNotCancelNativeOwnedDrag()
         {
             var previousWindow = ActionEditorHost.Window;
-            ActionEditorWindow original = null; JsonActionWorkbench native = null;
+            ActionEditorWindow original = null; UIToolkitActionEditorWindow native = null;
             try
             {
                 original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
-                native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show();
+                native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>(); native.Show();
                 native.position = new Rect(50, 50, 1000, 600); native.Focus();
                 yield return null; yield return null;
                 var item = App.AssetData.groups[0].Tracks[0].Clips[0];
@@ -1169,7 +1172,7 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator NativeWrongButtonReleaseAndLostFocusRespectGestureOwnership()
         {
-            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             try
             {
                 window.Show(); window.position = new Rect(50, 50, 1000, 600);
@@ -1181,7 +1184,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(App.Session.IsEditing, Is.True, "The left drag must be active before the unrelated release.");
                 Pointer(canvas, EventType.MouseUp, down, button: 1);
                 Assert.That(App.Session.IsEditing, Is.True, "A right-button release cannot commit a left-button drag.");
-                typeof(JsonActionWorkbench).GetMethod("OnLostFocus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(window, null);
+                typeof(UIToolkitActionEditorWindow).GetMethod("OnLostFocus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(window, null);
                 Assert.That(App.Session.IsEditing, Is.False);
                 Assert.That(App.AssetData.groups[0].Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
                 item = App.AssetData.groups[0].Tracks[0].Clips[0]; down = canvas.ClipRect(item, 1).center;
@@ -1210,18 +1213,18 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator InactiveNativeCancellationDoesNotTouchOriginalWindowToken()
         {
             var previousWindow = ActionEditorHost.Window;
-            ActionEditorWindow original = null; JsonActionWorkbench native = null;
+            ActionEditorWindow original = null; UIToolkitActionEditorWindow native = null;
             const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             try
             {
                 original = ScriptableObject.CreateInstance<ActionEditorWindow>(); original.Show();
-                native = ScriptableObject.CreateInstance<JsonActionWorkbench>(); native.Show();
+                native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>(); native.Show();
                 yield return null; yield return null;
                 var token = App.Session.BeginEdit(original);
                 typeof(ActionEditorWindow).GetField("guiEdit", flags).SetValue(original, token);
                 ((LegacyExperienceAsset)App.AssetData).Version = 17;
                 native.Canvas.Cancel();
-                typeof(JsonActionWorkbench).GetMethod("OnLostFocus", flags).Invoke(native, null);
+                typeof(UIToolkitActionEditorWindow).GetMethod("OnLostFocus", flags).Invoke(native, null);
                 Assert.That(token.IsActive, Is.True);
                 Assert.That(((LegacyExperienceAsset)App.AssetData).Version, Is.EqualTo(17));
                 typeof(ActionEditorWindow).GetMethod("OnLostFocus", flags).Invoke(original, null);
@@ -1276,7 +1279,7 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator NativeMultiClipDragGuidesMatchBoundsSnappingAndGestureLifetime()
         {
-            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             try
             {
                 window.Show(); window.position = new Rect(50, 50, 1000, 600); yield return null; yield return null;
@@ -1329,7 +1332,7 @@ namespace NBC.ActionEditor.Tests
                     }
                     else
                     {
-                        var captured = (int)typeof(JsonTimelineCanvas).GetField("pointer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas);
+                        var captured = (int)typeof(UIToolkitTimelineCanvas).GetField("pointer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas);
                         canvas.ReleasePointer(captured); Pointer(canvas, EventType.MouseDrag, edge); yield return null;
                     }
                     yield return null;
@@ -1345,7 +1348,7 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator NativeClipEdgesShowResizeCursorAndClearItOutsideEditableEdges()
         {
-            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             try
             {
                 window.Show(); window.position = new Rect(50, 50, 1000, 600); yield return null; yield return null;
@@ -1394,17 +1397,17 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator RulerContinuousSeekAndEscapeRestoreTime()
         {
-            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             try
             {
                 window.position = new Rect(50, 50, 1000, 600); window.Show(); yield return null; yield return null;
                 var root = window.rootVisualElement; var canvas = window.Canvas;
                 window.Seek(.5f);
                 Pointer(root, EventType.MouseDown, new Vector2(canvas.X(1), 30));
-                Assert.That(typeof(JsonTimelineCanvas).GetField("mode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas).ToString(), Is.EqualTo("Seek"), "ruler down mode");
+                Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas).ToString(), Is.EqualTo("Seek"), "ruler down mode");
                 Pointer(root, EventType.MouseDrag, new Vector2(canvas.X(2), 30));
-                Assert.That(typeof(JsonTimelineCanvas).GetField("mode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas).ToString(), Is.EqualTo("Seek"), "ruler move mode");
-                Assert.That((float)typeof(JsonTimelineCanvas).GetField("seekBefore", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas), Is.EqualTo(.5f), "ruler snapshot");
+                Assert.That(typeof(UIToolkitTimelineCanvas).GetField("mode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas).ToString(), Is.EqualTo("Seek"), "ruler move mode");
+                Assert.That((float)typeof(UIToolkitTimelineCanvas).GetField("seekBefore", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(canvas), Is.EqualTo(.5f), "ruler snapshot");
                 Assert.That(AssetPlayer.Inst.CurrentTime, Is.EqualTo(2).Within(.051));
                 var receivedKey = false;
                 root.RegisterCallback<KeyDownEvent>(_ => receivedKey = true, TrickleDown.TrickleDown);
@@ -1421,7 +1424,7 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator SharedLayoutEvidenceCapturesBothOwnedWindows()
         {
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
-            var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             var previousWindow = ActionEditorHost.Window;
             var previousLeft = Styles.TimelineLeftWidth; var previousScroll = Styles.TimelineScrollPos;
             try
@@ -1473,9 +1476,9 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator OriginalInspectorWelcomeAndSettingsHaveNativeCounterparts()
         {
-            var original = ScriptableObject.CreateInstance<ActionEditorWindow>(); var native = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var original = ScriptableObject.CreateInstance<ActionEditorWindow>(); var native = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             var originalProperty = ScriptableObject.CreateInstance<PropertyEvidenceWindow>(); originalProperty.Original = true;
-            var nativeProperty = ScriptableObject.CreateInstance<PropertyEvidenceWindow>(); var preferences = ScriptableObject.CreateInstance<JsonPreferencesWindow>();
+            var nativeProperty = ScriptableObject.CreateInstance<PropertyEvidenceWindow>(); var preferences = ScriptableObject.CreateInstance<UIToolkitPreferencesWindow>();
             var previousWindow = ActionEditorHost.Window;
             try
             {

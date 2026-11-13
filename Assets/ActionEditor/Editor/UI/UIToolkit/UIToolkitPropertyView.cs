@@ -11,18 +11,18 @@ using Object = UnityEngine.Object;
 
 namespace NBC.ActionEditor.Workbench
 {
-    public sealed class JsonInspectorTarget : ScriptableObject
+    public sealed class UIToolkitInspectorTarget : ScriptableObject
     {
-        [NonSerialized] public JsonActionWorkbench Owner;
+        [NonSerialized] public UIToolkitActionEditorWindow Owner;
     }
 
-    [CustomEditor(typeof(JsonInspectorTarget))]
-    public sealed class JsonSelectionInspector : Editor
+    [CustomEditor(typeof(UIToolkitInspectorTarget))]
+    public sealed class UIToolkitSelectionInspector : Editor
     {
-        public override VisualElement CreateInspectorGUI() => ((JsonInspectorTarget)target).Owner?.CreatePropertyView() ?? new Label("窗口已关闭");
+        public override VisualElement CreateInspectorGUI() => ((UIToolkitInspectorTarget)target).Owner?.CreatePropertyView() ?? new Label("窗口已关闭");
     }
 
-    public static class JsonPropertyView
+    public static class UIToolkitPropertyView
     {
         public static void Populate(VisualElement root, object value, Action refresh)
         {

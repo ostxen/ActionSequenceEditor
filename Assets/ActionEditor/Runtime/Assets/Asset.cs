@@ -10,6 +10,8 @@ namespace NBC.ActionEditor
     public abstract class Asset : IDirector
     {
         [HideInInspector] public List<Group> groups = new();
+        [HideInInspector] public List<Track> rootTracks = new();
+        [fsIgnore] public IEnumerable<Track> AllTracks => groups.SelectMany(group => group.Tracks).Concat(rootTracks);
         [SerializeField] private float length = 5f;
         [SerializeField] private float viewTimeMin;
         [SerializeField] private float viewTimeMax = 5f;
@@ -73,16 +75,11 @@ namespace NBC.ActionEditor
         public void UpdateMaxTime()
         {
             var t = 0f;
-            foreach (var group in groups)
+            foreach (var track in AllTracks)
             {
-                if (!group.IsActive) continue;
-                foreach (var track in group.Tracks)
-                {
-                    if (!track.IsActive) continue;
-                    foreach (var clip in track.Clips)
-                        if (clip.EndTime > t)
-                            t = clip.EndTime;
-                }
+                if (!track.IsActive) continue;
+                foreach (var clip in track.Clips)
+                    if (clip.EndTime > t) t = clip.EndTime;
             }
 
             Length = t;
@@ -134,6 +131,13 @@ namespace NBC.ActionEditor
                         }
                     }
                 }
+            }
+
+            foreach (var track in rootTracks.AsEnumerable().Reverse())
+            {
+                directables.Add(track); track.Validate(this, null);
+                foreach (var clip in track.Clips)
+                { directables.Add(clip); clip.Validate(this, track); }
             }
 
             if (directables != null)

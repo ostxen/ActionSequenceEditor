@@ -16,6 +16,7 @@ namespace NBC.ActionEditor.Serialization
         {
             Require(document != null, "$.document", "missing document.");
             Require(document.groups != null, "$.groups", "null structural collection.");
+            Require(document.rootTracks != null, "$.rootTracks", "null structural collection.");
             var seen = new HashSet<object>(DocumentValueConverter.ReferenceComparer.Instance) { document };
             foreach (var group in document.groups)
             {
@@ -23,25 +24,27 @@ namespace NBC.ActionEditor.Serialization
                 ParentType(group.GetType(), document.GetType(), "$.groups");
                 Unique(group, document.groups.Cast<object>(), "$.groups");
                 Require(group.Tracks != null, "$.groups.tracks", "null structural collection.");
-                foreach (var track in group.Tracks)
-                {
-                    Require(track != null && seen.Add(track), "$.groups.tracks", "null/shared track.");
-                    ParentType(track.GetType(), group.GetType(), "$.groups.tracks");
-                    Unique(track, group.Tracks.Cast<object>(), "$.groups.tracks");
-                    Require(track.Clips != null, "$.groups.tracks.actionClips", "null structural collection.");
-                    foreach (var clip in track.Clips)
-                    {
-                        const string path = "$.groups.tracks.actionClips";
-                        Require(clip != null && seen.Add(clip), path, "null/shared clip.");
-                        ParentType(clip.GetType(), track.GetType(), path);
-                        Unique(clip, track.Clips.Cast<object>(), path);
-                        var storedLength = (float)StoredClipLength.GetValue(clip);
-                        Require(Finite(storedLength) && storedLength >= 0, path + ".length", "invalid stored duration.");
-                        Require(Finite(clip.StartTime) && clip.StartTime >= 0 && Finite(clip.Length) && clip.Length >= 0
-                            && Finite(clip.EndTime) && Finite(clip.BlendIn) && Finite(clip.BlendOut), path, "invalid clip timing.");
-                        if (clip is ClipSignal) Require(clip.Length == 0, path, "point effective duration must be zero.");
-                    }
-                }
+                foreach (var track in group.Tracks) ValidateTrack(track, group.Tracks, group.GetType(), "$.groups.tracks", seen);
+            }
+            foreach (var track in document.rootTracks) ValidateTrack(track, document.rootTracks, null, "$.rootTracks", seen);
+        }
+        private static void ValidateTrack(Track track, IEnumerable<Track> siblings, Type parent, string path, HashSet<object> seen)
+        {
+            Require(track != null && seen.Add(track), path, "null/shared track.");
+            if (parent != null) ParentType(track.GetType(), parent, path);
+            Unique(track, siblings.Cast<object>(), path);
+            var clipsPath = path + ".actionClips";
+            Require(track.Clips != null, clipsPath, "null structural collection.");
+            foreach (var clip in track.Clips)
+            {
+                Require(clip != null && seen.Add(clip), clipsPath, "null/shared clip.");
+                ParentType(clip.GetType(), track.GetType(), clipsPath);
+                Unique(clip, track.Clips.Cast<object>(), clipsPath);
+                var storedLength = (float)StoredClipLength.GetValue(clip);
+                Require(Finite(storedLength) && storedLength >= 0, clipsPath + ".length", "invalid stored duration.");
+                Require(Finite(clip.StartTime) && clip.StartTime >= 0 && Finite(clip.Length) && clip.Length >= 0
+                    && Finite(clip.EndTime) && Finite(clip.BlendIn) && Finite(clip.BlendOut), clipsPath, "invalid clip timing.");
+                if (clip is ClipSignal) Require(clip.Length == 0, clipsPath, "point effective duration must be zero.");
             }
         }
         public static void Initialize(Asset document, DocumentFormatContext context)

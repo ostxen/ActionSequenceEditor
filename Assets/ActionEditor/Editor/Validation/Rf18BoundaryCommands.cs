@@ -163,7 +163,7 @@ namespace NBC.ActionEditor.Validation
             const string root = "Assets/ActionEditorValidationRF22";
             if (Directory.Exists(root) || File.Exists(root) || File.Exists(root + ".meta")) throw new IOException("Fixture exists, refusing overwrite.");
             if (App.Session.IsEditing || App.IsPlay || Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Length != 0
-                || Resources.FindObjectsOfTypeAll<JsonActionWorkbench>().Length != 0 || Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Length != 0
+                || Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>().Length != 0 || Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Length != 0
                 || Resources.FindObjectsOfTypeAll<Samples.LegacyExperiencePreview>().Length != 0)
                 throw new InvalidOperationException("Requires no active edit/playback or existing product/preview/export windows; never reuse user windows.");
             if (dryRun) return new { root, targets = new[] { root + "/IMGUI.json", root + "/IMGUI-Export.json", root + "/Toolkit.json", root + "/Toolkit-Export.json" },
@@ -172,7 +172,7 @@ namespace NBC.ActionEditor.Validation
             if (!confirm) throw new InvalidOperationException("Preview and explicit approval required.");
             var recovery = App.Session.CaptureRecovery(); var previous = App.TextAsset; var previousHost = ActionEditorHost.Window;
             var previousWidth = ActionEditorHost.Width; var owns = false;
-            ActionEditorWindow original = null; JsonActionWorkbench native = null; Samples.LegacyExperiencePreview preview = null; DocumentExportWindow export = null;
+            ActionEditorWindow original = null; UIToolkitActionEditorWindow native = null; Samples.LegacyExperiencePreview preview = null; DocumentExportWindow export = null;
             var results = new System.Collections.Generic.List<object>();
             try
             {
@@ -181,7 +181,7 @@ namespace NBC.ActionEditor.Validation
                 foreach (var toolkit in new[] { false, true })
                 {
                     App.TextAsset = null;
-                    if (toolkit) { JsonActionWorkbench.Open(); native = Resources.FindObjectsOfTypeAll<JsonActionWorkbench>().Single(); native.position = new Rect(60, 60, 1000, 600); }
+                    if (toolkit) { UIToolkitActionEditorWindow.Open(); native = Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>().Single(); native.position = new Rect(60, 60, 1000, 600); }
                     else { ActionEditorWindow.OpenDirectorWindow(); original = Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Single(); original.position = new Rect(60, 60, 1000, 600); }
                     await TutorialFrames();
                     var path = root + (toolkit ? "/Toolkit.json" : "/IMGUI.json");
@@ -189,7 +189,7 @@ namespace NBC.ActionEditor.Validation
                     await TutorialFrames();
                     if (App.Session.Path != path || App.AssetData.groups.Count != 3 || App.AssetData.groups.Sum(g => g.Tracks.Count) != 7
                         || App.AssetData.groups.SelectMany(g => g.Tracks).Sum(t => t.Clips.Count) != 13 || App.Session.IsDirty
-                        || (toolkit ? Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Length != 0 : Resources.FindObjectsOfTypeAll<JsonActionWorkbench>().Length != 0))
+                        || (toolkit ? Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Length != 0 : Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>().Length != 0))
                         throw new InvalidOperationException("Preset graph or originating view differs.");
                     var clip = App.AssetData.groups[0].Tracks[0].Clips[0]; App.SelectWithoutInspector(clip);
                     if (toolkit)
@@ -236,7 +236,7 @@ namespace NBC.ActionEditor.Validation
                     var expected = JsonDocumentCodec.Content(App.AssetData); var bytes = File.ReadAllBytes(path);
                     if (toolkit) { native.Close(); native = null; } else { original.Close(); original = null; }
                     App.TextAsset = null;
-                    if (toolkit) { JsonActionWorkbench.Open(); native = Resources.FindObjectsOfTypeAll<JsonActionWorkbench>().Single(); }
+                    if (toolkit) { UIToolkitActionEditorWindow.Open(); native = Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>().Single(); }
                     else { ActionEditorWindow.OpenDirectorWindow(); original = Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Single(); }
                     ActionEditorHost.OnObjectPickerConfig(AssetDatabase.LoadAssetAtPath<TextAsset>(path)); await TutorialFrames();
                     if (App.Session.Path != path || App.Session.IsDirty || JsonDocumentCodec.Content(App.AssetData) != expected) throw new InvalidOperationException("Reopened source differs.");

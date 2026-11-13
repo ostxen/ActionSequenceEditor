@@ -95,7 +95,9 @@ namespace NBC.ActionEditor
             if ((e.rawType == EventType.MouseUp && e.button == 2) ||
                 (e.rawType == EventType.KeyDown && e.keyCode == KeyCode.Escape))
                 CancelNavigation();
-            if (!_pointerRect.Contains(e.mousePosition)) return;
+            var zoomRect = new Rect(_pointerRect.x, Styles.PlayControlHeight / 2, _pointerRect.width,
+                _pointerRect.yMax - Styles.PlayControlHeight / 2);
+            if (!(e.type == EventType.ScrollWheel ? zoomRect : _pointerRect).Contains(e.mousePosition)) return;
 
             // var ev = Event.current;
             // if (ev.button == 2)
@@ -121,7 +123,8 @@ namespace NBC.ActionEditor
 
             if (e.type == EventType.ScrollWheel)
             {
-                asset.ViewTimeMax = TimelineNavigation.ZoomMaximum(asset.ViewTimeMin, asset.ViewTimeMax, e.delta.y, Position.width, true);
+                TimelineNavigation.SetRange(asset, TimelineNavigation.ZoomAt(asset.ViewTimeMin, asset.ViewTimeMax,
+                    e.delta.y, Position.width, (e.mousePosition.x - _pointerRect.x) / Mathf.Max(1, _pointerRect.width), true));
 
                 Window.Repaint();
 

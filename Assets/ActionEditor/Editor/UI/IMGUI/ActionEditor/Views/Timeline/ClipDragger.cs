@@ -41,6 +41,9 @@ namespace NBC.ActionEditor
         private readonly object editOwner = new object();
         private bool bypassMagnet;
         public IDirectable MoveToItem { get; private set; }
+        public bool MoveBefore { get; private set; }
+        public TrackDropTarget TrackDrop { get; private set; }
+        private Track movingTrack;
 
         public ItemDragType DragType
         {
@@ -69,14 +72,7 @@ namespace NBC.ActionEditor
             _tracks.Clear();
             var assets = App.AssetData;
             if (assets == null) return;
-            foreach (var group in assets.groups)
-            {
-                _tracks.Add(group);
-                foreach (var track in group.Tracks)
-                {
-                    _tracks.Add(track);
-                }
-            }
+            _tracks.AddRange(TimelineGeometry.VisibleRows(assets));
         }
 
         #endregion
@@ -244,7 +240,7 @@ namespace NBC.ActionEditor
         {
             var token = edit; edit = null;
             _dragType = ItemDragType.None; DragItems.Clear(); _dragBeginStartTime.Clear();
-            NowDragClips.Clear(); DragOffsetDictionary.Clear(); MoveToItem = null;
+            NowDragClips.Clear(); DragOffsetDictionary.Clear(); MoveToItem = null; movingTrack = null; TrackDrop = default;
             token?.Cancel();
         }
 
@@ -415,6 +411,8 @@ namespace NBC.ActionEditor
 
         private void OnBeginDragTrack(PointerEventData eventData)
         {
+            movingTrack = App.FistSelect as Track;
+            TrackDrop = default;
             DragType = ItemDragType.Track;
         }
 
@@ -428,82 +426,19 @@ namespace NBC.ActionEditor
             CheckMoveToTrack(eventData, true);
         }
 
-        private void CheckMoveToTrack(PointerEventData eventDat, bool confirm = false)
+        private void CheckMoveToTrack(PointerEventData eventData, bool confirm = false)
         {
-            if (App.FistSelect is not Track targetTrack) return;
-            var trackItem = TimelineMiddleView.GetItem(eventDat.MousePosition);
-
-            if (trackItem != null)
-            {
-                var halfY = trackItem.Position.y + trackItem.Position.height * 0.5f;
-                if (eventDat.MousePosition.y < halfY)
-                {
-                    trackItem = TimelineMiddleView.GetItem(new Vector2(eventDat.MousePosition.x,
-                        eventDat.MousePosition.y - Styles.LineHeight * 0.45f));
-                }
-            }
-
-            if (trackItem == null)
-            {
-                var last = TimelineMiddleView.GetLastItem();
-                if (last != null && eventDat.MousePosition.y > last.Position.y)
-                {
-                    trackItem = last;
-                }
-            }
-
-
-            if (trackItem != null)
-            {
-                if (targetTrack == trackItem.Data) return;
-                // if(trackItem.Data == )
-                var old = MoveToItem;
-                MoveToItem = trackItem.Data;
-                if (old != trackItem.Data)
-                {
-                    App.Repaint();
-                }
-
-                if (confirm)
-                {
-                    if (trackItem.Data is Group group)
-                    {
-                        NBC.ActionEditor.Storage.JsonEditCommands.MoveTrack(targetTrack, group, 0);
-                    }
-                    else if (trackItem.Data is Track track)
-                    {
-                        var index = track.Group.GetTrackIndex(track);
-                        if (track.Group == targetTrack.Group)
-                        {
-                            var selfIndex = targetTrack.Group.GetTrackIndex(targetTrack);
-                            if (selfIndex < index)
-                            {
-                                index = track.Group.GetTrackIndex(track);
-                            }
-                            else
-                            {
-                                index += 1;
-                            }
-                        }
-                        else
-                        {
-                            index += 1;
-                        }
-
-                        NBC.ActionEditor.Storage.JsonEditCommands.MoveTrack(targetTrack, track.Group, index);
-                    }
-
-                    App.Refresh();
-                }
-
-
-                // Debug.LogError($"当前所在track位置={trackItem.Data.Name}");
-            }
-
-            if (confirm)
-            {
-                MoveToItem = null;
-            }
+            var track = movingTrack;
+            if (track == null) return;
+            var drop = TimelineMiddleView.TrackDrop(track, eventData.MousePosition);
+            TrackDrop = drop;
+            var allowed = drop.IsValid && JsonEditCommands.Reorder(track, drop.Group, drop.Index).CanExecute(out _);
+            MoveToItem = allowed ? drop.Row : null; MoveBefore = drop.Before;
+            App.Repaint();
+            if (!confirm) return;
+            if (allowed) { JsonEditCommands.MoveTrack(track, drop.Group, drop.Index); App.Refresh(); }
+            MoveToItem = null;
+            movingTrack = null;
         }
 
         #endregion

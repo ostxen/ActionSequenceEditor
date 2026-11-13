@@ -45,6 +45,14 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void RelocatedStylesAndExtensionAdaptersKeepTheirResourceAndTypeBindings()
         {
+            const string ui = "Assets/ActionEditor/Editor/UI/UIToolkit/";
+            Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID(ui + nameof(UIToolkitActionEditorWindow) + ".cs"), Is.EqualTo("bd2bd6eded8ebf14687952b313d079d9"));
+            Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID(ui + nameof(UIToolkitTimelineCanvas) + ".cs"), Is.EqualTo("f7548d331bc116c4ba695eb4b55bdf0f"));
+            Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID(ui + nameof(UIToolkitPropertyView) + ".cs"), Is.EqualTo("947256fa11135cc43b04ba402a1f03c9"));
+            Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID(ui + nameof(UIToolkitPreferencesWindow) + ".cs"), Is.EqualTo("69c0eced166ee5a45ad033187ae1070e"));
+            Assert.That(UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEditor.MonoScript>(ui + nameof(UIToolkitActionEditorWindow) + ".cs").GetClass(), Is.EqualTo(typeof(UIToolkitActionEditorWindow)));
+            Assert.That(UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEditor.MonoScript>(ui + nameof(UIToolkitPreferencesWindow) + ".cs").GetClass(), Is.EqualTo(typeof(UIToolkitPreferencesWindow)));
+            Assert.That(UnityEditor.AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/ActionEditor/Editor/Workbench/JsonTimelineCanvas.uss"), Is.Not.Null);
             Assert.That(Resources.Load<GUISkin>("nbc/StyleSheet"), Is.Not.Null);
             Assert.That(Styles.WhiteTexture, Is.Not.Null);
             Assert.That(Styles.PlayIcon, Is.Not.Null);
@@ -90,7 +98,7 @@ namespace NBC.ActionEditor.Tests
             Assert.That(marker.CanScale() || marker.CanBlendIn(), Is.False);
             Assert.That(new DisabledBlend().CanBlendIn(), Is.False);
             Assert.That(EditorCustomFactory.GetInspector(clip), Is.TypeOf<ActionClipInspector>());
-            var root = new VisualElement(); JsonPropertyView.Populate(root, clip, () => { });
+            var root = new VisualElement(); UIToolkitPropertyView.Populate(root, clip, () => { });
             Assert.That(root.Q("json-clip-timing"), Is.Not.Null);
         }
         [Test] public void ParentAndUniqueConstraintsRemainExactAndInstanceAware()

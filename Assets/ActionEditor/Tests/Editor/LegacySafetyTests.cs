@@ -92,29 +92,29 @@ namespace NBC.ActionEditor.Tests
         public void LegacyAndWorkbenchMenusOpenSeparateWindowTypesWithoutChangingDocuments()
         {
             var oldWindows = Resources.FindObjectsOfTypeAll<ActionEditorWindow>();
-            var workbenches = Resources.FindObjectsOfTypeAll<JsonActionWorkbench>();
+            var workbenches = Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>();
             var document = App.AssetData;
             var target = App.TextAsset;
             try
             {
                 Assert.DoesNotThrow(ActionEditorWindow.OpenDirectorWindow);
                 Assert.That(Resources.FindObjectsOfTypeAll<ActionEditorWindow>(), Is.Not.Empty);
-                Assert.That(Resources.FindObjectsOfTypeAll<JsonActionWorkbench>(), Is.EquivalentTo(workbenches));
+                Assert.That(Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>(), Is.EquivalentTo(workbenches));
                 var legacy = Resources.FindObjectsOfTypeAll<ActionEditorWindow>().First();
                 Assert.That(typeof(ActionEditorWindow).GetField("_timelineView", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(legacy), Is.TypeOf<TimelineView>());
                 Assert.That(typeof(ActionEditorWindow).GetField("_welcomeView", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(legacy), Is.TypeOf<WelcomeView>());
-                Assert.DoesNotThrow(JsonActionWorkbench.Open);
-                Assert.That(Resources.FindObjectsOfTypeAll<JsonActionWorkbench>(), Is.Not.Empty);
+                Assert.DoesNotThrow(UIToolkitActionEditorWindow.Open);
+                Assert.That(Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>(), Is.Not.Empty);
                 Assert.That(App.AssetData, Is.SameAs(document));
                 Assert.That(App.TextAsset, Is.SameAs(target));
-                foreach (var window in Resources.FindObjectsOfTypeAll<JsonActionWorkbench>()) Assert.That(window.Document, Is.SameAs(document));
+                foreach (var window in Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>()) Assert.That(window.Document, Is.SameAs(document));
                 Assert.DoesNotThrow(() => App.SaveAsset());
                 Assert.That(App.AssetData, Is.SameAs(document));
             }
             finally
             {
                 foreach (var window in Resources.FindObjectsOfTypeAll<ActionEditorWindow>().Except(oldWindows)) window.Close();
-                foreach (var window in Resources.FindObjectsOfTypeAll<JsonActionWorkbench>().Except(workbenches)) window.Close();
+                foreach (var window in Resources.FindObjectsOfTypeAll<UIToolkitActionEditorWindow>().Except(workbenches)) window.Close();
             }
         }
 

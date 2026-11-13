@@ -27,14 +27,10 @@ namespace NBC.ActionEditor
                     var start = new StartTimePointer(preview);
                     pointers.Add(start); starts.Add(start); pointers.Add(new EndTimePointer(preview));
                 }
-                foreach (var group in asset.groups.AsEnumerable().Reverse())
+                foreach (var track in asset.AllTracks.Reverse())
                 {
-                    if (!group.IsActive) continue;
-                    foreach (var track in group.Tracks.AsEnumerable().Reverse())
-                    {
-                        if (!track.IsActive) continue;
-                        Add(track); foreach (var clip in track.Clips) Add(clip);
-                    }
+                    if (!track.IsActive) continue;
+                    Add(track); foreach (var clip in track.Clips) Add(clip);
                 }
                 pointers = pointers.OrderBy(pointer => pointer.time).ToList(); IsInitialized = true;
             }

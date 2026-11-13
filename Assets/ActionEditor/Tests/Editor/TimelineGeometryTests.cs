@@ -7,6 +7,38 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class TimelineGeometryTests
     {
+        [TestCase(0f)] [TestCase(.25f)] [TestCase(.75f)] [TestCase(1f)]
+        public void ZoomKeepsHoveredTimeFixedAtEveryAnchorAndMinimumSpan(float fraction)
+        {
+            foreach (var wheel in new[] { -120f, 120f })
+            {
+                var range = TimelineNavigation.ZoomAt(1, 8, wheel, 1000, fraction, true);
+                Assert.That(Mathf.Lerp(range.x, range.y, fraction), Is.EqualTo(1 + 7 * fraction).Within(.00001f));
+                Assert.That(range.y - range.x, Is.EqualTo(wheel > 0 ? 8.575f : 5.425f).Within(.00001f));
+            }
+            var min = TimelineNavigation.ZoomAt(0, .25f, -1, 500, fraction, true);
+            Assert.That(min.y - min.x, Is.EqualTo(.25f));
+            Assert.That(TimelineNavigation.ZoomAt(1, 8, 1, 1000, fraction, false), Is.EqualTo(new Vector2(1, 8)));
+            var asset = new LegacyExperienceAsset();
+            TimelineNavigation.SetRange(asset, new Vector2(-1, 9));
+            Assert.That(asset.ViewTimeMin, Is.EqualTo(-1)); Assert.That(asset.ViewTimeMax, Is.EqualTo(9));
+        }
+
+        [Test] public void TrackDropResolvesBeforeAfterGroupAndRootFromScrolledCoordinates()
+        {
+            var asset = new LegacyExperienceAsset(); var moving = asset.groups[0].Tracks[1];
+            var before = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 31), 0, 1000, 600, 28);
+            var after = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 53), 0, 1000, 600, 28);
+            Assert.That(before.Group, Is.SameAs(asset.groups[0])); Assert.That(before.Index, Is.Zero);
+            Assert.That(after.Index, Is.EqualTo(1));
+            var scrolled = TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 3), 28, 1000, 600, 28);
+            Assert.That(scrolled.Index, Is.Zero); Assert.That(scrolled.Y, Is.Zero);
+            var root = TimelineGeometry.TrackDrop(asset, moving, new Vector2(5, 31), 0, 1000, 600, 28);
+            Assert.That(root.IsValid, Is.True); Assert.That(root.Group, Is.Null);
+            Assert.That(root.Y, Is.EqualTo(TimelineGeometry.VisibleRows(asset).Count * 28));
+            Assert.That(TimelineGeometry.TrackDrop(asset, moving, new Vector2(90, 601), 0, 1000, 600, 28).IsValid, Is.False);
+            Assert.That(TimelineGeometry.TrackDrop(asset, moving, new Vector2(-1, 31), 0, 1000, 600, 28).IsValid, Is.False);
+        }
         [TestCase(120, 9.575f)]
         [TestCase(1, 9.575f)]
         [TestCase(-120, 6.425f)]

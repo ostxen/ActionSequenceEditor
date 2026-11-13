@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using NBC.ActionEditor.Storage;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -10,12 +8,12 @@ using UnityEngine.UIElements;
 
 namespace NBC.ActionEditor.Workbench
 {
-    public sealed class JsonActionWorkbench : EditorWindow
+    public sealed class UIToolkitActionEditorWindow : EditorWindow
     {
         public const float HeaderHeight = 40, RowHeight = 28, BottomHeight = 16;
         public float LeftWidth = 240;
         public float ScrollY;
-        public JsonTimelineCanvas Canvas { get; private set; }
+        public UIToolkitTimelineCanvas Canvas { get; private set; }
         private VisualElement transport, toolbar, footer;
         private ToolbarButton documents;
         private VisualElement customHeader;
@@ -25,7 +23,7 @@ namespace NBC.ActionEditor.Workbench
         private MinMaxSlider range;
         private Scroller scroll;
         private Label error;
-        private JsonInspectorTarget target;
+        private UIToolkitInspectorTarget target;
         private readonly List<VisualElement> inspectors = new List<VisualElement>();
         private bool syncing;
         private bool scheduled;
@@ -35,7 +33,7 @@ namespace NBC.ActionEditor.Workbench
         public Asset Document => Context.Document;
 
         [MenuItem("NBC/Action Editor/Open Workbench", false, -10)]
-        public static void Open() => GetWindow<JsonActionWorkbench>().Show();
+        public static void Open() => GetWindow<UIToolkitActionEditorWindow>().Show();
         private void OnEnable()
         {
             Lan.Load();
@@ -43,7 +41,7 @@ namespace NBC.ActionEditor.Workbench
             LeftWidth = Styles.TimelineLeftWidth;
             titleContent = new GUIContent(Lan.Title + " · UI Toolkit"); minSize = new Vector2(500, 250);
             if (target != null) DestroyImmediate(target);
-            target = CreateInstance<JsonInspectorTarget>(); target.hideFlags = HideFlags.HideAndDontSave; target.Owner = this;
+            target = CreateInstance<UIToolkitInspectorTarget>(); target.hideFlags = HideFlags.HideAndDontSave; target.Owner = this;
             App.Views.Attach(this, Repaint, Refresh);
             EditorApplication.update -= Tick;
             EditorApplication.update += Tick;
@@ -111,10 +109,10 @@ namespace NBC.ActionEditor.Workbench
             magnet = new ToolbarToggle { name = "json-magnet", value = Prefs.MagnetSnapping, tooltip = Lan.OpenMagnetSnappingTips };
             magnet.style.width = 26; magnet.style.flexShrink = 0; magnet.Add(new Image { image = Styles.MagnetIcon, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore });
             magnet.RegisterValueChangedCallback(e => Prefs.MagnetSnapping = e.newValue); toolbar.Add(magnet);
-            IconButton("json-settings", Styles.SettingsIcon, Lan.OpenPreferencesTips, () => JsonPreferencesWindow.ShowFor(this));
+            IconButton("json-settings", Styles.SettingsIcon, Lan.OpenPreferencesTips, () => UIToolkitPreferencesWindow.ShowFor(this));
             right.Add(toolbar); var rulerSpace = new VisualElement(); rulerSpace.style.height = 20; right.Add(rulerSpace); head.Add(right); rootVisualElement.Add(head);
             var body = new VisualElement(); body.style.flexGrow = 1; body.style.minHeight = 0; body.style.flexDirection = FlexDirection.Row;
-            Canvas = new JsonTimelineCanvas(this); body.Add(Canvas);
+            Canvas = new UIToolkitTimelineCanvas(this); body.Add(Canvas);
             scroll = new Scroller(0, 0, value => { if (!syncing) { ScrollY = value; Canvas.SyncAddGroup(); Canvas.MarkDirtyRepaint(); } }, SliderDirection.Vertical);
             scroll.style.width = 14; scroll.style.flexShrink = 0; body.Add(scroll); rootVisualElement.Add(body);
             footer = new VisualElement { name = "json-footer" }; footer.style.height = BottomHeight; footer.style.flexShrink = 0; footer.style.flexDirection = FlexDirection.Row;
@@ -202,10 +200,10 @@ namespace NBC.ActionEditor.Workbench
             if (App.FistSelect == null) { root.Add(new HelpBox(Lan.NotSelectAsset, HelpBoxMessageType.Info)); return; }
             var basic = new Foldout { text = string.Format(Lan.InsBaseInfo, Prefs.GetAssetTypeName(Document.GetType())), value = true, viewDataKey = "json-basic-info" };
             basic.Q<Toggle>().style.fontSize = 18; basic.Q<Toggle>().style.unityFontStyleAndWeight = FontStyle.Bold; root.Add(basic);
-            JsonPropertyView.DrawFields(basic, Document, Refresh, 0);
+            UIToolkitPropertyView.DrawFields(basic, Document, Refresh, 0);
             basic.contentContainer.style.marginLeft = 0;
             foreach (var field in basic.Query<Label>().ToList().Where(l => l.ClassListContains("unity-base-field__label"))) field.style.minWidth = field.style.width = 150;
-            var panel = new VisualElement(); panel.style.marginTop = 4; root.Add(panel); JsonPropertyView.Populate(panel, App.FistSelect, Refresh);
+            var panel = new VisualElement(); panel.style.marginTop = 4; root.Add(panel); UIToolkitPropertyView.Populate(panel, App.FistSelect, Refresh);
             foreach (var field in panel.Query<Label>().ToList().Where(l => l.ClassListContains("unity-base-field__label"))) field.style.minWidth = field.style.width = 150;
             root.SetEnabled(!App.FistSelect.IsLocked);
         }

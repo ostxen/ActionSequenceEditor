@@ -35,7 +35,7 @@ namespace NBC.ActionEditor.Samples
             EditorGUILayout.LabelField(Lan.Playhead, time.ToString("0.00") + " / " + asset.Length.ToString("0.00") + " 秒");
             var draw = GUILayoutUtility.GetRect(100, 100, GUILayout.ExpandWidth(true));
             EditorGUI.DrawRect(draw, asset.Background);
-            var clips = asset.groups.Where(g => g.IsActive).SelectMany(g => g.Tracks).Where(t => t.IsActive).SelectMany(t => t.Clips).ToArray();
+            var clips = asset.AllTracks.Where(t => t.IsActive).SelectMany(t => t.Clips).ToArray();
             var active = clips.OfType<LegacyExperienceInterval>().Where(c => c.ShowInPreview && time >= c.StartTime && time < c.EndTime).ToArray();
             for (var i = 0; i < active.Length; i++)
             {

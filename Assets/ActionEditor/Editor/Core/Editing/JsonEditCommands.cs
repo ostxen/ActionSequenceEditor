@@ -69,14 +69,17 @@ namespace NBC.ActionEditor.Storage
             () => { foreach (var item in items.Distinct()) DeleteCore(item); });
         public static JsonEditCommand Reorder(Track track, Group target, int index) => new JsonEditCommand("Move track", () =>
         {
-            if (track == null || target == null || !Contains(track) || !Contains(target) || track.IsLocked || target.IsLocked) return "锁定或失效轨道/分组不能重排。";
-            if (track.Group != target && !target.CanAddTrackOfType(track.GetType())) return "此轨道类型不适用于目标分组。";
+            if (track == null || !Contains(track) || track.IsLocked || target != null && (!Contains(target) || target.IsLocked)) return "锁定或失效轨道/分组不能重排。";
+            if (track.Group != target && target != null && !target.CanAddTrackOfType(track.GetType())) return "此轨道类型不适用于目标分组。";
+            if (track.Group != target && target == null && DirectableTypeInfo.For(track.GetType()).IsUnique
+                && App.AssetData.rootTracks.Any(t => t != track && t.GetType() == track.GetType())) return "根级已存在唯一轨道。";
             return null;
         }, () =>
         {
-            var source = track.Group; var destination = index;
-            if (source == target && source.Tracks.IndexOf(track) < destination) destination--;
-            source.Tracks.Remove(track); target.Tracks.Insert(Mathf.Clamp(destination, 0, target.Tracks.Count), track);
+            var source = track.Group?.Tracks ?? App.AssetData.rootTracks;
+            var destinationList = target?.Tracks ?? App.AssetData.rootTracks; var destination = index;
+            if (source == destinationList && source.IndexOf(track) < destination) destination--;
+            source.Remove(track); destinationList.Insert(Mathf.Clamp(destination, 0, destinationList.Count), track);
         });
         public static bool HasClipboard => clipboard != null;
         public static Type CopiedType => copiedType;
@@ -93,9 +96,13 @@ namespace NBC.ActionEditor.Storage
         private static string PasteError(IDirectable parent, float time)
         {
             if (clipboard == null || copiedType == null) return "剪贴板为空。";
-            if (parent == null || !Contains(parent) || parent.IsLocked) return "粘贴目标已失效或锁定。";
+            if (App.AssetData == null) return "没有打开的文档。";
             if (float.IsNaN(time) || float.IsInfinity(time)) return "粘贴时间必须为有限值。";
             if (cutSource != null && Contains(cutSource) && cutSource.IsLocked) return "剪切源已锁定。";
+            if (parent == null && typeof(Track).IsAssignableFrom(copiedType))
+                return DirectableTypeInfo.For(copiedType).IsUnique && App.AssetData.rootTracks.Any(t => t.GetType() == copiedType && t != cutSource)
+                    ? "根级已存在唯一轨道。" : null;
+            if (parent == null || !Contains(parent) || parent.IsLocked) return "粘贴目标已失效或锁定。";
             if (cutSource == parent) return "不能把对象剪切到自身。";
             if (typeof(Track).IsAssignableFrom(copiedType) && parent is Group group)
                 return group.CanAddTrackOfType(copiedType) ? null : "轨道类型、唯一性或挂载规则不允许粘贴。";
@@ -118,6 +125,7 @@ namespace NBC.ActionEditor.Storage
                 if (clone == null) throw new InvalidOperationException("剪贴板反序列化失败。");
                 if (cutSource != null && Contains(cutSource)) DeleteCore(cutSource);
                 if (parent is Group group && clone is Track track) group.Tracks.Add(track);
+                else if (parent == null && clone is Track rootTrack) App.AssetData.rootTracks.Add(rootTrack);
                 else if (parent is Track target && clone is Clip clip) { clip.StartTime = Mathf.Max(0, time); target.Clips.Add(clip); }
                 App.AssetData.Init();
             }).Execute();
@@ -128,7 +136,7 @@ namespace NBC.ActionEditor.Storage
         {
             if (item == null || item.IsLocked) throw new InvalidOperationException("锁定对象不能删除。");
             if (item is Group group) App.AssetData.groups.Remove(group);
-            else if (item is Track track && track.Parent is Group parent) parent.Tracks.Remove(track);
+            else if (item is Track track) (track.Group?.Tracks ?? App.AssetData.rootTracks).Remove(track);
             else if (item is Clip clip && clip.Parent is Track owner) owner.Clips.Remove(clip);
         }
         public static void Duplicate(IDirectable item)

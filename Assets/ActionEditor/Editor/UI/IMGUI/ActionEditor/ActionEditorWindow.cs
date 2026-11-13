@@ -19,6 +19,7 @@ namespace NBC.ActionEditor
         public OriginalTimelineGesture Gesture { get; } = new OriginalTimelineGesture();
         private JsonEditTransaction guiEdit;
         internal JsonEditTransaction CurrentEdit => guiEdit;
+        internal Vector2 ContentOffset { get; private set; }
 
         #region Init
 
@@ -84,10 +85,11 @@ namespace NBC.ActionEditor
             }
         }
 
-        private void OnDocumentChanged() { hasUnsavedChanges = Context.Session.IsDirty; Repaint(); }
+        private void OnDocumentChanged() { hasUnsavedChanges = Context.Session.IsDirty; App.Refresh(); Repaint(); }
 
         void OnGUI()
         {
+            ContentOffset = GUIUtility.GUIToScreenPoint(Vector2.zero) - position.position;
             if (titleContent.text != Lan.Title) titleContent = new GUIContent(Lan.Title);
             if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
             {

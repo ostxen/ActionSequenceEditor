@@ -97,7 +97,7 @@ namespace NBC.ActionEditor.Tests
             var source = App.TextAsset; var recovery = App.Session.CaptureRecovery();
             var fixture = new TextAsset(Storage.JsonDocumentCodec.Encode(new LegacyExperienceAsset())); App.TextAsset = fixture;
             var original = ScriptableObject.CreateInstance<ActionEditorWindow>();
-            var native = ScriptableObject.CreateInstance<Workbench.JsonActionWorkbench>();
+            var native = ScriptableObject.CreateInstance<Workbench.UIToolkitActionEditorWindow>();
             try
             {
                 original.Show(); native.Show(); yield return null; yield return null;

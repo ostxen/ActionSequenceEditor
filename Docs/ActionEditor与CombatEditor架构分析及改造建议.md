@@ -11,6 +11,8 @@
 
 ### 当前产品补充（2026-11-12）
 
+UI命名补充：当前生产链为`UIToolkitActionEditorWindow → UIToolkitTimelineCanvas/UIToolkitPropertyView → App.Context`，设置弹窗为`UIToolkitPreferencesWindow`。四个脚本保留GUID，只移除界面类型的历史Json前缀；命名空间、菜单、共享会话及格式不变。下方RF16/RF17等历史命名及移动清单不追溯改写。
+
 使用入口与操作链只在[功能体验样例教程](../Assets/ActionEditor/Samples/LegacyExperience/README.md)维护。`Open Action Editor`是IMGUI，`Open Workbench`是原生UI Toolkit，两者仍共用单文档/选择/播放头/Undo。产品动作词由现有中文/英文Lan目录统一；业务类型完整身份不随显示名称改变。
 
 RF19–RF22后的实际接线：`DocumentCreationService.Create`与`JsonDocumentSession.Save`共用`JsonDocumentStore.Commit`及`ReliableFileCommit`，严格校验/隔离快照/完整读回后提交，先推进基线再导入；UI创建弹窗仅采集、确认及调用`CreateAndOpen`返回发起界面。两UI保存图标、Ctrl+S/SaveChanges及自动保存经App同一入口；保存图标右键的导出打开共享`DocumentExportWindow`，`DocumentExportService`只写独立新目标，格式目录只注册真实JSON实现。无旧格式回退、第二套创建/导出序列化管线或多文档层。

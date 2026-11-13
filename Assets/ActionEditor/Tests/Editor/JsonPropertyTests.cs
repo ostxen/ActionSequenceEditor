@@ -100,12 +100,12 @@ namespace NBC.ActionEditor.Tests
         }
         [UnityTest] public IEnumerator NativeFieldsUseSharedDescriptionsAndWriteNestedValueTypes()
         {
-            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             try
             {
                 window.Show(); yield return null;
                 var root = new VisualElement(); window.rootVisualElement.Add(root); var value = new Fields();
-                void Refresh() { root.Clear(); JsonPropertyView.DrawFields(root, value, Refresh, 0); }
+                void Refresh() { root.Clear(); UIToolkitPropertyView.DrawFields(root, value, Refresh, 0); }
                 Refresh();
                 var popup = root.Q<PopupField<string>>(); Assert.That(popup.value, Is.EqualTo("First")); popup.index = 1;
                 Assert.That(value.Mode, Is.EqualTo(20));
@@ -119,13 +119,13 @@ namespace NBC.ActionEditor.Tests
         }
         [UnityTest] public IEnumerator NativeDelayedInputKeepsIntermediateTextUntilReturnAndEscapeCancels()
         {
-            var window = ScriptableObject.CreateInstance<JsonActionWorkbench>();
+            var window = ScriptableObject.CreateInstance<UIToolkitActionEditorWindow>();
             try
             {
                 window.Show(); window.Focus(); yield return null; yield return null;
                 var root = new VisualElement(); window.rootVisualElement.Add(root);
                 var clip = (LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0];
-                JsonPropertyView.DrawFields(root, clip, () => { }, 0);
+                UIToolkitPropertyView.DrawFields(root, clip, () => { }, 0);
                 var field = root.Query<IntegerField>().ToList().Single(f => f.label == "次数");
                 Assert.That(field.isDelayed, Is.True);
                 yield return null; yield return null;
@@ -147,7 +147,7 @@ namespace NBC.ActionEditor.Tests
                 Undo.PerformUndo(); yield return null;
                 Assert.That(((LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0]).Count, Is.EqualTo(3));
                 root.Clear(); clip = (LegacyExperienceInterval)App.AssetData.groups[0].Tracks[0].Clips[0];
-                JsonPropertyView.DrawFields(root, clip, () => { }, 0);
+                UIToolkitPropertyView.DrawFields(root, clip, () => { }, 0);
                 field = root.Query<IntegerField>().ToList().Single(f => f.label == "次数");
                 yield return null; input = field.Q("unity-text-input").Q<TextElement>(); input.Focus(); yield return null;
                 Key(KeyCode.A, control: true); Key(KeyCode.Alpha5, '5');

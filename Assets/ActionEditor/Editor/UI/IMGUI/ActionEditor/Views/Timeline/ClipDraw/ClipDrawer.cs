@@ -76,13 +76,7 @@ namespace NBC.ActionEditor
             List<Clip> clips = new List<Clip>();
             var asset = App.AssetData;
             if (asset == null) return;
-            foreach (var group in asset.groups)
-            {
-                foreach (var track in group.Tracks)
-                {
-                    clips.AddRange(track.Clips);
-                }
-            }
+            foreach (var track in asset.AllTracks) clips.AddRange(track.Clips);
 
             List<Clip> invalidClips = _clipDraws.Keys.Where(clip => !clips.Contains(clip)).ToList();
             foreach (var clip in invalidClips)

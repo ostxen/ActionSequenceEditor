@@ -43,7 +43,7 @@ namespace NBC.ActionEditor
             if (Data == ((ActionEditorWindow)Window).Gesture.MoveToItem)
             {
                 GUI.color = Color.white.WithAlpha(0.5f);
-                GUI.DrawTexture(new Rect(Position.x, Position.y + Position.height - 2, Styles.TimelineLeftWidth, 2),
+                GUI.DrawTexture(new Rect(Position.x, ((ActionEditorWindow)Window).Gesture.MoveBefore ? Position.y : Position.y + Position.height - 2, Styles.TimelineLeftWidth, 2),
                     Styles.WhiteTexture);
                 GUI.color = Color.white;
             }
@@ -376,10 +376,7 @@ namespace NBC.ActionEditor
                 if (EditorUtility.DisplayDialog(Lan.TrackDelete, Lan.TrackDeleteTips, Lan.TipsConfirm,
                         Lan.TipsCancel))
                 {
-                    if (track.Parent is Group g)
-                    {
-                        JsonEditCommands.Delete(track);
-                    }
+                    JsonEditCommands.Delete(track);
                 }
             }
 

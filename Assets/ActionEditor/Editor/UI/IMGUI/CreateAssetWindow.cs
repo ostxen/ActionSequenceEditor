@@ -20,7 +20,7 @@ namespace NBC.ActionEditor
         {
             var rect = new Rect(20, 25, 440, 240);
             _myRect = rect;
-            PopupWindow.Show(new Rect(rect.x, rect.y, 0, 0), new CreateAssetWindow { nativeOwner = EditorWindow.focusedWindow is NBC.ActionEditor.Workbench.JsonActionWorkbench });
+            PopupWindow.Show(new Rect(rect.x, rect.y, 0, 0), new CreateAssetWindow { nativeOwner = EditorWindow.focusedWindow is NBC.ActionEditor.Workbench.UIToolkitActionEditorWindow });
         }
 
         public override Vector2 GetWindowSize()

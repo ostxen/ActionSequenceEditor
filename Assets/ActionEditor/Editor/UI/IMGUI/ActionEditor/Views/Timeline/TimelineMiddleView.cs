@@ -15,6 +15,9 @@ namespace NBC.ActionEditor
         #region Static
 
         private static readonly List<TimelineTrackItemView> _itemViews = new List<TimelineTrackItemView>();
+        private static Rect viewport;
+        public static TrackDropTarget TrackDrop(Track track, Vector2 point) => TimelineGeometry.TrackDrop(
+            App.AssetData, track, point - viewport.position, Styles.TimelineScrollPos.y, viewport.width, viewport.height, Styles.LineHeight + Styles.Space);
 
         public static TimelineTrackItemView GetItem(Vector2 pos)
         {
@@ -51,9 +54,23 @@ namespace NBC.ActionEditor
 
         public override void OnDraw()
         {
+            viewport = Position;
             ClipDrawer.Reset();
             DrawList();
+            DrawTrackDrop();
             DrawMultiple();
+        }
+
+        private void DrawTrackDrop()
+        {
+            var gesture = ((ActionEditorWindow)Window).Gesture;
+            var drop = gesture.TrackDrop;
+            if (gesture.DragType != ItemDragType.Track || !drop.IsValid) return;
+            var color = gesture.MoveToItem != null ? new Color(.3f, .75f, 1) : Color.red;
+            var y = Mathf.Clamp(drop.Y, 2, Position.height - 2);
+            EditorGUI.DrawRect(new Rect(drop.Group == null ? 0 : 22, y, Styles.TimelineLeftWidth - 22, 2), color);
+            GUI.Label(new Rect(24, Mathf.Max(0, y - 20), Styles.TimelineLeftWidth - 24, 20),
+                gesture.MoveToItem == null ? "不能放置" : drop.Group == null ? "移到根级" : "加入组：" + drop.Group.Name);
         }
         
 

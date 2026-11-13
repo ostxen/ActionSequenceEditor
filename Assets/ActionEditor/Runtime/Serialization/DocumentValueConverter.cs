@@ -106,6 +106,7 @@ namespace NBC.ActionEditor.Serialization
                 if (Node(type) || type != declaration || declaration.IsAbstract || declaration.IsInterface) members.Add("$type", DocumentValue.String(DocumentFormatContext.Identity(type)));
                 foreach (var field in Fields(type))
                 {
+                    if (field.DeclaringType == typeof(Asset) && field.Name == "rootTracks" && ((Asset)value).rootTracks?.Count == 0) continue;
                     if (content && (field.DeclaringType == typeof(Asset) && (field.Name == "viewTimeMin" || field.Name == "viewTimeMax")
                         || field.DeclaringType == typeof(Group) && field.Name == "isCollapsed")) continue;
                     members.Add(field.Name, Capture(field.GetValue(value), field.FieldType, context, content, path + "." + field.Name, active));
@@ -235,13 +236,15 @@ namespace NBC.ActionEditor.Serialization
                 type = context.ResolveType(Scalar(tag, DocumentValue.ValueKind.String, path + ".$type"), declaration, path);
             }
             RequireBusinessType(type, context, path);
-            var members = Fields(type); Keys(value, members.Select(f => f.Name).Concat(tagged ? new[] { "$type" } : Array.Empty<string>()), path);
+            var members = Fields(type).Where(f => !(f.DeclaringType == typeof(Asset) && f.Name == "rootTracks" && !value.Members.ContainsKey(f.Name))).ToArray();
+            Keys(value, members.Select(f => f.Name).Concat(tagged ? new[] { "$type" } : Array.Empty<string>()), path);
             var memberPlans = members.Select(f => Prepare(value.Members[f.Name], f.FieldType, context, path + "." + f.Name)).ToArray();
             return () =>
             {
                 object result;
                 try { result = Activator.CreateInstance(type, true); }
                 catch { throw Error(path, "trusted constructor failed for " + DocumentFormatContext.Identity(type)); }
+                if (result is Asset asset && !value.Members.ContainsKey("rootTracks")) asset.rootTracks = new List<Track>();
                 for (var i = 0; i < members.Length; i++) members[i].SetValue(result, memberPlans[i]());
                 return result;
             };

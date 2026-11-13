@@ -25,11 +25,10 @@ namespace NBC.ActionEditor.Storage
             ActionDocumentGraph.RequireValid(source);
             var tree = DocumentValueConverter.Capture(source, typeof(Asset), context, true);
             var duration = 0f;
-            foreach (var group in source.groups)
-                if (group.IsActive)
-                    foreach (var track in group.Tracks)
-                        if ((bool)DocumentValueConverter.Fields(track.GetType()).Single(f => f.DeclaringType == typeof(Track) && f.Name == "active").GetValue(track))
-                            foreach (var clip in track.Clips) duration = Math.Max(duration, clip.EndTime);
+            foreach (var track in source.AllTracks)
+                if (track.Group == null || track.Group.IsActive)
+                    if ((bool)DocumentValueConverter.Fields(track.GetType()).Single(f => f.DeclaringType == typeof(Track) && f.Name == "active").GetValue(track))
+                        foreach (var clip in track.Clips) duration = Math.Max(duration, clip.EndTime);
             var members = tree.Members.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
             members["length"] = DocumentValueConverter.Capture(Math.Max(.1f, duration), typeof(float), context);
             return DocumentValue.Object(members).ContentKey();
