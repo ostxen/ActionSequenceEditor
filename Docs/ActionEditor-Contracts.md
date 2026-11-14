@@ -1,48 +1,43 @@
 # ActionEditor 时间、身份与扩展契约
 
-A02 定案，2026-11-09。实施进度仅记录在[唯一任务清单](../.codex/tasks/action-editor-refactor.md)。
+本文定义当前产品合同。实施状态、验证证据和待验范围仅记录在[唯一任务清单](../.codex/tasks/action-editor-refactor.md)；入门操作只维护在[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)。
 
-## 当前产品入口与阅读范围（2026-11-12）
+## 产品入口与状态归属
 
-本轮交互补充覆盖下方RF10的历史“左端固定”：两UI在时间区及标尺滚轮缩放时，以鼠标所在时间为锚点向两侧展开/收缩，保留原缩放步长及偏好作用域，最小跨度0.25秒。为保持锚点，视域左端允许为负；片段时间仍不得为负。
+菜单为 `NBC/Action Editor/IMGUI` 和 `NBC/Action Editor/UI Toolkit`，分别打开 `NBC.ActionEditor.Views.IMGUI.ActionEditorWindow` 与 `NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow`。两窗绑定同一作者会话、选择、剪贴板、播放头及Undo；每窗独立持有Presenter、工作区、焦点和捕获所有权。最后一个编辑窗口关闭时停止共享播放。
 
-两UI拖动轨道标题支持上半行前插、下半行后插、跨组及脱离所有组。组标题接收为首条，最左20px外侧或所有行下方空白接收为根级；根级轨道显示在所有组之后，可独立排序，不是隐藏分组。锁定/挂载/Unique约束在释放时重验，拖动不修改片段参数，一次释放对应一次Undo；Esc取消，视口外释放不移动。
+被动视图只绘制显示状态并上报意图。Application负责会话、事务和用例；Presentation负责Presenter、交互与几何；Infrastructure实现文件、Undo、时钟、偏好和AssetDatabase端口；Composition显式建立依赖并拥有Editor生命周期。Domain及Serialization不依赖UnityEditor，Application和Presentation不依赖具体视图。`ActionEditorHost`只作为组合根，不提供业务门面转发。
 
-当前v1结构新增唯一可省略成员`Asset.rootTracks`：省略明确表示空列表，不采用业务构造器预置轨道；空列表编码时省略，非空时完整编码。显式null拒绝，其余成员仍必须存在。该附加成员没有版本回退、类型别名或旧裸根迁移。根级Track的Parent为null、Root仍为文档，组/根集合共享所有权校验；根级Unique限根列表，重新入组仍须符合Attachable。根轨道参与派生时长、预览、快照、保存/导出、Recovery与Undo。
+组和独立轨道按 `ActionDocument.RootItems` 任意交错排列，组不嵌套；组持有轨道，轨道持有片段。结构拖动超过3px显示覆盖主体全宽的蓝/红插入线，不显示拖动文本。最左20px是独立根区，组移动携带完整子树，空组无折叠按钮但保留对齐占位。边缘24px按0–300px/s自动滚动。提交重验锁定、Attachable、Unique及版本，一次有效释放对应一步Undo，同位与相邻边界不产生空Undo。
 
-UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目录时间轴、属性视图与设置弹窗分别为`UIToolkitTimelineCanvas`、`UIToolkitPropertyView`、`UIToolkitPreferencesWindow`。去掉历史Json前缀仅区分界面职责，不改变存储格式或菜单；下方历史记录中的旧类型名按对应日期理解。
+两UI滚轮缩放以鼠标时间为锚点，最小跨度0.25秒、步进225；保持锚点时视域可为负，作者时间不得为负。中键平移保持跨度并在零点夹紧。片段最短可编辑区间0.01秒，点事件不可伸缩。Esc、失焦、捕获丢失及文档替换只取消本窗口拥有的操作。
 
-`NBC > Action Editor > Open Action Editor`（IMGUI）和`Open Workbench`（UI Toolkit）共用唯一会话及float业务图。入门只看[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)，不按下方历史实验方案创建`.asset`文档。当前生产格式为本文件RF16节的`actioneditor.json` v1封套，Runtime严格转换器已替代旧任意Json入口，无旧裸根回退、迁移或双写；FullSerializer仅保留相关忽略标记等依赖，不再决定生产读写规则。
+创建、保存、另存与自动保存进入 `DocumentLifecycle`，经同一 `JsonDocumentRepository` 和 `ReliableFileCommit` 完成快照、校验、完整读回及revision保护。字节提交后先推进来源与基线再导入，导入失败明确报告已提交，禁止自动重放。导出使用同一格式目录和隔离快照，只写独立新目标，不切来源、不清脏、不改变Undo、选择或播放。新建/另存/导出拒绝现存目标及meta，取消不写文件。
 
-创建、两UI保存/SaveChanges、自动保存、另存均由`DocumentCreationService`/`JsonDocumentSession`进入同一个`JsonDocumentStore.Commit → ReliableFileCommit`，字节提交后推进来源与基线，再导入。独立导出由`DocumentExportService`使用同一格式目录与隔离快照，仅写新目标，不切来源、不清脏。新建/另存/导出拒绝已有目标及meta，保存检查外部磁盘版本；导入失败明确字节已提交，不重放。保存图标右键提供保存、另存为、导出；实际格式选项只有`JSON (.json)`。
+## 唯一序列化契约
 
-下面“RF16定案”保留规格形成日期，其中未来时态不是当前任务状态；“R01–R10”及“A02”是对应日期的历史合同，旧格式/旧路径/未验证引用等描述不覆盖本节与RF16唯一契约。当前GUID/localFileId验证覆盖工程持久主/子资产的写盘、卸载、重新解析及失效/错类型拒绝，不宣称跨进程重启或任意外部引用已验。具体最终命令、数量、失败过程和人工待验仅见唯一任务清单，H01–H09不由自动化代签。
-
-## 当前唯一序列化契约（RF26 v2）
-
-本节是 RF18–RF20 的实现规格。RF18 已将 `JsonDocumentSession` 的转换与快照接入唯一新格式，旧裸根不再读取；创建/保存入口归一与导出分别按 RF19/RF20 验收，不因转换实现存在而宣称完整工作流已通过。开发期硬切覆盖旧 JSON 兼容要求；下文 R01–R10/A02 保留历史范围，`.asset`、稳定对象 ID、double 时间和独立窗口会话仍只是保留实验，不能套到当前产品。职责、逐文件移动清单及实际验证只记唯一任务清单。
-
+当前唯一可编辑和可导出格式为 `actioneditor.json` version 2。所有成员必需，完整类型身份精确匹配，禁止裸根回退、别名、迁移或双写。持久引用使用GUID/localFileId；有限float保存原始位，包含负零和次正规数。严格拒绝非有限数、错误图、失效引用和未知类型，失败候选不替换当前图。
 ### 最小边界与能力
 
-- Runtime `Serialization` 定义 `IActionDocumentFormat`：不可变 `Id`、`DisplayName`、`Extension`，独立的 `CanRead`、`CanWrite`、`CanExport`，以及 `Serialize(Asset, options, context) → byte[]` / `Deserialize(byte[], context) → Asset`。不支持的方向明确失败；不要求未来只写导出器实现可用的读回。失败抛有非空错误的异常，包含字段路径/类型身份但不包含作者字段值；禁止返回空字符串、空字节或 null 冒充成功。`options` 首期仅压缩/美化，编码为 UTF-8 无 BOM，context 只提供受控类型解析及 Unity 引用解析，不提供路径写入或会话操作。
+- Runtime `Serialization` 定义 `IActionDocumentFormat`：不可变 `Id`、`DisplayName`、`Extension`，独立的 `CanRead`、`CanWrite`、`CanExport`，以及 `Serialize(ActionDocument, options, context) → byte[]` / `Deserialize(byte[], context) → ActionDocument`。不支持的方向明确失败；不要求未来只写导出器实现可用的读回。失败抛有非空错误的异常，包含字段路径/类型身份但不包含作者字段值；禁止返回空字符串、空字节或 null 冒充成功。`options` 首期仅压缩/美化，编码为 UTF-8 无 BOM，context 只提供受控类型解析及 Unity 引用解析，不提供路径写入或会话操作。
 - 首个且唯一生产注册：`Id = actioneditor.json`，显示 `JSON (.json)`，扩展名 `.json`，读、写、导出均支持。Editor 格式目录显式注册实际实现，ID/扩展名冲突整体拒绝并列双方来源；创建/打开筛选 `CanRead && CanWrite`，导出筛选 `CanExport && CanWrite`，没有实现就不显示。文件扩展名选择候选，内容标识再次核实，大小写扩展名沿当前规则；不做旧格式探测或回退。
 - 格式实现只做数据转换。Editor `Serialization` 协调类型目录、图校验、隔离快照、作者内容比较与导出；`Storage` 负责路径、版本、`ReliableFileCommit` 和导入。Session 仍是唯一图、事务、Undo、Recovery 与保存基线的所有者。类型目录、磁盘格式、UI 各有职责，不新增第二份可编辑文档或万能注册框架。
 
 ### 唯一 JSON 结构与类型身份
 
-顶层仅为 `format`、`version`、`document`，分别固定为 `"actioneditor.json"`、整数 `2`、非空 Asset 节点。版本不同或缺失即拒绝，不读旧的裸根对象，不双写。版本号仅描述本契约，不表示对象稳定 ID。
+顶层仅为 `format`、`version`、`document`，分别固定为 `"actioneditor.json"`、整数 `2`、非空 ActionDocument 节点。版本不同或缺失即拒绝，不读旧的裸根对象，不双写。版本号仅描述本契约，不表示对象稳定 ID。
 
-`document` 及每个 Group/Track/Clip 使用 `$type` 加序列化字段。`$type` 为 **`Type.FullName + ", " + Assembly.GetName().Name`**，例如 `NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument, NBC.ActionEditor`，ordinal 精确匹配。它不是 Name/MenuName、短类名、路径或带版本的 AssemblyQualifiedName；程序集或命名空间改名是显式格式变更，不建设别名层。根节点仅允许 Group/Track，唯一 `rootItems` 保持任意交错顺序；Group 仅有 Track，Track 仅有 Clip，不允许组嵌套，也无第二份 groups/rootTracks 存储。集合保持顺序；不持久化父引用、`directables`、Actor 场景绑定、预览/选择/Undo/缓存、计算属性或委托。`ActorId` 是既有业务字段，不提升为持久 Unity 引用身份。
+`document` 及每个 Group/Track/Clip 使用 `$type` 加序列化字段。`$type` 为 **`Type.FullName + ", " + Assembly.GetName().Name`**，例如 `NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument, NBC.ActionEditor.Domain`，ordinal 精确匹配。它不是 Name/MenuName、短类名、路径或带版本的 AssemblyQualifiedName；程序集或命名空间改名是显式格式变更，不建设别名层。根节点仅允许 Group/Track，唯一 `rootItems` 保持任意交错顺序；Group 仅有 Track，Track 仅有 Clip，不允许组嵌套，也无第二份 groups/rootTracks 存储。集合保持顺序；不持久化父引用、`directables`、Actor 场景绑定、预览/选择/Undo/缓存、计算属性或委托。`ActorId` 是既有业务字段，不提升为持久 Unity 引用身份。
 
 序列化使用受控字段/类型策略，领域类型不依赖 FullSerializer：公共实例字段与 `[SerializeField]` 字段（含基类私有字段），排除 static、`[NonSerialized]`；不自动持久化属性。保留模型实际字段键，如 `rootItems`、`tracks`、`actionClips`、`startTime`、`length`、`blendIn`、`CrossBlendIn`。禁止框架元数据与业务字段重名、重复 JSON 键、未知字段静默丢弃、继承字段键冲突和 `$ref/$id` 对象图别名。序列化成员按 ordinal 名排序，数组/List 保持位置。所有契约成员必须存在，允许 null 的业务成员必须显式写 null；缺字段不使用样例构造器的预置数据补齐。
 
-类型解析先检查已加载、受信任的类型目录（不 `Assembly.Load` 用户输入），核实具体/非泛型/可序列化类型及预期 Asset/Group/Track/Clip 或声明业务字段的可赋值性。预检整份 token 树的类型、成员和引用，再构造候选；不能调用 `ReflectionTools.GetType` 的短名兜底或让 FullSerializer 自由解析 `$type`。业务类型由现有 Attribute/发现形成目录，不要求另填一套显示名称身份；测试类型只在显式测试 context 中允许，生产目录排除测试、验证和 Editor-only 定义。目录发现不执行构造器；反序列化只允许已核实类型，结构集合由输入完整替换而非追加构造器默认集合。业务构造/序列化回调仍是受信任代码，不宣称这是任意第三方代码沙箱。
+类型解析先检查已加载、受信任的类型目录（不 `Assembly.Load` 用户输入），核实具体/非泛型/可序列化类型及预期 ActionDocument/TimelineGroup/TimelineTrack/TimelineClip 或声明业务字段的可赋值性。预检整份 token 树的类型、成员和引用，再构造候选；不能调用 `ReflectionTools.GetType` 的短名兜底或让 FullSerializer 自由解析 `$type`。业务类型由现有 Attribute/发现形成目录，不要求另填一套显示名称身份；测试类型只在显式测试 context 中允许，生产目录排除测试、验证和 Editor-only 定义。目录发现不执行构造器；反序列化只允许已核实类型，结构集合由输入完整替换而非追加构造器默认集合。业务构造/序列化回调仍是受信任代码，不宣称这是任意第三方代码沙箱。
 
-嵌套的具体业务类/struct使用声明字段类型，声明为基类/接口而出现不同具体类型时也用同一受控`$type`；不允许任意object反序列化入口。剪贴板Group/Track/Clip片段由内部同一受控值转换器按预期节点类型捕获/还原，不强塞成Asset，也不另建磁盘文档格式；`IActionDocumentFormat`的公开文档入口仍只接受Asset。数组/List按声明元素类型递归，Dictionary及其他容器没有明确实现和用例时拒绝，不承诺任意.NET对象图可保存。
+嵌套的具体业务类/struct使用声明字段类型，声明为基类/接口而出现不同具体类型时也用同一受控`$type`；不允许任意object反序列化入口。剪贴板Group/Track/Clip片段由内部同一受控值转换器按预期节点类型捕获/还原，不强塞成Asset，也不另建磁盘文档格式；`IActionDocumentFormat`的公开文档入口仍只接受ActionDocument。数组/List按声明元素类型递归，Dictionary及其他容器没有明确实现和用例时拒绝，不承诺任意.NET对象图可保存。
 
 ### 值、Unity 引用、快照及比较
 
-- float 使用 JSON 数字，不固定小数位、不吸附、不转 decimal，沿现有 Single→double 数字输出的精度思路并实测打印器；读回必须恢复有限 Single 的原始位。**正零与负零均保留符号位**，输出负零须保留 `-0.0` 等可辨表示，内容比较也区分二者。NaN/Infinity（含嵌套业务字段）不能提交文档；数值溢出不夹紧。RF18 必须测极值、次正规数、固定种子随机位模式及压缩/美化，而不是把本节定案当作已通过。
+- float 使用 JSON 数字，不固定小数位、不吸附、不转 decimal，沿现有 Single→double 数字输出的精度思路并实测打印器；读回必须恢复有限 Single 的原始位。**正零与负零均保留符号位**，输出负零须保留 `-0.0` 等可辨表示，内容比较也区分二者。NaN/Infinity（含嵌套业务字段）不能提交文档；数值溢出不夹紧。验证覆盖极值、次正规数、固定种子随机位模式及压缩/美化，而不是把本节定案当作已通过。
 - null、空集合、数组/List 和嵌套业务对象分别保留。Vector2/3/4、Quaternion、Color 用其分量对象；AnimationCurve 保留全部 key 的时间、值、切线、权重、weightedMode 及前后 wrapMode，enum 保留整数并按声明类型校验；其他类型没有明确受控转换就报字段路径，不静默降级。字段的显示舍入不写回存储。
 - Unity Object 的非空持久表示唯一为 `{"$unity":{"guid":"32位小写资源GUID","localFileId":整数}}`，null 仍为 null；解析后必须验证对象存在且可赋给声明字段。支持当前工程持久主资产及子资产，不按名字/路径/GetInstanceID 恢复；场景对象、临时对象、失效引用、无 GUID 的内建对象拒绝，字符串资源路径继续只是字符串。Editor context 用 AssetDatabase 将引用与 GUID/localFileId 双向映射；Runtime 只注入解析器，不引用 UnityEditor，缺解析器遇非空引用必须报错。该引用标识不引入文档节点稳定 ID。
 - Editor 从当前图构造隔离快照，再在副本上执行既有序列化回调、派生时长重建与校验，不因保存/导出改变源图或视图。Undo/取消/Recovery 也走同一快照服务，仅携带作者图；视域、折叠、滚动与分栏由各窗口独立工作区持有，不进入文档或作者快照；Recovery 额外保存来源格式 ID/路径、保存快照、作者内容基线及磁盘 revision，不是第二种磁盘文档格式，不回退读取旧 Recovery。
@@ -51,7 +46,7 @@ UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目
 
 ### 完整最小样本与校验预期
 
-以下是**新契约样本**，不是从用户 JSON 复制，也不是当前产品可打开的资产。本轮仅作离线语法/结构检查；RF18 用真实实现逐字段/逐位读回，RF19 后才通过两个产品入口读写。为避免混入样例构造器的 3 组预置图，样本显式给出所有持久字段并用空组建立最小根，点/区间完整扩展由下列构造预期覆盖。
+以下两个完整样本是独立合同输入，回归测试直接读取本节并逐字段、逐位验证。空根样本不继承样例构造器的预置集合。
 
 ```json
 {
@@ -70,7 +65,7 @@ UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目
 }
 ```
 
-| 样本/变体 | 必须断言的预期（RF18 实现检查，不是本轮产品通过） |
+| 样本/变体 | 必须断言的预期 |
 |---|---|
 | 上述完整样本 | 根为 FeatureSampleDocument，0组而非构造器预置3组；Notes=null；length 位为 `0x3dcccccd`，不因显示0.1改变；范围[0,6]；工作区不在文档中 |
 | 按现有 FeatureSampleDocument 构造完整点/区间/循环样例后用新实现编码 | 3组、7轨、13片段；Marker零长度、Interval参数列表/Offset/Curve、Loop周期/速度逐字段相等；原样例业务类型身份不因产品文案改变 |
@@ -79,7 +74,7 @@ UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目
 | null组/轨/片段、重复节点、负/非有限时间、嵌套非有限业务float、缺引用解析器/失效或临时引用 | 显式失败，不修复为可保存的半图，不用null替换失败引用 |
 | 只改视域/折叠；改业务字段；美化与压缩 | 前者不标作者脏且完整作者快照不变；业务修改标脏且一步Undo；两种输出同作者内容和精确位值 |
 
-下面是同一封套内非空点事件样本，根length取真实末点0.5，片段基类存储length保留其默认1（Signal有效Length仍为0）。派生字段及基类私有字段同时存在；RF18应直接消费此块，而非仅验证自己的编码输出。
+下面是同一封套内非空点事件样本，根length取真实末点0.5，片段基类存储length保留其默认1（Signal有效Length仍为0）。派生字段及基类私有字段同时存在；回归测试直接消费此块，而非仅验证自己的编码输出。
 
 ```json
 {
@@ -88,7 +83,7 @@ UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目
   "document": {
     "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument, NBC.ActionEditor.Domain",
     "Background": { "a": 1, "b": 0.25, "g": 0.125, "r": 0.5 },
-    "Notes": "RF16 point contract fixture",
+    "Notes": "Point contract fixture",
     "Version": 1,
     "rootItems": [{
       "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleGroup, NBC.ActionEditor.Domain",
@@ -122,11 +117,9 @@ UI命名补充：UI Toolkit主窗口现为`UIToolkitActionEditorWindow`，同目
 
 还原后Signal有效`Length==0`、基类存储length仍为1、`StartTime`位为`0x3f000000`、EventCode=7，1组1轨1片段且父引用正确。实现通过受控字段赋值而非setter回写，不能把0.5吸附或被预置构造器追加片段。此规则也要求区间blend和跨混合缓存读回一致；不能以字段隐藏或暂未使用为由丢弃/规范化其原始float位值。
 
-### 真实入口接线与数据安全
+## 历史合同记录
 
-RF17 先将 `CreateLegacyAsset` 中类型构造/只创建提交提取至共用创建服务，两 UI 的 IMGUI 创建弹窗只负责输入、确认、回到发起窗口。RF18 加格式边界；RF19 再把创建、`App.OnObjectPickerConfig → Context.Open → Session.Open`、`App.SaveAsset`、Toolkit Save/SaveChanges、自动保存及另存为接到唯一格式/存储链，移除生产裸 `Json.Serialize/Deserialize` 路径（含剪贴板深拷贝），不保留兼容别名层。弹窗/Unity Selection/域重载/Editor更新位于宿主，不能因文件名搬到 Core 就声称依赖已解耦。
-
-保存/另存继续严格读回与外部字节版本保护，提交成功先推进来源/基线再尝试 Unity 导入；导入失败明确“字节已提交”，不自动重放。另存仅新目标并切换来源；导出从同一隔离快照写独立新目标，不切换来源/清脏/改Undo、选择或播放，活动手势明确拒绝。初期只允许 Assets 内现有允许目录，拒绝当前源（含大小写/规范化别名）、已存在文件/目录/meta及受保护目录；取消不变状态。RF20 的格式下拉框仅 JSON，不把业务资源类型与文件格式合并。不扩大工程外写入或历史探针授权。
+以下保留原日期与事实，仅用于追溯，不定义当前产品合同。
 
 ## R01–R10 当前入口契约（覆盖下文的正式存储与窗口取舍）
 

@@ -7,28 +7,38 @@
 
 ---
 
-## RF17 后的实际源码定位（2026-11-11）
+## 当前架构与职责
 
-### 当前产品补充（2026-11-12）
+两个正式菜单是 `NBC/Action Editor/IMGUI` 和 `NBC/Action Editor/UI Toolkit`。入门操作仅见[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)，数据规则见[当前合同](ActionEditor-Contracts.md)。
 
-UI命名补充：当前生产链为`UIToolkitActionEditorWindow → UIToolkitTimelineCanvas/UIToolkitPropertyView → App.Context`，设置弹窗为`UIToolkitPreferencesWindow`。四个脚本保留GUID，只移除界面类型的历史Json前缀；命名空间、菜单、共享会话及格式不变。下方RF16/RF17等历史命名及移动清单不追溯改写。
+| 模块 | 当前职责与边界 |
+|---|---|
+| Runtime/Domain、Metadata | 作者图、所有权、时间与能力规则、业务声明 |
+| Runtime/Serialization | 唯一version 2格式、字段值树、严格图/类型/数值校验及引用解析端口 |
+| Editor/Application | DocumentSession、事务、选择/剪贴板、结构/属性/片段用例、文档与播放协调 |
+| Editor/Presentation | 逐窗Presenter、只读显示状态、交互状态机、布局和命中；不依赖UnityEditor或具体控件 |
+| Editor/Infrastructure、Storage、Serialization | 文件提交、revision、AssetDatabase、Undo、时钟、恢复、偏好与类型/引用适配 |
+| Editor/Views/IMGUI、UIToolkit | 各自原生绘制、布局、焦点/捕获与输入适配，消费同一Presenter实现 |
+| Editor/Composition | 显式装配依赖、逐窗WindowBinding、唯一Editor更新与Inspector桥接 |
+| Editor/Extensions、Samples | 元数据绑定解析与双UI业务扩展、只读样例状态预览 |
+| Editor/Verification | 固定范围的引用、导出、持久化与双UI连续验收能力 |
 
-使用入口与操作链只在[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)维护。`Open Action Editor`是IMGUI，`Open Workbench`是原生UI Toolkit，两者仍共用单文档/选择/播放头/Undo。产品动作词由现有中文/英文Lan目录统一；业务类型完整身份不随显示名称改变。
+Domain与Serialization单向依赖。Application只依赖Domain及窄端口；Presentation依赖Application/Domain。Editor组合这些程序集并实现基础设施。验证程序集不进入产品类型目录。
 
-RF19–RF22后的实际接线：`DocumentCreationService.Create`与`JsonDocumentSession.Save`共用`JsonDocumentStore.Commit`及`ReliableFileCommit`，严格校验/隔离快照/完整读回后提交，先推进基线再导入；UI创建弹窗仅采集、确认及调用`CreateAndOpen`返回发起界面。两UI保存图标、Ctrl+S/SaveChanges及自动保存经App同一入口；保存图标右键的导出打开共享`DocumentExportWindow`，`DocumentExportService`只写独立新目标，格式目录只注册真实JSON实现。无旧格式回退、第二套创建/导出序列化管线或多文档层。
+共享状态只有一份作者文档、选择、剪贴板、播放头及Undo。每个窗口拥有独立工作区、Presenter、订阅和捕获所有者；依赖由WindowBinding传入，不通过服务定位器取得。ActionEditorHost只承担组合根和Editor生命周期，不承包业务用例。
 
-RF22固定隔离教程探针连续覆盖两个真实窗口方法、同一创建动作、各UI手势、Undo/Redo、状态预览、窗口保存、关闭重开和独立导出读回；系统路径/确认输入由固定批准新路径替代，IMGUI属性/手势适配器调用不冒充整窗OS点击。当前普通测试另覆盖真实文本控件和原生Pointer输入。工程证据只在唯一任务清单，人工体验和性能泛化仍不由这些结果代签。后续旧章节保留其日期、原路径和“建议/待做”的历史语境，不当成当前缺陷或格式事实。
+四条调用链分别是：
 
-RF18补充：当前生产转换已硬切至Runtime/Serialization的actioneditor.json v1封套。旧Json任意序列化类已移除；Editor/Serialization负责格式目录、受信任类型/持久引用注入与隔离快照，字段值树用于作者内容比较，完整读回不先规范化原始快照。Init只可重建派生根length，其他持久字段被回调改写时拒绝；保存前回调仅在独立副本执行。RF19继续统一创建/存储及UI保存入口，RF20才实现独立导出，下文早期格式描述保留历史范围。
+- 结构编辑：原生输入适配 → TimelinePresenter/StructureGesture → StructureEditing → StructureRules重验/DocumentSession事务 → 变更通知 → VisibleTimelineLayout → 原生绘制。
+- 属性编辑：原生字段意图 → PropertyPresenter/PropertyPath → PropertyEditing批次校验/事务 → 会话通知 → 字段值快照 → 控件更新。
+- 保存：原生保存意图 → DocumentPresenter → DocumentLifecycle → JsonDocumentRepository/可靠字节提交 → 记录来源与基线 → AssetDatabase导入 → 显示结果。
+- 播放：唯一EditorUpdateDriver → Playback协调 → AssetPlayer/预览会话 → 显式资源求值与释放 → 逐窗刷新；最后一个窗口离开才停止共享播放。
 
-两套生产UI已分别归入`Editor/UI/IMGUI`与`Editor/UI/UIToolkit`，主类型命名空间和程序集不变。`Editor/Core/Documents/App.cs`仅保留共享状态/文档入口转发、自动保存和播放协调；Unity更新/场景/域重载、Inspector代理、对话框、窗口宽度和备用重绘由`Editor/UI/ActionEditorHost.cs`适配。选择服务通过事件请求Inspector，不反向引用宿主；共享Views仍只保存对象owner及Action回调。播放状态位于`Editor/Preview/ActionEditorPlayback.cs`。
+具体工程证据、失败修复和资源测量只记[唯一任务清单](../.codex/tasks/action-editor-refactor.md)，本文不复制执行台账。Combat接入不属于当前已实现能力。
 
-共享创建逻辑位于`Editor/Core/Documents/DocumentCreationService.cs`，创建弹窗只采集输入、确认、打开结果和返回原UI；本项尚不切换格式/可靠存储实现。`TypeMetaInfo`、`ActionEditorTypeCatalog`与`ExtensionResolver`在`Editor/Extensions`，两套UI直接调用目录/解析服务，已移除EditorTools中的转发和嵌套元数据。Header/Inspector实例化仍在`UI/Extensions/EditorCustomFactory.cs`，不把双绘制适配器当纯Core。Styles及Resources键不变。
+## 历史设计记录
 
-实验链源码在`Editor/Experiments/AssetWorkbench`与`Runtime/Experiments/AssetWorkbench`，仍参与原程序集/原测试；生产不依赖该链。唯一跨程序集移动为完全Editor条件编译的Prefs进入Editor/Preferences。79个原文件通过固定清单AssetDatabase命令移动，GUID及移动瞬间源码/meta字节逐项验证；所需新目录meta由Unity生成，不删除旧空目录。本文后续历史分析保留移动前路径及行号，其当前路径以唯一任务RF16-C映射和RF17执行证据为准，不能拿历史问题描述当当前缺陷。
-
----
-
+下文保留原日期与讨论语境，不作为当前实现、入口或格式说明。
 ## 2026-11-11 RF16 目录与序列化边界定案
 
 本节覆盖早期“本轮不改格式”的限制，不改写历史证据。保留两个真实窗口、float 的 Asset/Group/Track/Clip 和单一共享上下文；目录按 `UI/IMGUI`、`UI/UIToolkit`、`Core`、`Serialization`、`Storage`、`Extensions`、`Preview` 分职责整理，不新建程序集或兼容别名。逐文件源/目标映射、实际依赖及基线只在[唯一任务清单](../.codex/tasks/action-editor-refactor.md)的 RF16 记录维护。

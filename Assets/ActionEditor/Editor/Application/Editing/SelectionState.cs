@@ -11,6 +11,7 @@ namespace NBC.ActionEditor.Application.Editing
         private readonly List<IDirectable> items = new List<IDirectable>();
         public IDirectable[] Items => items.ToArray();
         public int Count => items.Count;
+        public long Version { get; private set; }
         public IDirectable First => items.Count == 0 ? null : items[0];
         public bool CanMultipleSelect { get; set; }
         public event Action InspectorRequested;
@@ -25,11 +26,11 @@ namespace NBC.ActionEditor.Application.Editing
         public bool Set(IDirectable[] selected, bool allowMultiple)
         {
             var next = selected?.Where(item => item != null).Distinct().ToArray() ?? Array.Empty<IDirectable>();
-            var changed = next.Length != items.Count || next.Any(item => !items.Contains(item));
+            var changed = !next.SequenceEqual(items);
             if (allowMultiple && !changed) return false;
             items.Clear(); items.AddRange(next);
             CanMultipleSelect = allowMultiple && items.Count == 1 && items[0] is not TimelineClip;
-            if (changed) Changed?.Invoke();
+            if (changed) { Version++; Changed?.Invoke(); }
             if (allowMultiple && changed && selected != null) InspectorRequested?.Invoke();
             return changed;
         }
@@ -37,7 +38,7 @@ namespace NBC.ActionEditor.Application.Editing
         {
             var removed = items.RemoveAll(item => document == null || !document.directables.Contains(item));
             if (items.Count != 1 || items[0] is TimelineClip) CanMultipleSelect = false;
-            if (removed != 0) Changed?.Invoke();
+            if (removed != 0) { Version++; Changed?.Invoke(); }
         }
     }
 }

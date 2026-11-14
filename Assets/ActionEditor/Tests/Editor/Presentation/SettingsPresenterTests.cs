@@ -1,3 +1,5 @@
+using NBC.ActionEditor.Views.IMGUI;
+using ToolkitPreferences = NBC.ActionEditor.Views.UIToolkit.PreferencesWindow;
 using System;
 using System.Collections.Generic;
 using NBC.ActionEditor.Application.Settings;
@@ -8,7 +10,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.UIElements;
-using NBC.ActionEditor.Workbench;
 
 namespace NBC.ActionEditor.Tests.Presentation
 {
@@ -42,7 +43,7 @@ namespace NBC.ActionEditor.Tests.Presentation
         [UnityTest] public IEnumerator NativeSettingsControlsCommitOnlyToInjectedStoreAndShowFailures()
         {
             var store = new Store(); var session = new SettingsSession(store);
-            var window = ScriptableObject.CreateInstance<UIToolkitPreferencesWindow>();
+            var window = ScriptableObject.CreateInstance<ToolkitPreferences>();
             var imgui = new PreferencesWindow();
             try
             {

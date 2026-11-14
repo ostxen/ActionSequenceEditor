@@ -35,7 +35,30 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public float DocumentLength => editing.Document?.Length ?? 0;
         public bool Locked(object value) => value is IDirectable item && item.IsLocked;
         public EditorSettings Settings => settings();
-        public PropertyPath Path(object owner) => new PropertyPath(editing, owner);
+        // 业务有效性与存储结构分开：有限但无效的参数仍可定位并通过普通事务修正。
+        public IReadOnlyList<PropertyIssueState> CaptureIssues() => editing.Document == null
+            ? Array.Empty<PropertyIssueState>()
+            : editing.Document.directables.Select((item, key) => (item, key))
+                .Where(entry => entry.item is TimelineClip clip && !clip.IsValid)
+                .Select(entry => new PropertyIssueState(entry.key, editing.Version, "检查片段参数：" + entry.item.Name)).ToArray();
+        public void SelectIssue(PropertyIssueState issue)
+        {
+            if (issue.Version != editing.Version || editing.Document == null || issue.Key < 0
+                || issue.Key >= editing.Document.directables.Count)
+                throw new InvalidOperationException("诊断目标已改变，请刷新列表。");
+            var item = editing.Document.directables[issue.Key] as TimelineClip;
+            if (item == null || item.IsValid) throw new InvalidOperationException("诊断已失效，请刷新列表。");
+            CancelDraft();
+            selection?.Set(new IDirectable[] { item }, false);
+        }
+        // 路径绑定创建时的选择代次，不让已移除的控件继续编辑旧选择。
+        public PropertyPath Path(object owner)
+        {
+            if (selection == null || !selection.Contains(owner as IDirectable)) return new PropertyPath(editing, owner);
+            var version = selection.Version;
+            return new PropertyPath(editing, owner, selection.Items.Where(item => item.GetType() == owner.GetType()).Cast<object>(),
+                () => selection.Version == version);
+        }
         public IReadOnlyList<PropertyDescription> Fields(object owner) => PropertyDescription.For(owner.GetType())
             .Where(d => !d.Field.IsInitOnly && d.Visible(owner)).OrderBy(d => d.Field.DeclaringType == d.Field.ReflectedType ? 1 : 0).ToArray();
         public PropertyDescription Describe(FieldInfo field) => PropertyDescription.For(field);
@@ -76,7 +99,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public void Write(PropertyPath path, object value)
         {
             RequireAvailableEdit();
-            path.Write(PropertyFieldState.CopyValue(value));
+            path.Transform(_ => editing.CopyValue(value));
         }
         public bool CanInput(PropertyPath path) => path.CanEdit && !editing.IsEditing;
 
@@ -84,9 +107,10 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public PropertyDraft BeginDraft(PropertyPath path)
         {
             RequireAvailableEdit();
+            path.ValidateOwner();
+            if (draft != null && !draft.Path.CanEdit) CancelDraft();
             if (draft != null && draft.Path.SameLocation(path)) return draft;
             CancelDraft();
-            path.ValidateOwner();
             return draft = new PropertyDraft(path, editing.Version);
         }
         public void PreviewDraft(PropertyDraft input, object value)
@@ -101,7 +125,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
             try
             {
                 input.Path.ValidateOwner();
-                if (input.Version != editing.Version || !Equals(input.Original, input.Path.Read()))
+                if (input.Version != editing.Version || !input.Originals.SequenceEqual(input.Path.ReadValues()))
                     throw new InvalidOperationException("属性已被其他操作修改，请重新输入。");
             }
             catch
@@ -113,7 +137,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
             input.Value = value;
             // 先清输入所有权，提交通知即使同步重建控件也不会二次提交。
             CancelDraft(input);
-            if (!Equals(input.Original, value)) Write(input.Path, value);
+            if (input.Originals.Any(original => !Equals(original, value))) Write(input.Path, value);
         }
         public void CancelDraft(PropertyDraft input = null)
         {

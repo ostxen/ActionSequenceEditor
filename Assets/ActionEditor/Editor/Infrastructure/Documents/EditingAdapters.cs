@@ -2,6 +2,7 @@ using System;
 using NBC.ActionEditor.Application.Ports;
 using NBC.ActionEditor.Domain;
 using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Serialization;
 
 namespace NBC.ActionEditor.Infrastructure.Documents
 {
@@ -27,6 +28,24 @@ namespace NBC.ActionEditor.Infrastructure.Documents
     // Unity 对象默认空引用，普通可构造值按其声明类型创建。
     public sealed class PropertyValueFactory : IPropertyValueFactory
     {
+        private readonly DocumentFormatContext context;
+        public PropertyValueFactory(DocumentFormatContext context = null) { this.context = context; }
+        // 可变业务值沿用受控字段转换，Unity资源引用保留身份。
+        public object Copy(object value)
+        {
+            if (value == null || value is string || value is UnityEngine.Object) return value;
+            var type = value.GetType();
+            if (type.IsValueType && !ContainsMutableReference(type)) return value;
+            var format = context ?? DocumentFormats.Context;
+            return DocumentValueConverter.Restore(DocumentValueConverter.Capture(value, type, format), type, format);
+        }
+        // struct按值传递不等于深拷贝；其内部列表、数组和业务对象仍需隔离。
+        private static bool ContainsMutableReference(Type type)
+        {
+            if (type.IsPrimitive || type.IsEnum || type == typeof(string) || typeof(UnityEngine.Object).IsAssignableFrom(type)) return false;
+            if (!type.IsValueType) return true;
+            return System.Array.Exists(DocumentValueConverter.Fields(type), field => ContainsMutableReference(field.FieldType));
+        }
         public object Create(Type type)
         {
             if (type == typeof(string)) return "";

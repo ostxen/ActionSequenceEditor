@@ -3,8 +3,8 @@
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF23 `complete`（限执行记录范围，RF23记录GUI输入重放间歇性风险）。Combat 专属实施与验收暂缓。
-- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30本地提交`b12720a`（278/278），RF31本地提交`015d687`（280/280），RF32本地提交`04e76c9`（303/303）。RF33实施中。具体规格以第4.3节及最新执行记录为准。
-- 下一步：继续RF33单更新驱动、预览生命周期及完整持久化闭环，再顺序实施RF34–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
+- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30本地提交`b12720a`（278/278），RF31本地提交`015d687`（280/280），RF32本地提交`04e76c9`（303/303），RF33本地提交`069b887`（312/312及双UI持久探针）。RF34工程验收完成，待本地提交。具体规格以第4.3节及最新执行记录为准。
+- 下一步：RF34本地提交后顺序实施RF35–RF37。保留IMGUI/UI Toolkit，统一交互规则和根混排；不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
 
@@ -520,7 +520,7 @@ RF36对最终源码全量复核上述要求，并抽查结构编辑、属性编�
 | complete | RF31 | IMGUI被动视图接线及统一交互规则 | RF30 |
 | complete | RF32 | 属性/菜单/设置/文档Presenter与业务扩展契约 | RF31 |
 | completed | RF33 | 播放预览、生命周期、Undo/恢复/保存完整闭环 | RF32 |
-| in_progress | RF34 | 删除旧架构/实验/无用入口与残留命名 | RF33 |
+| complete | RF34 | 删除旧架构/实验/无用入口与残留命名 | RF33 |
 | planned | RF35 | 双UI真实操作、边界矩阵与持久完整回归 | RF34 |
 | planned | RF36 | 冷进程/资源测量及全量职责、可读性、命名和注释验收 | RF35 |
 | planned | RF37 | 当前架构文档、唯一教程、最终验收与交付 | RF36 |
@@ -842,6 +842,64 @@ void ITimelineView.SetCapture(bool requested);
 - 收尾验收：`222930Z-835ad4ad`完整303/303，0失败/跳过/不确定；`223213Z-346bfc52`workflow46/46，真实21项目734源码构建0错误39警告17.20秒，文档解析仍因缺yaml/markdown_it而blocked，未安装。git diff --check通过。属性正常绘制为Presenter只读字段/集合/子对象投影，控件只回传路径和输入；扩展显式目标句柄及类型元数据不作为默认递归绘制的数据源。文档弹窗绑定显式context，播放/设置/属性分别持窄用例，未建万能Presenter。新生产文件与实质重写控件已审查状态所有权、单向依赖、错误反馈和精简中文注释，补偏好GUI颜色finally恢复。
 - 后续边界：共享宿主App/ActionEditorHost与更新/恢复/自动保存仍按RF33处理，历史目录/类型与当前文档旧说明按RF34/RF37清扫；不声称整个产品架构已完成。窗口历史失败残留与用户窗口不可无审计混删，RF36需独立计数验证。保护路径只核对Git状态，不声明历史字节哈希证明。完整资源、冷进程、性能及H01–H09仍未验收。
 
+### RF34 退役与命名清扫执行记录
+
+- 状态：complete（本项工程范围，人工H01–H09未代签），2026-11-14。最终完整`064828Z-5eecc314`编译passed、发现并执行281/281，0失败/跳过/不确定；覆盖最终Composition/Views/Verification物理路径、逐窗异常隔离、属性批编辑、精确几何、全部纹理及当前合同两JSON。最终隔离双UI持久闭环`064553Z-500b2097`→`064634Z-ca809999`→`064651Z-01186792`passed两界面，根混排/属性/真实保存/UndoRedo/磁盘重开/另存/Recovery/自动保存/导出与三失败边界，自有窗口目录清理通过。
+- 最终离线`064856Z-88950ed5`workflow45/45、真实生成21项目700源码、0错误39既有警告25.66秒；整体code仍因yaml/markdown_it缺失blocked，未安装。名称/路径审计无旧UI/Validation/实验/已消费维护入口及兼容别名；GUIStyle与草稿Original值属技术/当前语义，不作为历史名删除。完整新架构引用门禁和资源/MonoScript绑定真实通过，资源全量校验无目标skipped，未声称冷进程/性能/PlayMode/Player Build或人工通过。
+- 责任审阅：Context仅组合共享作者依赖、Views独立逐窗注册；窗口与控件不再通过App门面获取作者状态，原生适配只发中性输入；属性路径持选择代次及批候选，提交规则在Application/Domain唯一实现；存储与播放保留严格格式、原子提交、资源所有权。实验测试54项逐断言映射保留能力，59个原综合方法完整拆分，新增实际能力门禁不削弱断言。固定清单删除/移动与空目录均经AssetDatabase审核，第三方许可证保留。
+- 提交前完整status及cached diff审查329路径，cached diff --check通过；所有受保护场景、用户JSON/Timeline、个人配置及Jsons.meta未暂存。未推送，不修改用户工作；最后一项修复后仅任务记录更新。后续完整功能矩阵、资源压力/冷调用、全量生产可读性与最终教程连续链依赖RF35–RF37，不在本项冒称完成。
+
+- 组合职责与清扫已完成、禁止重放：`064058Z-87ad145d`→`064152Z-adeb06cb`→`064212Z-e5a25d98`，planHash 2bceae685a62e776f84030eb4240c3202d6ceae80c7d69faf1c65f47f573c093，ActionEditorContext按原GUID移至Composition，ActionEditorViews独立负责逐窗注册表；无消费者FieldInfoExtensions/CreateUtilities源码及meta删除，Core五精确空目录按深度删除，87序列化资产无依赖。已消费CompositionLayoutCommands退役`064314Z-5c723922`→`064402Z-9faf50ec`→`064421Z-7a433339`，policy/规程移除、拒绝回归保留。
+- 异常隔离复现：`063121Z-d52a6d55`实际1执行0通过1失败（workflow零通过摘要见console终态），首个Repaint异常阻断后续窗口；注册表逐项隔离并检查即时注册身份，汇总异常，已解除窗口不再调用，`063343Z-6e2c41f5`同用例1/1。移除Host重复全窗Repaint订阅；WindowBinding通知finally绘制、释放finally保证设置订阅/注册归还；`063632Z-e74a7b0d`预览/生命周期25/25通过。此前完整`062422Z-9261f82a`280/280，0失败/跳过/不确定，覆盖当时最终纹理/脚本/文档样本，但早于注册表修复，最终须再跑。离线`062525Z-aa11099c`45/45、21项目701源码0错误39警告8.12秒，缺yaml/markdown_it仍blocked；新docs/API及唯一教程本地链接0失效，未跟踪源码尾空白0。RF34仍未提交。
+
+- 最新固定归位完成、禁止重放：preview `061302Z-ff0c1b88`→approve `061343Z-2641a4ff`→apply `061401Z-b49a2a64`，hash a4c415649950dafb9352b1fcc706eaa6989d607490d8551402599e8dbe39c58d；CreateDocumentWindow/DocumentInspector/ClipInspector三文件同名移动保持GUID与字节，PrefsConst和Preview.png两项无消费者、87序列化资产依赖为零后退役。原偏好键NBSkillWidth保留，不重置个人配置。首次apply `061042Z-fa947222`工作树变更提前拒绝，未执行资源变更，另建新预览审批后成功。已消费ViewResourceLayoutCommands单项退役 `062126Z-5091c952`→`062212Z-a6652385`→`062229Z-78643aa7`，policy/规程移除、拒绝回归保留。纹理逐字段及当前扩展类型绑定`060314Z-e154193b`9/9通过；新增最终三文件绑定断言待完整验证。
+- 真实引用新身份探针`055745Z-9f9d37cf`→`055830Z-3018927a`→`055847Z-1c32f769`passed四检查，主/子资源磁盘卸载重载、失效/错型拒绝。离线`055746Z-f8cb69f0`workflow45/45、21项目702源码、0错误39警告10.40秒；整体code缺yaml/markdown_it blocked，未安装。当前docs1/4–9已改为现行API参考并指向唯一FeatureSample教程，不保留失效Asset/ActionClip/PreferencesGUI/WelcomeGUI示例；历史断言继承表右栏同步现行测试身份，历史左栏保留。发现`062022Z-6cab5b55`280项。RF34仍in_progress，尚未提交，最终回归待跑。
+
+- 最终测试路径与IMGUI职责命名空间编译`054621Z-1a6e0960`通过，完整`054814Z-21dad44c`发现并执行280/280，0失败/跳过/不确定；验证程序集为NBC.ActionEditor.Verification.Editor，当前CLI组actioneditor.verification，无旧组别名。已消费TestLayoutCommands preview `052847Z-dd1b36db`→approve `052940Z-27d46dc7`→apply `052957Z-e2884f43`退役，policy/规程死项移除。当前合同/架构/验收阅读入口与唯一教程同步新菜单、职责和v2；独立两个JSON样本保留为原生测试输入，历史证据不批量改写。RF34仍未完成，当前文档变化须重新验证。
+
+- 23项测试源码归位及19空目录退役已实际完成、禁止重放：preview `052622Z-e7d18df7`→approve `052708Z-b17af73f`→apply `052725Z-62a4f1e9`，planHash 0594a9581fd02b246820b905aa094b7b5d6eea36a3e96d6d7eb5d78a4ada11e6；创建Domain/Application/Infrastructure/Views四测试目录，精确路径/GUID及字节哈希见preview，逐项保持源码身份，空目录清单外任何内容拒绝。大型共享测试按会话编辑/持久化/窗口生命周期/属性控件/两种输入/布局拆分，59个方法及参数化身份完整继承；共享夹具仅负责现场恢复及输入工具，测量直接调用各能力夹具。当前能力命名完整测试`051150Z-8e1804f2`发现执行280/280，0失败/跳过/不确定（早于最后路径与无语义fixture字符串清理）。双UI持久探针preview `050531Z-d7b8dc47`→approve `050614Z-e23dfd8a`→apply `050633Z-93da5fa5` passed两界面、拥有窗口/目录清理，覆盖根混排/属性/真实SaveChanges/UndoRedo/重开/另存/Recovery/自动保存/导出/锁文件/导入失败/外部冲突。已消费CapabilityLayoutCommands单项退役`050313Z-f358ff7a`→`050359Z-dff61ff3`→`050414Z-686add3e`，policy/规程清除，workflow45/45。RF34尚未完成或提交。
+
+- 验证能力实际归位，禁止重放：preview `045939Z-eac73524`→approve `050029Z-f7f00118`→apply `050046Z-9bcf7d57` passed，planHash c2c833cddb8ac51b56bb9ca996696bf8a147d12de33ea620a6698a61495fed55；四移动、删除无人调用DocumentCreationService源码/meta一项，SyncAll。原综合边界源码按引用/导出/教程/工程生成拆分，Validation目录、程序集、命名空间与CLI组均硬切Verification，方法去任务编号；持久探针保留全部断言改为PersistenceCommands，明确完成编辑后实际使用显式保存，不冒充定时自动保存。受控退出安全能力保留，但本轮不执行退出。编译`045524Z-45702818`和`045808Z-9534291e`通过；workflow45/45通过，移动后完整测试与真实探针待执行。未提交RF34。
+
+- 已消费ViewLayoutCommands实际退役：preview `044951Z-7c3075c6`→approve `045033Z-92fa6466`→apply `045047Z-3c83bfed`，planHash 71770c17329e237519f3682f3987bbe12279e90ca01f94bc660ad404edccfa51；唯一源码及meta（GUID809eea9ff2e680d4ba4012ad9af6e637），目录0。已移除arrange_view_layout当前policy/规程并加入未知命令无Editor访问拒绝测试，不重放15移动。
+
+- 视图最终布局完整验证`20261114T044414Z-6404317f`：编译通过、发现并执行280/280，0失败/跳过/不确定；未提供资源目标，资源全量验收未执行。先前`043951Z-f8e6f2ed`因机械替换破坏Unity固定覆盖方法OnHeaderGUI而CS0115编译失败（测试未执行），恢复准确方法名后`044126Z-cf7fc431`类型/资源绑定专项通过。只读`044324Z-b5d52157`当时无产品窗口，两个菜单均绑定各自Views命名空间的ActionEditorWindow.Open；不推断后续现场。下一步退役已消费布局入口，再按当前能力拆分验证命令；RF34仍实施中，未提交/未push。
+
+- 双窗类型硬切为各自`NBC.ActionEditor.Views.IMGUI/UIToolkit.ActionEditorWindow`，菜单`NBC/Action Editor/IMGUI`与`UI Toolkit`，不保留旧类型/菜单别名；Toolkit控件键及样式类去除无关Json前缀。`042734Z-1145d569`编译通过，完整`042936Z-38d2072a`实际279/280，唯一失败为资源测试用nameof(alias)拼接脚本路径、旧文件尚未与新类同名；不删GUID/GetClass断言。资源移动后改以typeof(...).Name及最终路径核验。首次批量只读超128并发被工具拒绝，没有写入；改为定向搜索及小批次后实施。
+- 已执行且禁止重放：固定15项视图职责布局preview `043556Z-82be7dee`→approve `043652Z-e486ce9b`→apply `043709Z-ea0eec51`，planHash 9fb4893c6b96e1e7c1e8f3c2203c3845598bdb4ce154983536b4135c58de53b9。完整路径/GUID清单保存在preview：Toolkit四源码与样式同名归位、IMGUI窗口/欢迎/时间轴标题/文档工具栏归位、Com→Standard且Inspectors→Properties、两扩展→Extensions、Host→Composition、最终UI→Views。AssetDatabase逐项核对GUID和文件/目录子项字节，15移动、0删除，SyncAll。编译`043439Z-1472875e`、workflow44/44通过。移动后源码调用者同步EditorExtensionFactory/DocumentToolbar、去无人调用Init*Dic方法、实际样式路径与MonoScript断言；最终全套正在运行，RF34未完成/未提交/未push。
+
+- 六资源退役及TimeTransform最终产物完整`041126Z-84ec9004`：编译通过、280/280，0失败/跳过/不确定；身份发现已无实验54项及消费退役命令。离线`041126Z-752ad4fd`：workflow44/44、真实21项目692源码方案0错误39既有警告30.81秒；整体code因yaml/markdown_it缺失blocked，未安装。源码/meta查找确认六目标均不存在，git diff --check通过。RF34仍需双窗最终命名/路径、验证能力命名及剩余资源审计，不提前提交或声称完成。
+
+- 已执行且禁止重放：四旧时间轴辅助、FullSerializer.dll与已消费ExperimentRetirementCommands（自身）及各meta，固定六资源preview `040841Z-0a1740f1`→approve `040927Z-9190c92b`→apply `040947Z-e300b744`，planHash 2e88a23e0104e95906c6717dd15edc46e4ab1c68641a3341b0d7481d199a47f4；具体路径/GUID/源码与meta SHA256存该preview。调用者闭包为空，当前已加载程序集无DLL引用、43个序列化资产数据库依赖无引用；实际删除6、目录0，SyncAll。声明保留所有第三方许可证，无目录/用户数据删除。编译`040724Z-5465d7b6`及workflow44/44通过；已清除两次消费的退役policy/拒参活项/当前规程，未知命令无Editor访问拒绝测试保留。最终全套与生成方案检查待跑，RF34仍in_progress。
+
+- 实验退役后完整`035123Z-3b3d90d8`编译通过，280/280、0失败/跳过/不确定；总数减少54均对应下方逐断言实验映射，不按数量降低产品要求。workflow切换当前审批样本后44/44。时间轴旧辅助无产品调用者，ExtensionEndToEnd改查真实Presenter行状态；TimelineGeometryTests已切到当前ViewportNavigation/VisibleTimelineLayout/StructureDropGeometry/ClipGesture，16例保留锚点、225步进、最小跨度、坐标回转、折叠无内容变更、滚动/反向框选与严格阈值/同距首参考。旧双UI差异、负Start的倒置缩放规则和根区一律追加合同明确退役，由4.3.3与StructureGestureTests/TimelinePresenterTests继承，不保留孤立旧算法。
+- 几何继承失败证据：错误filter-type=class在本地参数解析拒绝，未运行Unity；`035733Z-904d0a86`实际16执行15通过1失败，旧float运算顺序的坐标基准与当前差0.000122px，改为独立double公式后`040045Z-2d99e511`仍15/16，Duration(1180)实际228.000015而非228（容差0.00001）。不放宽断言，TimeTransform中间计算改double、仍返回float；`040304Z-e0407729`编译及16/16通过。最终全套须覆盖该生产变更。四旧辅助/DLL/已消费审核命令六资源固定退役正在准备，尚未删除。
+
+- 最新完整回归`20261114T033612Z-1e49ebb6`：334/334，0失败/跳过/不确定，包含新增适配器两项与预览六例；WindowDiagnostics提取后编译通过，`034346Z-865d665d`查询当时两产品窗口均未打开，两个菜单声明绑定存在。预览边界专项`032721Z-308fd008`24/24。doctor `034304Z-8bb088bf`通过。
+- 已执行且禁止重放：25实验源码及meta固定退役preview `034809Z-fefb26cd`→approve `034920Z-8b49ff66`→apply `034940Z-405d32ce`，planHash e17d4841956ab3d1bfef461184c79b2724b1ef797670e0ccc28d5162e541ffc1。精确路径/GUID/源码与meta SHA256保存在该preview；范围为11实验实现、2实验辅助、8逐断言映射测试、A01/A05/B06四验证源码。43个序列化资产的AssetDatabase依赖查询无实验依赖；全Assets源码闭包无外部消费者。实际删除25、目录删除0，SyncAll；不读取用户业务内容、不删除用户资源。审核命令编译`034619Z-f91e722b`通过、执行前workflow46/46；执行后废弃三probe policy，审批回归改用当前document_lifecycle_probe。退役后全套与离线检查待跑，审核命令自身尚待后续固定清单退役。
+
+- 20261114续验：预览常规Update中业务回调释放并清空directable，`023758Z-b4ba9eff`实际1/1失败，NullReferenceException位于TimePointers.cs:57。回调后立即重验预览代次，`023940Z-56ed3864`预览18/18，包含相同释放场景。前次完整`022708Z-e8680f35`325/325已核对，覆盖真实IMGUI诊断按钮`021733Z-7ad3f28f`、Toolkit诊断输入、显式Header/样例预览上下文及独立Inspector工厂；不以此前“尚无按钮证据”记录否定后续补证。
+- App调用者已硬切具体Context/Selection/Clipboard/Playback/Session用例，删除Host.Window/Width及全部保存/恢复这些全局窗口缓存的测试代码。Host只保留组合根的唯一作者Context、Views、Editor更新、恢复与Inspector选择桥，不添加App业务透传。属性工厂要求显式SettingsSession，无默认全局偏好；选择器确认沿用本次注入的保存路径委托，过滤和迟到事务重验保留。`025230Z-b509548e`中间编译失败为两处自动替换误伤相等表达式，修复后`025349Z-590cb542`326/326；`030600Z-f6c1609c`预览专项通过。
+- 已执行且禁止重放：App.cs及meta唯一资源退役preview `030802Z-fbcf9ec3`→approve `030914Z-943269f5`→apply `030938Z-385a4271`，GUID388d9541706214b549412603b072872b，planHash e8e29ee315071a3cbbb0371ac1d95be009732ef01ad034cb9ca17aaf5ce5e31d。展示唯一目标及闭包后引用4.3.1连续授权，AssetDatabase删除；无目录/用户资源删除。Git源码搜索只剩架构禁用字符串，资源查找确认源码/meta均不存在。`031030Z-2370374d`连接暂不可达、未运行编译或测试，doctor `031059Z-9c29851b`恢复，删除后完整`031342Z-f87df896`326/326，0失败/跳过/不确定。
+- 离线`032024Z-aa122fc9`：workflow46/46、真实生成21项目720源码方案0错误39既有警告15.14秒；文档解析仍缺yaml/markdown_it而blocked，未安装。随后补实验事务能力继承：ApplicationAdapterTests.RowUnlockChangesOnlyItsFlagAndUndoRestoresInheritedLocks核对继承锁拒绝、单独解锁、两次Undo/Redo与整图；ResizeAndBatchRenameShareOneUndoAndDeletionRestoresBothClips核对同token缩放+批重命名、一Undo、删除及活动事务保存/切换拒绝。`032424Z-84f8438b`专项通过；完整和离线结果早于这两项新测试，最终仍须重跑。git diff --check通过（早于新增两测试），RF34仍in_progress，实验断言逐项映射/退役、验证命令能力化与路径/菜单命名未完成，未暂存/未提交/未push。
+- 属性边界续验：选择切换的旧延迟字段`014919Z-d699ccae`实际1执行1失败（不是零发现）；PropertyPath绑定SelectionState递增代次，单选/多选、先离开再返回都拒绝旧回调，失败清草稿不占事务。`015148Z-13f0dacb`属性25/25；struct内嵌列表深拷贝补独立字段转换，标量值类型保持快速路径，`015542Z-50c0952b`26/26。Reveal片段改为展开所属轨道的父组，隔离另一Workspace且不标脏。删除已消费Rf18Move方法/哈希及policy，保留同文件仍活跃的引用/导出/教程能力；未知入口拒绝回归含rf18_move。当前完整`020301Z-1d025153`322/322，0失败/跳过/不确定，早于下述诊断补齐。
+- 实验问题按钮能力迁移到PropertyPresenter只读诊断及两原生Inspector；以当前FeatureSampleLoop.Period=0（有限、存储图合法但业务IsValid=false）验证真实Toolkit按钮定位→原生FloatField=2→问题消失→Undo恢复问题。首次`021058Z-22a48524`1失败，测试未等待窗口schedule重建就查新字段；保留原断言并等待两帧后`021421Z-67a87a91`1/1通过。实验任意NaN直接污染后修正不作为新格式兼容目标：非有限作者图必须在快照/保存边界拒绝，不能为原实验流程放松严格有限数合同；未实施绕过校验的修复入口。IMGUI问题按钮已接线但尚无本次实际按钮输入证据；完整回归待最后代码。
+- 当前最终全套`013059Z-88ee6598`：319/319，0失败/跳过/不确定，包含当前生产属性/创建揭示/窄Inspector最终代码；未指定资源目标skipped。离线`013815Z-cfdda779`：workflow46/46，真实21项目721源码生成方案0错误39既有警告10.47秒；yaml/markdown_it缺失使文档结构检查blocked，未安装。git diff --check通过。RF34仍in_progress，实验断言映射、App完全退役及最终路径/菜单命名尚未完成，未提交RF34/未push。
+- 创建轨道选择/揭示要求迁入真实双UI菜单：StructureEditing返回创建项，菜单完成单次作者提交后选择；TimelinePresenter只在发起窗口展开父组和滚动揭示，不改变其他窗口视域。两原生菜单各连续22次创建，核对最后轨道完整可见、共享选择、另一窗口scroll=0及Undo/Redo；`011615Z-14000e7f`缺Domain using编译失败，`011711Z-e00fa651`补引用后专项通过。完整`011903Z-c300c89d`318/318，0失败/跳过/不确定。
+- 真实Toolkit CustomEditor在280px属性宽下向量分量`012506Z-a5eebfe1`复现仅6.666687px（要求>15）；根因为BuildProperties把所有嵌套分量标签也设为150px。限定顶层标签后`012730Z-4db8798d`同一真实CustomEditor专项通过，向量实际提交(7,8,9)正确。完整终验进行中，不以之前318结果覆盖该次最终变更。
+- 属性迁移缺口已真实复现：`004434Z-ef40817f`多选写Count第二对象仍3而非17。PropertyPath携带本次同类型选择快照，提交前整批重验锁定/所属/路径，并先生成独立候选后单事务写回；嵌套字段、数组/列表操作共享批路径，草稿比较所有基线。可变提交通过窄Copy端口沿用受控字段转换，不让两个对象共享列表/参数/曲线。原生mixed显示、string/collection设null按钮和双UI真实输入已补；`005552Z-1162911d`属性22/22通过，含不同轨锁定与异长集合不部分写入。
+- 完整`005739Z-a6e1966b`实际316执行314通过2失败，均因IMGUI字符串null按钮使字段测试最后Rect变为按钮，真实键盘点中按钮清空而非输入。将操作按钮放到字段前保持字段末行，`010418Z-3314ac56`双UI菜单/真实字段专项通过。新IMGUI父集合null测试`010735Z-0b92b383`及`011009Z-0d06fe5e`失败，诊断显示测试误记录递归子字符串按钮Rect；按当前父字段标签限定后`011216Z-9595fdca`属性专项通过（计数待最终完整核对）。这些失败不隐去，RF34仍未交付。
+- TimelineComposition改为消费WindowBinding注入的SettingsSession和DocumentPresenter，双窗保存快捷键不再重新获取另一套路径交互，显式绑定的磁吸/步长也用于时间轴。SaveChanges取消测试补两个TimelineKey.Save请求，Recovery不变；20261114 `002501Z-20f7bdde`完整314/314通过。
+- 已执行且禁止重放：固定四维护源码退役preview `003444Z-a3fe534b`→approve `003523Z-cc962131`→apply `003538Z-dce5bf01`，删除Validation/ApplicationLayoutCommands、DomainLayoutCommands、Rf17MoveCommands、ViewRetirementCommands及其meta，包含本次自退役入口。调用及非meta GUID搜索仅命中固定清单，无产品/测试消费者；preview展示四目标与哈希，按真实系列授权审批，AssetDatabase删除并SyncAll。编译`003327Z-2144caa6`通过，前置workflow46/46；执行后对应九个已消费policy/拒参死项/当前operations段落清理，补无Editor访问拒绝测试。实验代码及其断言映射仍未完成，不宣称RF34交付。
+- 密集点输入能力已迁入NativeTimelineDensityTests：两个真实原生窗口、1001点、三档视域、实际指针命中、首末点与作者内容不变。`234254Z-329c0fd8`专项通过，`234713Z-ce3a5857`及`235245Z-50b646bd`完整313/313，0失败/跳过/不确定。只读`233932Z-3aa4530a`当时窗口列表为空，不推断现场窗口消失原因，不宣称冷进程或性能验收。
+- 删除AssetPlayer.Inst、App默认来源构造和无使用播放枚举，测试直接核对注入context.Player；移除App无人调用的初始化/打开事件、帧刷新标记、OnGUIEnd/OnUpdate/步进、选择透传与播放事件中转，关闭测试订阅实际Playback.Stopped。App仍未完全退役，不将本次减量视为RF34完成。
+- 窗口通知缺陷先复现：20261114 `000053Z-52d67fcf`实际1例失败，第一窗口Changed异常使第二窗口通知次数0而非1；报告的零通过通用提示不代表零发现。Context改为逐订阅执行并汇总异常交回Session.NotificationWarning，`000257Z-ef8f3faf`预览/生命周期16/16通过，含断开后警告清除。
+- 保存路径改由DocumentPresenterComposition/WindowBinding及双窗BindContext显式注入，默认Unity文件对话框绑定其自己的context；确认切换时沿用同一路径端口。移除App.SavePathRequested可变全局回调和Host无人调用的SaveAs路径。双窗真实SaveChanges取消用例使用同一独立context，检查2次请求、图引用/Recovery/dirty不变，不影响全局作者图。`000613Z-50aa91bf`测试访问internal Binding编译失败，改测试反射而非扩大产品API，`000714Z-afcfa67f`完整314/314通过。
+- LegacySafetyTests不再查询实验ActionWorkbench：保留两个产品窗口集合不变、创建非法类型无提交、打开失败/保存取消断言；原6个AutoSaveSchedule时间案例迁到真实Application.DocumentAutoSave，额外核对提交次数/dirty/保存时间。`001234Z-96928aaa`因测试命名空间遮蔽Contracts编译失败，显式using修复后`001328Z-6154869a`编译通过、完整314/314，0失败/跳过/不确定。以上日期20261114；asset-validation未指定目标skipped。RF34仍in_progress，未本地提交，未push。
+- RF33已本地提交069b887，无push。首批移除静态窗口视图缓存调用：欢迎页/工具栏由窗口直接构造、关闭清空；移除ViewBase继承，绘制恢复GUI颜色。原泄漏回归改为核对面板实例重绘不增长与关闭释放，Shift断言迁到当前PointerInput，不删除功能断言。
+- `232612Z-54e42422`编译阶段连接中断（editor status连接提前关闭，后续Pipeline不可达），非源码诊断；doctor `232717Z-6cb508cd`恢复后，`232739Z-a34f71ac`编译及完整测试通过。新增固定retire_view_protocols，workflow46/46；`233159Z-5d0c07b4`编译通过。
+- 已执行且禁止重放：preview `233316Z-90833630`→approve `233401Z-ebca3b98`→apply `233426Z-c7bb05c6`，经AssetDatabase删除14份源码及meta：ViewBase/ItemViewBase/EditorWindowExtensions/ICustomized/CustomizedDrawTools/PointerEventData及8个指针拖动接口，固定GUID和源码/meta哈希核验，SyncAll。已展示完整路径并引用本系列真实连续授权，无目录/用户文件删除。退役后`233509Z-eb5e81cb`编译及完整Editor测试通过。RF34仍实施中，实验代码、App/静态Player、命名与已消费命令policy仍需继续清理，未提交RF34。
+
 ### RF33 生命周期及完整存储执行记录
 
 - 状态：in_progress，前置RF32本地提交`04e76c9`，未push。
@@ -1017,6 +1075,54 @@ void ITimelineView.SetCapture(bool requested);
 
 #### RF24 测试与资源去向补充
 
+##### RF34 实验测试逐断言继承审计（删除前记录，20261114）
+
+以下为删除前核对的实际旧源码断言，而不是按用例数量替代覆盖。右列仍使用本次可发现身份，最终能力改名时同步。仅实验独有合同明确退役；所有产品能力继续保留，不以减少总数作为完成证据。25源码及meta已于034940Z-405d32ce按固定审核清单删除，具体证据见RF34执行记录。
+
+| 实验文件与用例 | 断言与当前继承/退役决定 |
+|---|---|
+| DocumentModelTests.RuntimeModelHasStableIdsAndNoWorkspaceOrPlaybackFields | 图合法性/所属/字段隔离由OrderedDocumentTests.HandwrittenMixedRootsKeepOwnershipValuesCurveReferenceAndExactBits及WindowWorkspacesDoNotEnterSnapshotsAndReleaseRemovedGraphReferences继承；GUID式业务节点ID是实验图合同，当前按有序作者图与引用身份工作，不新增ID字段。 |
+| InvalidAndUnknownDataAreDiagnosedWithoutMutation | 重复所有权、null结构和非有限值由DocumentFormatTests.InvalidStructuralGraphAndNegativeRawTimingAreNotRepaired、FiniteFloatBitsIncludeNegativeZeroSubnormalsExtremesAndRandomPayloads、ProductionContextRejectsTestTypesAndUnresolvedTemporaryReferences拒绝；实验ID重复计数与允许NaN污染后继续工作退役，不建立宽松修复路径。 |
+| OverlapPolicyDoesNotRejectAdjacentIntervalsOrSameTimePoints | 相邻/点/交叉混合由TypeCatalogTests.NeighborPolicyKeepsPropertyCrossBlendSeparateFromStrictEdges、PropertyEditingTests.ClipPropertyTimingCannotBorrowAnActiveGestureOrCrossItsNextBound及现行ClipTimingRules继承；不保留实验轨道OverlapPolicy枚举。 |
+| UnityClonePreservesPolymorphismButDoesNotShareMutableEventState | DocumentFormatTests.ClipboardUsesSameConverterAndPreservesNestedPayload、PropertyEditingTests.SelectedPropertyWritesAndCollectionEditsAreAtomicAndDoNotShareMutableValues、ValueTypePropertyCopiesKeepNestedMutableFieldsIndependent验证多态与独立列表/嵌套参数/曲线；UnityEngine.Object.Instantiate实验ScriptableObject身份合同退役。 |
+| TransactionTests.RowUnlockAllowsOnlyLockFlagChangeAndRetainsUndo | ApplicationAdapterTests.RowUnlockChangesOnlyItsFlagAndUndoRestoresInheritedLocks明确验证父锁拒绝重命名/子解锁、单独解锁不改名称、两次Undo和Redo、整图回到基线，032424Z-84f8438b通过。 |
+| CancelAndInvalidCommitNeverMutateDocument | SharedEditsUndoRedoAndCancelKeepWholeJsonGraph、OwnedTransactionsRollbackNestedFailuresAndDoNotAddEmptyUndoSteps及Application.DocumentSessionTests.ValidationOrHistoryFailureRollsBackAndAllowsNextEdit保留取消、校验失败、完整回滚。 |
+| CommandsUndoRedoRestoreDataIdsSelectionAndIndependentCollections | StructuralCommandsRevalidateAndRollbackFailuresWithoutEmptyUndo、CopyPasteTrackAndCutClipPreservePayloadAndRespectLocks、BatchDeletionAndLockedCutDoNotPartiallyModifyGraphOrClipboard保留新增/复制/剪切/Undo/Redo与参数；PropertyEditingTests多选独立值覆盖可变集合。实验稳定ID重建选择退役：当前换图清除陈旧引用选择，TimelinePresenterTests.DocumentReplacementAndUndoDropStaleKeysAndCancelCapture验证。 |
+| LocksForeignIdsAndOverlappingTransactionsCannotLeakPartialEdits | BatchDeletionAndLockedCutDoNotPartiallyModifyGraphOrClipboard、TransactionTokensRejectOtherOwnersAndStaleTokensAndCommitOneUndo、StructuralCommandsRevalidateAndRollbackFailuresWithoutEmptyUndo保留锁、外来对象/过期目标、另owner事务及不部分提交；不保留字符串外来ID API。 |
+| ResizeBatchChangeAndDeleteUndoRestoreWholeTransaction | ApplicationAdapterTests.ResizeAndBatchRenameShareOneUndoAndDeletionRestoresBothClips逐项保留同token缩放+两对象重命名、一次Undo/Redo、两对象删除/Undo，以及活动事务中保存/切换拒绝，032424Z-84f8438b通过。实验删除后恢复ID选择同上退役。 |
+| SessionTests.FailedOpenAndSaveKeepOriginalTargetAndDirtyState | Application.DocumentSessionTests.FailedReadAndHistoryResetPreserveCurrentGraphAndActiveToken、CommitFailureAndExternalConflictRetainDirtyGraphSourceAndRevision，及StorageSafetyTests物理锁文件/失败提交继承失败图/来源/dirty。 |
+| WorkspaceChangesAreNotContentAndDirtySwitchRequiresExplicitDiscard | OrderedDocumentTests.WindowWorkspacesDoNotEnterSnapshotsAndReleaseRemovedGraphReferences、ZoomAndFoldDoNotDirtyAuthoringData、DiscardFromEitherWindowRestoresSharedBaselineAndClearsPendingUndo保留视域不标脏、明确discard和重复discard；DocumentPresenter负责确认，底层隔离生命周期不弹UI。 |
+| SessionsAndRepeatedDisposalDoNotShareState | Application.DocumentSessionTests.UnityUndoInOtherSessionPreservesUnchangedGraphAndActiveTransaction、UndoCancelsTokensAndDisposalUnsubscribesExactlyOnce保留隔离验证上下文及Dispose幂等/拒绝后续输入。产品窗口独立作者会话要求明确退役，双窗必须共享作者图而逐窗Workspace独立。 |
+| AutoSaveFailureRetainsDirtyContentAndLastSuccessTime | Application.DocumentSessionTests.AutoSaveUsesExactDeadlineSkipsGesturesAndThrottlesFailures保留120秒等准确边界、失败dirty/最后成功时钟、后续成功与导入后不重放；失败后一秒立即重试的实验调度退役为明确失败节流，不能恢复每帧IO重试。 |
+| RegistryPropertyTests.RegistrationIsAtomicAndCustomTypeUsesTheSameTransactionBoundary | DocumentFormatTests.RegistryIsAtomicAndReadWriteExportCapabilitiesAreIndependent及TypeCatalogTests.NativePropertyBindingsAreIndependentExactOrExplicitlyInheritedAndRejectConflicts保留冲突诊断两来源/不部分发布；PropertyEditingTests.ExplicitNativePropertyExtensionUsesRealControlAndSharedUndo保留真实自定义IntegerField、同编辑边界及Undo；非法业务状态由普通事务校验测试继承。 |
+| ConflictingBatchAndSharedFactoryCannotPartiallyPublish | 上述RegistryIsAtomic与精确绑定冲突测试保留批注册不部分发布。实验任意lambda单例业务工厂接口退役，生产类型目录先预检类型、构造隔离，不增加等价任意工厂扩展。预览工厂的资源隔离仍由PreviewOwnershipTests.PartialFactoryFailureReleasesAlreadyCreatedResources及PreviewFactoryCancellationReleasesReturnedButUnownedInstance覆盖。 |
+| NativeFieldsCollectionsNullAndMultiSelectionRoundTripWithUndo | PropertyEditingTests.NativeSelectionFieldsEditBothValuesAndNullButtonsUseOneUndo、ImguiNullButtonsApplyToSelectionAndUndoRestoresBothValues保留两对象标量/列表/null/独立值/Undo；SharedCollectionOperationsCoverNullFirstArrayRemovalReorderAndBounds、NativeFieldsUseSharedDescriptionsAndWriteNestedValueTypes补索引/向量；RulerContinuousSeekAndEscapeRestoreTime保留Esc。非法时间拒绝由ClipPropertyRejectsNonFiniteAndInvalidStepWithoutLeavingEdit覆盖。实验NaN污染修复按钮改为有限但IsValid=false的Period=0，真实NativeIssueButtonSelectsInvalidClipAndParameterEditClearsDiagnosticWithUndo与ImguiIssueButtonSelectsClipWithoutChangingAuthorContent继承定位/修正/Undo，不放松严格有限数。 |
+| UnknownTypesAndTransientReferencesAreDiagnosedWithoutDiscardingContent | DocumentFormatTests.ProductionContextRejectsTestTypesAndUnresolvedTemporaryReferences及InvalidEnvelopeTypesMembersAndNumbersFailBeforeBusinessConstruction保留未注册/临时资源拒绝；未知类型不构造/源内容不改。当前错误通过异常/用例结果报告，不保留实验issue.TargetId字符串合同。 |
+| InteractionTests.PlainWheelZoomPanAndContextMenusMatchOriginalEntryPoints | ExtensionEndToEndTests.BothRulersZoomAroundHoveredTimeWithoutAuthorChanges、WindowLayoutTests.WindowNavigationRecordsPreferencesAndWheelPanResults、BothMenusAndPropertyControlsProduceEquivalentPointAndIntervalGraphs及CopyPasteTrackAndCutClipPreservePayloadAndRespectLocks保留真实滚轮/中键/标尺/菜单新建复制与Undo。旧滚轮只改scale不锚定时间、固定1.3秒取整细节由4.3.3鼠标锚点和共享设置规则取代。 |
+| DragCandidateCancelCommitUndoAndNoPressAreConsistent | ToolkitTimelineTests.ToolkitDragResizeCancelAndCaptureLossUseRealPointerEvents、ImguiTimelineTests.ImguiInputNeedsPressAndEndsOutside、ToolkitTimelineTests.ToolkitWrongButtonReleaseAndLostFocusRespectGestureOwnership及TimelinePresenterTests.CompleteMoveCommitUndoRedoNeedsNoWindowOrGlobalEvent保留无按下不动、取消/一次释放/Undo、真实捕获ID、Esc/丢捕获/失焦/Detach；双UI释放矩阵仍由RF35全量补齐。 |
+| ResizeBoxSelectPanAndLocksUseRealCanvasCoordinates | TimelinePresenterTests.ResizeUsesSharedMinimumAndLeftHandlePriority、FoldMarqueeAndTextConsumedShortcutUseSharedSelection、EmptyFoldAndLockedSourceCannotStartAuthoringOrLeaveCapture及双UI真实输入用例保留拉伸、框选、平移、锁定不开始；当前长度最小0.01，不保留实验double时长。 |
+| SnapMultiMoveInvalidOverlapAndOutsideReleaseAreAtomic | ToolkitTimelineTests.ToolkitMultiClipDragGuidesMatchBoundsSnappingAndGestureLifetime、ImguiTimelineTests.ImguiMultiMoveClampsOneDeltaAndKeepsSpacingAtZero、ImguiTimelineTests.ImguiInvalidStretchRestoresLengthAndTrackReorderIsUndoable、ImguiTimelineTests.ImguiMiddlePanReleaseOutsideDoesNotConsumeLaterLeftDrag及TimelinePresenterTests.MultiselectMoveUsesOneDeltaAndCancelMarqueeRestoresSelection覆盖同delta/单Undo/取消视域与选择/外部释放。实验严格禁止所有重叠退役为当前明确CrossBlend/邻居合同。 |
+| TimelineTests.RealDenseCanvasPaintsAndHitsWithoutChangingDefinition | TimelineDensityTests.DensePointsPaintAndHitInBothNativeWindowsWithoutChangingContent：两原生窗口1001点、三档视域、真实指针命中与内容/dirty不变，含首末端点；密度测试不充当性能/裁剪证明。 |
+| CoordinateRoundtripAndEventHitRectUseSameTransform（三例） | TimelineGeometryTests.TimePixelTransformMatchesFormulaAndRoundTrips及ShortIntervalsPointsAndReverseMarqueeUseActualLayoutBounds、TimelinePresenterTests.ResizeUsesSharedMinimumAndLeftHandlePriority保留坐标回转、短片段点击宽度、反向框选；当前实际12px点宽优先于实验6px最小外观。 |
+| ZeroAndEndpointSignalsRemainVisibleAndDrawingSetupDoesNotDirtyContent | 上述双窗密度测试显式首末key保留，TimelineGeometryTests短片段/点几何核对端点，内容编码/无事务断言保留；不保留实验自行new TimelineCanvas的窗口外构造API。 |
+| WorkbenchTests.TrackHeadersTargetNewEventsAndViewControlsDoNotEditDefinition | TimelineDensityTests.BothNativeMenusSelectAndRevealCreatedTracksWithoutScrollingTheOtherWindow保留新轨选择/22次滚动揭示/另一视域不动/Undo；ExtensionEndToEndTests.BothMenusAndPropertyControlsProduceEquivalentPointAndIntervalGraphs保留目标轨创建；PropertyEditingTests.ActualToolkitInspectorKeepsVectorComponentsUsableAtNarrowWidth保留真实280px向量分量>15px与提交；导航不标脏由双窗导航/标尺用例继承。 |
+| LayoutRestoresFullWidthTimelineAndNativeUnityInspector | ToolkitTimelineTests.ToolkitUsesSameGraphToolkitInspectorAndImguiGeometry及SharedLayoutEvidenceCapturesBothOwnedWindows保留原生CustomEditor/字段Undo、850/1024/1400主体满宽/无固定属性面板/标尺及范围栏几何；ExtensionEndToEndTests空组折叠/组轨创建与TimelinePresenterTests双窗workspace保留折叠/分栏取消不改作者。实验双pane和249px固定分栏不是当前布局合同。 |
+| LayoutEvidenceCapturesOwnedWindowOnly | SharedLayoutEvidenceCapturesBothOwnedWindows同样只捕获本次窗口、释放临时渲染资源；截图本身不是人工视觉验收。 |
+| ToolbarTrackCreationUpdatesRowsInLaidOutCanvas | BothNativeMenusSelectAndRevealCreatedTracksWithoutScrollingTheOtherWindow及ToolkitEmptyFoldPlaceholderStaysPassiveAndTracksUndoRedoFirstChild保留实际布局/菜单创建/行刷新，不要求实验+Track工具栏或固定Track 1命名。 |
+| RealWindowLayoutResizesAndCanBeClosedAndReopened | BothWindowOpenOrdersShareContextAndRebuildWithoutRegistrationLeaks及SharedLayoutEvidenceCapturesBothOwnedWindows保留真实大小变化/关闭重建与订阅恢复；新窗口空文档的实验独立会话断言退役，必须看到共享会话。 |
+| RebuildingNativeTreeDoesNotAccumulateControlsOrCallbacks | BothWindowOpenOrdersShareContextAndRebuildWithoutRegistrationLeaks保留三次CreateGUI/注册不增长/控件不重复，Toolkit无IMGUIContainer由真实原生树检查继承；不要求实验TwoPaneSplitView存在。 |
+| IndependentWindowsDoNotShareDocumentOrSelection | 整例独立作者图与选择合同退役，当前明确唯一会话；TimelinePresenterTests.TwoWindowsShareAuthorsButNotRangeScrollCaptureOrDisposal及BothWindowOpenOrdersShareContextAndRebuildWithoutRegistrationLeaks验证必须共享而逐窗捕获/视域独立。 |
+| TimeContractTests.ForwardPointTruthTable（六例）、ShortIntervalCrossedInOneAdvanceHasBothBoundaries | PreviewOwnershipTests.ForwardPreviewCrossesZeroShortIntervalAndEndpointOnlyOnce走真实float预览会话，核对零点/跨越1微秒区间两边界/终点、重复采样不重复进入；不保留实验double辅助函数API。 |
+| IntervalIsLeftClosedRightOpen（四例） | PreviewOwnershipTests.PreviewContinuousUpdatesUseLeftClosedRightOpenInterval逐项.249999/.25/.749999/.75实际边界更新覆盖，032721Z-308fd008预览24/24。 |
+| LoopCrossingsDoNotLoseCycles（六例） | 整组实验周期计数及端点/下一周期零点独立ID算法退役：当前播放器对一次更新只采样末端和取余位置，不构建逻辑全周期事件执行器；PlaybackPauseLoopStepAndFaultKeepResourceOwnershipExplicit及PlaybackStoppedDuringLoopBoundaryCannotRecreatePreviewOrAdvancePreviousTime保留当前循环/停止/资源要求。不得声称保留实验多周期逐次逻辑事件执行。 |
+| TouchingIntervalsAndPointsDoNotOverlap | 当前邻居/点能力与CrossBlend分开由TypeCatalogTests.NeighborPolicyKeepsPropertyCrossBlendSeparateFromStrictEdges、CapabilitiesRemainIndependentOfLocksAndRespectSignalsAndBlendSentinels继承；不将实验OverlapPolicy.Reject带入新图。 |
+| FrameRatesAreExplicitAndIndependent | SettingsPresenterTests.ImmediateIntentsShareModeDefaultsAndRejectInvalidValuesWithoutWriting与两UI实际时间字段消费注入FrameRate；实验ToFrames的AwayFromZero与参数类型double合同退役，当前控件Mathf.RoundToInt及float秒，不保留孤立换算工具凑测试。无效帧率仍由EditorSettings构造拒绝。 |
+| PersistentIdsAreNonEmptyCanonicalAndIndependentOfUnityObjects | 实验节点StableId格式整例退役；新产品资源身份仍必须GUID/localFileId，由OrderedDocumentTests手写引用及固定reference探针保留，与作者节点字符串ID不是一回事。 |
+| SameTimeSortHonorsOldCycleThenExitPointEnterThenStableOrder | 实验Cycle/Phase/ID排序整例退役，不偷偷替换当前播放语义；新增EqualTimePreviewBoundariesUseReverseTrackThenStableClipOrder核对实际逆轨顺序、片段稳定顺序及同刻旧退出/点/新进入。 |
+| PersistenceProbeCommands及PersistenceProbeDocument（A01） | 实验SerializeReference/.asset格式和DocumentId字符串退役。DocumentFormatTests完整字段/参数/两多态类型与OrderedDocumentTests手写资源、ApplicationAdapterTests事务Undo及document_lifecycle_probe双窗磁盘重开继承；真实主/子资源卸载重载由仍保留的reference探针负责，删除实验探针不删除该能力。 |
+| SessionProbeCommands（A05） | .asset A/B独立仓储退役；当前FailedRead/CommitFailure、StorageSafetyTests真实磁盘/重复提交/外部版本及document_lifecycle_probe重开/来源/Recovery继承。资源往返同上，不以内存对象相同代替卸载重载。 |
+| WorkbenchProbeCommands.WorkbenchProbe（B06） | 实验窗口固定链退役，原生字段/null/向量/取消/Undo/保存/重开由上述真实双UI用例及document_lifecycle_probe/仍保留教程链继承；诊断JsonStatus/WindowStatus已抽入WindowDiagnostics，返回产品窗口绑定自己的Context，不再依赖实验模型。 |
+
 测试源码统一改为当前能力命名和Domain/Application/Presentation/Infrastructure/Views目录。以下为保留要求的映射，不承诺旧类型/测试名或固定202计数；实际删测前必须逐断言核实新用例覆盖，仍受当前真实运行阻塞。
 
 | 当前Tests/Editor文件 | 目标与保留要求 |
@@ -1027,13 +1133,13 @@ void ITimelineView.SetCapture(bool requested);
 | ExtensionEndToEndTests.cs | Views：双UI真实属性/菜单/拖动/取消/根混排/保存重开/播放；禁止用直接用例调用替代SendEvent/Pointer验收 |
 | InteractionMeasurementTests.cs | 迁至性能测试；保留实际入口计时/分配，增加独立进程冷首调用，不把当前live Editor测量冒充冷测 |
 | InteractionTests.cs | 实验窗口测试退役；移动/拉伸/框选/锁定/吸附/外部释放能力转新Presentation和双UI输入测试 |
-| JsonPropertyTests.cs | PropertyPresenter及真实双UI控件：字段条件/实际选项值、延迟提交/Esc、null/数组/嵌套struct、锁定和陈旧路径 |
+| PropertyEditingTests.cs | PropertyPresenter及真实双UI控件：字段条件/实际选项值、延迟提交/Esc、null/数组/嵌套struct、锁定和陈旧路径 |
 | LegacyBaselineTests.cs | Domain/Playback/Serialization当前样例回归；保留数值与边界预期，删除历史名称与格式假设 |
 | LegacySafetyTests.cs | Application/Views：无效打开不切换、创建失败、保存取消、单调自动保存、两个独立UI入口；不再查询实验窗口 |
 | PreviewOwnershipTests.cs | Application/Composition：单update驱动、初始化部分失败释放、幂等Dispose、停止异常与预览冲突诊断 |
 | RegistryPropertyTests.cs | 实验注册实现退役；原子发布、冲突工厂隔离和真实控件集合/null要求转现行扩展/PropertyPresenter测试 |
 | SessionTests.cs | 实验.asset会话退役；磁盘/Recovery/来源切换失败不变要求由新Application/Infrastructure完整覆盖 |
-| SharedJsonTests.cs | 按Application/Presentation/Views拆分；保留真实控件、事务owner、Undo、选择、保存/自动保存/恢复、取消/输入作用域等断言 |
+| cs | 按Application/Presentation/Views拆分；保留真实控件、事务owner、Undo、选择、保存/自动保存/恢复、取消/输入作用域等断言 |
 | StorageSafetyTests.cs | Infrastructure：真实锁文件、外部revision、createOnly、meta/目录边界、写入/替换/读回故障、提交后导入失败 |
 | TimeContractTests.cs | Domain时间边界/邻接/同时间排序；只保留当前模型和float要求的规则，不强行兼容实验ID/double图 |
 | TimelineGeometryTests.cs | Presentation：变换、点/短片段、左手柄优先、可见布局、组块、根混排、鼠标锚点与最小跨度 |

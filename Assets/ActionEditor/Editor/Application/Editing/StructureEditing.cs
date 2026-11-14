@@ -65,6 +65,14 @@ namespace NBC.ActionEditor.Application.Editing
             var index = asset.RootItems.OfType<TimelineGroup>().Count();
             command.Execute(); return asset.RootItems.OfType<TimelineGroup>().ElementAt(index);
         }
+        // 创建结果交给调用者决定选择和视域，作者用例不持有窗口状态。
+        public IDirectable Create(object parent, Type type, float time = 0)
+        {
+            if (parent is ActionDocument) return AddGroup(type);
+            if (parent is TimelineGroup group) return AddTrack(group, type);
+            if (parent is TimelineTrack track) return AddClip(track, type, time);
+            throw new InvalidOperationException("没有有效创建目标。");
+        }
         public TimelineTrack AddTrack(TimelineGroup group, Type type)
         {
             var command = Creation(group, type);

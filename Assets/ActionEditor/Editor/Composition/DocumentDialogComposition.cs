@@ -21,7 +21,7 @@ namespace NBC.ActionEditor.Composition
         }
         public Type[] CreationTypes() => ActionEditorTypeCatalog.DerivedFrom(typeof(ActionDocument)).Select(i => i.type)
             .Where(t => !t.IsAbstract && t.GetConstructor(Type.EmptyTypes) != null).Distinct().OrderBy(t => t.FullName, StringComparer.Ordinal).ToArray();
-        public string ValidateNewPath(string path) => DocumentCreationService.ValidateNewPath(path);
+        public string ValidateNewPath(string path) => new Infrastructure.Documents.JsonDocumentRepository().ValidateNewPath(path);
         public string[] ExportIds() => DocumentFormats.Registry.Exportable.Select(f => f.Id).ToArray();
         public string[] ExportLabels() => DocumentFormats.Registry.Exportable.Select(f => f.DisplayName).ToArray();
         public string ExportExtension(string id) => DocumentFormats.Registry.ById(id).Extension.TrimStart('.');

@@ -4,6 +4,16 @@ using NBC.ActionEditor.Application.Editing;
 
 namespace NBC.ActionEditor.Presentation.Contracts
 {
+    // 诊断只交付本次文档代次和不透明位置，不暴露可写片段。
+    public readonly struct PropertyIssueState
+    {
+        public int Key { get; }
+        public long Version { get; }
+        public string Message { get; }
+        internal PropertyIssueState(int key, long version, string message)
+        { Key = key; Version = version; Message = message; }
+    }
+
     // 复杂字段只向视图交付子字段快照，不保留作者对象引用。
     public sealed class PropertyObjectState
     {
@@ -17,6 +27,7 @@ namespace NBC.ActionEditor.Presentation.Contracts
         public PropertyDescription Description { get; }
         public PropertyPath Path { get; }
         public object Value { get; }
+        public bool Mixed { get; }
         public Type Type => Description.Field.FieldType;
         public string Label => Description.Label ?? Description.Field.Name;
         private readonly string[] optionLabels;
@@ -24,7 +35,7 @@ namespace NBC.ActionEditor.Presentation.Contracts
         public int OptionIndex { get; }
         internal PropertyFieldState(PropertyDescription description, PropertyPath path, object value)
         {
-            Description = description; Path = path; Value = value;
+            Description = description; Path = path; Value = value; Mixed = path.IsMixed;
             OptionIndex = description.OptionIndex(Value);
             optionLabels = new string[description.Constants.Count];
             for (var i = 0; i < optionLabels.Length; i++)

@@ -11,8 +11,8 @@ from .core import WorkflowError, blocked, consume_approval, digest, make_plan
 
 
 READ_ONLY = frozenset({
-    "actioneditor.validation json_status",
-    "actioneditor.validation window_status",
+    "actioneditor.verification json_status",
+    "actioneditor.verification window_status",
     "editor status", "scene list_open", "scene get_hierarchy", "build get_settings",
     "build.target list", "build list_profiles", "test list", "test status", "script recompile_status",
     "settings.player get", "settings.audio get", "settings.graphics get", "settings.input get",
@@ -27,25 +27,14 @@ READ_ONLY = frozenset({
 
 # Explicit catalog, not a prefix heuristic. Only implemented return/poll contracts are admitted.
 MUTATIONS = {
-    "actioneditor.validation document_lifecycle_probe": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation arrange_feature_layout": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation retire_imgui_timeline_sources": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation retire_editing_sources": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation arrange_application_layout": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation arrange_domain_layout": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation rename_toolkit_ui": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation rf22_tutorial_probe": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation rf20_export_probe": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation cancel_save_dialog": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation rf18_move": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation rf18_reference_probe": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation sync_projects": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation rf17_move": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation controlled_quit": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation shared_json_probe": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation workbench_probe": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation session_probe": {"dry_run": True, "confirm": True, "poll": None},
-    "actioneditor.validation persistence_probe": {"dry_run": True, "confirm": True, "poll": None},
+    "actioneditor.verification document_lifecycle_probe": {"dry_run": True, "confirm": True, "poll": None},
+    "actioneditor.verification tutorial_probe": {"dry_run": True, "confirm": True, "poll": None},
+    "actioneditor.verification export_probe": {"dry_run": True, "confirm": True, "poll": None},
+    "actioneditor.verification cancel_save_dialog": {"dry_run": True, "confirm": True, "poll": None},
+    "actioneditor.verification reference_probe": {"dry_run": True, "confirm": True, "poll": None},
+    "actioneditor.verification sync_projects": {"dry_run": True, "confirm": True, "poll": None},
+    "actioneditor.verification controlled_quit": {"dry_run": True, "confirm": True, "poll": None},
+    "actioneditor.verification persistence_probe": {"dry_run": True, "confirm": True, "poll": None},
     "asset delete": {"dry_run": True, "confirm": True, "poll": None},
     "settings.player set": {"dry_run": True, "confirm": True, "poll": None},
     "build set_settings": {"dry_run": True, "confirm": True, "poll": None},
@@ -336,15 +325,15 @@ class Unity:
 
     def preview(self, command, parameters, inputs=()):
         validate_parameters(parameters)
-        if command in {"actioneditor.validation arrange_feature_layout", "actioneditor.validation document_lifecycle_probe"} and parameters:
+        if command in {"actioneditor.verification document_lifecycle_probe", "actioneditor.verification persistence_probe"} and parameters:
             blocked("Fixed operation accepts no parameters; targets cannot be overridden.")
-        if command == "actioneditor.validation cancel_save_dialog":
+        if command == "actioneditor.verification cancel_save_dialog":
             if parameters:
                 blocked("Fixed dialog recovery accepts no parameters.")
             from .modal import save_dialog
             instance = parse_instances(self.raw(["pipeline", "editors"]), self.context.project)
             return make_plan(self.run, "unity", command, {}, high_risk=True, inputs=inputs, preview=save_dialog(instance["pid"]))
-        if command in {"actioneditor.validation retire_imgui_timeline_sources", "actioneditor.validation retire_editing_sources", "actioneditor.validation arrange_application_layout", "actioneditor.validation arrange_domain_layout", "actioneditor.validation rename_toolkit_ui", "actioneditor.validation controlled_quit", "actioneditor.validation rf17_move", "actioneditor.validation rf18_move", "actioneditor.validation rf18_reference_probe", "actioneditor.validation sync_projects", "actioneditor.validation rf20_export_probe", "actioneditor.validation rf22_tutorial_probe"} and parameters:
+        if command in {"actioneditor.verification controlled_quit", "actioneditor.verification reference_probe", "actioneditor.verification sync_projects", "actioneditor.verification export_probe", "actioneditor.verification tutorial_probe"} and parameters:
             blocked("Fixed operation accepts no parameters; targets cannot be overridden.")
         if command not in MUTATIONS:
             blocked(f"Mutation policy/return contract not implemented: {command}")
@@ -358,9 +347,9 @@ class Unity:
         if plan.get("kind") != "unity" or plan.get("command") not in MUTATIONS:
             blocked("Unsupported Unity mutation plan.")
         validate_parameters(plan["parameters"])
-        if plan["command"] in {"actioneditor.validation arrange_feature_layout", "actioneditor.validation document_lifecycle_probe"} and plan["parameters"]:
+        if plan["command"] in {"actioneditor.verification document_lifecycle_probe", "actioneditor.verification persistence_probe"} and plan["parameters"]:
             blocked("Fixed operation accepts no parameters.")
-        if plan["command"] == "actioneditor.validation cancel_save_dialog":
+        if plan["command"] == "actioneditor.verification cancel_save_dialog":
             if plan["parameters"]:
                 blocked("Fixed dialog recovery accepts no parameters.")
             from .modal import save_dialog, cancel_save_dialog
@@ -370,7 +359,7 @@ class Unity:
                 blocked("Native save dialog changed since preview.")
             consume_approval(self.run, plan, approval_file)
             return cancel_save_dialog(current)
-        if plan["command"] in {"actioneditor.validation retire_imgui_timeline_sources", "actioneditor.validation retire_editing_sources", "actioneditor.validation arrange_application_layout", "actioneditor.validation arrange_domain_layout", "actioneditor.validation rename_toolkit_ui", "actioneditor.validation controlled_quit", "actioneditor.validation rf17_move", "actioneditor.validation rf18_move", "actioneditor.validation rf18_reference_probe", "actioneditor.validation sync_projects", "actioneditor.validation rf20_export_probe", "actioneditor.validation rf22_tutorial_probe"} and plan["parameters"]:
+        if plan["command"] in {"actioneditor.verification controlled_quit", "actioneditor.verification reference_probe", "actioneditor.verification sync_projects", "actioneditor.verification export_probe", "actioneditor.verification tutorial_probe"} and plan["parameters"]:
             blocked("Fixed operation accepts no parameters.")
         self.ready()
         self.discover()

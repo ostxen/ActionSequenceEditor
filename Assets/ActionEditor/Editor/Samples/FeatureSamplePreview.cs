@@ -7,10 +7,10 @@ namespace NBC.ActionEditor.Samples
     [CustomHeader(typeof(FeatureSampleDocument))]
     public sealed class FeatureSampleHeader : HeaderBase
     {
-        public override void OnGUI()
+        public override void OnGUI(EditorExtensionContext context)
         {
             if (GUILayout.Button(Lan.PreviewTitle, EditorStyles.toolbarButton))
-                EditorWindow.GetWindow<FeatureSamplePreview>(Lan.PreviewTitle).Show();
+                FeatureSamplePreview.ShowFor(context);
         }
     }
 
@@ -18,15 +18,22 @@ namespace NBC.ActionEditor.Samples
     [ToolkitHeader(typeof(FeatureSampleDocument))]
     public sealed class FeatureSampleToolkitHeader : ToolkitHeaderView
     {
-        public override UnityEngine.UIElements.VisualElement CreateGUI() =>
-            new UnityEditor.UIElements.ToolbarButton(() => EditorWindow.GetWindow<FeatureSamplePreview>(Lan.PreviewTitle).Show()) { text = Lan.PreviewTitle };
+        public override UnityEngine.UIElements.VisualElement CreateGUI(EditorExtensionContext context) =>
+            new UnityEditor.UIElements.ToolbarButton(() => FeatureSamplePreview.ShowFor(context)) { text = Lan.PreviewTitle };
     }
 
     public sealed class FeatureSamplePreview : EditorWindow
     {
         private Vector2 scroll;
         private Presentation.Presenters.FeatureSamplePresenter presenter;
-        private void OnEnable() => presenter = Composition.FeatureSampleComposition.Create();
+        // 预览由发起扩展显式绑定，两个独立宿主不会借用彼此文档。
+        public void Bind(EditorExtensionContext context) => presenter = Composition.FeatureSampleComposition.Create(context);
+        public static void ShowFor(EditorExtensionContext context)
+        {
+            var window = CreateInstance<FeatureSamplePreview>();
+            window.titleContent = new GUIContent(Lan.PreviewTitle);
+            window.Bind(context); window.Show();
+        }
         private void OnDisable() => presenter = null;
         private void OnInspectorUpdate() => Repaint();
 

@@ -11,7 +11,7 @@ namespace NBC.ActionEditor.Infrastructure.Assets
         {
             if (type == null || type.Assembly.IsDynamic) return false;
             var name = type.Assembly.GetName().Name;
-            if (name.Split('.').Any(part => part == "Tests" || part == "Test" || part == "Validation" || part == "Verification")) return false;
+            if (name.Split('.').Any(part => part == "Tests" || part == "Test" || part == "Verification")) return false;
             return !type.Assembly.GetCustomAttributesData().Any(attribute => attribute.AttributeType.FullName == "UnityEngine.TestTools.TestRunner.TestAssemblyAttribute");
         }
     }

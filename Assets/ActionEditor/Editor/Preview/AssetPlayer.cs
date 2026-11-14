@@ -4,12 +4,9 @@ using UnityEngine;
 
 namespace NBC.ActionEditor
 {
-    public enum EditorPlaybackState { Stoped, PlayingForwards, PlayingBackwards }
-
     // 持有当前采样时间及唯一预览会话，重入Reset使旧采样结果失效。
     public class AssetPlayer
     {
-        public static AssetPlayer Inst => App.Context.Player;
         private readonly Func<ActionDocument> document;
         private readonly ActionEditorPreviewSession preview;
         private float currentTime;
@@ -17,7 +14,6 @@ namespace NBC.ActionEditor
         public event Action Faulted;
         public float previousTime { get; private set; }
         public bool IsInitialized => preview.IsInitialized;
-        public AssetPlayer() : this(() => App.AssetData) { }
         public AssetPlayer(Func<ActionDocument> document, Func<Type, PreviewBase> factory = null)
         {
             this.document = document ?? throw new ArgumentNullException(nameof(document));

@@ -4,6 +4,7 @@ using System.Linq;
 using NBC.ActionEditor.Application.Documents;
 using NBC.ActionEditor.Application.Editing;
 using NBC.ActionEditor.Application.Settings;
+using NBC.ActionEditor.Domain;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Timeline;
 
@@ -46,6 +47,19 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public void Scroll(float value) => Run(() => Workspace.ScrollY = Math.Max(0, value));
         public void ViewRange(float minimum, float maximum) => Run(() => Workspace.SetRange(minimum, maximum));
         public void Fit() => Run(() => Workspace.SetRange(0, Math.Max(.25f, session.Document?.Length ?? 7)));
+        // 只滚动发起创建的窗口；展开父组后按当前行几何揭示完整对象。
+        public void Reveal(IDirectable item) => Run(() =>
+        {
+            var row = item is TimelineClip selectedClip ? selectedClip.Parent : item;
+            if (row?.Parent is TimelineGroup group) Workspace.SetCollapsed(group, false);
+            Refresh();
+            var index = layout.Rows.ToList().IndexOf(row);
+            if (index < 0) return;
+            var top = index * size.RowHeight;
+            if (top < Workspace.ScrollY) Workspace.ScrollY = top;
+            else if (top + size.RowHeight > Workspace.ScrollY + size.Height)
+                Workspace.ScrollY = top + size.RowHeight - size.Height;
+        });
         public TimelinePresenter(DocumentSession session, SelectionState selection, StructureEditing structure, ClipboardEditing clipboard,
             ClipEditing clips, TimelineWorkspace workspace, ITimelinePlayhead playhead, Func<EditorSettings> settings, ITimelineView view)
         {

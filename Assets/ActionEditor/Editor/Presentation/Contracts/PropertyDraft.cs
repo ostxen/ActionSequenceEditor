@@ -8,9 +8,10 @@ namespace NBC.ActionEditor.Presentation.Contracts
         internal PropertyPath Path { get; }
         internal long Version { get; }
         public object Original { get; }
+        internal object[] Originals { get; }
         public object Value { get; internal set; }
         public bool Active { get; internal set; } = true;
         internal PropertyDraft(PropertyPath path, long version)
-        { Path = path; Version = version; Original = Value = path.Read(); }
+        { Path = path; Version = version; Originals = path.ReadValues(); Original = Value = Originals[0]; }
     }
 }

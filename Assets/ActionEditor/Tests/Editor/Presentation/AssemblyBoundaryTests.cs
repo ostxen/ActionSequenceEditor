@@ -49,7 +49,7 @@ namespace NBC.ActionEditor.Tests.Presentation
             foreach (var path in Directory.GetFiles(Path.Combine(root, directory), "*.cs", SearchOption.AllDirectories))
             {
                 var source = File.ReadAllText(path);
-                foreach (var forbidden in new[] { "UnityEditor", "UnityEngine.UIElements", "EditorWindow", "Event.current", "App.", "File.", "AssetDatabase", "Selection.activeObject" })
+                foreach (var forbidden in new[] { "UnityEditor", "UnityEngine.UIElements", "EditorWindow", "Event.current", "App.", "ActionEditorHost.", "File.", "AssetDatabase", "Selection.activeObject" })
                     Assert.That(source, Does.Not.Contain(forbidden), path);
             }
         }

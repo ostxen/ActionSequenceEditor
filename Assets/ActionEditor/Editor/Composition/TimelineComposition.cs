@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Views.IMGUI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,15 +32,15 @@ namespace NBC.ActionEditor.Composition
             { if (EditorUtility.DisplayDialog(title, title == Lan.GroupDelete ? Lan.GroupDeleteTips : Lan.TrackDeleteTips, Lan.TipsConfirm, Lan.TipsCancel)) confirmed(); }
             public void Rename(IDirectable item) => RenameItemWindow.Show(item, context.Structure.Rename);
         }
-        public static TimelinePresenter Create(ActionEditorContext context, TimelineWorkspace workspace, ITimelineView view)
+        public static TimelinePresenter Create(ActionEditorContext context, TimelineWorkspace workspace, ITimelineView view,
+            Application.Settings.SettingsSession settings, DocumentPresenter documents)
         {
             var presenter = new TimelinePresenter(context.Session, context.Selection, context.Structure, context.ClipboardEditing,
-                context.Clips, workspace, new Playhead(context), () => Prefs.Session.Current, view);
+                context.Clips, workspace, new Playhead(context), () => settings.Current, view);
             presenter.Menus = new TimelineMenuPresenter(context.Session, context.Structure, context.ClipboardEditing, context.Clipboard,
-                context.Selection, new Catalog(), new Dialogs(context), Text);
+                context.Selection, new Catalog(), new Dialogs(context), Text, presenter.Reveal);
             presenter.HostAction += key =>
             {
-                var documents = DocumentPresenterComposition.Create(context);
                 if (key == TimelineKey.Save) documents.Invoke(DocumentIntent.Save);
                 else if (key == TimelineKey.Undo) documents.Invoke(DocumentIntent.Undo);
                 else if (key == TimelineKey.Redo) documents.Invoke(DocumentIntent.Redo);

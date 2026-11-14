@@ -2,16 +2,15 @@
 
 本文件记录验收证据和待验操作，不维护第二份任务状态。唯一任务状态见 `.codex/tasks/action-editor-refactor.md`。本轮只覆盖 ActionEditor，未改 Combat、包/设置、用户 JSON，未执行 Player Build 或推送。
 
-## 当前阅读入口（2026-11-12补充，历史证据不改写）
+## 当前阅读入口
 
-UI Toolkit主窗口当前类名为`UIToolkitActionEditorWindow`，时间轴/属性/设置分别为`UIToolkitTimelineCanvas`、`UIToolkitPropertyView`、`UIToolkitPreferencesWindow`；下方历史证据中的Json前缀名称指重命名前同一实现，不是另一套编辑器。
+两个正式菜单为 `NBC/Action Editor/IMGUI` 和 `NBC/Action Editor/UI Toolkit`，窗口分别位于 `NBC.ActionEditor.Views.IMGUI` 与 `.UIToolkit`，均名为 `ActionEditorWindow`。两窗共享单文档、选择、播放头及Undo，逐窗工作区与捕获独立。
 
-入门正文只维护在[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)。当前菜单仍为`NBC > Action Editor > Open Action Editor`（IMGUI）与`Open Workbench`（原生UI Toolkit），共用单文档/选择/播放头/Undo。生产格式已硬切为[合同RF16唯一契约](ActionEditor-Contracts.md)中的`actioneditor.json` v1；不再读取旧裸根，不自动迁移用户资源。请用新建隔离样例进行下方人工检查，不用旧正式文件试覆盖。
+入门操作正文只维护在[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)。当前[存储合同](ActionEditor-Contracts.md)为严格 `actioneditor.json` version 2，根组和独立轨道按RootItems混排。保存、另存、自动保存和独立导出由共享用例与可靠提交实现，导出不改变来源或基线。
 
-RF18–RF22已补充唯一转换、主/子资产引用卸载读回、导入失败语义、保存/另存以及独立导出和双UI磁盘连续链。当前保存图标右键提供“保存 / 另存为 / 导出”，导出格式仅`JSON (.json)`；导出不切来源或清除脏状态。新阶段命令/计数/结果仅记唯一任务清单，不把下方RF15的164项和旧格式持久探针重新标成新格式证据。系统文件框成功输入、完整桌面命中、跨进程引用及任意第三方扩展仍不能据此宣称通过；H01–H09继续全部待用户。
+最终工程状态与证据只见[唯一任务清单](../.codex/tasks/action-editor-refactor.md)。H01–H09仍为待用户体验的范围，不以自动化测试或截图代签。
 
-以下“两个入口与数据合同”至文末均为**RF15（2026-11-11）原范围记录**。其中原版/新版、FullSerializer、当时未覆盖项和旧路径保留作为历史证据，不覆盖本节与当前合同。
-
+以下均为RF15当日记录，保留原始身份、计数与限制，不定义当前产品合同。
 ## 两个入口与数据合同
 
 - 原版：`NBC/Action Editor/Open Action Editor`，GUILayout/Event 绘制。

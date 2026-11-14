@@ -54,6 +54,8 @@ namespace NBC.ActionEditor
                 var localPreviousTime = target.directable.ToLocalTime(previousTime + deltaMoveClip);
 
                 target.Update(localCurrentTime, localPreviousTime);
+                // 更新回调也可能释放预览并清空目标，失效后不再读取作者对象。
+                if (active != null && !active()) return;
                 lastTargetStartTime = target.directable.StartTime;
             }
         }

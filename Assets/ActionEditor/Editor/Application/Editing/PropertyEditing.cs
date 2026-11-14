@@ -17,5 +17,6 @@ namespace NBC.ActionEditor.Application.Editing
         { this.session = session ?? throw new ArgumentNullException(nameof(session)); this.values = values ?? throw new ArgumentNullException(nameof(values)); }
         public void Change(Action change) => session.Edit("Edit properties", change);
         public object CreateElement(Type type) => values.Create(type);
+        public object CopyValue(object value) => values.Copy(value);
     }
 }

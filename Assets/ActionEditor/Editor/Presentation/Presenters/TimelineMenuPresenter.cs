@@ -19,10 +19,11 @@ namespace NBC.ActionEditor.Presentation.Presenters
         private readonly ITimelineTypeCatalog catalog;
         private readonly ITimelineDialogs dialogs;
         private readonly Func<string, string> text;
+        private readonly Action<IDirectable> reveal;
         public TimelineMenuPresenter(DocumentSession session, StructureEditing structure, ClipboardEditing clipboard, ClipboardState copied,
-            SelectionState selection, ITimelineTypeCatalog catalog, ITimelineDialogs dialogs, Func<string, string> text)
+            SelectionState selection, ITimelineTypeCatalog catalog, ITimelineDialogs dialogs, Func<string, string> text, Action<IDirectable> reveal)
         { this.session = session; this.structure = structure; this.clipboard = clipboard; this.copied = copied;
-            this.selection = selection; this.catalog = catalog; this.dialogs = dialogs; this.text = text; }
+            this.selection = selection; this.catalog = catalog; this.dialogs = dialogs; this.text = text; this.reveal = reveal; }
 
         public IReadOnlyList<TimelineMenuEntry> Groups() => Creation(session.Document, typeof(TimelineGroup), 0, "").ToArray();
         public IReadOnlyList<TimelineMenuEntry> Build(IDirectable item, bool header, float time)
@@ -78,7 +79,12 @@ namespace NBC.ActionEditor.Presentation.Presenters
                 var facts = DirectableTypeInfo.For(choice.Type);
                 if (facts.AttachableTypes != null && !facts.AttachableTypes.Contains(parent.GetType())) continue;
                 yield return new TimelineMenuEntry(prefix + (string.IsNullOrEmpty(choice.Category) ? "" : choice.Category + "/") + choice.Name,
-                    command.CanExecute(out _), command.Execute);
+                    command.CanExecute(out _), () =>
+                    {
+                        var created = structure.Create(parent, choice.Type, time);
+                        selection.Set(new[] { created }, true);
+                        reveal(created);
+                    });
             }
         }
     }

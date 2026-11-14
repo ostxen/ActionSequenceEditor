@@ -1,6 +1,0 @@
-{
-    "name": "NBC.ActionEditor.Validation.Editor",
-    "references": ["NBC.ActionEditor.Domain", "NBC.ActionEditor.Serialization", "NBC.ActionEditor.Application", "NBC.ActionEditor.Presentation", "NBC.ActionEditor.Editor", "Unity.Pipeline.Attributes"],
-    "includePlatforms": ["Editor"],
-    "autoReferenced": false
-}

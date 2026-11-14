@@ -17,9 +17,10 @@ namespace NBC.ActionEditor.Presentation.Timeline
                 || float.IsNaN(width) || float.IsInfinity(width) || width <= 0) throw new ArgumentOutOfRangeException(nameof(span));
             Minimum = minimum; Span = span; Width = width; Left = left;
         }
-        public float X(float time) => Left + (time - Minimum) * Scale;
-        public float Time(float x) => Minimum + (x - Left) / Scale;
-        public float Duration(float pixels) => pixels / Scale;
+        // 中间运算保留双精度，避免先舍入比例后放大远端坐标误差。
+        public float X(float time) => (float)(Left + ((double)time - Minimum) / Span * Width);
+        public float Time(float x) => (float)(Minimum + ((double)x - Left) / Width * Span);
+        public float Duration(float pixels) => (float)((double)pixels / Width * Span);
     }
 
     // 每次生成行几何都使用当前图和本窗口工作区，失效对象不会留在键缓存中。

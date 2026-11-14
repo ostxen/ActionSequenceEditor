@@ -17,6 +17,8 @@ namespace NBC.ActionEditor.Infrastructure.Documents
     {
         private readonly ICommitFiles files;
         private readonly Action<string> import;
+        // 选择器与仓储共享扩展名规则，避免绕过真实打开入口的过滤。
+        public static bool IsDocumentPath(string path) => string.Equals(Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase);
         public JsonDocumentRepository(ICommitFiles files = null, Action<string> import = null)
         {
             this.files = files ?? new CommitFiles();

@@ -20,5 +20,6 @@ namespace NBC.ActionEditor.Application.Ports
     public interface IPropertyValueFactory
     {
         object Create(Type type);
+        object Copy(object value);
     }
 }

@@ -45,7 +45,7 @@ namespace NBC.ActionEditor.Storage
             {
                 var name = assembly.GetName().Name;
                 if (assembly.IsDynamic || editorOnly.Contains(name) || name.EndsWith(".Tests", StringComparison.Ordinal)
-                    || name.IndexOf(".Validation", StringComparison.Ordinal) >= 0 || name.IndexOf(".Verification", StringComparison.Ordinal) >= 0 || name.EndsWith(".Editor", StringComparison.Ordinal)
+                    || name.IndexOf(".Verification", StringComparison.Ordinal) >= 0 || name.EndsWith(".Editor", StringComparison.Ordinal)
                     || name.StartsWith("UnityEditor", StringComparison.Ordinal)) continue;
                 Type[] types;
                 try { types = assembly.GetTypes(); }

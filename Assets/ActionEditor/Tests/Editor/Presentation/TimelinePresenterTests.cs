@@ -61,6 +61,27 @@ namespace NBC.ActionEditor.Tests.Presentation
                 Presenter.Pointer(new PointerInput(action, x, y, button, control, shift, region));
             public void Dispose() { Presenter.Dispose(); Session.Dispose(); }
         }
+        [Test] public void RevealClipExpandsItsGroupAndLeavesOtherWorkspaceUntouched()
+        {
+            using var h = new Harness();
+            using var other = h.Create(new View(), new TimelineWorkspace());
+            other.Resize(new TimelineSize(800, 90));
+            h.Presenter.Resize(new TimelineSize(800, 90));
+            var clip = h.Document.AllTracks.Skip(4).First().Clips.First();
+            var group = (TimelineGroup)clip.Parent.Parent;
+            h.Presenter.Workspace.SetCollapsed(group, true);
+            other.Workspace.SetCollapsed(group, true);
+            h.Presenter.Refresh(); other.Refresh();
+            h.Presenter.Reveal(clip);
+            Assert.That(h.Presenter.Workspace.IsCollapsed(group), Is.False);
+            var row = h.Presenter.State.Rows.Single(value => value.Key == h.Presenter.KeyFor(clip.Parent));
+            Assert.That(row.Bounds.Y, Is.GreaterThanOrEqualTo(0));
+            Assert.That(row.Bounds.Y + row.Bounds.Height, Is.LessThanOrEqualTo(90));
+            Assert.That(other.Workspace.IsCollapsed(group), Is.True);
+            Assert.That(other.Workspace.ScrollY, Is.Zero);
+            Assert.That(h.Session.IsDirty, Is.False);
+        }
+
         [Test] public void CompleteMoveCommitUndoRedoNeedsNoWindowOrGlobalEvent()
         {
             using var h = new Harness(); var rect = h.First.Bounds; var x = rect.X + rect.Width / 2; var y = rect.Y + 8;
