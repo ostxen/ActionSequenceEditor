@@ -23,6 +23,42 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class PropertyControlsTests : SharedContextFixture
     {
+        private sealed class SettingsControlsWindow : EditorWindow
+        {
+            public bool Captured, DisabledAfterPopup;
+            public Color ColorAfterSeparator;
+            public static readonly Color OuterColor = new Color(.2f, .4f, .6f, .8f);
+            private void OnGUI()
+            {
+                var enabled = GUI.enabled; var color = GUI.color;
+                try
+                {
+                    GUI.enabled = false;
+                    NBC.ActionEditor.Views.IMGUI.Controls.EditorTools.CleanPopup("Value", 1, new System.Collections.Generic.List<int> { 1, 2 });
+                    DisabledAfterPopup = !GUI.enabled;
+                    GUI.color = OuterColor;
+                    NBC.ActionEditor.Views.IMGUI.Controls.EditorTools.BoldSeparator();
+                    ColorAfterSeparator = GUI.color;
+                    Captured = true;
+                }
+                finally { GUI.enabled = enabled; GUI.color = color; }
+            }
+        }
+
+        [UnityTest] public IEnumerator SettingsControlsPreserveTheCallingGuiDisabledAndColorScopes()
+        {
+            var window = ScriptableObject.CreateInstance<SettingsControlsWindow>();
+            try
+            {
+                window.Show(); window.Repaint(); yield return null; yield return null;
+                Assert.That(window.Captured, Is.True);
+                Assert.That(window.DisabledAfterPopup, Is.True);
+                Assert.That(window.ColorAfterSeparator, Is.EqualTo(SettingsControlsWindow.OuterColor));
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally { window.Close(); }
+        }
+
         private sealed class CollectionFixture
         {
             public System.Collections.Generic.List<string> Values = new System.Collections.Generic.List<string> { "one", "two" };

@@ -6,148 +6,51 @@ using UnityEngine;
 
 namespace NBC.ActionEditor.Views.IMGUI.Controls
 {
+    // 原生偏好与Inspector的小型布局控件，保留调用者GUI作用域。
     public static class EditorTools
     {
         public static void BoldSeparator()
         {
-            var tex = Styles.WhiteTexture;
+            var texture = Styles.WhiteTexture;
             var lastRect = GUILayoutUtility.GetLastRect();
             GUILayout.Space(14);
-            GUI.color = new Color(0, 0, 0, 0.25f);
-            GUI.DrawTexture(new Rect(0, lastRect.yMax + 6, Screen.width, 4), tex);
-            GUI.DrawTexture(new Rect(0, lastRect.yMax + 6, Screen.width, 1), tex);
-            GUI.DrawTexture(new Rect(0, lastRect.yMax + 9, Screen.width, 1), tex);
-            GUI.color = Color.white;
+            var color = GUI.color;
+            try
+            {
+                GUI.color = new Color(0, 0, 0, 0.25f);
+                GUI.DrawTexture(new Rect(0, lastRect.yMax + 6, Screen.width, 4), texture);
+                GUI.DrawTexture(new Rect(0, lastRect.yMax + 6, Screen.width, 1), texture);
+                GUI.DrawTexture(new Rect(0, lastRect.yMax + 9, Screen.width, 1), texture);
+            }
+            finally { GUI.color = color; }
         }
 
-        public static string GUILayoutGetFilePath(string title, string des, string path, bool textReadonly = false)
+        // 取消系统对话框也结束水平布局；只读文本不会重新启用外层禁用控件。
+        public static string GUILayoutGetFolderPath(string title, string description, string path, bool textReadonly = false)
         {
-            GUILayout.BeginHorizontal();
-            GUI.enabled = !textReadonly;
-            var str = EditorGUILayout.TextField(new GUIContent(title, des), path);
-            GUI.enabled = true;
-            if (GUILayout.Button(Lan.Select, GUILayout.Width(40)))
+            using (new EditorGUILayout.HorizontalScope())
             {
-                var select_path =
-                    EditorUtility.OpenFilePanel(Lan.SelectFile,
-                        "Assets/", "");
-                if (string.IsNullOrEmpty(select_path)) return str;
-                int asset_start_index = select_path.IndexOf("Assets", StringComparison.Ordinal);
-                if (asset_start_index > -1)
-                {
-                    select_path = select_path.Substring(asset_start_index,
-                        select_path.Length - asset_start_index);
-                }
-
-                str = select_path;
+                string value;
+                using (new EditorGUI.DisabledScope(textReadonly))
+                    value = EditorGUILayout.TextField(new GUIContent(title, description), path);
+                if (!GUILayout.Button(Lan.Select, GUILayout.Width(40))) return value;
+                var selected = EditorUtility.OpenFolderPanel(Lan.SelectFolder, "Assets/", "");
+                if (string.IsNullOrEmpty(selected)) return value;
+                var assetIndex = selected.IndexOf("Assets", StringComparison.Ordinal);
+                return assetIndex >= 0 ? selected.Substring(assetIndex) : selected;
             }
-
-            GUILayout.EndHorizontal();
-            return str;
         }
 
-        public static string GUILayoutGetFolderPath(string title, string des, string path, bool textReadonly = false)
+        // 选项不添加空值，未知当前值维持未选择状态。
+        public static T CleanPopup<T>(string prefix, T selected, List<T> options, params GUILayoutOption[] guiOptions)
         {
-            GUILayout.BeginHorizontal();
-            GUI.enabled = !textReadonly;
-            var str = EditorGUILayout.TextField(new GUIContent(title, des), path);
-            GUI.enabled = true;
-            if (GUILayout.Button(Lan.Select, GUILayout.Width(40)))
-            {
-                var select_path =
-                    EditorUtility.OpenFolderPanel(Lan.SelectFolder,
-                        "Assets/", "");
-                if (string.IsNullOrEmpty(select_path)) return str;
-                int asset_start_index = select_path.IndexOf("Assets", StringComparison.Ordinal);
-                if (asset_start_index > -1)
-                {
-                    select_path = select_path.Substring(asset_start_index,
-                        select_path.Length - asset_start_index);
-                }
-
-                str = select_path;
-            }
-
-            GUILayout.EndHorizontal();
-            return str;
+            var index = options.IndexOf(selected);
+            var labels = options.Select(option => option != null ? option.ToString() : "NONE").ToArray();
+            using (new EditorGUI.DisabledScope(options.Count == 0))
+                index = string.IsNullOrEmpty(prefix)
+                    ? EditorGUILayout.Popup(index, labels, guiOptions)
+                    : EditorGUILayout.Popup(prefix, index, labels, guiOptions);
+            return index < 0 ? default : options[index];
         }
-
-        ///Generic Popup for selection of any element within a list
-        public static T Popup<T>(string prefix, T selected, List<T> options, params GUILayoutOption[] GUIOptions)
-        {
-            return Popup<T>(null, prefix, selected, options, GUIOptions);
-        }
-
-        public static T Popup<T>(Rect? rect, string prefix, T selected, List<T> options,
-            params GUILayoutOption[] GUIOptions)
-        {
-            var index = 0;
-            if (options.Contains(selected))
-            {
-                index = options.IndexOf(selected) + 1;
-            }
-
-            var stringedOptions = new List<string>();
-            if (options.Count == 0)
-            {
-                stringedOptions.Add("NONE AVAILABLE");
-            }
-            else
-            {
-                stringedOptions.Add("NONE");
-                stringedOptions.AddRange(options.Select(o => o != null ? o.ToString() : "NONE"));
-            }
-
-            GUI.enabled = stringedOptions.Count > 1;
-            if (!string.IsNullOrEmpty(prefix))
-            {
-                if (rect == null)
-                {
-                    index = EditorGUILayout.Popup(prefix, index, stringedOptions.ToArray(), GUIOptions);
-                }
-                else
-                {
-                    index = EditorGUI.Popup(rect.Value, prefix, index, stringedOptions.ToArray());
-                }
-            }
-            else
-            {
-                if (rect == null)
-                {
-                    index = EditorGUILayout.Popup(index, stringedOptions.ToArray(), GUIOptions);
-                }
-                else
-                {
-                    index = EditorGUI.Popup(rect.Value, index, stringedOptions.ToArray());
-                }
-            }
-
-            GUI.enabled = true;
-
-            return index == 0 ? default(T) : options[index - 1];
-        }
-
-        /// <summary>
-        /// 用于选择列表中任何元素而不添加NONE的通用弹出窗口
-        /// </summary>
-        public static T CleanPopup<T>(string prefix, T selected, List<T> options, params GUILayoutOption[] GUIOptions)
-        {
-            var index = -1;
-            if (options.Contains(selected))
-            {
-                index = options.IndexOf(selected);
-            }
-
-            var stringedOptions = options.Select(o => o != null ? o.ToString() : "NONE");
-
-            GUI.enabled = options.Count > 0;
-            if (!string.IsNullOrEmpty(prefix))
-                index = EditorGUILayout.Popup(prefix, index, stringedOptions.ToArray(), GUIOptions);
-            else index = EditorGUILayout.Popup(index, stringedOptions.ToArray(), GUIOptions);
-            GUI.enabled = true;
-
-            return index == -1 ? default(T) : options[index];
-        }
-
     }
 }

@@ -154,12 +154,14 @@ namespace NBC.ActionEditor.Presentation.Presenters
         {
             RequireAvailableEdit();
             var elementType = collectionType.IsArray ? collectionType.GetElementType() : collectionType.GetGenericArguments()[0];
-            path.Transform(current => CollectionEditing.Append(collectionType, (IList)current, CreateElement(elementType)));
+            // 列表操作会原地修改容器；候选必须脱离作者图，不能早于事务改动快照基线。
+            path.Transform(current => CollectionEditing.Append(collectionType, (IList)editing.CopyValue(current), CreateElement(elementType)));
         }
         public void Remove(PropertyPath path, Type collectionType, int index)
         {
             RequireAvailableEdit();
-            path.Transform(current => CollectionEditing.Remove(collectionType, (IList)current, index));
+            // 整批候选预检成功前不触碰任何原列表，后续目标越界也不会留下半次删除。
+            path.Transform(current => CollectionEditing.Remove(collectionType, (IList)editing.CopyValue(current), index));
         }
         private void RequireAvailableEdit()
         {

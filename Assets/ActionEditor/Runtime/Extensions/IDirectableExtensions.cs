@@ -1,11 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using UnityEngine;
 
 namespace NBC.ActionEditor
 {
+    // 提供直接节点的时间换算、同级约束与混合权重，不持有编辑器状态。
     public static class IDirectableExtensions
     {
         #region 长度 and 时间转换
@@ -34,9 +33,6 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 切片能否混合
         /// </summary>
-        /// <param name="directable"></param>
-        /// <param name="other"></param>
-        /// <returns></returns>
         public static bool CanCrossBlend(this IDirectable directable, IDirectable other)
         {
             if (directable == null || other == null) return false;
@@ -60,8 +56,6 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 当前开始时间是否可用
         /// </summary>
-        /// <param name="directable"></param>
-        /// <returns></returns>
         public static bool CanValidTime(this IDirectable directable)
         {
             return CanValidTime(directable, directable.StartTime, directable.EndTime);
@@ -70,10 +64,6 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 当前开始时间是否可用
         /// </summary>
-        /// <param name="directable"></param>
-        /// <param name="startTime"></param>
-        /// <param name="endTime"></param>
-        /// <returns></returns>
         public static bool CanValidTime(this IDirectable directable, float startTime, float endTime)
         {
             if (directable.Parent != null)
@@ -87,11 +77,6 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 当前开始时间是否可用
         /// </summary>
-        /// <param name="directable"></param>
-        /// <param name="parent"></param>
-        /// <param name="startTime"></param>
-        /// <param name="endTime"></param>
-        /// <returns></returns>
         public static bool CanValidTime(this IDirectable directable, IDirectable parent, float startTime, float endTime)
         {
             var prevDirectable = directable.GetPreviousSibling(parent);
@@ -141,12 +126,6 @@ namespace NBC.ActionEditor
 
         #region 切片获取
 
-        // parent.Children.Select()
-        // public static T[] GetCoincideSibling<T>(this IDirectable directable) where T : IDirectable
-        // {
-        //     return GetCoincideSibling(directable, directable.Parent) as T[];
-        // }
-
         public static IDirectable[] GetCoincideSibling(this IDirectable directable)
         {
             return GetCoincideSibling(directable, directable.Parent);
@@ -176,6 +155,7 @@ namespace NBC.ActionEditor
 
         public static IDirectable GetPreviousSibling(this IDirectable directable, IDirectable parent)
         {
+            // 保留父列表次序，取最后一个更早开始的节点，而非重新按时间排序。
             if (parent != null)
             {
                 return parent.Children.LastOrDefault(d =>
@@ -188,9 +168,6 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 返回父对象的下个同级
         /// </summary>
-        /// <param name="directable"></param>
-        /// <typeparam name="T"></typeparam>
-        /// <returns></returns>
         public static T GetNextSibling<T>(this IDirectable directable) where T : IDirectable
         {
             return (T)GetNextSibling(directable, directable.Parent);
@@ -199,8 +176,6 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 返回父对象的下个同级
         /// </summary>
-        /// <param name="directable"></param>
-        /// <returns></returns>
         public static IDirectable GetNextSibling(this IDirectable directable)
         {
             return GetNextSibling(directable, directable.Parent);
@@ -209,11 +184,9 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 返回指定轨道的下个子对象
         /// </summary>
-        /// <param name="directable"></param>
-        /// <param name="parent"></param>
-        /// <returns></returns>
         public static IDirectable GetNextSibling(this IDirectable directable, IDirectable parent)
         {
+            // 保留父列表次序，取第一个更晚开始的节点；同起点不构成前后邻居。
             if (parent != null)
             {
                 return parent.Children.FirstOrDefault(d =>
@@ -230,9 +203,6 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 根据其混合特性在指定当地时间的权重。
         /// </summary>
-        /// <param name="directable"></param>
-        /// <param name="time"></param>
-        /// <returns></returns>
         public static float GetWeight(this IDirectable directable, float time)
         {
             return GetWeight(directable, time, directable.BlendIn, directable.BlendOut);
@@ -241,10 +211,6 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 基于所提供的覆盖混合入/出属性在指定本地时间的权重
         /// </summary>
-        /// <param name="directable"></param>
-        /// <param name="time"></param>
-        /// <param name="blendInOut"></param>
-        /// <returns></returns>
         public static float GetWeight(this IDirectable directable, float time, float blendInOut)
         {
             return GetWeight(directable, time, blendInOut, blendInOut);
@@ -271,8 +237,6 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 返回剪辑的上一个循环长度
         /// </summary>
-        /// <param name="clip"></param>
-        /// <returns></returns>
         public static float GetPreviousLoopLocalTime(this ISubClipContainable clip)
         {
             var clipLength = clip.GetLength();
@@ -290,8 +254,6 @@ namespace NBC.ActionEditor
         /// <summary>
         /// 返回剪辑的下一个循环长度
         /// </summary>
-        /// <param name="clip"></param>
-        /// <returns></returns>
         public static float GetNextLoopLocalTime(this ISubClipContainable clip)
         {
             var clipLength = clip.GetLength();

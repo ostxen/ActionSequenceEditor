@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace NBC.ActionEditor
 {
+    // 按显式绑定与继承距离选择唯一视图扩展。
     public static class ExtensionResolver
     {
         public static Type ResolveExtension(IEnumerable<Type> candidates, Type target, bool inspector)

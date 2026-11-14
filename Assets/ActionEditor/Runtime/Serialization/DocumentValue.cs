@@ -7,7 +7,7 @@ using System.Text;
 
 namespace NBC.ActionEditor.Serialization
 {
-    /// <summary>Field/value tree shared by conversion and author-content comparison, independent of a disk format.</summary>
+    // 保存与磁盘格式无关的只读值树，供字段转换及作者内容比较共用。
     public sealed class DocumentValue
     {
         public enum ValueKind { Null, Boolean, Number, String, Array, Object }
@@ -27,7 +27,7 @@ namespace NBC.ActionEditor.Serialization
         public static DocumentValue String(string value) => value == null ? Null() : new DocumentValue(ValueKind.String, value);
         public static DocumentValue List(IEnumerable<DocumentValue> items) => new DocumentValue(ValueKind.Array, items: items);
         public static DocumentValue Object(IDictionary<string, DocumentValue> members) => new DocumentValue(ValueKind.Object, members: members);
-        // Length-prefixed typed framing, not JSON normalization. Ordering belongs to the field contract.
+        // 类型及长度前缀区分值边界；顺序遵守字段契约，不以JSON排版比较内容。
         public string ContentKey()
         {
             var result = new StringBuilder();
@@ -42,7 +42,7 @@ namespace NBC.ActionEditor.Serialization
         }
     }
 
-    /// <summary>Strict JSON transport: duplicate names, trailing bytes and non-JSON numbers are errors.</summary>
+    // 严格读写JSON；拒绝重复成员、尾随内容及非法数字。
     public static class DocumentJson
     {
         public static DocumentValue Parse(string text) => new Parser(text).Read();
@@ -87,6 +87,7 @@ namespace NBC.ActionEditor.Serialization
                     if (!first) Line(output, compressed, depth); output.Append('}'); break;
             }
         }
+        // 逐字符解析并限制嵌套深度，不加载或构造业务类型。
         private sealed class Parser
         {
             private readonly string text;

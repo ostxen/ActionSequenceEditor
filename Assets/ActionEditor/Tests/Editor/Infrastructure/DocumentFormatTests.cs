@@ -55,6 +55,26 @@ namespace NBC.ActionEditor.Tests
         private static ActionDocument Read(string json) => Format.Deserialize(Encoding.UTF8.GetBytes(json), Context);
         private static int Bits(float value) => BitConverter.ToInt32(BitConverter.GetBytes(value), 0);
 
+        [Test] public void TypeAndFieldMetadataStayIsolatedAcrossContextsAndPublicCopies()
+        {
+            var trusted = new DocumentFormatContext(new[] { typeof(Values), typeof(Nested) });
+            var denied = new DocumentFormatContext(Array.Empty<Type>());
+            var expected = typeof(Values).FullName + ", " + typeof(Values).Assembly.GetName().Name;
+            Assert.That(trusted.ResolveType(expected, typeof(Values), "$"), Is.EqualTo(typeof(Values)));
+            trusted.RequireType(typeof(Values), "$");
+            Assert.Throws<InvalidDataException>(() => denied.RequireType(typeof(Values), "$"));
+            Assert.Throws<InvalidDataException>(() => denied.ResolveType(expected, typeof(Values), "$"));
+            var fields = DocumentValueConverter.Fields(typeof(Values));
+            var first = fields[0]; fields[0] = null;
+            Assert.That(DocumentValueConverter.Fields(typeof(Values))[0], Is.EqualTo(first));
+            var source = new Values { Numbers = new[] { float.Epsilon, -.0f } };
+            var captured = DocumentValueConverter.Capture(source, typeof(Values), trusted);
+            var restored = (Values)DocumentValueConverter.Restore(captured, typeof(Values), trusted);
+            Assert.That(Bits(restored.Numbers[0]), Is.EqualTo(1));
+            Assert.Throws<InvalidDataException>(() => DocumentValueConverter.Capture(source, typeof(Values), denied));
+            Assert.Throws<InvalidDataException>(() => DocumentValueConverter.Restore(captured, typeof(Values), denied));
+        }
+
         [Test] public void IndependentContractFixturesReplaceConstructorDefaultsAndPreserveSignalStorage()
         {
             var contract = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "../Docs/ActionEditor-Contracts.md"));

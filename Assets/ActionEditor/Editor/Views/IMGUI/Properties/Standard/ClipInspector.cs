@@ -5,6 +5,7 @@ using UnityEngine;
 
 namespace NBC.ActionEditor.Views.IMGUI.Properties.Standard
 {
+    // 为片段属性扩展提供明确类型的目标访问。
     public abstract class ClipInspector<T> : ClipInspector where T : TimelineClip
     {
         protected T action => (T)target;

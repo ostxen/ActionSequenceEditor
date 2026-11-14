@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace NBC.ActionEditor.Samples
 {
+    // 从IMGUI工具栏打开绑定当前宿主的样例预览。
     [CustomHeader(typeof(FeatureSampleDocument))]
     public sealed class FeatureSampleHeader : HeaderBase
     {
@@ -22,6 +23,7 @@ namespace NBC.ActionEditor.Samples
             new UnityEditor.UIElements.ToolbarButton(() => FeatureSamplePreview.ShowFor(context)) { text = Lan.PreviewTitle };
     }
 
+    // 绘制样例Presenter的值帧，不遍历或修改作者图。
     public sealed class FeatureSamplePreview : EditorWindow
     {
         private Vector2 scroll;

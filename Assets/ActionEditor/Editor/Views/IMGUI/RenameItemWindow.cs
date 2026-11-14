@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace NBC.ActionEditor.Views.IMGUI
 {
+    // 收集名称并交回调用者，不直接修改作者图。
     public sealed class RenameItemWindow : EditorWindow
     {
         private IDirectable item;

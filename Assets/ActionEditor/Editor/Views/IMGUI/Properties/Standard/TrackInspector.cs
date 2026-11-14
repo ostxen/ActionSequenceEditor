@@ -5,11 +5,13 @@ using UnityEngine;
 
 namespace NBC.ActionEditor.Views.IMGUI.Properties.Standard
 {
+    // 为轨道属性扩展提供明确类型的目标访问。
     public abstract class TrackInspector<T> : TrackInspector where T : TimelineTrack
     {
         protected T action => (T)target;
     }
 
+    // 绘制轨道名称和公共字段，提交交由属性Presenter。
     [CustomInspectors(typeof(TimelineTrack), true)]
     public class TrackInspector : InspectorsBase
     {

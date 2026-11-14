@@ -48,7 +48,7 @@ namespace NBC.ActionEditor.Tests
             public void ValidateAndInitialize(ActionDocument document) => ActionDocumentGraph.Initialize(document, context);
         }
 
-        private sealed class WindowInput : IDisposable
+        internal sealed class WindowInput : IDisposable
         {
             public readonly ActionEditorContext Context;
             public readonly ActionEditorViews Views = new ActionEditorViews();

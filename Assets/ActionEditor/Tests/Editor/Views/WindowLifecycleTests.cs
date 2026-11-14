@@ -323,7 +323,7 @@ namespace NBC.ActionEditor.Tests
                     Assert.That(buttons.Select(b => b.text), Does.Contain(Lan.CreateAsset).And.Contain(Lan.SelectAsset));
                     var labels = native.rootVisualElement.Q("timeline-welcome").Query<Label>().ToList();
                     Assert.That(labels.Select(l => l.text), Does.Contain(Lan.WelcomeHint).And.Contain(Lan.WelcomeHelp));
-                    Assert.That(Prefs.GetAssetTypeName(typeof(FeatureSampleDocument)), Is.EqualTo(Lan.FeatureSample));
+                    Assert.That(new Composition.DocumentDialogComposition(ActionEditorHost.Context).TypeName(typeof(FeatureSampleDocument)), Is.EqualTo(Lan.FeatureSample));
                     var menu = new System.Collections.Generic.List<string>(); Composition.DocumentPresenterComposition.PopulateSaveMenu(Composition.DocumentPresenterComposition.Create(ActionEditorHost.Context), (label, action) => menu.Add(label));
                     Assert.That(menu, Is.EqualTo(new[] { Lan.Save, Lan.SaveAs, Lan.Export }));
                     Assert.That(string.Join(" ", menu) + Lan.WelcomeHint + Lan.CreateSafety + Lan.FeatureSample, Does.Not.Contain("JSON").And.Not.Contain("旧版").And.Not.Contain("新版"));

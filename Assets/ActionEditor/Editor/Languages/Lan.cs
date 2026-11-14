@@ -6,6 +6,7 @@ using UnityEngine;
 
 namespace NBC.ActionEditor
 {
+    // 装配当前语言文案，仅在用户选择时保存语言偏好。
     public class Lan
     {
         #region 静态

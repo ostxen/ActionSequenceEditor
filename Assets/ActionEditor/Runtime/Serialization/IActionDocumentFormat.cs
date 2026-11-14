@@ -21,18 +21,21 @@ namespace NBC.ActionEditor.Serialization
         ActionDocument Deserialize(byte[] bytes, DocumentFormatContext context);
     }
 
+    // 传递输出选项，不改变文档内容或格式能力。
     public readonly struct DocumentFormatOptions
     {
         public bool Compressed { get; }
         public DocumentFormatOptions(bool compressed) { Compressed = compressed; }
     }
 
+    // 将借入的Unity资源与持久身份互换，不承担资源所有权。
     public interface IDocumentReferenceResolver
     {
         DocumentReference Identify(Object value, Type declaredType);
         Object Resolve(DocumentReference reference, Type declaredType);
     }
 
+    // 用GUID与文件内标识区分主资源和子资源。
     public readonly struct DocumentReference
     {
         public string Guid { get; }
@@ -44,17 +47,20 @@ namespace NBC.ActionEditor.Serialization
     public sealed class DocumentFormatContext
     {
         private readonly Dictionary<string, Type> types;
+        private readonly Dictionary<Type, string> identities;
         public IDocumentReferenceResolver References { get; }
         public DocumentFormatContext(IEnumerable<Type> trustedTypes, IDocumentReferenceResolver references = null)
         {
             References = references;
             types = new Dictionary<string, Type>(StringComparer.Ordinal);
+            identities = new Dictionary<Type, string>();
             foreach (var type in trustedTypes ?? throw new ArgumentNullException(nameof(trustedTypes)))
             {
                 if (type == null || type.IsAbstract || type.IsInterface || type.ContainsGenericParameters || !type.IsSerializable) continue;
                 var id = Identity(type);
                 if (types.TryGetValue(id, out var existing) && existing != type) throw new InvalidDataException("Conflicting trusted type: " + id);
                 types[id] = type;
+                identities[type] = id;
             }
         }
         public static string Identity(Type type) => type.FullName + ", " + type.Assembly.GetName().Name;
@@ -64,6 +70,13 @@ namespace NBC.ActionEditor.Serialization
                 throw new InvalidDataException(path + ": unknown or incompatible type identity.");
             return type;
         }
-        public void RequireType(Type type, string path) => ResolveType(Identity(type), type, path);
+        // 类型身份在受信任目录建立时计算一次；逐字段捕获不重复读取程序集元数据。
+        internal string RequireIdentity(Type type, string path)
+        {
+            if (type == null || !identities.TryGetValue(type, out var identity))
+                throw new InvalidDataException(path + ": unknown or incompatible type identity.");
+            return identity;
+        }
+        public void RequireType(Type type, string path) => RequireIdentity(type, path);
     }
 }

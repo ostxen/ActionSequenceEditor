@@ -7,7 +7,7 @@ using NBC.ActionEditor.Serialization;
 
 namespace NBC.ActionEditor.Storage
 {
-    /// <summary>Editor coordination over the unique runtime format and format-independent snapshots.</summary>
+    // 协调严格JSON格式与隔离快照，不自行提交文件。
     public static class JsonDocumentCodec
     {
         private static IActionDocumentFormat Format => DocumentFormats.Registry.ById("actioneditor.json");
@@ -29,6 +29,7 @@ namespace NBC.ActionEditor.Storage
             var snapshot = CreateSaveSnapshot(asset);
             return ReadbackDifferences(snapshot, Decode(snapshot));
         }
+        // 对比原始快照与读回图，不能把两边同时初始化而掩盖内容变化。
         public static string[] ReadbackDifferences(string source, ActionDocument decoded)
         {
             var before = (ActionDocument)DocumentValueConverter.Restore(DocumentJson.Parse(source).Members["document"], typeof(ActionDocument), DocumentFormats.Context);

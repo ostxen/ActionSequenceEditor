@@ -2,6 +2,7 @@
 
 namespace NBC.ActionEditor
 {
+    // 生成灰度或透明度变体，不修改共享绘制状态。
     public static class ColorUtility
     {
         public static Color Grey(float value) {

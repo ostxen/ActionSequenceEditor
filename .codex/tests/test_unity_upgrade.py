@@ -5,13 +5,13 @@ from pathlib import Path
 import sys
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from workflow_lib.core import Context, WorkflowError
 from workflow_lib.unity import (
     READ_ONLY, MUTATIONS, STATUS_QUERIES, Unity,
-    decode_response, parse_instances, validate_parameters, validate_test_result,
+    EditorBindingError, decode_response, parse_instances, validate_parameters, validate_test_result,
 )
 
 
@@ -72,6 +72,33 @@ class UnityUpgradeTests(unittest.TestCase):
         self.unity.raw = Mock(return_value=json.dumps({"instances": [self.instance(pid=456)]}))
         with self.assertRaises(WorkflowError):
             self.unity.ready()
+
+    def test_poll_survives_more_than_six_transient_timeouts_without_replaying(self):
+        self.unity.ready = Mock(side_effect=[WorkflowError("timeout", "blocked")] * 7 + [{}])
+        self.unity.call = Mock(return_value={"status": "completed"})
+        with patch("workflow_lib.unity.time.monotonic", return_value=0), patch("workflow_lib.unity.time.sleep"):
+            self.assertEqual(self.unity.poll("test status", {"completed"}, 300), {"status": "completed"})
+        self.assertEqual(self.unity.ready.call_count, 8)
+        self.unity.call.assert_called_once_with("test status", timeout=15)
+
+    def test_poll_stops_immediately_when_target_binding_changes(self):
+        self.unity.ready = Mock(side_effect=EditorBindingError("changed target"))
+        self.unity.call = Mock()
+        with patch("workflow_lib.unity.time.monotonic", return_value=0), patch("workflow_lib.unity.time.sleep") as sleep:
+            with self.assertRaises(EditorBindingError):
+                self.unity.poll("test status", {"completed"}, 300)
+        sleep.assert_not_called()
+        self.unity.call.assert_not_called()
+
+    def test_poll_deadline_reports_unknown_result_without_new_operation(self):
+        self.unity.ready = Mock(side_effect=WorkflowError("timeout", "blocked"))
+        self.unity.call = Mock()
+        with patch("workflow_lib.unity.time.monotonic", side_effect=[0, 0, 301]), patch("workflow_lib.unity.time.sleep"):
+            with self.assertRaises(WorkflowError) as failure:
+                self.unity.poll("test status", {"completed"}, 300)
+        self.assertEqual(failure.exception.status, "blocked")
+        self.assertIn("do not replay", str(failure.exception))
+        self.unity.call.assert_not_called()
 
     def test_ready_checks_bound_status_project(self):
         self.unity.raw = Mock(side_effect=[json.dumps({"instances": [self.instance()]}),

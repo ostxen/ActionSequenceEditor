@@ -12,11 +12,13 @@ using Object = UnityEngine.Object;
 
 namespace NBC.ActionEditor.Views.UIToolkit
 {
+    // 作为Unity Inspector的逐窗选择目标，不保存作者数据。
     public sealed class UIToolkitInspectorTarget : ScriptableObject
     {
         [NonSerialized] public ActionEditorWindow Owner;
     }
 
+    // 将Inspector绘制委托给仍存在的发起窗口。
     [CustomEditor(typeof(UIToolkitInspectorTarget))]
     public sealed class UIToolkitSelectionInspector : Editor
     {

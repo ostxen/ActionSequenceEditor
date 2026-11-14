@@ -11,15 +11,18 @@ using Object = UnityEngine.Object;
 
 namespace NBC.ActionEditor.Serialization
 {
-    /// <summary>One controlled field converter for documents, snapshots and clipboard fragments.</summary>
+    // 文档、快照与剪贴板共用受控字段契约，先验证整图再创建业务对象。
     public static class DocumentValueConverter
     {
         private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
         private static readonly Dictionary<Type, FieldInfo[]> fields = new Dictionary<Type, FieldInfo[]>();
         private static InvalidDataException Error(string path, string reason) => new InvalidDataException(path + ": " + reason);
         public static FieldInfo[] Fields(Type type)
+            => (FieldInfo[])FieldsFor(type).Clone();
+        // 内部只枚举缓存，公开入口仍返回副本，避免业务调用者改写字段契约。
+        private static FieldInfo[] FieldsFor(Type type)
         {
-            if (fields.TryGetValue(type, out var found)) return (FieldInfo[])found.Clone();
+            if (fields.TryGetValue(type, out var found)) return found;
             var result = new List<FieldInfo>();
             for (var current = type; current != null && current != typeof(object); current = current.BaseType)
                 result.AddRange(current.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
@@ -28,7 +31,7 @@ namespace NBC.ActionEditor.Serialization
             if (result.Any(f => f.Name.StartsWith("$", StringComparison.Ordinal)) || result.GroupBy(f => f.Name, StringComparer.Ordinal).Any(g => g.Count() != 1))
                 throw Error("$", "conflicting field keys on " + DocumentFormatContext.Identity(type));
             found = result.OrderBy(f => f.Name, StringComparer.Ordinal).ToArray(); fields.Add(type, found);
-            return (FieldInfo[])found.Clone();
+            return found;
         }
         private static bool Node(Type type) => typeof(ActionDocument).IsAssignableFrom(type) || typeof(TimelineGroup).IsAssignableFrom(type)
             || typeof(TimelineTrack).IsAssignableFrom(type) || typeof(TimelineClip).IsAssignableFrom(type);
@@ -103,8 +106,8 @@ namespace NBC.ActionEditor.Serialization
                 if (Components(type)) return DocumentValue.Object(ComponentNames(type).ToDictionary(n => n, n => Capture(Component(value, n), ComponentType(type, n), context, content, path + "." + n, active), StringComparer.Ordinal));
                 RequireBusinessType(type, context, path);
                 var members = new Dictionary<string, DocumentValue>(StringComparer.Ordinal);
-                if (Node(type) || type != declaration || declaration.IsAbstract || declaration.IsInterface) members.Add("$type", DocumentValue.String(DocumentFormatContext.Identity(type)));
-                foreach (var field in Fields(type))
+                if (Node(type) || type != declaration || declaration.IsAbstract || declaration.IsInterface) members.Add("$type", DocumentValue.String(context.RequireIdentity(type, path)));
+                foreach (var field in FieldsFor(type))
                 {
                     members.Add(field.Name, Capture(field.GetValue(value), field.FieldType, context, content, path + "." + field.Name, active));
                 }
@@ -146,7 +149,7 @@ namespace NBC.ActionEditor.Serialization
         }
         private static string Scalar(DocumentValue value, DocumentValue.ValueKind kind, string path)
         { if (value.Kind != kind) throw Error(path, "incorrect value kind."); return value.Scalar; }
-        /// <summary>Validates the entire token graph before invoking any business constructor.</summary>
+        // 完整预检成功后才执行构造计划，后部非法字段不能触发前部业务构造副作用。
         public static object Restore(DocumentValue value, Type declaration, DocumentFormatContext context)
         { var plan = Prepare(value, declaration, context, "$"); return plan(); }
         private static Func<object> Prepare(DocumentValue value, Type declaration, DocumentFormatContext context, string path)
@@ -233,7 +236,7 @@ namespace NBC.ActionEditor.Serialization
                 type = context.ResolveType(Scalar(tag, DocumentValue.ValueKind.String, path + ".$type"), declaration, path);
             }
             RequireBusinessType(type, context, path);
-            var members = Fields(type);
+            var members = FieldsFor(type);
             Keys(value, members.Select(f => f.Name).Concat(tagged ? new[] { "$type" } : Array.Empty<string>()), path);
             var memberPlans = members.Select(f => Prepare(value.Members[f.Name], f.FieldType, context, path + "." + f.Name)).ToArray();
             return () =>

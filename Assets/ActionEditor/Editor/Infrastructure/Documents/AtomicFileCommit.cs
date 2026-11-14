@@ -3,6 +3,7 @@ using System.IO;
 
 namespace NBC.ActionEditor.Infrastructure.Documents
 {
+    // 隔离原子提交所需的文件操作，允许定点注入失败。
     public interface ICommitFiles
     {
         bool Exists(string path);
@@ -13,6 +14,7 @@ namespace NBC.ActionEditor.Infrastructure.Documents
         void Delete(string path);
     }
 
+    // 执行物理文件操作；暂存文件独占创建并刷新至磁盘。
     public sealed class CommitFiles : ICommitFiles
     {
         public bool Exists(string path) => File.Exists(path);
@@ -28,11 +30,13 @@ namespace NBC.ActionEditor.Infrastructure.Documents
         public void Delete(string path) => File.Delete(path);
     }
 
+    // 校验暂存字节后一次提交，失败时只清理本次暂存文件。
     public sealed class AtomicFileCommit
     {
         private readonly ICommitFiles files;
         public AtomicFileCommit(ICommitFiles files = null) { this.files = files ?? new CommitFiles(); }
 
+        // 仅在目标版本仍匹配时替换；创建模式绝不覆盖已存在目标。
         public void Save(string target, Func<byte[]> serialize, Action<byte[]> validate, byte[] expectedCurrent = null, bool createOnly = false)
         {
             if (string.IsNullOrWhiteSpace(target)) throw new ArgumentException("Missing target.", nameof(target));
@@ -50,6 +54,7 @@ namespace NBC.ActionEditor.Infrastructure.Documents
                 var written = files.Read(staged);
                 if (!Equal(bytes, written)) throw new IOException("Staged document differs from serialized bytes.");
                 validate(written);
+                // 暂存期间可能发生外部写入，提交前再次核对同一版本。
                 if (createOnly && files.Exists(target)) throw new IOException("Create target appeared during save.");
                 if (expectedCurrent != null && (!files.Exists(target) || !Equal(files.Read(target), expectedCurrent)))
                     throw new IOException("Document changed during save.");

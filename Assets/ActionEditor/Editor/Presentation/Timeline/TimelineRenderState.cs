@@ -40,6 +40,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
             Playing = playing; RangeEnabled = rangeEnabled;
         }
     }
+    // 保存单行绘制值，键只在本窗口当前布局中解析。
     public readonly struct TimelineRowState
     {
         public readonly int Key, Depth;
@@ -52,6 +53,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
         { Key = key; Depth = depth; Title = title; TypeName = typeName; IsGroup = group; CanFold = canFold;
             Collapsed = collapsed; Locked = locked; Active = active; Selected = selected; Bounds = bounds; Color = color; }
     }
+    // 保存片段几何与显示能力，不向视图暴露可写片段。
     public readonly struct TimelineClipState
     {
         public readonly int Key, RowKey;

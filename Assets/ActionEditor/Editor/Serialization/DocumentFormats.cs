@@ -10,6 +10,7 @@ using Object = UnityEngine.Object;
 
 namespace NBC.ActionEditor.Storage
 {
+    // 校验格式注册，并按真实读写或导出能力提供目录。
     public sealed class DocumentFormatRegistry
     {
         private readonly IActionDocumentFormat[] formats;
@@ -31,11 +32,13 @@ namespace NBC.ActionEditor.Storage
             ?? throw new InvalidDataException("No editable format for file extension.");
     }
 
+    // 装配唯一格式目录与生产受信任类型上下文。
     public static class DocumentFormats
     {
         public static DocumentFormatRegistry Registry { get; } = new DocumentFormatRegistry(new IActionDocumentFormat[] { new ActionDocumentJsonFormat() });
         private static DocumentFormatContext production;
         public static DocumentFormatContext Context => production ??= CreateContext();
+        // 只发现已加载的生产类型；测试类型必须由隔离调用显式提供。
         public static DocumentFormatContext CreateContext(params Type[] explicitTestTypes)
         {
             var editorOnly = new HashSet<string>(CompilationPipeline.GetAssemblies(AssembliesType.Editor)
@@ -58,6 +61,7 @@ namespace NBC.ActionEditor.Storage
         }
     }
 
+    // 通过GUID及localFileId解析持久资源，不拥有或销毁引用目标。
     public sealed class AssetReferenceResolver : IDocumentReferenceResolver
     {
         public DocumentReference Identify(Object value, Type declaredType)

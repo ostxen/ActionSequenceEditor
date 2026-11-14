@@ -1,15 +1,13 @@
-﻿using NBC.ActionEditor.Domain;
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
-using System.Linq;
 
 
 namespace NBC.ActionEditor
 {
+    // 共享偏好会话与原有键的入口，不承担业务类型发现或创建目录。
     public static class Prefs
     {
         public static readonly string CONFIG_PATH =
@@ -57,36 +55,6 @@ namespace NBC.ActionEditor
         public static int FrameRate { get => Current.FrameRate; set => Change(fps: value, snap: 1f / value); }
         public static float SnapInterval { get => Current.SnapInterval; set => Change(snap: Mathf.Max(value, .001f)); }
 
-        public static readonly Dictionary<string, Type> AssetTypes = new Dictionary<string, Type>();
-        public static readonly List<string> AssetNames = new List<string>();
-
-        public static void InitializeAssetTypes()
-        {
-            AssetTypes.Clear();
-            AssetNames.Clear();
-            var types = ActionEditorTypeCatalog.DerivedFrom(typeof(ActionDocument)).Select(info => info.type);
-            foreach (var t in types)
-            {
-                var typeName = t.GetCustomAttributes(typeof(NameAttribute), false).FirstOrDefault() is NameAttribute nameAtt ? nameAtt.name : t.Name.SplitCamelCase();
-                AssetTypes[typeName] = t;
-                AssetNames.Add(typeName);
-            }
-        }
-
-        public static string GetAssetTypeName(Type type)
-        {
-            if (type == typeof(Samples.FeatureSample.FeatureSampleDocument)) return Lan.FeatureSample;
-            foreach (var key in AssetTypes.Keys)
-            {
-                var v = AssetTypes[key];
-                if (v == type)
-                {
-                    return key;
-                }
-            }
-
-            return type?.GetCustomAttributes(typeof(NameAttribute), false).OfType<NameAttribute>().FirstOrDefault()?.name ?? type?.Name.SplitCamelCase() ?? string.Empty;
-        }
     }
 }
 

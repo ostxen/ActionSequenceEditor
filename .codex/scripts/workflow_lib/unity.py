@@ -94,21 +94,28 @@ def decode_response(text):
     raise WorkflowError("Unexpectedly deep response envelope.")
 
 
+class EditorBindingError(WorkflowError):
+    """A changed or ambiguous target must stop polling, unlike a transient timeout."""
+
+    def __init__(self, message):
+        super().__init__(message, "blocked")
+
+
 def parse_instances(text, project):
     data = decode_response(text)
     if not isinstance(data, dict) or not isinstance(data.get("instances"), list):
-        blocked("Unknown CLI status schema; do not guess the selected project.")
+        raise EditorBindingError("Unknown CLI status schema; do not guess the selected project.")
     instances = [item for item in data["instances"] if isinstance(item, dict)
                  and item.get("projectPath") and Path(item["projectPath"]).resolve() == Path(project).resolve()
                  and item.get("isRunning") is True]
     if len(instances) != 1:
-        blocked(f"Expected exactly one project instance; received {len(instances)}.")
+        raise EditorBindingError(f"Expected exactly one project instance; received {len(instances)}.")
     instance = instances[0]
     if not instance.get("pipelineServer", {}).get("isReachable"):
         blocked("This project's Pipeline server is unreachable.")
     pid = instance.get("pid")
     if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
-        blocked("Missing target Editor PID.")
+        raise EditorBindingError("Missing target Editor PID.")
     return instance
 
 
@@ -206,12 +213,12 @@ class Unity:
     def ready(self, require_ready=True):
         instance = parse_instances(self.raw(["pipeline", "editors"]), self.context.project)
         if self.pid is not None and self.pid != instance["pid"]:
-            blocked("Editor restarted during this operation; inspect state before a fresh request.")
+            raise EditorBindingError("Editor restarted during this operation; inspect state before a fresh request.")
         self.pid = instance["pid"]
         status = decode_response(self.raw(["command", "editor", "status", "--project-path",
                                           str(self.context.project), "--pid", str(self.pid), "--timeout", "20"]))
         if not isinstance(status, dict) or Path(status.get("projectPath", "")).resolve() != self.context.project:
-            blocked("Editor status project does not match the target.")
+            raise EditorBindingError("Editor status project does not match the target.")
         if require_ready and (status.get("status") != "ready" or status.get("compiling") is not False
                               or status.get("domainReloadInProgress") is not False):
             blocked("Editor is busy; no new operation was started.")
@@ -264,19 +271,17 @@ class Unity:
 
     def poll(self, command, terminal, timeout=300, interval=1):
         deadline = time.monotonic() + timeout
-        errors = 0
         while time.monotonic() < deadline:
             try:
                 # Domain reload may reconnect to a restarted/other instance; rebind every observation.
                 self.ready(require_ready=False)
                 value = self.call(command, timeout=min(15, max(1, int(deadline - time.monotonic()))))
-                errors = 0
+            except EditorBindingError:
+                raise
             except WorkflowError as exc:
                 if exc.status != "blocked":
                     raise
-                errors += 1
-                if errors > 5:
-                    raise
+                # 长同步操作会阻塞主线程状态查询，按调用者总期限观察，不重发操作。
                 time.sleep(interval)
                 continue
             if isinstance(value, dict) and value.get("status") in terminal:

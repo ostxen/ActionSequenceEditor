@@ -57,8 +57,9 @@ namespace NBC.ActionEditor.Tests
         {
             var calls = TestDocument.Constructors;
             Assert.That(ActionEditorTypeCatalog.DerivedFrom(typeof(ActionDocument)).Any(i => i.type == typeof(TestDocument)), Is.False);
-            Prefs.InitializeAssetTypes();
-            Assert.That(Prefs.AssetTypes.Values.Contains(typeof(TestDocument)), Is.False);
+            var creation = new Composition.DocumentDialogComposition(ActionEditorHost.Context);
+            Assert.That(creation.CreationTypes().Contains(typeof(TestDocument)), Is.False);
+            Assert.That(creation.CreationTypes(), Does.Contain(typeof(FeatureSampleDocument)));
             Assert.Throws<System.IO.InvalidDataException>(() => NBC.ActionEditor.Storage.DocumentFormats.Context.RequireType(typeof(TestDocument), "$"));
             Assert.That(TestDocument.Constructors, Is.EqualTo(calls));
             Assert.That(typeof(PropertyDescription).Assembly, Is.SameAs(typeof(ActionDocument).Assembly));

@@ -18,6 +18,7 @@ python .codex/scripts/workflow.py unity compile --timeout 300
 ```
 
 编译会触发 Editor 生命周期，应在当前任务需要时执行，不要在纯文档修改时强制触发。脚本轮询编译终态并保留 console，不把请求已受理当作成功。
+轮询中的暂时不可达会在调用者指定的总期限内继续观察，但不会重新提交原操作；PID变化、目标重复或工程不匹配立即阻断。总期限耗尽仍表示结果未知，应查询原操作终态而非重放。长套件需根据真实耗时设置期限，不能把轮询恢复当作操作已完成。
 需要参数的查询将 JSON 对象保存到项目内文件，再传入 `--params-file`。例如 `asset find` 的参数 `{"name":"Example","search-in":"Assets","limit":20}`。参数名必须与注册描述一致，禁止注入工程、PID、runtime 或 confirm 等保留参数。
 
 ## 测试

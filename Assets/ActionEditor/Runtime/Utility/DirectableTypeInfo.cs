@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace NBC.ActionEditor
 {
-    /// <summary>Cached type facts only. Locks, enabled state and blend sentinels remain instance state.</summary>
+    // 缓存类型声明能力；锁定、启用和混合哨兵值仍由实例决定。
     public sealed class DirectableTypeInfo
     {
         private static readonly Dictionary<Type, DirectableTypeInfo> cache = new Dictionary<Type, DirectableTypeInfo>();

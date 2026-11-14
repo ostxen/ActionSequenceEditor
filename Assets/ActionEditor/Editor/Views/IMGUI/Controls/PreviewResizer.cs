@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace NBC.ActionEditor.Views.IMGUI.Controls
 {
+    // 处理选择器预览区的原生尺寸拖动与折叠偏好。
     [Serializable]
     internal class PreviewResizer
     {

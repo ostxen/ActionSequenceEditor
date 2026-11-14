@@ -17,10 +17,12 @@ namespace NBC.ActionEditor
         public ActionEditorPreviewSession(Func<Type, PreviewBase> factory) => this.factory = factory ?? throw new ArgumentNullException(nameof(factory));
         public void Initialize(ActionDocument asset)
         {
+            var version = generation + 1;
             Dispose();
+            // 旧资源释放可以同步初始化新文档，后到的代次必须保留，不能合并两套指针。
+            if (generation != version) throw new OperationCanceledException("预览初始化已被更新的会话取代。");
             if (asset == null) return;
             pointers = new List<IDirectableTimePointer>();
-            var version = generation;
             try
             {
                 void Add(IDirectable target)

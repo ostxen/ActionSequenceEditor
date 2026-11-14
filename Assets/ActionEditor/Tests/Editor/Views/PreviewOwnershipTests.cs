@@ -269,6 +269,29 @@ namespace NBC.ActionEditor.Tests
             Assert.That(player.IsInitialized, Is.False); Assert.That(probe.Disposals, Is.EqualTo(1));
             player.Reset(); Assert.That(probe.Disposals, Is.EqualTo(1));
         }
+
+        [Test] public void ReinitializingFromDisposeKeepsLatestPreviewWithoutMergingGraphs()
+        {
+            var first = new FeatureSampleDocument();
+            var outer = new FeatureSampleDocument();
+            var latest = new FeatureSampleDocument();
+            var probes = new List<ReentrantProbe>();
+            ActionEditorPreviewSession session = null;
+            session = new ActionEditorPreviewSession(_ => { var probe = new ReentrantProbe(); probes.Add(probe); return probe; });
+            try
+            {
+                session.Initialize(first); var original = probes.ToArray();
+                original[0].OnDispose = () => session.Initialize(latest);
+                Assert.Throws<OperationCanceledException>(() => session.Initialize(outer));
+                Assert.That(session.IsInitialized, Is.True);
+                Assert.That(original.All(p => p.Disposals == 1), Is.True);
+                Assert.That(probes.Count, Is.EqualTo(original.Length * 2), "旧初始化不能在新一代之后再创建第二套资源。");
+                Assert.That(probes.Skip(original.Length).All(p => ReferenceEquals(p.directable.Root, latest)), Is.True);
+                session.Sample(1, 0, false);
+            }
+            finally { session.Dispose(); }
+            Assert.That(probes.All(p => p.Disposals == 1), Is.True);
+        }
         [Test] public void PlaybackPauseLoopStepAndFaultKeepResourceOwnershipExplicit()
         {
             var asset = new FeatureSampleDocument(); var probes = new List<Probe>();

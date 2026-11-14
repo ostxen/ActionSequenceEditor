@@ -2,16 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
 namespace NBC.ActionEditor.Views.IMGUI
 {
-    /// <summary>
-    /// 对象选择器窗口
-    /// </summary>
+    // 处理原生选择列表、搜索和预览布局；资源发现与Editor所有权各自独立。
     public class ObjectSelectorWindow : EditorWindow
     {
         private class Styles
@@ -35,14 +32,6 @@ namespace NBC.ActionEditor.Views.IMGUI
             public GUIStyle dragHandle = "RL DragHandle";
         }
 
-        private class BuiltinRes
-        {
-            public string name;
-            public Texture icon;
-            public string path;
-            public int id;
-        }
-
         private Styles _styles;
         private float _toolbarHeight = 44f;
         private float _previewSize = 101f;
@@ -50,18 +39,17 @@ namespace NBC.ActionEditor.Views.IMGUI
         private string _searchFilter;
         private bool _focusSearchFilter;
         private int _lastSelectedIdx;
-        private BuiltinRes[] _currentBuiltinResources;
-        private BuiltinRes[] _activeBuiltinList;
+        private ObjectPickerCatalog.Entry[] _currentBuiltinResources;
+        private ObjectPickerCatalog.Entry[] _activeBuiltinList;
         private string _folderPath;
         private Object _lastSelectedObject;
         private Texture2D _lastSelectedObjectIcon;
         private Action<Object> _itemSelectedCallback;
         private Predicate<string> _assetPathFilter;
-        private BuiltinRes _noneBuiltinRes;
+        private ObjectPickerCatalog.Entry _noneBuiltinRes;
         private bool _showNoneItem;
         private Vector2 _scrollPosition;
-        private EditorWrapperCache _editorWrapperCache;
-        private SerializedProperty _cacheProperty;
+        private ObjectPreviewCache _editorWrapperCache;
         private PreviewResizer _previewResizer = new PreviewResizer();
         private static ObjectSelectorWindow _sharedObjectSelector;
 
@@ -83,7 +71,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             return text;
         }
 
-        public static ObjectSelectorWindow get
+        private static ObjectSelectorWindow Shared
         {
             get
             {
@@ -120,87 +108,22 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 显示的列表项数量
         /// </summary>
-        private int itemCount
-        {
-            get
-            {
-                int num2 = _activeBuiltinList.Length;
-                int num3 = (!_showNoneItem) ? 0 : 1;
-                return num2 + num3;
-            }
-        }
+        private int itemCount => _activeBuiltinList.Length + (_showNoneItem ? 1 : 0);
 
         /// <summary>
         /// 显示对象选择器
         /// </summary>
-        /// <typeparam name="T"></typeparam>
         /// <param name="obj">初始的对象</param>
         /// <param name="itemSelectedCallback">列表项选中回调</param>
         /// <param name="folderPath">所属的文件夹路径</param>
-        /// <param name="allowedInstanceIDs"></param>
         public static void ShowObjectPicker<T>(Object obj, Action<Object> itemSelectedCallback,
             string folderPath = "Assets", List<int> allowedInstanceIDs = null, Predicate<string> assetPathFilter = null) where T : Object
         {
-            Type typeFromHandle = typeof(T);
-            get.Show(obj, typeFromHandle, null, itemSelectedCallback, folderPath, allowedInstanceIDs, assetPathFilter);
+            Shared.ShowPicker(obj, typeof(T).Name, itemSelectedCallback, folderPath, allowedInstanceIDs, assetPathFilter);
         }
 
-        /// <summary>
-        /// 显示对象选择器
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="obj">初始的对象</param>
-        /// <param name="requiredTypeName"></param>
-        /// <param name="itemSelectedCallback">列表项选中回调</param>
-        /// <param name="folderPath">所属的文件夹路径</param>
-        /// <param name="allowedInstanceIDs"></param>
-        public static void ShowObjectPicker<T>(Object obj, string requiredTypeName,
-            Action<Object> itemSelectedCallback,
-            string folderPath = "Assets", List<int> allowedInstanceIDs = null) where T : Object
-        {
-            get.Show(obj, requiredTypeName, null, itemSelectedCallback, folderPath, allowedInstanceIDs);
-        }
-
-        public static void ShowObjectPicker<T>(Object obj, Action<Object> itemSelectedCallback,
-            string folderPath, Object[] allowedInstanceObjects) where T : Object
-        {
-            List<int> allowedInstanceIDs = null;
-            if (allowedInstanceObjects != null)
-            {
-                allowedInstanceIDs = new List<int>(allowedInstanceObjects.Length);
-                foreach (var allowedInstanceObject in allowedInstanceObjects)
-                {
-                    allowedInstanceIDs.Add(allowedInstanceObject.GetInstanceID());
-                }
-            }
-
-            ShowObjectPicker<T>(obj, itemSelectedCallback, folderPath, allowedInstanceIDs);
-        }
-
-        public static void ShowObjectPicker(SerializedProperty property,
-            Action<Object> itemSelectedCallback, string folderPath = "Assets")
-        {
-            get.Show(null, typeof(Object), property, itemSelectedCallback, folderPath);
-        }
-
-        public void Show(Object obj, Type requiredType, SerializedProperty property,
-            Action<Object> itemSelectedCallback, string folderPath, List<int> allowedInstanceIDs = null, Predicate<string> assetPathFilter = null)
-        {
-            string requiredTypeName = string.Empty;
-            if (property != null)
-            {
-                obj = property.objectReferenceValue;
-                requiredTypeName = property.objectReferenceValue.GetType().Name;
-            }
-            else
-            {
-                requiredTypeName = requiredType.Name;
-            }
-
-            Show(obj, requiredTypeName, property, itemSelectedCallback, folderPath, allowedInstanceIDs, assetPathFilter);
-        }
-
-        public void Show(Object obj, string requiredType, SerializedProperty property,
+        // 发现和选择回调都沿本次打开参数建立，不持有作者字段或事务。
+        private void ShowPicker(Object obj, string requiredType,
             Action<Object> itemSelectedCallback, string folderPath, List<int> allowedInstanceIDs = null, Predicate<string> assetPathFilter = null)
         {
             _assetPathFilter = assetPathFilter;
@@ -211,7 +134,6 @@ namespace NBC.ActionEditor.Views.IMGUI
                 return;
             }
 
-            _cacheProperty = property;
             _itemSelectedCallback = itemSelectedCallback;
             InitIfNeeded();
 
@@ -228,50 +150,8 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 初始化所指定的文件夹路径里的对象列表
         /// </summary>
-        /// <param name="requiredTypeName"></param>
-        /// <param name="allowedInstanceIDs"></param>
         private void InitBuiltinList(string requiredTypeName, List<int> allowedInstanceIDs)
-        {
-            int lenFolderPath = _folderPath.Length; // + 1;
-            List<BuiltinRes> builtinResList = new List<BuiltinRes>();
-
-            if (allowedInstanceIDs == null)
-            {
-                string[] guids = AssetDatabase.FindAssets("t:" + requiredTypeName, new[] { _folderPath });
-                foreach (var guid in guids)
-                {
-                    BuiltinRes builtinRes = new BuiltinRes();
-                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                    if (_assetPathFilter != null && !_assetPathFilter(assetPath)) continue;
-                    builtinRes.name = assetPath.Substring(lenFolderPath, assetPath.LastIndexOf('.') - lenFolderPath);
-                    builtinRes.icon = AssetDatabase.GetCachedIcon(assetPath);
-                    builtinRes.path = assetPath;
-                    builtinResList.Add(builtinRes);
-                }
-            }
-            else
-            {
-                foreach (var allowedInstanceID in allowedInstanceIDs)
-                {
-                    string assetPath = AssetDatabase.GetAssetPath(allowedInstanceID);
-                    if (_assetPathFilter != null && !_assetPathFilter(assetPath)) continue;
-                    Object obj = EditorUtility.InstanceIDToObject(allowedInstanceID);
-                    bool isSub = AssetDatabase.IsSubAsset(allowedInstanceID);
-                    string assetName = isSub
-                        ? obj.name
-                        : assetPath.Substring(lenFolderPath, assetPath.LastIndexOf('.') - lenFolderPath);
-                    BuiltinRes builtinRes = new BuiltinRes();
-                    builtinRes.name = assetName;
-                    builtinRes.icon =
-                        isSub ? AssetPreview.GetMiniThumbnail(obj) : AssetDatabase.GetCachedIcon(assetPath);
-                    builtinRes.path = assetPath;
-                    builtinRes.id = allowedInstanceID;
-                    builtinResList.Add(builtinRes);
-                }
-            }
-
-            _currentBuiltinResources = _activeBuiltinList = builtinResList.ToArray();
-        }
+            => _currentBuiltinResources = _activeBuiltinList = ObjectPickerCatalog.Discover(_folderPath, requiredTypeName, allowedInstanceIDs, _assetPathFilter);
 
         private void OnEnable()
         {
@@ -295,6 +175,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             if (_editorWrapperCache != null)
             {
                 _editorWrapperCache.Dispose();
+                _editorWrapperCache = null;
             }
         }
 
@@ -316,7 +197,7 @@ namespace NBC.ActionEditor.Views.IMGUI
 
             if (_noneBuiltinRes == null)
             {
-                _noneBuiltinRes = new BuiltinRes();
+                _noneBuiltinRes = new ObjectPickerCatalog.Entry();
                 _noneBuiltinRes.name = "None";
             }
 
@@ -391,15 +272,13 @@ namespace NBC.ActionEditor.Views.IMGUI
             GUI.Label(totalRect, GUIContent.none, _styles.iconAreaBg);
             _scrollPosition = GUI.BeginScrollView(totalRect, _scrollPosition, viewRect);
 
-            int num = FirstVisibleRow(0f, _scrollPosition);
-            if (num >= 0 && num < itemCount)
+            int firstRow = FirstVisibleRow(0f, _scrollPosition);
+            if (firstRow >= 0 && firstRow < itemCount)
             {
-                int num3 = num;
-                int num4 = Math.Min(itemCount, 2147483647);
-                float num5 = 16f;
-                int num6 = (int)Math.Ceiling(position.height / num5);
-                num4 = Math.Min(num4, num3 + num6 * 1 + 1);
-                DrawListInternal(num3, num4);
+                const float rowHeight = 16f;
+                int visibleRows = (int)Math.Ceiling(position.height / rowHeight);
+                int endRow = Math.Min(itemCount, firstRow + visibleRows + 1);
+                DrawListInternal(firstRow, endRow);
             }
 
             GUI.EndScrollView();
@@ -441,7 +320,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             }
         }
 
-        private void DrawListItemInternal(Rect rect4, BuiltinRes builtinResource, int itemIdx)
+        private void DrawListItemInternal(Rect rect4, ObjectPickerCatalog.Entry builtinResource, int itemIdx)
         {
             Event current = Event.current;
             float num5 = 18f;
@@ -487,8 +366,6 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 每个项的矩形区域
         /// </summary>
-        /// <param name="itemIdx"></param>
-        /// <returns></returns>
         private Rect ListItemCalcRect(int itemIdx)
         {
             return new Rect(0f, itemIdx * 16f, listPosition.width, 16f);
@@ -500,11 +377,11 @@ namespace NBC.ActionEditor.Views.IMGUI
 
             if (_editorWrapperCache == null)
             {
-                _editorWrapperCache = new EditorWrapperCache(EditorFeatures.PreviewGUI);
+                _editorWrapperCache = new ObjectPreviewCache();
             }
 
             Object currentObject = _lastSelectedObject;
-            EditorWrapper editorWrapper = null;
+            ObjectPreviewEditor editorWrapper = null;
 
             if (_previewSize < 75f)
             {
@@ -570,11 +447,11 @@ namespace NBC.ActionEditor.Views.IMGUI
                 }
 
                 WidePreview(_previewSize, text3, currentObject, editorWrapper);
-                _editorWrapperCache.CleanupUntouchedEditors();
             }
+            _editorWrapperCache.CleanupUntouchedEditors();
         }
 
-        private void LinePreview(string s, Object o, EditorWrapper p)
+        private void LinePreview(string s, Object o, ObjectPreviewEditor p)
         {
             if (_lastSelectedObjectIcon != null)
             {
@@ -593,7 +470,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             }
         }
 
-        private void WidePreview(float actualSize, string s, Object o, EditorWrapper p)
+        private void WidePreview(float actualSize, string s, Object o, ObjectPreviewEditor p)
         {
             float num = 5f;
             Rect pos = new Rect(num, _topSize + num, actualSize - num * 2f, actualSize - num * 2f);
@@ -669,8 +546,6 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 设置选中的索引
         /// </summary>
-        /// <param name="selectedIdx"></param>
-        /// <param name="callback"></param>
         private void SetSelectedAssetByIdx(int selectedIdx, bool callback = true)
         {
             _lastSelectedIdx = selectedIdx;
@@ -702,10 +577,7 @@ namespace NBC.ActionEditor.Views.IMGUI
                 if (_editorWrapperCache != null && _lastSelectedObject)
                 {
                     _editorWrapperCache.CleanupUntouchedEditors();
-                    EditorWrapper editorWrapper = _editorWrapperCache[_lastSelectedObject];
-                    if (editorWrapper != null)
-                    {
-                    }
+                    _ = _editorWrapperCache[_lastSelectedObject];
                 }
             }
 
@@ -718,18 +590,11 @@ namespace NBC.ActionEditor.Views.IMGUI
                 if (_lastSelectedObject == null || _assetPathFilter == null || _assetPathFilter(AssetDatabase.GetAssetPath(_lastSelectedObject)))
                     _itemSelectedCallback(_lastSelectedObject);
             }
-            else if (callback && _cacheProperty != null)
-            {
-                _cacheProperty.objectReferenceValue = _lastSelectedObject;
-                _cacheProperty.serializedObject.ApplyModifiedProperties();
-            }
         }
 
         /// <summary>
         /// 绘制对象的预览图标
         /// </summary>
-        /// <param name="rect"></param>
-        /// <param name="icon"></param>
         private void DrawObjectIcon(Rect rect, Texture icon)
         {
             if (icon == null)
@@ -754,9 +619,6 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 找到第一个可见的列表项
         /// </summary>
-        /// <param name="yOffset"></param>
-        /// <param name="scrollPos"></param>
-        /// <returns></returns>
         private int FirstVisibleRow(float yOffset, Vector2 scrollPos)
         {
             float num = scrollPos.y - yOffset;
@@ -775,15 +637,15 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// </summary>
         private void FilterSettingsChanged()
         {
-            BuiltinRes[] array = _currentBuiltinResources;
+            ObjectPickerCatalog.Entry[] array = _currentBuiltinResources;
             if (array != null && array.Length > 0 && !string.IsNullOrEmpty(_searchFilter))
             {
-                List<BuiltinRes> list3 = new List<BuiltinRes>();
+                List<ObjectPickerCatalog.Entry> list3 = new List<ObjectPickerCatalog.Entry>();
                 string value = _searchFilter.ToLower();
-                BuiltinRes[] array2 = array;
+                ObjectPickerCatalog.Entry[] array2 = array;
                 for (int j = 0; j < array2.Length; j++)
                 {
-                    BuiltinRes builtinResource = array2[j];
+                    ObjectPickerCatalog.Entry builtinResource = array2[j];
                     if (builtinResource.name.ToLower().Contains(value))
                     {
                         list3.Add(builtinResource);
@@ -804,7 +666,6 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 列表项滚动到指定矩形区域
         /// </summary>
-        /// <param name="r"></param>
         private void ScrollToPosition(Rect r)
         {
             float y = r.y;
@@ -826,8 +687,6 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 指定矩形定位后的区域
         /// </summary>
-        /// <param name="r"></param>
-        /// <returns></returns>
         private static Rect AdjustRectForFraming(Rect r)
         {
             r.height += _sharedObjectSelector._styles.resultsGridLabel.fixedHeight * 2f;
@@ -838,9 +697,6 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 列表项定位
         /// </summary>
-        /// <param name="assetPath"></param>
-        /// <param name="frame"></param>
-        /// <returns></returns>
         private bool ListItemFrame(string assetPath, bool frame)
         {
             int num = ListItemIndexOf(assetPath);
@@ -860,9 +716,6 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 列表项定位
         /// </summary>
-        /// <param name="obj"></param>
-        /// <param name="frame"></param>
-        /// <returns></returns>
         private bool ListItemFrame(Object obj, bool frame)
         {
             if (obj == null || !AssetDatabase.Contains(obj))
@@ -876,8 +729,6 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 根据路径查找所在的索引
         /// </summary>
-        /// <param name="assetPath"></param>
-        /// <returns></returns>
         private int ListItemIndexOf(string assetPath)
         {
             int num = 0;
@@ -898,10 +749,10 @@ namespace NBC.ActionEditor.Views.IMGUI
                 }
             }
 
-            BuiltinRes[] activeBuiltinList = _activeBuiltinList;
+            ObjectPickerCatalog.Entry[] activeBuiltinList = _activeBuiltinList;
             for (int j = 0; j < activeBuiltinList.Length; j++)
             {
-                BuiltinRes builtinResource = activeBuiltinList[j];
+                ObjectPickerCatalog.Entry builtinResource = activeBuiltinList[j];
                 if (assetPath == builtinResource.path)
                 {
                     return num;
@@ -915,180 +766,4 @@ namespace NBC.ActionEditor.Views.IMGUI
     }
 
 
-    internal class EditorWrapper : IDisposable
-    {
-        public delegate void VoidDelegate(SceneView sceneView);
-
-        private Editor editor;
-        public string name => editor.target.name;
-
-        private EditorWrapper()
-        {
-        }
-
-        public void OnEnable()
-        {
-            MethodInfo method = editor.GetType().GetMethod("OnEnable",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (method != null)
-            {
-                method.Invoke(editor, null);
-            }
-        }
-
-        public void OnDisable()
-        {
-            MethodInfo method = editor.GetType().GetMethod("OnDisable",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (method != null)
-            {
-                method.Invoke(editor, null);
-            }
-        }
-
-        public bool HasPreviewGUI()
-        {
-            return editor.HasPreviewGUI();
-        }
-
-        public void OnPreviewSettings()
-        {
-            editor.OnPreviewSettings();
-        }
-
-        public void OnPreviewGUI(Rect position, GUIStyle background)
-        {
-            editor.OnPreviewGUI(position, background);
-        }
-
-        public void OnInteractivePreviewGUI(Rect r, GUIStyle background)
-        {
-            if (editor != null)
-            {
-                editor.OnInteractivePreviewGUI(r, background);
-            }
-        }
-
-        public string GetInfoString()
-        {
-            return editor.GetInfoString();
-        }
-
-        public static EditorWrapper Make(Object obj, EditorFeatures requirements)
-        {
-            EditorWrapper editorWrapper = new EditorWrapper();
-            if (editorWrapper.Init(obj, requirements))
-            {
-                return editorWrapper;
-            }
-
-            editorWrapper.Dispose();
-            return null;
-        }
-
-        private bool Init(Object obj, EditorFeatures requirements)
-        {
-            editor = Editor.CreateEditor(obj);
-            if (editor == null)
-            {
-                return false;
-            }
-
-            if ((requirements & EditorFeatures.PreviewGUI) > EditorFeatures.None && !editor.HasPreviewGUI())
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        public void Dispose()
-        {
-            if (editor != null)
-            {
-                Object.DestroyImmediate(editor);
-                editor = null;
-            }
-
-            GC.SuppressFinalize(this);
-        }
-    }
-
-
-    enum EditorFeatures
-    {
-        None = 0,
-        PreviewGUI = 1,
-        OnSceneDrag = 4
-    }
-
-    class EditorWrapperCache : IDisposable
-    {
-        private readonly Dictionary<Object, EditorWrapper> _editorCache;
-        private readonly Dictionary<Object, bool> _usedEditors;
-        private readonly EditorFeatures _requirements;
-
-        public EditorWrapper this[Object o]
-        {
-            get
-            {
-                _usedEditors[o] = true;
-                if (_editorCache.TryGetValue(o, out var item))
-                {
-                    return item;
-                }
-
-                EditorWrapper editorWrapper = EditorWrapper.Make(o, _requirements);
-                EditorWrapper editorWrapper2 = editorWrapper;
-                _editorCache[o] = editorWrapper2;
-                return editorWrapper2;
-            }
-        }
-
-        public EditorWrapperCache(EditorFeatures requirements)
-        {
-            _requirements = requirements;
-            _editorCache = new Dictionary<Object, EditorWrapper>();
-            _usedEditors = new Dictionary<Object, bool>();
-        }
-
-        public void CleanupUntouchedEditors()
-        {
-            List<Object> list = new List<Object>();
-            foreach (Object current in _editorCache.Keys)
-            {
-                if (!_usedEditors.ContainsKey(current))
-                {
-                    list.Add(current);
-                }
-            }
-
-            if (_editorCache != null)
-            {
-                foreach (Object current2 in list)
-                {
-                    EditorWrapper editorWrapper = _editorCache[current2];
-                    _editorCache.Remove(current2);
-                    if (editorWrapper != null)
-                    {
-                        editorWrapper.Dispose();
-                    }
-                }
-            }
-
-            _usedEditors.Clear();
-        }
-
-        public void CleanupAllEditors()
-        {
-            _usedEditors.Clear();
-            CleanupUntouchedEditors();
-        }
-
-        public void Dispose()
-        {
-            CleanupAllEditors();
-            GC.SuppressFinalize(this);
-        }
-    }
 }

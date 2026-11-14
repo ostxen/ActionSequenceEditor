@@ -43,7 +43,6 @@ namespace NBC.ActionEditor.Views.IMGUI
             Lan.Load();
             Styles.Load();
             Workspace.LeftWidth = Styles.TimelineLeftWidth;
-            Prefs.InitializeAssetTypes();
             _welcomeView = new WelcomeView(Documents);
             header = new TimelineHeaderView(Binding, Workspace);
             Timeline?.Dispose(); Timeline = new TimelineSurface(this, Binding, Workspace);

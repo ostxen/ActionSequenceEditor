@@ -12,7 +12,7 @@ using UnityEngine;
 
 namespace NBC.ActionEditor.Infrastructure.Documents
 {
-    /// <summary>One path, byte commit and import boundary for editable documents.</summary>
+    // 统一文档路径、严格读回、字节提交及Unity导入边界。
     public sealed class JsonDocumentRepository : IDocumentRepository
     {
         private readonly ICommitFiles files;
@@ -59,7 +59,7 @@ namespace NBC.ActionEditor.Infrastructure.Documents
                 if (differences.Length != 0) throw new InvalidDataException("JSON 读回内容不一致，拒绝提交。差异字段：" + string.Join(", ", differences.Take(8)));
                 if (expectedCurrent == null) ValidateNewPath(path);
             }, expectedCurrent, createOnly: expectedCurrent == null);
-            // The exact bytes just committed are the revision. Do not read a later external edit as our baseline.
+            // 基线取本次已提交字节，不能将更晚的外部写入冒认为自身版本。
             return new DocumentCommit(serialized, JsonDocumentCodec.ContentOfSnapshot(serialized), new UTF8Encoding(false).GetBytes(serialized));
         }
         public void Import(string path)
