@@ -24,8 +24,8 @@ namespace NBC.ActionEditor.Views.IMGUI
         public void SetCapture(bool value)
         {
             captured = value;
-            if (Event.current == null) return;
-            if (value) GUIUtility.hotControl = captureId;
+            // 失焦和文档替换可能不在OnGUI内，仍须释放本窗口留下的原生捕获。
+            if (value) { if (Event.current != null) GUIUtility.hotControl = captureId; }
             else if (GUIUtility.hotControl == captureId) GUIUtility.hotControl = 0;
         }
         // 主体坐标减去工具栏高度；捕获后的松开仍传递到共享状态机校验按钮与越界。
