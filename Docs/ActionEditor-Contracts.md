@@ -12,7 +12,11 @@
 
 两UI滚轮缩放以鼠标时间为锚点，最小跨度0.25秒、步进225；保持锚点时视域可为负，作者时间不得为负。中键平移保持跨度并在零点夹紧。片段最短可编辑区间0.01秒，点事件不可伸缩。Esc、失焦、捕获丢失及文档替换只取消本窗口拥有的操作。
 
-创建、保存、另存与自动保存进入 `DocumentLifecycle`，经同一 `JsonDocumentRepository` 和 `ReliableFileCommit` 完成快照、校验、完整读回及revision保护。字节提交后先推进来源与基线再导入，导入失败明确报告已提交，禁止自动重放。导出使用同一格式目录和隔离快照，只写独立新目标，不切来源、不清脏、不改变Undo、选择或播放。新建/另存/导出拒绝现存目标及meta，取消不写文件。
+创建、保存、另存与自动保存进入 `DocumentLifecycle`，经同一 `JsonDocumentRepository` 和 `AtomicFileCommit` 完成快照、校验、完整读回及revision保护。字节提交后先推进来源与基线再导入，导入失败明确报告已提交，禁止自动重放。导出使用同一格式目录和隔离快照，只写独立新目标，不切来源、不清脏、不改变Undo、选择或播放。新建/另存/导出拒绝现存目标及meta，取消不写文件。
+
+属性字段由共享描述和`PropertyPath`解释，原生控件不直接持久化作者对象。集合增删先为每个目标构造隔离候选，整批预检通过后一次事务提交；后部目标失败不改变前部目标，Undo/Redo恢复完整批次。路径处理嵌套struct时逐层回写，陈旧对象、锁定和活动编辑边界在真实提交处重验。
+
+播放只有一个Editor时钟驱动。预览会话拥有创建的预览实例，不拥有借入的作者图或Unity资源；回调引发替换/取消时，旧代次不能继续求值或清理新会话。逐窗订阅、原生捕获和选择器Editor缓存随各自所有者释放，关闭非最后窗口不停止共享播放。
 
 ## 唯一序列化契约
 
@@ -21,7 +25,7 @@
 
 - Runtime `Serialization` 定义 `IActionDocumentFormat`：不可变 `Id`、`DisplayName`、`Extension`，独立的 `CanRead`、`CanWrite`、`CanExport`，以及 `Serialize(ActionDocument, options, context) → byte[]` / `Deserialize(byte[], context) → ActionDocument`。不支持的方向明确失败；不要求未来只写导出器实现可用的读回。失败抛有非空错误的异常，包含字段路径/类型身份但不包含作者字段值；禁止返回空字符串、空字节或 null 冒充成功。`options` 首期仅压缩/美化，编码为 UTF-8 无 BOM，context 只提供受控类型解析及 Unity 引用解析，不提供路径写入或会话操作。
 - 首个且唯一生产注册：`Id = actioneditor.json`，显示 `JSON (.json)`，扩展名 `.json`，读、写、导出均支持。Editor 格式目录显式注册实际实现，ID/扩展名冲突整体拒绝并列双方来源；创建/打开筛选 `CanRead && CanWrite`，导出筛选 `CanExport && CanWrite`，没有实现就不显示。文件扩展名选择候选，内容标识再次核实，大小写扩展名沿当前规则；不做旧格式探测或回退。
-- 格式实现只做数据转换。Editor `Serialization` 协调类型目录、图校验、隔离快照、作者内容比较与导出；`Storage` 负责路径、版本、`ReliableFileCommit` 和导入。Session 仍是唯一图、事务、Undo、Recovery 与保存基线的所有者。类型目录、磁盘格式、UI 各有职责，不新增第二份可编辑文档或万能注册框架。
+- 格式实现只做数据转换。Editor `Serialization` 协调类型目录、图校验、隔离快照和作者内容比较；`Infrastructure/Documents` 通过 `JsonDocumentRepository` 负责路径、版本、`AtomicFileCommit` 和导入，导出用例消费相同格式与快照边界。Session 仍是唯一图、事务、Undo、Recovery 与保存基线的所有者。类型目录、磁盘格式、UI 各有职责，不新增第二份可编辑文档或万能注册框架。
 
 ### 唯一 JSON 结构与类型身份
 

@@ -91,7 +91,7 @@ namespace NBC.ActionEditor.Tests
             var window = ScriptableObject.CreateInstance<ToolkitWindow>();
             try
             {
-                window.position = new Rect(50, 50, 1000, 600); window.Show(); yield return null; yield return null;
+                window.Show(); window.position = new Rect(50, 50, 1000, 600); window.Focus(); yield return null; yield return null;
                 var canvas = window.Canvas;
                 var item = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                 var rect = canvas.ClipRect(item, 1); var center = rect.center;
@@ -103,6 +103,10 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(item.StartTime, Is.EqualTo(1.3f).Within(.051f)); // configured 0.1-second snapping
                 Undo.PerformUndo(); item = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                 Assert.That(item.StartTime, Is.EqualTo(.25f));
+                // Undo重建Inspector可延迟转移原生焦点；下一次拖动必须从已聚焦窗口开始。
+                yield return null; yield return null;
+                window.Focus(); canvas.Focus(); yield return null; yield return null;
+                Assert.That(EditorWindow.focusedWindow, Is.SameAs(window));
                 rect = canvas.ClipRect(item, 1); center = rect.center;
                 Pointer(canvas, EventType.MouseDown, center); Pointer(canvas, EventType.MouseDrag, center + new Vector2(30, 0));
                 yield return null;

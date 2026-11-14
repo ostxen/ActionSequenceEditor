@@ -38,6 +38,12 @@
 - 第二组第一轨：内循环周期、倍速、偏移和匹配长度菜单。第二轨“属性练习”：文字、数值、bool、枚举、颜色、向量、曲线、条件字段和参数列表。
 - 第三组：展开后体验锁定/解锁及激活/停用。滚轮缩放、中键平移、底部范围和秒/帧设置都不等同于修改片段内容。
 
+## 两个界面同时使用
+
+从两个菜单各开一个窗口，选择和修改任一片段，另一窗口会显示同一作者内容与播放头。各窗的视域、折叠、滚动和分栏独立，不会因只调整布局而标记文档未保存。拖动归发起窗口所有；Esc或该窗失焦会取消当前候选。切换窗口可能使发起窗失焦，所以先松开提交，或取消后再到另一窗继续。关闭一个窗口不清空文档，也不停止仍有窗口使用的共享播放。
+
+集合字段可展开后显式添加/删除元素，null与空集合不同；取消或失败不保留半次集合修改。Undo后领域对象可能重建，重新选择目标再编辑，不依赖旧Inspector引用。
+
 ## 最小业务接入与边界
 
 Runtime 的 `ActionDocument.RootItems` 依次存放 `TimelineGroup` 或 `TimelineTrack`；组持有轨道，轨道持有 `TimelineClip`。沿样例使用 `Name`、`MenuName`、`Attachable` 等业务声明。Editor 的 IMGUI Header 继承 `HeaderBase` 并声明 `CustomHeader`，Toolkit Header 继承 `ToolkitHeaderView` 并声明 `ToolkitHeader`；属性控件扩展分别声明 `CustomInspectors` 和 `ToolkitProperties`。字段描述与提交由共享 `PropertyPresenter` 负责，原生视图只构建控件。参考 `Runtime/Samples/FeatureSample` 和 `Editor/Samples/FeatureSamplePreview.cs`。
