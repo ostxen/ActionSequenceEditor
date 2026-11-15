@@ -30,16 +30,16 @@ namespace NBC.ActionEditor.Views.UIToolkit
             if (error != null) error.text = message ?? string.Empty;
         }
         private void OnDisable() { presenter?.Dispose(); presenter = null; }
-        public static void ShowFor(EditorWindow owner)
+        public static void ShowFor(EditorWindow owner, Func<ISettingsView, SettingsPresenter> create)
         {
             var window = CreateInstance<PreferencesWindow>();
+            window.presenter = create(window);
             window.ShowAsDropDown(new Rect(owner.position.xMax - 405, owner.position.y + 20, 400, 5), new Vector2(400, 310));
         }
 
         public void CreateGUI()
         {
-            if (presenter == null) presenter = Composition.SettingsComposition.Create(this);
-            else Draw();
+            if (presenter != null) Draw();
         }
         private void Draw()
         {

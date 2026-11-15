@@ -1,8 +1,8 @@
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Presentation.Properties;
+using NBC.ActionEditor.Presentation.Contracts;
 using System;
-using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using NBC.ActionEditor.Presentation.Presenters;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -35,29 +35,20 @@ namespace NBC.ActionEditor.Views.UIToolkit
             this.presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
             this.extensions = extensions ?? EditorExtensionFactory.GetToolkitProperties;
         }
-        public void Populate(VisualElement root, object value, Action refresh)
+        public void Populate(VisualElement root, PropertyTargetState value, Action refresh)
         {
             if (value == null) return;
             // 自定义属性适配也服从共同锁定状态，不能绕过默认面板的禁用范围。
-            root.SetEnabled(!presenter.Locked(value));
-            if (value is IData)
-            {
-                var extension = extensions(value.GetType());
-                if (extension != null) { extension.Populate(root, value, presenter, refresh); return; }
-            }
-            var title = new Label(presenter.Title(value));
+            root.SetEnabled(!value.Locked);
+            var extension = extensions(value.Type);
+            if (extension != null) { extension.Populate(root, value, presenter, refresh); return; }
+            var title = new Label(value.Title);
             title.style.fontSize = 18; title.style.unityFontStyleAndWeight = FontStyle.Bold; title.style.backgroundColor = new Color(0, 0, 0, .2f); root.Add(title);
-            var description = presenter.Description(value);
+            var description = value.Description;
             if (!string.IsNullOrEmpty(description)) root.Add(new HelpBox(description, HelpBoxMessageType.None));
-            if (value is IDirectable directable)
-            {
-                if (value is TimelineGroup || value is TimelineTrack) Add(root, "Name", directable.Name, next => presenter.Rename(directable, next));
-                if (value is TimelineClip clip)
-                {
-                    DrawClipControls(root, clip, refresh);
-                }
-            }
-            DrawFields(root, value, refresh, 0);
+            if (value.CanRename) Add(root, "Name", value.Name, next => { presenter.Rename(value.Id, next); refresh(); });
+            if (value.Clip != null) DrawClipControls(root, value.Id, value.Clip, refresh);
+            DrawFields(root, value.Fields, refresh, 0);
         }
 
         private static VisualElement Box(VisualElement root)
@@ -66,9 +57,8 @@ namespace NBC.ActionEditor.Views.UIToolkit
             box.style.paddingLeft = box.style.paddingRight = box.style.paddingTop = box.style.paddingBottom = 4;
             box.style.backgroundColor = new Color(0, 0, 0, .12f); root.Add(box); return box;
         }
-        private void DrawClipControls(VisualElement root, TimelineClip clip, Action refresh)
+        private void DrawClipControls(VisualElement root, PropertyFieldId clip, ClipPropertyState state, Action refresh)
         {
-            var state = presenter.ClipState(clip);
             if (!state.Valid) root.Add(new HelpBox("该剪辑无效。 请确保设置了所需的参数。", HelpBoxMessageType.Error));
             var minimum = state.Minimum; var maximum = state.Maximum;
             void Apply(float start, float end)
@@ -130,32 +120,31 @@ namespace NBC.ActionEditor.Views.UIToolkit
             field.RegisterValueChangedCallback(evt => changed(evt.newValue)); root.Add(field);
         }
 
-        public void DrawFields(VisualElement root, object obj, Action refresh, int depth, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath = null)
+        public void DrawFields(VisualElement root, IReadOnlyList<PropertyInputState> fields, Action refresh, int depth)
         {
-            if (obj == null || depth > 6) return;
-            foreach (var state in presenter.CaptureFields(obj, propertyPath))
+            if (fields == null || depth > 6) return;
+            foreach (var state in fields)
             {
-                var description = state.Description;
                 var label = state.Label;
                 var current = state.Value;
                 var type = state.Type;
-                var pathToField = state.Path;
+                var pathToField = state.Id;
                 void Set(object next) { presenter.Write(pathToField, next); refresh(); }
-                if (description.HasRange && type == typeof(float)) Bind(root, new Slider(label, description.Minimum, description.Maximum) { showInputField = true }, current, Set);
-                else if (description.HasRange && type == typeof(int)) Bind(root, new SliderInt(label, Mathf.CeilToInt(description.Minimum), Mathf.FloorToInt(description.Maximum)) { showInputField = true }, current, Set);
-                else if (description.OptionType != null && type == typeof(int))
+                if (state.HasRange && type == typeof(float)) Bind(root, new Slider(label, state.Minimum, state.Maximum) { showInputField = true }, current, Set);
+                else if (state.HasRange && type == typeof(int)) Bind(root, new SliderInt(label, Mathf.CeilToInt(state.Minimum), Mathf.FloorToInt(state.Maximum)) { showInputField = true }, current, Set);
+                else if (state.HasOptions && type == typeof(int))
                 {
                     var labels = state.OptionLabels.ToList();
                     if (labels.Count == 0) continue;
                     var control = new PopupField<string>(label, labels, Math.Max(0, state.OptionIndex));
-                    control.RegisterValueChangedCallback(e => Set(state.OptionValue(control.index))); root.Add(control);
+                    control.RegisterValueChangedCallback(e => { presenter.SelectOption(state.Id, control.index); refresh(); }); root.Add(control);
                 }
-                else if (description.ResourceType != null && type == typeof(string))
+                else if (state.ResourceType != null && type == typeof(string))
                 {
-                    var control = new ObjectField(label) { objectType = description.ResourceType, allowSceneObjects = false, value = AssetDatabase.LoadAssetAtPath<Object>(current as string ?? "") };
+                    var control = new ObjectField(label) { objectType = state.ResourceType, allowSceneObjects = false, value = AssetDatabase.LoadAssetAtPath<Object>(current as string ?? "") };
                     control.RegisterValueChangedCallback(e => Set(AssetDatabase.GetAssetPath(e.newValue))); root.Add(control);
                 }
-                else DrawValue(root, label, type, current, Set, refresh, depth, pathToField);
+                else DrawValue(root, state, Set, refresh, depth);
             }
         }
 
@@ -165,16 +154,17 @@ namespace NBC.ActionEditor.Views.UIToolkit
             control.RegisterValueChangedCallback(e => set(e.newValue)); root.Add(control);
         }
 
-        private void DrawValue(VisualElement root, string label, Type type, object value, Action<object> set, Action refresh, int depth, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath)
+        private void DrawValue(VisualElement root, PropertyInputState state, Action<object> set, Action refresh, int depth)
         {
             if (depth > 6) return;
+            var label = state.Label; var type = state.Type; var value = state.Value; var propertyPath = state.Id;
             if (type == typeof(string))
             {
-                BindDelayed(root, new TextField(label) { isDelayed = true }, value, propertyPath, refresh);
+                BindDelayed(root, new TextField(label) { isDelayed = true }, value, state, refresh);
                 if (value != null) root.Add(new Button(() => set(null)) { text = "设为空值 " + label });
             }
-            else if (type == typeof(float)) BindDelayed(root, new FloatField(label) { isDelayed = true }, value, propertyPath, refresh);
-            else if (type == typeof(int)) BindDelayed(root, new IntegerField(label) { isDelayed = true }, value, propertyPath, refresh);
+            else if (type == typeof(float)) BindDelayed(root, new FloatField(label) { isDelayed = true }, value, state, refresh);
+            else if (type == typeof(int)) BindDelayed(root, new IntegerField(label) { isDelayed = true }, value, state, refresh);
             else if (type == typeof(bool)) Bind(root, new Toggle(label), value, set);
             else if (type == typeof(Color)) Bind(root, new ColorField(label), value, set);
             else if (type == typeof(Vector2)) { root.Add(new Label(label)); Bind(root, new Vector2Field(), value, set); }
@@ -186,7 +176,7 @@ namespace NBC.ActionEditor.Views.UIToolkit
             else if (type == typeof(RectInt)) Bind(root, new RectIntField(label), value, set);
             else if (type == typeof(Bounds)) Bind(root, new BoundsField(label), value, set);
             else if (type == typeof(BoundsInt)) Bind(root, new BoundsIntField(label), value, set);
-            else if (type == typeof(AnimationCurve)) Bind(root, new CurveField(label), NBC.ActionEditor.Presentation.Contracts.PropertyFieldState.CopyValue(value), set);
+            else if (type == typeof(AnimationCurve)) Bind(root, new CurveField(label), value, set);
             else if (type.IsEnum)
             {
                 var control = new EnumField(label, (Enum)(value ?? Activator.CreateInstance(type)));
@@ -200,37 +190,37 @@ namespace NBC.ActionEditor.Views.UIToolkit
             else if (type.IsArray || type.IsGenericType && type.GetGenericTypeDefinition() == typeof(System.Collections.Generic.List<>))
             {
                 var fold = new Foldout { text = label, value = false }; root.Add(fold);
-                var elementType = type.IsArray ? type.GetElementType() : type.GetGenericArguments()[0];
-                var list = value as IList;
-                if (list != null) fold.Add(new Button(() => set(null)) { text = "设为空值 " + label });
-                if (list != null) for (var i = 0; i < list.Count; i++)
+                if (!state.IsNull) fold.Add(new Button(() => set(null)) { text = "设为空值 " + label });
+                for (var i = 0; i < state.Children.Count; i++)
                 {
                     var index = i;
+                    var child = state.Children[i];
                     var row = new VisualElement(); row.style.marginLeft = 10; fold.Add(row);
-                    DrawValue(row, "Element " + i, elementType, list[i], next => { presenter.Write(propertyPath.Element(index), next); refresh(); }, refresh, depth + 1, propertyPath.Element(index));
+                    DrawValue(row, child, next => { presenter.Write(child.Id, next); refresh(); }, refresh, depth + 1);
                     row.Add(new Button(() =>
                     {
-                        presenter.Remove(propertyPath, type, index); refresh();
+                        presenter.Remove(propertyPath, index); refresh();
                     }) { text = "删除元素" });
                 }
                 fold.Add(new Button(() =>
                 {
-                    presenter.Append(propertyPath, type); refresh();
+                    presenter.Append(propertyPath); refresh();
                 }) { text = "+ 元素" });
             }
             else if (depth < 6)
             {
                 var fold = new Foldout { text = label, value = true }; root.Add(fold);
-                if (value == null) fold.Add(new Button(() => set(presenter.CreateElement(type))) { text = "创建 " + type.Name });
-                else DrawFields(fold, value, refresh, depth + 1, propertyPath);
+                if (state.IsNull) fold.Add(new Button(() => { presenter.CreateValue(propertyPath); refresh(); }) { text = "创建 " + type.Name });
+                else DrawFields(fold, state.Children, refresh, depth + 1);
             }
         }
 
         // 控件负责原生文本缓冲，Presenter负责输入身份、取消和最终作者提交。
         private void BindDelayed<T>(VisualElement root, BaseField<T> control, object value,
-            NBC.ActionEditor.Application.Editing.PropertyPath path, Action refresh)
+            PropertyInputState state, Action refresh)
         {
-            NBC.ActionEditor.Presentation.Contracts.PropertyDraft draft = null;
+            var path = state.Id;
+            NBC.ActionEditor.Presentation.Properties.PropertyDraft draft = null;
             HelpBox error = null;
             void CancelInput()
             {
@@ -255,7 +245,7 @@ namespace NBC.ActionEditor.Views.UIToolkit
                 }
             }
             control.SetValueWithoutNotify(value is T typed ? typed : default);
-            control.showMixedValue = path.IsMixed;
+            control.showMixedValue = state.Mixed;
             control.RegisterCallback<FocusInEvent>(_ => Input(() => draft = presenter.BeginDraft(path)));
             control.RegisterCallback<InputEvent>(e => Input(() =>
             {

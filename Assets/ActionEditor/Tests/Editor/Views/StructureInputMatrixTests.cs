@@ -12,7 +12,7 @@ using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Samples.FeatureSample;
 using NBC.ActionEditor.Serialization;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -42,15 +42,15 @@ namespace NBC.ActionEditor.Tests
             private readonly DocumentFormatContext context = DocumentFormats.CreateContext(typeof(UniqueTrack));
             private readonly ActionDocumentJsonFormat format = new ActionDocumentJsonFormat();
             public string Capture(ActionDocument document) => System.Text.Encoding.UTF8.GetString(format.Serialize(
-                DocumentSnapshots.Capture(document, false, context), new DocumentFormatOptions(false), context));
+                DocumentCopy.Capture(document, false, context), new DocumentFormatOptions(false), context));
             public ActionDocument Restore(string snapshot) => format.Deserialize(System.Text.Encoding.UTF8.GetBytes(snapshot), context);
-            public string Content(ActionDocument document) => DocumentSnapshots.Content(document, context);
+            public string Content(ActionDocument document) => DocumentCopy.Content(document, context);
             public void ValidateAndInitialize(ActionDocument document) => ActionDocumentGraph.Initialize(document, context);
         }
 
         internal sealed class WindowInput : IDisposable
         {
-            public readonly ActionEditorContext Context;
+            public readonly EditorFixture Context;
             public readonly ActionEditorViews Views = new ActionEditorViews();
             public readonly SettingsSession Settings = new SettingsSession(new Preferences());
             public readonly ImguiWindow Imgui;
@@ -69,9 +69,9 @@ namespace NBC.ActionEditor.Tests
 
             public WindowInput(bool toolkit, int height = 650, bool unique = false)
             {
-                globalViews = ActionEditorHost.Views.Count;
-                snapshots = unique ? (IDocumentSnapshot)new TestSnapshots() : new DocumentSnapshot();
-                Context = new ActionEditorContext(new DocumentSession(snapshots, new JsonDocumentRepository(), new UnityUndoHistory(), new RecoveryCodec()));
+                globalViews = EditorFixture.SharedViews.Count;
+                snapshots = unique ? (IDocumentSnapshot)new TestSnapshots() : new SessionSnapshotCodec();
+                Context = new EditorFixture(new DocumentSession(snapshots, new JsonDocumentRepository(), new UnityUndoHistory(), new RecoveryCodec()));
                 var document = new FeatureSampleDocument();
                 for (var i = 0; i < 3; i++)
                 {
@@ -91,12 +91,12 @@ namespace NBC.ActionEditor.Tests
                 if (toolkit)
                 {
                     Toolkit = ScriptableObject.CreateInstance<ToolkitWindow>();
-                    Toolkit.BindContext(Context, Views, Settings);
+                    Toolkit.Bind((owner, repaint, changed) => Context.Bind(owner, repaint, changed, Views, Settings));
                 }
                 else
                 {
                     Imgui = ScriptableObject.CreateInstance<ImguiWindow>();
-                    Imgui.BindContext(Context, Views, Settings);
+                    Imgui.Bind((owner, repaint, changed) => Context.Bind(owner, repaint, changed, Views, Settings));
                 }
                 // Show可能恢复同类型上次窗口尺寸，测试尺寸必须在显示后设定。
                 Window.Show(); Window.position = new Rect(60, 60, 1000, height); Window.Focus(); Window.Repaint();
@@ -162,7 +162,7 @@ namespace NBC.ActionEditor.Tests
             {
                 try { Close(); }
                 finally { Context.Dispose(); }
-                Assert.That(ActionEditorHost.Views.Count, Is.EqualTo(globalViews));
+                Assert.That(EditorFixture.SharedViews.Count, Is.EqualTo(globalViews));
             }
         }
 
@@ -465,12 +465,12 @@ namespace NBC.ActionEditor.Tests
                 if (toolkit)
                 {
                     var window = ScriptableObject.CreateInstance<ImguiWindow>();
-                    other = window; window.BindContext(h.Context, h.Views, h.Settings);
+                    other = window; window.Bind((owner, repaint, changed) => h.Context.Bind(owner, repaint, changed, h.Views, h.Settings));
                 }
                 else
                 {
                     var window = ScriptableObject.CreateInstance<ToolkitWindow>();
-                    other = window; window.BindContext(h.Context, h.Views, h.Settings);
+                    other = window; window.Bind((owner, repaint, changed) => h.Context.Bind(owner, repaint, changed, h.Views, h.Settings));
                 }
                 other.Show(); other.position = new Rect(1100, 60, 550, 300);
                 h.Window.Focus(); h.Window.Repaint(); yield return null; yield return null; yield return null;

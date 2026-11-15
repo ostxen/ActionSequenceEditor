@@ -23,13 +23,14 @@ namespace NBC.ActionEditor.Views.IMGUI
         { presenter?.Dispose(); presenter = Composition.SettingsComposition.Create(this, session); }
         public void Render(SettingsValue value) { state = value; editorWindow?.Repaint(); }
         public void ShowError(string message) { error = message; editorWindow?.Repaint(); }
-        public override void OnOpen() { if (presenter == null) presenter = Composition.SettingsComposition.Create(this); }
+        public override void OnOpen() { }
         public override void OnClose() { presenter?.Dispose(); presenter = null; }
 
-        public static void Show(Rect rect)
+        public static void Show(Rect rect, System.Func<ISettingsView, SettingsPresenter> create)
         {
             _myRect = rect;
-            PopupWindow.Show(new Rect(rect.x, rect.y, 0, 0), new PreferencesWindow());
+            var window = new PreferencesWindow(); window.presenter = create(window);
+            PopupWindow.Show(new Rect(rect.x, rect.y, 0, 0), window);
         }
 
         public override Vector2 GetWindowSize()
@@ -47,7 +48,7 @@ namespace NBC.ActionEditor.Views.IMGUI
         // 控件只提交用户变化，首次绘制不改写偏好。
         private void DrawPreferences()
         {
-            if (presenter == null) presenter = Composition.SettingsComposition.Create(this);
+            if (presenter == null) return;
             GUILayout.BeginVertical("box");
             GUI.color = new Color(0, 0, 0, 0.3f);
 

@@ -7,7 +7,7 @@ namespace NBC.ActionEditor.Composition
     {
         public static FeatureSamplePresenter Create(EditorExtensionContext context)
         {
-            return new FeatureSamplePresenter(() => context.Document, () => context.Time);
+            return new FeatureSamplePresenter(context.Capture);
         }
     }
 }

@@ -6,7 +6,7 @@ using NBC.ActionEditor.Application.Documents;
 using NBC.ActionEditor.Infrastructure.Documents;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -14,9 +14,20 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class ApplicationAdapterTests
     {
+        private sealed class RenameDialog : ITimelineDialogs
+        {
+            public string InitialName;
+            public Action<string> Submit;
+            public void Delete(string title, Action confirmed) { }
+            public void Rename(string initialName, Action<string> submit) { InitialName = initialName; Submit = submit; }
+        }
+        private sealed class EmptyCatalog : ITimelineTypeCatalog
+        {
+            public IReadOnlyList<TimelineTypeChoice> DerivedFrom(Type baseType) => Array.Empty<TimelineTypeChoice>();
+        }
         [Test] public void RowUnlockChangesOnlyItsFlagAndUndoRestoresInheritedLocks()
         {
-            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            using var context = new EditorFixture(Composition.DocumentComposition.Create());
             var document = new FeatureSampleDocument();
             var group = document.RootItems.OfType<NBC.ActionEditor.Domain.TimelineGroup>().First();
             var track = group.Tracks[0];
@@ -24,13 +35,13 @@ namespace NBC.ActionEditor.Tests
             track.IsLocked = true; group.IsLocked = true;
             context.Session.Open(new DocumentOpenData(document));
             var before = JsonDocumentCodec.Encode(context.Document);
-            Assert.Throws<InvalidOperationException>(() => context.Structure.Rename(group, "must not change"));
-            Assert.Throws<InvalidOperationException>(() => context.Structure.ToggleLock(track));
+            Assert.Throws<InvalidOperationException>(() => context.Nodes.Rename(group, "must not change"));
+            Assert.Throws<InvalidOperationException>(() => context.Nodes.ToggleLock(track));
             Assert.That(JsonDocumentCodec.Encode(context.Document), Is.EqualTo(before));
-            context.Structure.ToggleLock(group);
+            context.Nodes.ToggleLock(group);
             Assert.That(group.IsLocked, Is.False);
             Assert.That(track.IsLocked, Is.True);
-            context.Structure.ToggleLock(track);
+            context.Nodes.ToggleLock(track);
             Assert.That(track.IsLocked, Is.False);
             Assert.That(group.Name, Is.EqualTo(groupName));
             Assert.That(track.Name, Is.EqualTo(trackName));
@@ -44,11 +55,23 @@ namespace NBC.ActionEditor.Tests
             group = context.Document.RootItems.OfType<NBC.ActionEditor.Domain.TimelineGroup>().First();
             Assert.That(group.IsLocked || group.Tracks[0].IsLocked, Is.False);
             Assert.That(context.Session.IsEditing, Is.False);
+            var dialog = new RenameDialog();
+            var menus = new NBC.ActionEditor.Presentation.Presenters.TimelineMenuPresenter(context.Session, context.Structure, context.Nodes, context.Clips,
+                context.ClipboardEditing, context.Clipboard, context.Selection, new EmptyCatalog(), dialog, key => key, _ => { });
+            menus.Build(group, true, 0).Single(entry => entry.Text == "Rename").Invoke();
+            Assert.That(dialog.InitialName, Is.EqualTo(groupName));
+            dialog.Submit("renamed through menu");
+            Assert.That(group.Name, Is.EqualTo("renamed through menu"));
+            UnityEditor.Undo.PerformUndo();
+            var restored = JsonDocumentCodec.Encode(context.Document);
+            Assert.Throws<InvalidOperationException>(() => dialog.Submit("stale dialog"));
+            Assert.That(JsonDocumentCodec.Encode(context.Document), Is.EqualTo(restored));
+            Assert.That(context.Document.RootItems.OfType<Domain.TimelineGroup>().First().Name, Is.EqualTo(groupName));
         }
 
         [Test] public void ResizeAndBatchRenameShareOneUndoAndDeletionRestoresBothClips()
         {
-            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            using var context = new EditorFixture(Composition.DocumentComposition.Create());
             context.Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
             var track = context.Document.AllTracks.First();
             var first = track.Clips[0]; var second = track.Clips[1];
@@ -56,7 +79,7 @@ namespace NBC.ActionEditor.Tests
             using (var token = context.Session.BeginEdit(this))
             {
                 context.Clips.Resize(token, first, .5f, .75f);
-                context.Structure.Rename(first, "changed"); context.Structure.Rename(second, "changed");
+                context.Nodes.Rename(first, "changed"); context.Nodes.Rename(second, "changed");
                 token.Commit();
             }
             Assert.That(first.StartTime, Is.EqualTo(.5f)); Assert.That(first.Length, Is.EqualTo(.75f));
@@ -70,7 +93,7 @@ namespace NBC.ActionEditor.Tests
             using (var token = context.Session.BeginEdit(this))
             {
                 Assert.That(context.Lifecycle.Save().Succeeded, Is.False);
-                Assert.Throws<InvalidOperationException>(() => Composition.DocumentPresenterComposition.ConfirmSwitch(context));
+                Assert.Throws<InvalidOperationException>(() => context.CreateDocuments().ConfirmSwitch());
                 context.Structure.Deletion(first, second).Execute();
                 token.Commit();
             }
@@ -82,27 +105,32 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void DocumentDialogsKeepExplicitContextAndRejectInvalidCreationNames()
         {
-            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            using var context = new EditorFixture(Composition.DocumentComposition.Create());
             var fixture = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument())) { name = "Isolated source" };
             var existing = Resources.FindObjectsOfTypeAll<DocumentExportWindow>();
             DocumentExportWindow window = null;
-            var global = ActionEditorHost.Context.Document;
+            var global = EditorFixture.Shared.Document;
             try
             {
                 context.Open(fixture);
-                var binding = new Composition.DocumentDialogComposition(context);
-                Assert.That(binding.DocumentName, Is.EqualTo("Isolated source"));
+                var binding = new Infrastructure.Documents.DocumentDialogCatalog();
+                Assert.That(context.Source.name, Is.EqualTo("Isolated source"));
                 Assert.That(binding.ValidateName("  Example  "), Is.EqualTo("Example"));
                 foreach (var name in new[] { "", "..", "a/b", "a\\b" })
                     Assert.Throws<ArgumentException>(() => binding.ValidateName(name));
                 Assert.That(binding.CreationTypes(), Does.Contain(typeof(FeatureSampleDocument)));
-                DocumentExportWindow.ShowFor(context);
+                context.CreateDocuments().Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Export);
                 window = Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Except(existing).Single();
+                var catalogField = typeof(DocumentExportWindow).GetField("binding", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(catalogField.FieldType, Is.EqualTo(typeof(IDocumentDialogCatalog)));
+                Assert.That(catalogField.GetValue(window), Is.TypeOf<DocumentDialogCatalog>());
+                Assert.That(typeof(Views.IMGUI.RenameItemWindow).GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .Any(field => typeof(IDirectable).IsAssignableFrom(field.FieldType)), Is.False);
                 Assert.That(window.ExportTo("actioneditor.json", null), Is.False);
                 using var token = context.Session.BeginEdit(this);
                 Assert.Throws<InvalidOperationException>(() => window.ExportTo("actioneditor.json", "Assets/ActionEditor/ActiveExportMustNotWrite.json"));
                 Assert.That(token.IsActive, Is.True);
-                Assert.That(ActionEditorHost.Context.Document, Is.SameAs(global));
+                Assert.That(EditorFixture.Shared.Document, Is.SameAs(global));
             }
             finally
             {
@@ -113,20 +141,20 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void DocumentPresenterClosesOnlyItsInjectedContextAndProtectsActiveEdit()
         {
-            var global = ActionEditorHost.Context.Document;
-            var globalSource = ActionEditorHost.Context.Source;
-            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            var global = EditorFixture.Shared.Document;
+            var globalSource = EditorFixture.Shared.Source;
+            using var context = new EditorFixture(Composition.DocumentComposition.Create());
             var fixture = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument()));
             try
             {
                 context.Open(fixture);
-                var presenter = Composition.DocumentPresenterComposition.Create(context);
+                var presenter = context.CreateDocuments();
                 using (var token = context.Session.BeginEdit(this))
                 {
                     Assert.Throws<InvalidOperationException>(() => presenter.Invoke(DocumentIntent.Close));
                     Assert.Throws<InvalidOperationException>(() => presenter.Invoke(DocumentIntent.Open));
                     Assert.Throws<InvalidOperationException>(() => presenter.Invoke(DocumentIntent.Create));
-                    Assert.Throws<InvalidOperationException>(() => Composition.DocumentPresenterComposition.ConfirmSwitch(context));
+                    Assert.Throws<InvalidOperationException>(() => context.CreateDocuments().ConfirmSwitch());
                     var creation = context.Lifecycle.Create(typeof(FeatureSampleDocument), "Assets/ActionEditor/ActiveEditMustNotCreate.json");
                     Assert.That(creation.Succeeded, Is.False);
                     Assert.That(creation.Exception, Is.TypeOf<InvalidOperationException>());
@@ -137,8 +165,8 @@ namespace NBC.ActionEditor.Tests
                 presenter.Invoke(DocumentIntent.Close);
                 Assert.That(context.Document, Is.Null);
                 Assert.That(context.Source, Is.Null);
-                Assert.That(ActionEditorHost.Context.Document, Is.SameAs(global));
-                Assert.That(ActionEditorHost.Context.Source, Is.SameAs(globalSource));
+                Assert.That(EditorFixture.Shared.Document, Is.SameAs(global));
+                Assert.That(EditorFixture.Shared.Source, Is.SameAs(globalSource));
             }
             finally { UnityEngine.Object.DestroyImmediate(fixture); }
         }
@@ -150,14 +178,14 @@ namespace NBC.ActionEditor.Tests
             var path = System.IO.Path.Combine(directory, "preferences.json");
             try
             {
-                var store = new Infrastructure.PreferencesStore(path);
+                var store = new Infrastructure.Settings.PreferencesStore(path);
                 var session = new NBC.ActionEditor.Application.Settings.SettingsSession(store);
                 var baseline = session.Current;
                 var candidate = new NBC.ActionEditor.Application.Settings.EditorSettings(NBC.ActionEditor.Application.Settings.TimeStepMode.Frames,
                     .025f, 40, false, false, 15, "Assets/ActionEditor/");
                 Assert.That(session.Commit(candidate).Succeeded, Is.True);
-                Assert.That(new Infrastructure.PreferencesStore(path).Read(), Is.EqualTo(candidate));
-                var failing = new NBC.ActionEditor.Application.Settings.SettingsSession(new Infrastructure.PreferencesStore(System.IO.Path.Combine(directory, "missing", "preferences.json")));
+                Assert.That(new Infrastructure.Settings.PreferencesStore(path).Read(), Is.EqualTo(candidate));
+                var failing = new NBC.ActionEditor.Application.Settings.SettingsSession(new Infrastructure.Settings.PreferencesStore(System.IO.Path.Combine(directory, "missing", "preferences.json")));
                 Assert.That(failing.Commit(candidate).Succeeded, Is.False);
                 Assert.That(failing.Current, Is.EqualTo(baseline));
             }
@@ -192,7 +220,7 @@ namespace NBC.ActionEditor.Tests
             const string path = "Assets/ActionEditor/LifecycleFixture.json";
             var files = new Files();
             var repository = new JsonDocumentRepository(files, _ => throw new IOException("import"));
-            using var context = new ActionEditorContext(Composition.DocumentComposition.Create(repository), repository);
+            using var context = new EditorFixture(Composition.DocumentComposition.Create(repository), repository);
             var fixture = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument()));
             try
             {

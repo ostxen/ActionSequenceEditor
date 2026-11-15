@@ -43,20 +43,10 @@ namespace NBC.ActionEditor.Application.Editing
             if (float.IsNaN(time) || float.IsInfinity(time)) return "粘贴时间必须为有限值。";
             if (state.CutSource != null && structure.Contains(state.CutSource) && state.CutSource.IsLocked) return "剪切源已锁定。";
             if (parent == null && typeof(TimelineTrack).IsAssignableFrom(state.Type))
-                return DirectableTypeInfo.For(state.Type).IsUnique && session.Document.RootItems.OfType<TimelineTrack>().Any(t => t.GetType() == state.Type && t != state.CutSource)
-                    ? "根级已存在唯一轨道。" : null;
+                return StructureRules.AttachmentError(session.Document, state.Type, state.CutSource);
             if (parent == null || !structure.Contains(parent) || parent.IsLocked) return "粘贴目标已失效或锁定。";
             if (state.CutSource == parent) return "不能把对象剪切到自身。";
-            if (typeof(TimelineTrack).IsAssignableFrom(state.Type) && parent is TimelineGroup group)
-                return group.CanAddTrackOfType(state.Type) ? null : "轨道类型、唯一性或挂载规则不允许粘贴。";
-            if (typeof(TimelineClip).IsAssignableFrom(state.Type) && parent is TimelineTrack track)
-            {
-                var info = DirectableTypeInfo.For(state.Type);
-                if (info.AttachableTypes != null && !info.AttachableTypes.Contains(track.GetType())) return "片段类型不适用于当前轨道。";
-                if (info.IsUnique && track.Clips.Any(c => c.GetType() == state.Type && c != state.CutSource)) return "当前轨道已存在唯一片段。";
-                return null;
-            }
-            return "剪贴板类型不适用于当前目标。";
+            return StructureRules.AttachmentError(parent, state.Type, state.CutSource);
         }
         public bool CanPaste(IDirectable parent) => PasteError(parent, 0) == null;
         public IDirectable Paste(IDirectable parent, float time = 0)

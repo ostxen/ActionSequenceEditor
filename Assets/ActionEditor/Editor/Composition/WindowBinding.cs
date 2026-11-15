@@ -2,20 +2,22 @@ using System;
 using NBC.ActionEditor.Application.Settings;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
+using NBC.ActionEditor.Presentation.Timeline;
 
 namespace NBC.ActionEditor.Composition
 {
-    // 逐窗组合对象持有Presenter和订阅，关闭只释放本窗口的绑定。
+    // 逐窗绑定仅拥有Presenter、视图注册和释放，不接收共享作者服务集合。
     public sealed class WindowBinding : IDisposable, ISettingsView
     {
         private readonly object owner;
-        private readonly Action repaint;
-        private readonly Action changed;
+        private readonly Action repaint, changed, stopPlayback;
         private readonly ActionEditorViews views;
         private readonly Func<DateTime> lastSave;
+        private readonly Func<string> documentName;
+        private readonly Func<TimelineWorkspace, ITimelineView, TimelinePresenter> createTimeline;
+        private readonly Action<IDirectable[]> select;
         private readonly SettingsSession settings;
         private bool disposed;
-        public ActionEditorContext Context { get; }
         public DocumentPresenter Documents { get; }
         public PlaybackPresenter Playback { get; }
         public PropertyPresenter Properties { get; }
@@ -23,32 +25,27 @@ namespace NBC.ActionEditor.Composition
         public EditorExtensionContext Extensions { get; }
         public EditorSettings Preferences { get; private set; }
         public string SettingsError { get; private set; }
-        public string DocumentName => Context.Source != null ? Context.Source.name : string.Empty;
+        public string DocumentName => documentName();
         public DateTime LastSave => lastSave();
-
-        public WindowBinding(object owner, Action repaint, Action changed)
-            : this(owner, repaint, changed, ActionEditorHost.Context, ActionEditorHost.Views, Prefs.Session,
-                () => ActionEditorHost.Context.AutoSave.LastSaved) { }
-
-        // 会话与视图注册表显式配对，隔离宿主也可复用相同释放路径。
-        public WindowBinding(object owner, Action repaint, Action changed, ActionEditorContext context,
-            ActionEditorViews views, SettingsSession settings, Func<DateTime> lastSave, Func<bool, string> chooseSavePath = null)
+        public WindowBinding(object owner, Action repaint, Action changed, ActionEditorViews views,
+            DocumentPresenter documents, PlaybackPresenter playback, PropertyPresenter properties, SettingsSession settings,
+            EditorExtensionContext extensions, Func<string> documentName, Func<DateTime> lastSave,
+            Func<TimelineWorkspace, ITimelineView, TimelinePresenter> createTimeline, Action<IDirectable[]> select, Action stopPlayback)
         {
             this.owner = owner ?? throw new ArgumentNullException(nameof(owner));
             this.repaint = repaint ?? throw new ArgumentNullException(nameof(repaint));
             this.changed = changed ?? throw new ArgumentNullException(nameof(changed));
             this.views = views ?? throw new ArgumentNullException(nameof(views));
             this.lastSave = lastSave ?? throw new ArgumentNullException(nameof(lastSave));
-            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            this.documentName = documentName ?? throw new ArgumentNullException(nameof(documentName));
+            this.createTimeline = createTimeline ?? throw new ArgumentNullException(nameof(createTimeline));
+            this.select = select ?? throw new ArgumentNullException(nameof(select));
+            this.stopPlayback = stopPlayback ?? throw new ArgumentNullException(nameof(stopPlayback));
             this.settings = settings;
-            Context = context ?? throw new ArgumentNullException(nameof(context));
-            Extensions = new EditorExtensionContext(() => context.Document, () => context.Player.CurrentTime);
-            Documents = DocumentPresenterComposition.Create(Context, chooseSavePath);
-            Playback = PlaybackComposition.Create(Context, settings);
-            Properties = PropertyComposition.Create(context, settings);
+            Documents = documents; Playback = playback; Properties = properties; Extensions = extensions;
             Settings = SettingsComposition.Create(this, settings);
             views.Attach(owner, repaint, changed);
-            Context.Changed += OnChanged;
+            Documents.Changed += OnChanged;
         }
         private void OnChanged()
         {
@@ -58,29 +55,20 @@ namespace NBC.ActionEditor.Composition
         }
         public void Render(EditorSettings value) { Preferences = value; repaint(); }
         public void ShowError(string message) { SettingsError = message; repaint(); }
-        public void Select(params IDirectable[] items) { Context.Selection.Set(items, false); views.Repaint(); }
+        public void Select(params IDirectable[] items) { select(items); views.Repaint(); }
         public void SetTick(Action tick) => views.SetTick(owner, tick);
-        // 时间轴快捷键和交互偏好复用本窗口的依赖，不重新获取全局宿主。
-        public TimelinePresenter CreateTimeline(Presentation.Timeline.TimelineWorkspace workspace, ITimelineView view)
-            => TimelineComposition.Create(Context, workspace, view, settings, Documents);
-        public void PopulateSaveMenu(Action<string, Action> add)
-        {
-            DocumentPresenterComposition.PopulateSaveMenu(Documents, add);
-        }
+        public SettingsPresenter CreateSettings(ISettingsView view) => SettingsComposition.Create(view, settings);
+        public TimelinePresenter CreateTimeline(TimelineWorkspace workspace, ITimelineView view) => createTimeline(workspace, view);
+        public void PopulateSaveMenu(Action<string, Action> add) => DocumentPresenterComposition.PopulateSaveMenu(Documents, add);
         public void Dispose()
         {
             if (disposed) return;
-            disposed = true; Context.Changed -= OnChanged;
+            disposed = true; Documents.Changed -= OnChanged;
             try { Properties.CancelDraft(); }
             finally
             {
                 try { Settings.Dispose(); }
-                finally
-                {
-                    views.Detach(owner);
-                    // 最后视图离开时才停止共享播放；前面的释放异常不能遗留注册。
-                    if (views.Count == 0) Context.Playback.Stop();
-                }
+                finally { views.Detach(owner); if (views.Count == 0) stopPlayback(); }
             }
         }
     }

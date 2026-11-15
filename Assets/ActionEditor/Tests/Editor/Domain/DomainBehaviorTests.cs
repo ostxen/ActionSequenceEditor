@@ -1,4 +1,5 @@
 using System.Linq;
+using NBC.ActionEditor.Infrastructure.Preview;
 using NBC.ActionEditor.Domain;
 using System;
 using NUnit.Framework;
@@ -65,7 +66,7 @@ namespace NBC.ActionEditor.Tests
         {
             var original = CreateSample();
             original.OnBeforeSerialize();
-            var context = Storage.DocumentFormats.CreateContext(typeof(FixtureDocument), typeof(FixtureTrack), typeof(FixtureInterval), typeof(FixturePoint));
+            var context = Infrastructure.Serialization.DocumentFormats.CreateContext(typeof(FixtureDocument), typeof(FixtureTrack), typeof(FixtureInterval), typeof(FixturePoint));
             var format = new Serialization.ActionDocumentJsonFormat();
             var json = format.Serialize(original, default, context);
             Assert.That(json, Is.Not.Empty);

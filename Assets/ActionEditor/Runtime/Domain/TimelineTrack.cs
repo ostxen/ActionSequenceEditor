@@ -139,6 +139,9 @@ namespace NBC.ActionEditor.Domain
 
         public TimelineClip AddClip(Type type, float time)
         {
+            var error = StructureRules.AttachmentError(this, type);
+            if (error != null) throw new InvalidOperationException(error);
+            if (float.IsNaN(time) || float.IsInfinity(time) || time < 0) throw new ArgumentOutOfRangeException(nameof(time));
             var catAtt =
                 type.GetCustomAttributes(typeof(CategoryAttribute), true).FirstOrDefault() as CategoryAttribute;
             if (catAtt != null && Clips.Count == 0) Name = catAtt.category + " Track";
@@ -165,6 +168,11 @@ namespace NBC.ActionEditor.Domain
 
         public TimelineClip AddClip(TimelineClip clip)
         {
+            if (clip != null)
+            {
+                var error = StructureRules.AttachmentError(this, clip.GetType(), clip);
+                if (error != null) throw new InvalidOperationException(error);
+            }
             if (clip != null && clip.CanValidTime(this, clip.StartTime, clip.EndTime))
             {
                 if (clip.Parent != null && clip.Parent is TimelineTrack track)

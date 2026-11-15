@@ -11,10 +11,18 @@ namespace NBC.ActionEditor.Presentation.Presenters
         private readonly DocumentSession session;
         private readonly DocumentLifecycle lifecycle;
         private readonly IDocumentInteraction interaction;
+        private readonly IDocumentNavigation navigation;
         public bool Dirty => session.IsDirty;
         public bool HasDocument => session.Document != null;
-        public DocumentPresenter(DocumentSession session, DocumentLifecycle lifecycle, IDocumentInteraction interaction)
-        { this.session = session ?? throw new ArgumentNullException(nameof(session)); this.lifecycle = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle)); this.interaction = interaction ?? throw new ArgumentNullException(nameof(interaction)); }
+        public Type DocumentType => session.Document?.GetType();
+        public event Action Changed { add => session.Changed += value; remove => session.Changed -= value; }
+        public DocumentPresenter(DocumentSession session, DocumentLifecycle lifecycle, IDocumentInteraction interaction, IDocumentNavigation navigation)
+        {
+            this.session = session ?? throw new ArgumentNullException(nameof(session));
+            this.lifecycle = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle));
+            this.interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
+            this.navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
+        }
 
         public void Invoke(DocumentIntent intent)
         {
@@ -23,16 +31,35 @@ namespace NBC.ActionEditor.Presentation.Presenters
                 throw new InvalidOperationException("请先完成或取消当前编辑，再切换文档。");
             switch (intent)
             {
-                case DocumentIntent.Create: if (interaction.ConfirmSwitch()) interaction.CreateDocument(); break;
-                case DocumentIntent.Open: if (interaction.ConfirmSwitch()) interaction.PickDocument(); break;
-                case DocumentIntent.Close: if (interaction.ConfirmSwitch()) interaction.CloseDocument(); break;
+                case DocumentIntent.Create: interaction.CreateDocument(Create); break;
+                case DocumentIntent.Open: interaction.PickDocument(OpenPicked); break;
+                case DocumentIntent.Close: if (ConfirmSwitch()) navigation.Close(); break;
                 case DocumentIntent.Save: Save(false); break;
                 case DocumentIntent.SaveAs: Save(true); break;
-                case DocumentIntent.Export: RequireExport(); interaction.ShowExport(); break;
+                case DocumentIntent.Export: RequireExport(); interaction.ShowExport(Export); break;
                 case DocumentIntent.Undo: interaction.Undo(false); break;
                 case DocumentIntent.Redo: interaction.Undo(true); break;
                 default: throw new ArgumentOutOfRangeException(nameof(intent));
             }
+        }
+        public bool ConfirmSwitch()
+        {
+            RequireSwitch();
+            var choice = interaction.ConfirmSwitch(session.IsDirty);
+            if (choice == DocumentSwitchChoice.Cancel) return false;
+            if (choice == DocumentSwitchChoice.Save) Save(false);
+            RequireSwitch();
+            return choice == DocumentSwitchChoice.Discard || !session.IsDirty;
+        }
+        private void RequireSwitch()
+        {
+            if (session.IsEditing) throw new InvalidOperationException("请先完成或取消当前编辑，再切换文档。");
+        }
+        public void OpenPicked(object source)
+        {
+            RequireSwitch();
+            if (source == null || !navigation.Accepts(source) || navigation.IsCurrent(source)) return;
+            if (ConfirmSwitch()) navigation.Open(source);
         }
         // 活动编辑拒绝在选择路径前发生，取消不写盘也不推进保存标记。
         private void Save(bool saveAs)
@@ -59,9 +86,11 @@ namespace NBC.ActionEditor.Presentation.Presenters
         }
         public bool Create(Type type, string path)
         {
-            if (session.IsEditing) throw new InvalidOperationException("请先完成或取消当前编辑，再创建文档。");
+            if (string.IsNullOrEmpty(path)) return false;
+            if (!ConfirmSwitch()) return false;
             var result = lifecycle.Create(type, path);
             if (!result.Succeeded && !result.Cancelled) ExceptionDispatchInfo.Capture(result.Exception).Throw();
+            if (result.Succeeded) navigation.OpenPath(path);
             return result.Succeeded;
         }
     }

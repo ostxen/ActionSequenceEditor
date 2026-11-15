@@ -174,17 +174,24 @@ namespace NBC.ActionEditor.Tests.Application
             Assert.That(h.Repository.Commits, Is.EqualTo(2));
         }
 
-        private sealed class Interaction : NBC.ActionEditor.Presentation.Contracts.IDocumentInteraction
+        private sealed class Interaction : NBC.ActionEditor.Presentation.Contracts.IDocumentInteraction, NBC.ActionEditor.Presentation.Contracts.IDocumentNavigation
         {
             public bool Confirm;
             public string Path;
             public int PathRequests, Saves, Opens, Creates, Closes, Exports, Undos, Redos;
             public string ChooseSavePath(bool saveAs) { PathRequests++; return Path; }
-            public void PickDocument() => Opens++;
-            public void CreateDocument() => Creates++;
-            public void CloseDocument() => Closes++;
-            public bool ConfirmSwitch() => Confirm;
-            public void ShowExport() => Exports++;
+            public Action<object> Selected;
+            public Func<Type, string, bool> Create;
+            public void PickDocument(Action<object> selected) => Selected = selected;
+            public void CreateDocument(Func<Type, string, bool> create) => Create = create;
+            public bool IsCurrent(object source) => false;
+            public bool Accepts(object source) => true;
+            public void Open(object source) => Opens++;
+            public void OpenPath(string path) => Creates++;
+            public void Close() => Closes++;
+            public NBC.ActionEditor.Presentation.Contracts.DocumentSwitchChoice ConfirmSwitch(bool dirty)
+                => Confirm ? NBC.ActionEditor.Presentation.Contracts.DocumentSwitchChoice.Discard : NBC.ActionEditor.Presentation.Contracts.DocumentSwitchChoice.Cancel;
+            public void ShowExport(Func<string, string, bool> export) => Exports++;
             public void Saved() => Saves++;
             public void Undo(bool redo) { if (redo) Redos++; else Undos++; }
         }
@@ -193,10 +200,11 @@ namespace NBC.ActionEditor.Tests.Application
         {
             using var h = new Harness();
             var interaction = new Interaction();
-            var presenter = new NBC.ActionEditor.Presentation.Presenters.DocumentPresenter(h.Session, h.Lifecycle, interaction);
+            var presenter = new NBC.ActionEditor.Presentation.Presenters.DocumentPresenter(h.Session, h.Lifecycle, interaction, interaction);
             presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Create);
             presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Open);
             presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Close);
+            interaction.Selected(new object()); interaction.Create(typeof(Document), "B");
             Assert.That(interaction.Creates + interaction.Opens + interaction.Closes, Is.Zero);
             presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.SaveAs);
             Assert.That(interaction.PathRequests, Is.EqualTo(1));
@@ -224,6 +232,7 @@ namespace NBC.ActionEditor.Tests.Application
             interaction.Confirm = true;
             presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Create);
             presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Open);
+            interaction.Selected(new object()); interaction.Create(typeof(Document), "B");
             presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Close);
             presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Undo);
             presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Redo);

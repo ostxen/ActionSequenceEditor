@@ -18,7 +18,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
     // 根区和入组区互斥；组排序始终使用整个可见组块。
     public static class StructureDropGeometry
     {
-        public static StructureDrop Hit(ActionDocument document, TimelineRootItem source, VisibleTimelineLayout layout,
+        public static StructureDrop Hit(ActionDocument document, TimelineRootItem source, TimelineLayout layout,
             TimelineWorkspace workspace, TimelineSize size, float x, float y)
         {
             if (document == null || x < 0 || x >= size.Width || y < 0 || y >= size.Height) return default;

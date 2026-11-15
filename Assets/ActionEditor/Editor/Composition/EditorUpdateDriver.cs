@@ -1,18 +1,26 @@
 using System;
 using NBC.ActionEditor.Application.Settings;
+using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Playback;
+using NBC.ActionEditor.Application.Ports;
 
 namespace NBC.ActionEditor.Composition
 {
     // 单一宿主时钟协调共享保存、播放和逐窗更新，不持有具体窗口。
     public sealed class EditorUpdateDriver
     {
-        private readonly ActionEditorContext context;
+        private readonly DocumentAutoSave autoSave;
+        private readonly DocumentPlayback playback;
+        private readonly IEditorClock clock;
         private readonly ActionEditorViews views;
         private readonly SettingsSession settings;
         private readonly Action<Exception> failed;
-        public EditorUpdateDriver(ActionEditorContext context, ActionEditorViews views, SettingsSession settings, Action<Exception> failed)
+        public EditorUpdateDriver(DocumentAutoSave autoSave, DocumentPlayback playback, IEditorClock clock,
+            ActionEditorViews views, SettingsSession settings, Action<Exception> failed)
         {
-            this.context = context ?? throw new ArgumentNullException(nameof(context));
+            this.autoSave = autoSave ?? throw new ArgumentNullException(nameof(autoSave));
+            this.playback = playback ?? throw new ArgumentNullException(nameof(playback));
+            this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
             this.views = views ?? throw new ArgumentNullException(nameof(views));
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.failed = failed ?? throw new ArgumentNullException(nameof(failed));
@@ -24,17 +32,17 @@ namespace NBC.ActionEditor.Composition
             if (views.Count == 0) return;
             try
             {
-                var result = context.AutoSave.Tick(settings.Current.AutoSaveSeconds);
+                var result = autoSave.Tick(settings.Current.AutoSaveSeconds);
                 if (result.HasValue && !result.Value.Succeeded) failed(result.Value.Exception);
             }
             catch (Exception error) { failed(error); }
             try
             {
-                if (context.Playback.Update(context.Clock.PlaybackTime, context.Clock.TimeScale)) views.Repaint();
+                if (playback.Update(clock.PlaybackTime, clock.TimeScale)) views.Repaint();
             }
             catch (Exception error)
             {
-                try { context.Playback.Stop(); }
+                try { playback.Stop(); }
                 catch (Exception stopError) { failed(stopError); }
                 failed(error);
             }

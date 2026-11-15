@@ -4,6 +4,7 @@ using System.Linq;
 using NBC.ActionEditor.Domain;
 using NBC.ActionEditor.Samples.FeatureSample;
 using UnityEngine;
+using NBC.ActionEditor.Presentation.Contracts;
 
 namespace NBC.ActionEditor.Presentation.Presenters
 {
@@ -17,11 +18,11 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public IReadOnlyList<SampleIntervalState> Intervals { get; }
         public IReadOnlyList<SampleLoopState> Loops { get; }
         public IReadOnlyList<SampleMarkerState> Markers { get; }
-        internal FeatureSampleState(float time, FeatureSampleDocument document, SampleIntervalState[] intervals,
+        internal FeatureSampleState(ExtensionDocumentState document, SampleIntervalState[] intervals,
             SampleLoopState[] loops, SampleMarkerState[] markers)
         {
-            Available = document != null; Time = time; Length = document?.Length ?? 0;
-            Background = document?.Background ?? default;
+            Available = document.Type == typeof(FeatureSampleDocument); Time = document.Time; Length = document.Length;
+            Background = document.Document?.Field<Color>(nameof(FeatureSampleDocument.Background)) ?? default;
             Intervals = Array.AsReadOnly(intervals); Loops = Array.AsReadOnly(loops); Markers = Array.AsReadOnly(markers);
         }
     }
@@ -34,13 +35,14 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public float Position { get; }
         public Color Tint { get; }
         public Vector3 Offset { get; }
-        internal SampleIntervalState(FeatureSampleInterval clip, float time)
+        internal SampleIntervalState(ExtensionNodeState clip, float time)
         {
-            Caption = clip.Caption; Offset = clip.Offset;
-            Progress = Mathf.Clamp01((time - clip.StartTime) / clip.Length);
-            Position = Mathf.Clamp01(clip.Curve == null ? Progress : clip.Curve.Evaluate(Progress));
-            var tint = clip.Tint;
-            tint.a *= Mathf.Clamp01(clip.GetClipWeight(time - clip.StartTime)) * Mathf.Clamp01(clip.Gain);
+            Caption = clip.Field<string>(nameof(FeatureSampleInterval.Caption)); Offset = clip.Field<Vector3>(nameof(FeatureSampleInterval.Offset));
+            Progress = Mathf.Clamp01((time - clip.Start) / clip.Length);
+            var curve = clip.Field<AnimationCurve>(nameof(FeatureSampleInterval.Curve));
+            Position = Mathf.Clamp01(curve == null ? Progress : curve.Evaluate(Progress));
+            var tint = clip.Field<Color>(nameof(FeatureSampleInterval.Tint));
+            tint.a *= Mathf.Clamp01(clip.Weight) * Mathf.Clamp01(clip.Field<float>(nameof(FeatureSampleInterval.Gain)));
             Tint = tint;
         }
     }
@@ -51,12 +53,12 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public string Caption { get; }
         public int Iteration { get; }
         public float Time { get; }
-        internal SampleLoopState(FeatureSampleLoop clip, float time)
+        internal SampleLoopState(ExtensionNodeState clip, float time)
         {
-            Caption = clip.Caption;
-            var local = (time - clip.StartTime - clip.SubClipOffset) * clip.SubClipSpeed;
-            Iteration = Mathf.FloorToInt(local / clip.SubClipLength) + 1;
-            Time = Mathf.Repeat(local, clip.SubClipLength);
+            Caption = clip.Field<string>(nameof(FeatureSampleLoop.Caption));
+            var local = (time - clip.Start - clip.LoopOffset) * clip.LoopSpeed;
+            Iteration = Mathf.FloorToInt(local / clip.LoopLength) + 1;
+            Time = Mathf.Repeat(local, clip.LoopLength);
         }
     }
 
@@ -66,31 +68,28 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public float Time { get; }
         public string Message { get; }
         public int Code { get; }
-        internal SampleMarkerState(FeatureSampleMarker clip)
-        { Time = clip.StartTime; Message = clip.Message; Code = clip.EventCode; }
+        internal SampleMarkerState(ExtensionNodeState clip)
+        { Time = clip.Start; Message = clip.Field<string>(nameof(FeatureSampleMarker.Message)); Code = clip.Field<int>(nameof(FeatureSampleMarker.EventCode)); }
     }
 
     // 从明确注入的共享播放头生成样例状态，窗口开闭不取得预览资源所有权。
     public sealed class FeatureSamplePresenter
     {
-        private readonly Func<ActionDocument> document;
-        private readonly Func<float> time;
-        public FeatureSamplePresenter(Func<ActionDocument> document, Func<float> time)
+        private readonly Func<ExtensionDocumentState> capture;
+        public FeatureSamplePresenter(Func<ExtensionDocumentState> capture)
         {
-            this.document = document ?? throw new ArgumentNullException(nameof(document));
-            this.time = time ?? throw new ArgumentNullException(nameof(time));
+            this.capture = capture ?? throw new ArgumentNullException(nameof(capture));
         }
         public FeatureSampleState Capture()
         {
-            var asset = document() as FeatureSampleDocument;
-            var current = time();
-            var clips = asset == null ? Array.Empty<TimelineClip>() : asset.AllTracks.Where(t => t.IsActive).SelectMany(t => t.Clips).ToArray();
-            return new FeatureSampleState(current, asset,
-                clips.OfType<FeatureSampleInterval>().Where(c => c.ShowInPreview && current >= c.StartTime && current < c.EndTime)
+            var asset = capture(); var current = asset.Time;
+            var clips = asset.Type == typeof(FeatureSampleDocument) ? asset.Clips : Array.Empty<ExtensionNodeState>();
+            return new FeatureSampleState(asset,
+                clips.Where(c => c.Type == typeof(FeatureSampleInterval) && c.Field<bool>(nameof(FeatureSampleInterval.ShowInPreview)) && current >= c.Start && current < c.End)
                     .Select(c => new SampleIntervalState(c, current)).ToArray(),
-                clips.OfType<FeatureSampleLoop>().Where(c => current >= c.StartTime && current < c.EndTime)
+                clips.Where(c => c.Type == typeof(FeatureSampleLoop) && current >= c.Start && current < c.End)
                     .Select(c => new SampleLoopState(c, current)).ToArray(),
-                clips.OfType<FeatureSampleMarker>().Where(c => c.StartTime <= current).OrderBy(c => c.StartTime)
+                clips.Where(c => c.Type == typeof(FeatureSampleMarker) && c.Start <= current).OrderBy(c => c.Start)
                     .Select(c => new SampleMarkerState(c)).ToArray());
         }
     }

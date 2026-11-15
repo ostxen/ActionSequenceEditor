@@ -5,14 +5,14 @@ using System.Linq;
 
 namespace NBC.ActionEditor.Application.Editing
 {
-    // 结构和常用作者属性变更在共享会话中校验，不访问窗口或全局状态。
+    // 结构修改在共享会话中预检和提交，不访问窗口或全局状态。
     public sealed class StructureEditing
     {
         private readonly DocumentSession session;
         private readonly Func<IDirectable[]> selection;
         public StructureEditing(DocumentSession session, Func<IDirectable[]> selection)
         { this.session = session ?? throw new ArgumentNullException(nameof(session)); this.selection = selection ?? throw new ArgumentNullException(nameof(selection)); }
-        public bool Contains(IDirectable item) => item != null && session.Document != null && session.Document.directables.Contains(item);
+        public bool Contains(IDirectable item) => StructureRules.Contains(session.Document, item);
         public void Delete(IDirectable item) => Deletion(item).Execute();
         private void DeleteCore(IDirectable item)
         {
@@ -31,32 +31,15 @@ namespace NBC.ActionEditor.Application.Editing
             });
         private string CreationError(object parent, Type type, float time)
         {
-            if (session.Document == null || type == null || type.IsAbstract || type.ContainsGenericParameters || type.GetConstructor(Type.EmptyTypes) == null)
-                return "没有可创建的具体类型。";
+            if (session.Document == null) return "没有打开的文档。";
             if (float.IsNaN(time) || float.IsInfinity(time) || time < 0) return "创建时间必须为有限非负值。";
-            var info = DirectableTypeInfo.For(type);
-            if (parent is ActionDocument asset)
+            if (parent is ActionDocument document)
             {
-                if (!ReferenceEquals(asset, session.Document) || !typeof(TimelineGroup).IsAssignableFrom(type)) return "目标文档或分组类型已失效。";
-                if (info.AttachableTypes != null && !info.AttachableTypes.Contains(asset.GetType())) return "分组类型不适用于当前文档。";
-                if (info.IsUnique && asset.RootItems.OfType<TimelineGroup>().Any(g => g.GetType() == type)) return "当前文档已存在唯一分组。";
+                if (!ReferenceEquals(document, session.Document) || type == null || !typeof(TimelineGroup).IsAssignableFrom(type))
+                    return "目标文档或分组类型已失效。";
             }
-            else if (parent is IDirectable directable)
-            {
-                if (!Contains(directable) || directable.IsLocked) return "目标已失效或被锁定。";
-                if (parent is TimelineGroup group)
-                { if (!group.CanAddTrackOfType(type)) return "轨道类型、唯一性或挂载规则不允许创建。"; }
-                else if (parent is TimelineTrack track)
-                {
-                    if (!typeof(TimelineClip).IsAssignableFrom(type) || info.AttachableTypes != null && !info.AttachableTypes.Contains(track.GetType())) return "片段类型不适用于当前轨道。";
-                    if (info.IsUnique && track.Clips.Any(c => c.GetType() == type)) return "当前轨道已存在唯一片段。";
-                    var category = track.Clips.FirstOrDefault()?.GetType().RTGetAttribute<CategoryAttribute>(true)?.category;
-                    if (category != null && category != info.Category) return "片段分类不适用于当前轨道。";
-                }
-                else return "目标不是分组或轨道。";
-            }
-            else return "没有有效创建目标。";
-            return null;
+            else if (parent is not IDirectable item || !Contains(item) || item.IsLocked) return "目标已失效或被锁定。";
+            return StructureRules.AttachmentError(parent, type);
         }
         public TimelineGroup AddGroup(Type type)
         {
@@ -86,7 +69,7 @@ namespace NBC.ActionEditor.Application.Editing
             var before = track.Clips.ToArray(); command.Execute(); return track.Clips.Except(before).Single();
         }
         public EditOperation Deletion(params IDirectable[] items) => new EditOperation(session, "Delete timeline items",
-            () => items == null || items.Length == 0 ? "没有选择对象。" : items.Any(i => i == null || !Contains(i) || i.IsLocked) ? "选择中有失效或锁定对象，未删除任何内容。" : null,
+            () => StructureRules.DeletionError(session.Document, items),
             () => { foreach (var item in items.Distinct()) DeleteCore(item); });
         public string MoveError(TimelineRootItem source, TimelineGroup target, int boundary, long version)
         {
@@ -110,26 +93,6 @@ namespace NBC.ActionEditor.Application.Editing
             Reorder(source, target, boundary).Execute();
             return true;
         }
-        public void Rename(IDirectable item, string name)
-        {
-            if (!Contains(item) || item.IsLocked) throw new InvalidOperationException("锁定或失效对象不能重命名。");
-            session.Edit("Rename", () =>
-            {
-                if (item is TimelineGroup group) group.Name = name ?? "";
-                else if (item is TimelineTrack track) track.Name = name ?? "";
-                else if (item is TimelineClip clip) clip.Name = name ?? "";
-            });
-        }
-        public void ToggleLock(IDirectable item)
-        {
-            if (!Contains(item) || item.Parent?.IsLocked == true) throw new InvalidOperationException("对象已失效或父分组已锁定。");
-            session.Edit("Toggle lock", () => item.IsLocked = !item.IsLocked);
-        }
-        public void ToggleActive(IDirectable item)
-        {
-            if (!Contains(item) || item.IsLocked) throw new InvalidOperationException("对象已失效或锁定。");
-            session.Edit("Toggle active", () => item.IsActive = !item.IsActive);
-        }
         public void DeleteSelection()
         {
             Deletion(selection()).Execute();
@@ -142,5 +105,32 @@ namespace NBC.ActionEditor.Application.Editing
             if (StructureRules.IsNoOp(session.Document, track, target, index)) return;
             operation.Execute();
         }
+    }
+
+    // 名称、锁定与启用是节点编辑，不承担结构创建或移动。
+    public sealed class NodeEditing
+    {
+        private readonly DocumentSession session;
+        public NodeEditing(DocumentSession session) => this.session = session ?? throw new ArgumentNullException(nameof(session));
+        public void Rename(IDirectable item, string name)
+        {
+            new EditOperation(session, "Rename", () => Error(item, false), () =>
+            {
+                if (item is TimelineGroup group) group.Name = name ?? "";
+                else if (item is TimelineTrack track) track.Name = name ?? "";
+                else if (item is TimelineClip clip) clip.Name = name ?? "";
+            }).Execute();
+        }
+        public void ToggleLock(IDirectable item)
+        {
+            new EditOperation(session, "Toggle lock", () => Error(item, true), () => item.IsLocked = !item.IsLocked).Execute();
+        }
+        public void ToggleActive(IDirectable item)
+        {
+            new EditOperation(session, "Toggle active", () => Error(item, false), () => item.IsActive = !item.IsActive).Execute();
+        }
+        private string Error(IDirectable item, bool changingLock)
+            => !StructureRules.Contains(session.Document, item) || (changingLock ? item.Parent?.IsLocked == true : item.IsLocked)
+                ? "对象已失效或锁定。" : null;
     }
 }

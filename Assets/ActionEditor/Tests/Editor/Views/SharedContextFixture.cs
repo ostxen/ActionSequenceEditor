@@ -11,7 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -20,6 +20,45 @@ using UnityEngine.UIElements;
 
 namespace NBC.ActionEditor.Tests
 {
+    // 仅测试使用反射观察组合根私有状态，不为断言恢复生产服务查询入口。
+    public sealed class EditorFixture : IDisposable
+    {
+        public readonly Composition.EditorComposition Composition;
+        public EditorFixture(NBC.ActionEditor.Application.Documents.DocumentSession session, JsonDocumentRepository repository = null)
+            => Composition = new Composition.EditorComposition(session, repository);
+        private EditorFixture(Composition.EditorComposition composition) => Composition = composition;
+        public static EditorFixture Shared => new EditorFixture((Composition.EditorComposition)typeof(ActionEditorHost)
+            .GetField("composition", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null));
+        public static ActionEditorViews SharedViews => (ActionEditorViews)typeof(ActionEditorHost)
+            .GetField("views", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null);
+        public static NBC.ActionEditor.Application.Settings.SettingsSession SharedSettings => (NBC.ActionEditor.Application.Settings.SettingsSession)typeof(ActionEditorHost)
+            .GetField("settings", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null);
+        private T Read<T>(string name) => (T)typeof(Composition.EditorComposition)
+            .GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(Composition);
+        public NBC.ActionEditor.Application.Documents.DocumentSession Session => Read<NBC.ActionEditor.Application.Documents.DocumentSession>("session");
+        public ActionDocument Document => Session.Document;
+        public DocumentNavigation Navigation => Read<DocumentNavigation>("navigation");
+        public TextAsset Source => Navigation.Source;
+        public NBC.ActionEditor.Application.Documents.DocumentLifecycle Lifecycle => Read<NBC.ActionEditor.Application.Documents.DocumentLifecycle>("lifecycle");
+        public NBC.ActionEditor.Application.Documents.DocumentAutoSave AutoSave => Read<NBC.ActionEditor.Application.Documents.DocumentAutoSave>("autoSave");
+        public NBC.ActionEditor.Application.Editing.SelectionState Selection => Read<NBC.ActionEditor.Application.Editing.SelectionState>("selection");
+        public NBC.ActionEditor.Application.Editing.ClipboardState Clipboard => Read<NBC.ActionEditor.Application.Editing.ClipboardState>("clipboard");
+        public NBC.ActionEditor.Application.Editing.StructureEditing Structure => Read<NBC.ActionEditor.Application.Editing.StructureEditing>("structure");
+        public NBC.ActionEditor.Application.Editing.NodeEditing Nodes => Read<NBC.ActionEditor.Application.Editing.NodeEditing>("nodes");
+        public NBC.ActionEditor.Application.Editing.ClipboardEditing ClipboardEditing => Read<NBC.ActionEditor.Application.Editing.ClipboardEditing>("clipboardEditing");
+        public NBC.ActionEditor.Application.Editing.PropertyEditing Properties => Read<NBC.ActionEditor.Application.Editing.PropertyEditing>("properties");
+        public NBC.ActionEditor.Application.Editing.ClipEditing Clips => Read<NBC.ActionEditor.Application.Editing.ClipEditing>("clips");
+        public NBC.ActionEditor.Application.Ports.IEditorClock Clock => Read<NBC.ActionEditor.Application.Ports.IEditorClock>("clock");
+        public NBC.ActionEditor.Application.Playback.DocumentPlayback Playback => Read<NBC.ActionEditor.Application.Playback.DocumentPlayback>("playback");
+        public NBC.ActionEditor.Infrastructure.Preview.DocumentSampler Player => Read<NBC.ActionEditor.Infrastructure.Preview.DocumentSampler>("player");
+        public void Open(TextAsset value) => Navigation.Open(value);
+        public NBC.ActionEditor.Presentation.Presenters.DocumentPresenter CreateDocuments(Func<bool, string> choose = null) => Composition.CreateDocuments(choose);
+        public NBC.ActionEditor.Presentation.Presenters.PropertyPresenter CreateProperties(NBC.ActionEditor.Application.Settings.SettingsSession settings) => Composition.CreateProperties(settings);
+        public Composition.WindowBinding Bind(object owner, Action repaint, Action changed, ActionEditorViews views,
+            NBC.ActionEditor.Application.Settings.SettingsSession settings, Func<bool, string> choose = null)
+            => Composition.CreateBinding(owner, repaint, changed, views, settings, choose);
+        public void Dispose() => Composition.Dispose();
+    }
     public abstract class SharedContextFixture
     {
         protected static readonly TimelineWorkspace Workspace = new TimelineWorkspace();
@@ -37,17 +76,17 @@ namespace NBC.ActionEditor.Tests
 
         [SetUp] public void Setup()
         {
-            previous = ActionEditorHost.Context.Source;
-            recovery = ActionEditorHost.Context.Session.CaptureRecovery();
-            fixture = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
-            ActionEditorHost.Context.Open(fixture);
-            Workspace.Bind(null); Workspace.Bind(ActionEditorHost.Context.Document); Workspace.SetRange(0, 7);
+            previous = EditorFixture.Shared.Source;
+            recovery = EditorFixture.Shared.Session.CaptureRecovery();
+            fixture = new TextAsset(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
+            EditorFixture.Shared.Open(fixture);
+            Workspace.Bind(null); Workspace.Bind(EditorFixture.Shared.Document); Workspace.SetRange(0, 7);
         }
 
         [TearDown] public void Teardown()
         {
-            ActionEditorHost.Context.Session.CancelEdit(); ActionEditorHost.Context.Playback.Stop(); ActionEditorHost.Context.Open(previous);
-            ActionEditorHost.Context.Session.RestoreRecovery(recovery);
+            EditorFixture.Shared.Session.CancelEdit(); EditorFixture.Shared.Playback.Stop(); EditorFixture.Shared.Open(previous);
+            EditorFixture.Shared.Session.RestoreRecovery(recovery);
             UnityEngine.Object.DestroyImmediate(fixture);
         }
 

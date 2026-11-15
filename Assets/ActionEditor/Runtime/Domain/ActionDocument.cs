@@ -122,6 +122,8 @@ namespace NBC.ActionEditor.Domain
         public TimelineGroup AddGroup(Type type)
         {
             if (!typeof(TimelineGroup).IsAssignableFrom(type)) return null;
+            var error = StructureRules.AttachmentError(this, type);
+            if (error != null) throw new InvalidOperationException(error);
             var newGroup = Activator.CreateInstance(type) as TimelineGroup;
             if (newGroup != null)
             {
@@ -135,6 +137,8 @@ namespace NBC.ActionEditor.Domain
 
         public T AddGroup<T>(string name = "") where T : TimelineGroup, new()
         {
+            var error = StructureRules.AttachmentError(this, typeof(T));
+            if (error != null) throw new InvalidOperationException(error);
             var newGroup = new T();
             if (string.IsNullOrEmpty(name))
             {

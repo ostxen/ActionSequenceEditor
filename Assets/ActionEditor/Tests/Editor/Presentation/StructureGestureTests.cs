@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Infrastructure.Serialization;
 using System;
 using System.Linq;
 using NBC.ActionEditor.Application.Documents;
@@ -41,7 +42,7 @@ namespace NBC.ActionEditor.Tests.Presentation
                 Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
                 Editing = new StructureEditing(Session, () => Selection.Items);
                 var clipboard = new ClipboardEditing(Session, Editing, new ClipboardState(), new FragmentCodec(), item => Selection.Set(new[] { item }, false));
-                Presenter = new TimelinePresenter(Session, Selection, Editing, clipboard, new ClipEditing(Session), new TimelineWorkspace(),
+                Presenter = new TimelinePresenter(Session, Selection, Editing, new NodeEditing(Session), clipboard, new ClipEditing(Session), new TimelineWorkspace(),
                     new Playhead(), () => new EditorSettings(TimeStepMode.Seconds, .1f, 30, false, true, 0, "Assets/"), View);
                 Presenter.Resize(new TimelineSize(1000, height));
             }
@@ -49,7 +50,7 @@ namespace NBC.ActionEditor.Tests.Presentation
             public void Pointer(PointerAction action, float x, float y, PointerButton button = PointerButton.Primary) => Presenter.Pointer(new PointerInput(action, x, y, button));
             public float Y(IDirectable item) => Presenter.State.Rows.Single(row => row.Key == Key(item)).Bounds.Y + 14;
             private int Key(IDirectable item) => Presenter.State.Rows.Single(row => row.Title == item.Name).Key;
-            public string Content => NBC.ActionEditor.Storage.JsonDocumentCodec.Content(Document);
+            public string Content => NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Content(Document);
             public void Dispose() { Presenter.Dispose(); Session.Dispose(); }
         }
 
@@ -75,10 +76,10 @@ namespace NBC.ActionEditor.Tests.Presentation
             Assert.That(target.Tracks[1], Is.SameAs(track)); Assert.That(track.Parent, Is.SameAs(target));
             h.Editing.Move(track, null, 1, h.Session.Version);
             Assert.That(h.Document.RootItems[1], Is.SameAs(track)); Assert.That(track.Parent, Is.Null);
-            var encoded = NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(h.Document);
-            var loaded = NBC.ActionEditor.Storage.JsonDocumentCodec.Decode(encoded);
+            var encoded = NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Encode(h.Document);
+            var loaded = NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Decode(encoded);
             Assert.That(loaded.RootItems.Select(item => ((IDirectable)item).Name), Is.EqualTo(h.Document.RootItems.Select(item => ((IDirectable)item).Name)));
-            Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Content(loaded), Is.EqualTo(h.Content));
+            Assert.That(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Content(loaded), Is.EqualTo(h.Content));
             h.Editing.Move(track, first, 0, h.Session.Version);
             Assert.That(h.Content, Is.EqualTo(original)); Assert.That(track.Clips, Is.EqualTo(clips));
             Undo.PerformUndo(); Assert.That(h.Document.RootItems[1], Is.TypeOf<FeatureSampleIntervalTrack>());

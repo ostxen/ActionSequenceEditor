@@ -28,6 +28,6 @@ namespace NBC.ActionEditor.Presentation.Contracts
     public interface ITimelineDialogs
     {
         void Delete(string title, Action confirmed);
-        void Rename(NBC.ActionEditor.IDirectable item);
+        void Rename(string initialName, Action<string> submit);
     }
 }

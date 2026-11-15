@@ -13,6 +13,8 @@ namespace NBC.ActionEditor.Presentation.Presenters
     {
         private readonly DocumentSession session;
         private readonly StructureEditing structure;
+        private readonly NodeEditing nodes;
+        private readonly ClipEditing clips;
         private readonly ClipboardEditing clipboard;
         private readonly ClipboardState copied;
         private readonly SelectionState selection;
@@ -20,9 +22,9 @@ namespace NBC.ActionEditor.Presentation.Presenters
         private readonly ITimelineDialogs dialogs;
         private readonly Func<string, string> text;
         private readonly Action<IDirectable> reveal;
-        public TimelineMenuPresenter(DocumentSession session, StructureEditing structure, ClipboardEditing clipboard, ClipboardState copied,
+        public TimelineMenuPresenter(DocumentSession session, StructureEditing structure, NodeEditing nodes, ClipEditing clips, ClipboardEditing clipboard, ClipboardState copied,
             SelectionState selection, ITimelineTypeCatalog catalog, ITimelineDialogs dialogs, Func<string, string> text, Action<IDirectable> reveal)
-        { this.session = session; this.structure = structure; this.clipboard = clipboard; this.copied = copied;
+        { this.session = session; this.structure = structure; this.nodes = nodes; this.clips = clips; this.clipboard = clipboard; this.copied = copied;
             this.selection = selection; this.catalog = catalog; this.dialogs = dialogs; this.text = text; this.reveal = reveal; }
 
         public IReadOnlyList<TimelineMenuEntry> Groups() => Creation(session.Document, typeof(TimelineGroup), 0, "").ToArray();
@@ -35,15 +37,15 @@ namespace NBC.ActionEditor.Presentation.Presenters
             {
                 entries.AddRange(Creation(group, typeof(TimelineTrack), 0, text("AddTrack") + "/"));
                 if (copied.Type != null && typeof(TimelineTrack).IsAssignableFrom(copied.Type)) Entry("PasteTrack", () => clipboard.Paste(group), clipboard.CanPaste(group));
-                Entry("GroupDisable", () => structure.ToggleActive(group), !group.IsLocked, !group.IsActive);
-                Entry("GroupLocked", () => structure.ToggleLock(group), true, group.IsLocked);
-                Entry("Rename", () => dialogs.Rename(group), !group.IsLocked);
+                Entry("GroupDisable", () => nodes.ToggleActive(group), !group.IsLocked, !group.IsActive);
+                Entry("GroupLocked", () => nodes.ToggleLock(group), true, group.IsLocked);
+                Entry("Rename", () => dialogs.Rename(group.Name, name => nodes.Rename(group, name)), !group.IsLocked);
                 Entry("GroupDelete", () => dialogs.Delete(text("GroupDelete"), () => structure.Delete(group)), !group.IsLocked);
             }
             else if (item is TimelineTrack track && header)
             {
-                Entry("TrackDisable", () => structure.ToggleActive(track), !track.IsLocked, !track.IsActive);
-                Entry("TrackLocked", () => structure.ToggleLock(track), track.Parent?.IsLocked != true, track.IsLocked);
+                Entry("TrackDisable", () => nodes.ToggleActive(track), !track.IsLocked, !track.IsActive);
+                Entry("TrackLocked", () => nodes.ToggleLock(track), track.Parent?.IsLocked != true, track.IsLocked);
                 Entry("TrackCopy", () => clipboard.Copy(track));
                 Entry("TrackReplica", () => clipboard.Duplicate(track), !track.IsLocked && !DirectableTypeInfo.For(track.GetType()).IsUnique);
                 Entry("TrackDelete", () => dialogs.Delete(text("TrackDelete"), () => structure.Delete(track)), !track.IsLocked);
@@ -55,9 +57,9 @@ namespace NBC.ActionEditor.Presentation.Presenters
                 Entry("ClipCut", () => clipboard.Copy(clip, true), !clip.IsLocked);
                 if (clip is ISubClipContainable loop && loop.SubClipLength > 0)
                 {
-                    Entry("MatchPreviousLoop", () => session.Edit("Match previous loop", clip.TryMatchPreviousSubClipLoop), !clip.IsLocked);
-                    Entry("MatchClipLength", () => session.Edit("Match source", clip.TryMatchSubClipLength), !clip.IsLocked);
-                    Entry("MatchNextLoop", () => session.Edit("Match next loop", clip.TryMatchNexSubClipLoop), !clip.IsLocked);
+                    Entry("MatchPreviousLoop", () => clips.MatchLoop(clip, -1), !clip.IsLocked);
+                    Entry("MatchClipLength", () => clips.MatchLoop(clip, 0), !clip.IsLocked);
+                    Entry("MatchNextLoop", () => clips.MatchLoop(clip, 1), !clip.IsLocked);
                 }
                 Entry("ClipDelete", () => structure.Delete(clip), !clip.IsLocked);
             }
@@ -76,8 +78,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
             {
                 var command = structure.Creation(parent, choice.Type, time);
                 // 不显示不适用的业务类型；当前锁定或唯一冲突则保留禁用项。
-                var facts = DirectableTypeInfo.For(choice.Type);
-                if (facts.AttachableTypes != null && !facts.AttachableTypes.Contains(parent.GetType())) continue;
+                if (!StructureRules.AllowsParent(choice.Type, parent.GetType())) continue;
                 yield return new TimelineMenuEntry(prefix + (string.IsNullOrEmpty(choice.Category) ? "" : choice.Category + "/") + choice.Name,
                     command.CanExecute(out _), () =>
                     {

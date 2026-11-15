@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NBC.ActionEditor.Samples.FeatureSample;
 using NUnit.Framework;
 using UnityEngine;

@@ -16,11 +16,12 @@ namespace NBC.ActionEditor.Presentation.Presenters
         private readonly DocumentSession session;
         private readonly SelectionState selection;
         private readonly StructureEditing structure;
+        private readonly NodeEditing nodes;
         private readonly ClipboardEditing clipboard;
         private readonly ITimelineView view;
         private readonly ITimelinePlayhead playhead;
         private readonly Func<EditorSettings> settings;
-        private readonly VisibleTimelineLayout layout = new VisibleTimelineLayout();
+        private readonly TimelineLayout layout = new TimelineLayout();
         private readonly TimelineInteraction interaction;
         private TimelineSize size = new TimelineSize(1000, 500);
         private bool disposed, refreshing;
@@ -41,8 +42,8 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public IReadOnlyList<TimelineMenuEntry> GroupMenu() => Menus?.Groups() ?? Array.Empty<TimelineMenuEntry>();
         public void Invoke(TimelineMenuEntry entry) => Run(() => { if (entry.Enabled) entry.Invoke(); });
         public int KeyFor(NBC.ActionEditor.IDirectable item) => layout.KeyFor(item);
-        public void ToggleLock(int key) => Run(() => structure.ToggleLock(layout.Resolve(key)));
-        public void ToggleActive(int key) => Run(() => structure.ToggleActive(layout.Resolve(key)));
+        public void ToggleLock(int key) => Run(() => nodes.ToggleLock(layout.Resolve(key)));
+        public void ToggleActive(int key) => Run(() => nodes.ToggleActive(layout.Resolve(key)));
         public void PlaybackState(bool isPlaying, bool isRange) { playing = isPlaying; rangeEnabled = isRange; Refresh(); }
         public void Scroll(float value) => Run(() => Workspace.ScrollY = Math.Max(0, value));
         public void ViewRange(float minimum, float maximum) => Run(() => Workspace.SetRange(minimum, maximum));
@@ -60,12 +61,13 @@ namespace NBC.ActionEditor.Presentation.Presenters
             else if (top + size.RowHeight > Workspace.ScrollY + size.Height)
                 Workspace.ScrollY = top + size.RowHeight - size.Height;
         });
-        public TimelinePresenter(DocumentSession session, SelectionState selection, StructureEditing structure, ClipboardEditing clipboard,
+        public TimelinePresenter(DocumentSession session, SelectionState selection, StructureEditing structure, NodeEditing nodes, ClipboardEditing clipboard,
             ClipEditing clips, TimelineWorkspace workspace, ITimelinePlayhead playhead, Func<EditorSettings> settings, ITimelineView view)
         {
             this.session = session ?? throw new ArgumentNullException(nameof(session));
             this.selection = selection ?? throw new ArgumentNullException(nameof(selection));
             this.structure = structure ?? throw new ArgumentNullException(nameof(structure));
+            this.nodes = nodes ?? throw new ArgumentNullException(nameof(nodes));
             this.clipboard = clipboard ?? throw new ArgumentNullException(nameof(clipboard));
             Workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
             this.playhead = playhead ?? throw new ArgumentNullException(nameof(playhead));

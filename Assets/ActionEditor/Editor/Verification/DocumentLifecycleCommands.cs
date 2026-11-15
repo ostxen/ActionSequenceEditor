@@ -11,7 +11,7 @@ using NBC.ActionEditor.Domain;
 using NBC.ActionEditor.Infrastructure.Documents;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using Unity.Pipeline.Commands;
 using UnityEditor;
 using UnityEngine;
@@ -46,7 +46,7 @@ namespace NBC.ActionEditor.Verification
                 throw new InvalidOperationException("需要空闲编辑模式。");
             if (Directory.Exists(Root) || File.Exists(Root) || File.Exists(Root + ".meta"))
                 throw new IOException("固定验证目录已存在，拒绝覆盖。");
-            if (ActionEditorHost.Context.Session.IsEditing || ActionEditorHost.Context.Playback.IsPlaying) throw new InvalidOperationException("需要当前会话没有活动编辑或播放。");
+            if (VerificationSession.Shared.Session.IsEditing || VerificationSession.Shared.Playback.IsPlaying) throw new InvalidOperationException("需要当前会话没有活动编辑或播放。");
             if (dryRun) return new
             {
                 root = Root,
@@ -55,11 +55,11 @@ namespace NBC.ActionEditor.Verification
                 touchesUserSession = false, writesPreferences = false, nativeFileDialogs = false
             };
             if (!confirm) throw new InvalidOperationException("需要预览与真实审批。");
-            var graph = ActionEditorHost.Context.Document;
-            var source = ActionEditorHost.Context.Source;
-            var recovery = ActionEditorHost.Context.Session.CaptureRecovery();
+            var graph = VerificationSession.Shared.Document;
+            var source = VerificationSession.Shared.Source;
+            var recovery = VerificationSession.Shared.Session.CaptureRecovery();
 
-            var originalViews = ActionEditorHost.Views.Count;
+            var originalViews = VerificationSession.SharedViews.Count;
             var owned = false;
             try
             {
@@ -67,8 +67,8 @@ namespace NBC.ActionEditor.Verification
                 if (!owned) throw new IOException("无法创建验证目录。");
                 Run(false);
                 Run(true);
-                Require(ReferenceEquals(ActionEditorHost.Context.Document, graph) && ActionEditorHost.Context.Source == source
-                    && ActionEditorHost.Context.Session.CaptureRecovery() == recovery && ActionEditorHost.Views.Count == originalViews, "用户会话或窗口注册发生变化。");
+                Require(ReferenceEquals(VerificationSession.Shared.Document, graph) && VerificationSession.Shared.Source == source
+                    && VerificationSession.Shared.Session.CaptureRecovery() == recovery && VerificationSession.SharedViews.Count == originalViews, "用户会话或窗口注册发生变化。");
                 return new { status = "passed", interfaces = 2, cleanup = "owned windows and folder only", checks = "mixed roots/property/SaveChanges/Undo/Redo/reopen/save-as/recovery/autosave/export/locked target/import failure/external conflict" };
             }
             finally
@@ -86,7 +86,7 @@ namespace NBC.ActionEditor.Verification
             var copy = Root + "/" + name + "-Copy.json";
             var exported = Root + "/" + name + "-Export.json";
             var repository = new JsonDocumentRepository();
-            using var context = new ActionEditorContext(DocumentComposition.Create(repository), repository);
+            using var context = new VerificationSession(DocumentComposition.Create(repository), repository);
             var views = new ActionEditorViews();
             var settings = new SettingsSession(new Preferences());
             ImguiWindow imgui = null;
@@ -97,17 +97,17 @@ namespace NBC.ActionEditor.Verification
                 if (toolkit)
                 {
                     native = ScriptableObject.CreateInstance<ToolkitWindow>();
-                    native.BindContext(context, views, settings); native.Show();
+                    native.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, settings)); native.Show();
                 }
                 else
                 {
                     imgui = ScriptableObject.CreateInstance<ImguiWindow>();
-                    imgui.BindContext(context, views, settings); imgui.Show();
+                    imgui.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, settings)); imgui.Show();
                 }
-                new DocumentDialogComposition(context).CreateAndOpen(typeof(FeatureSampleDocument), path);
+                context.CreateDocuments().Create(typeof(FeatureSampleDocument), path);
                 var clip = (FeatureSampleInterval)context.Document.AllTracks.First().Clips.First();
-                var properties = PropertyComposition.Create(context, settings);
-                properties.Write(properties.Field(clip, typeof(FeatureSampleInterval).GetField("Count")).Path, 27);
+                var properties = context.CreateProperties(settings);
+                properties.Write(properties.CaptureInputs(clip).Single(f => f.Name == "Count").Id, 27);
                 var group = context.Document.RootItems.OfType<TimelineGroup>().First();
                 context.Structure.Move(group.Tracks[0], null, 1, context.Session.Version);
                 Require(context.Document.RootItems[1] is TimelineTrack, "根结构未形成组/轨交错。");
@@ -127,12 +127,12 @@ namespace NBC.ActionEditor.Verification
                 if (toolkit)
                 {
                     native = ScriptableObject.CreateInstance<ToolkitWindow>();
-                    native.BindContext(context, views, settings); native.Show();
+                    native.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, settings)); native.Show();
                 }
                 else
                 {
                     imgui = ScriptableObject.CreateInstance<ImguiWindow>();
-                    imgui.BindContext(context, views, settings); imgui.Show();
+                    imgui.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, settings)); imgui.Show();
                 }
                 Require(context.Lifecycle.SaveAs(copy).Succeeded && context.Session.Path == copy, "另存失败。");
                 context.Session.Edit("Recovery value", () => ((FeatureSampleDocument)context.Document).Version = 17);
@@ -146,7 +146,7 @@ namespace NBC.ActionEditor.Verification
                 var autoSave = new DocumentAutoSave(context.Session, context.Lifecycle, clock);
                 clock.Now = 10; Require(autoSave.Tick(10)?.Succeeded == true, "自动保存未提交。");
                 var windows = Resources.FindObjectsOfTypeAll<DocumentExportWindow>();
-                DocumentExportWindow.ShowFor(context);
+                context.CreateDocuments().Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Export);
                 export = Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Except(windows).Single();
                 Require(export.ExportTo("actioneditor.json", exported), "导出失败。");
                 Require(JsonDocumentCodec.Content(JsonDocumentCodec.Decode(File.ReadAllText(exported))) == JsonDocumentCodec.Content(context.Document), "导出独立读回不符。");
@@ -162,7 +162,7 @@ namespace NBC.ActionEditor.Verification
         }
 
         // 每种失败都核对实际字节和基线，不重试未知提交。
-        private static void VerifyFailures(ActionEditorContext context, string path)
+        private static void VerifyFailures(VerificationSession context, string path)
         {
             context.Session.Edit("Locked target", () => ((FeatureSampleDocument)context.Document).Version = 18);
             var before = File.ReadAllBytes(path);
@@ -173,7 +173,7 @@ namespace NBC.ActionEditor.Verification
             }
             Require(context.Lifecycle.Save().Succeeded, "解除占用后保存失败。");
             var failedRepository = new JsonDocumentRepository(import: _ => throw new IOException("Injected import failure"));
-            using (var failed = new ActionEditorContext(DocumentComposition.Create(failedRepository), failedRepository))
+            using (var failed = new VerificationSession(DocumentComposition.Create(failedRepository), failedRepository))
             {
                 failed.Open(AssetDatabase.LoadAssetAtPath<TextAsset>(path));
                 failed.Session.Edit("Import failure", () => ((FeatureSampleDocument)failed.Document).Version = 19);

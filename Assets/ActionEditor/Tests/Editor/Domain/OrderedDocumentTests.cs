@@ -5,7 +5,7 @@ using System.Text;
 using NBC.ActionEditor.Domain;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Serialization;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -95,10 +95,10 @@ namespace NBC.ActionEditor.Tests
         {
             var document = Read(); var group = (TimelineGroup)document.RootItems[0];
             var first = new TimelineWorkspace(); var second = new TimelineWorkspace(); first.Bind(document); second.Bind(document);
-            var before = DocumentSnapshots.Content(document, Context);
+            var before = DocumentCopy.Content(document, Context);
             first.SetRange(-2, 9); first.ScrollY = 45; first.LeftWidth = 350; first.SetCollapsed(group, true);
             Assert.That(second.ViewTimeMin, Is.Zero); Assert.That(second.ScrollY, Is.Zero); Assert.That(second.LeftWidth, Is.EqualTo(240)); Assert.That(second.IsCollapsed(group), Is.False);
-            Assert.That(DocumentSnapshots.Content(document, Context), Is.EqualTo(before));
+            Assert.That(DocumentCopy.Content(document, Context), Is.EqualTo(before));
             document.RemoveRoot(group); first.Bind(document); Assert.That(first.IsCollapsed(group), Is.False);
             first.Bind(Read()); Assert.That(first.ScrollY, Is.EqualTo(45)); Assert.That(first.IsCollapsed(group), Is.False);
             first.Bind(null); Assert.That(first.ScrollY, Is.Zero);

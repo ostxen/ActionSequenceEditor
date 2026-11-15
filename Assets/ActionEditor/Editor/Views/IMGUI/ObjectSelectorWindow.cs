@@ -38,18 +38,18 @@ namespace NBC.ActionEditor.Views.IMGUI
         private float _topSize;
         private string _searchFilter;
         private bool _focusSearchFilter;
-        private int _lastSelectedIdx;
-        private ObjectPickerCatalog.Entry[] _currentBuiltinResources;
-        private ObjectPickerCatalog.Entry[] _activeBuiltinList;
+        private int _selectedIndex = -1;
+        private ObjectPickerCatalog.Entry[] _entries = Array.Empty<ObjectPickerCatalog.Entry>();
+        private ObjectPickerCatalog.Entry[] _visibleEntries = Array.Empty<ObjectPickerCatalog.Entry>();
         private string _folderPath;
-        private Object _lastSelectedObject;
-        private Texture2D _lastSelectedObjectIcon;
+        private Object _selectedObject;
+        private Texture2D _selectedIcon;
         private Action<Object> _itemSelectedCallback;
         private Predicate<string> _assetPathFilter;
-        private ObjectPickerCatalog.Entry _noneBuiltinRes;
+        private ObjectPickerCatalog.Entry _noneEntry;
         private bool _showNoneItem;
         private Vector2 _scrollPosition;
-        private ObjectPreviewCache _editorWrapperCache;
+        private ObjectPreviewCache _previewCache;
         private PreviewResizer _previewResizer = new PreviewResizer();
         private static ObjectSelectorWindow _sharedObjectSelector;
 
@@ -100,15 +100,9 @@ namespace NBC.ActionEditor.Views.IMGUI
             new Rect(0f, _toolbarHeight, position.width, Mathf.Max(0f, _topSize - _toolbarHeight));
 
         /// <summary>
-        /// 完全文件夹路径
-        /// </summary>
-        private string folderFullPath =>
-            Path.Combine(UnityEngine.Application.dataPath, _folderPath.Length > 6 ? _folderPath.Substring(7) : string.Empty);
-
-        /// <summary>
         /// 显示的列表项数量
         /// </summary>
-        private int itemCount => _activeBuiltinList.Length + (_showNoneItem ? 1 : 0);
+        private int itemCount => _visibleEntries.Length + (_showNoneItem ? 1 : 0);
 
         /// <summary>
         /// 显示对象选择器
@@ -126,32 +120,32 @@ namespace NBC.ActionEditor.Views.IMGUI
         private void ShowPicker(Object obj, string requiredType,
             Action<Object> itemSelectedCallback, string folderPath, List<int> allowedInstanceIDs = null, Predicate<string> assetPathFilter = null)
         {
-            _assetPathFilter = assetPathFilter;
-            _folderPath = folderPath;
-            if (!Directory.Exists(folderFullPath))
+            var fullPath = Path.Combine(UnityEngine.Application.dataPath, folderPath.Length > 6 ? folderPath.Substring(7) : string.Empty);
+            if (!Directory.Exists(fullPath))
             {
                 Debug.LogError(folderPath + " is not a Directory!");
                 return;
             }
 
+            _assetPathFilter = assetPathFilter;
+            _folderPath = folderPath;
+            DiscoverEntries(requiredType, allowedInstanceIDs);
             _itemSelectedCallback = itemSelectedCallback;
             InitIfNeeded();
-
-
-            InitBuiltinList(requiredType, allowedInstanceIDs);
             titleContent = new GUIContent("Select " + requiredType);
             _focusSearchFilter = true;
             _showNoneItem = true;
-            _searchFilter = String.Empty;
-            ListItemFrame(obj, true);
+            _searchFilter = string.Empty;
+            _scrollPosition = Vector2.zero;
+            _previewCache?.Dispose();
+            _previewCache = null;
+            SelectIndex(0, false);
+            FrameSelection(obj, true);
             ShowAuxWindow();
         }
 
-        /// <summary>
-        /// 初始化所指定的文件夹路径里的对象列表
-        /// </summary>
-        private void InitBuiltinList(string requiredTypeName, List<int> allowedInstanceIDs)
-            => _currentBuiltinResources = _activeBuiltinList = ObjectPickerCatalog.Discover(_folderPath, requiredTypeName, allowedInstanceIDs, _assetPathFilter);
+        private void DiscoverEntries(string requiredType, List<int> allowedInstanceIDs)
+            => _entries = _visibleEntries = ObjectPickerCatalog.Discover(_folderPath, requiredType, allowedInstanceIDs, _assetPathFilter);
 
         private void OnEnable()
         {
@@ -163,19 +157,19 @@ namespace NBC.ActionEditor.Views.IMGUI
         {
             _itemSelectedCallback = null;
             _assetPathFilter = null;
-            _currentBuiltinResources = null;
-            _activeBuiltinList = null;
-            _lastSelectedObject = null;
-            _lastSelectedObjectIcon = null;
+            _entries = Array.Empty<ObjectPickerCatalog.Entry>();
+            _visibleEntries = Array.Empty<ObjectPickerCatalog.Entry>();
+            _selectedObject = null;
+            _selectedIcon = null;
             if (_sharedObjectSelector == this)
             {
                 _sharedObjectSelector = null;
             }
 
-            if (_editorWrapperCache != null)
+            if (_previewCache != null)
             {
-                _editorWrapperCache.Dispose();
-                _editorWrapperCache = null;
+                _previewCache.Dispose();
+                _previewCache = null;
             }
         }
 
@@ -195,10 +189,10 @@ namespace NBC.ActionEditor.Views.IMGUI
                 _styles = new Styles();
             }
 
-            if (_noneBuiltinRes == null)
+            if (_noneEntry == null)
             {
-                _noneBuiltinRes = new ObjectPickerCatalog.Entry();
-                _noneBuiltinRes.name = "None";
+                _noneEntry = new ObjectPickerCatalog.Entry();
+                _noneEntry.name = "None";
             }
 
             _topSize = position.height - _previewSize;
@@ -218,7 +212,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             HandleKeyboard();
             GUI.BeginGroup(new Rect(0f, 0f, position.width, position.height), GUIContent.none);
             SearchArea();
-            GridListArea();
+            ListArea();
             PreviewArea();
             GUI.EndGroup();
 
@@ -247,7 +241,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             if (text != _searchFilter || _focusSearchFilter)
             {
                 _searchFilter = text;
-                FilterSettingsChanged();
+                ApplySearch();
                 Repaint();
             }
 
@@ -264,7 +258,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             GUILayout.EndArea();
         }
 
-        private void GridListArea()
+        private void ListArea()
         {
             Rect totalRect = listPosition;
             float itemHeight = itemCount * 16f;
@@ -276,51 +270,28 @@ namespace NBC.ActionEditor.Views.IMGUI
             if (firstRow >= 0 && firstRow < itemCount)
             {
                 const float rowHeight = 16f;
-                int visibleRows = (int)Math.Ceiling(position.height / rowHeight);
+                int visibleRows = (int)Math.Ceiling(totalRect.height / rowHeight);
                 int endRow = Math.Min(itemCount, firstRow + visibleRows + 1);
-                DrawListInternal(firstRow, endRow);
+                DrawRows(firstRow, endRow);
             }
 
             GUI.EndScrollView();
 
-            if (_lastSelectedObject && !_lastSelectedObjectIcon &&
-                AssetPreview.IsLoadingAssetPreview(_lastSelectedObject.GetInstanceID()))
+            if (_selectedObject && !_selectedIcon &&
+                AssetPreview.IsLoadingAssetPreview(_selectedObject.GetInstanceID()))
             {
-                _lastSelectedObjectIcon = AssetPreview.GetAssetPreview(_lastSelectedObject);
+                _selectedIcon = AssetPreview.GetAssetPreview(_selectedObject);
                 Repaint();
             }
         }
 
-        private void DrawListInternal(int beginIndex, int endIndex)
+        private void DrawRows(int beginIndex, int endIndex)
         {
-            int num = beginIndex;
-            int num2 = 0;
-            if (_showNoneItem)
-            {
-                if (beginIndex < 1)
-                {
-                    DrawListItemInternal(ListItemCalcRect(num), _noneBuiltinRes, num);
-                    num++;
-                }
-
-                num2++;
-            }
-
-            if (_activeBuiltinList.Length > 0)
-            {
-                int num4 = beginIndex - num2;
-                num4 = Math.Max(num4, 0);
-                int num5 = num4;
-                while (num5 < _activeBuiltinList.Length && num <= endIndex)
-                {
-                    DrawListItemInternal(ListItemCalcRect(num), _activeBuiltinList[num5], num);
-                    num++;
-                    num5++;
-                }
-            }
+            for (var row = beginIndex; row < endIndex; row++)
+                DrawRow(RowRect(row), _showNoneItem && row == 0 ? _noneEntry : _visibleEntries[row - (_showNoneItem ? 1 : 0)], row);
         }
 
-        private void DrawListItemInternal(Rect rect4, ObjectPickerCatalog.Entry builtinResource, int itemIdx)
+        private void DrawRow(Rect rect4, ObjectPickerCatalog.Entry builtinResource, int itemIdx)
         {
             Event current = Event.current;
             float num5 = 18f;
@@ -334,7 +305,7 @@ namespace NBC.ActionEditor.Views.IMGUI
                 {
                     if (current.clickCount == 1)
                     {
-                        SetSelectedAssetByIdx(itemIdx);
+                        SelectIndex(itemIdx);
                         current.Use();
                     }
                     else if (current.clickCount == 2)
@@ -347,7 +318,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             }
             else if (current.type == EventType.Repaint)
             {
-                if (itemIdx == _lastSelectedIdx)
+                if (itemIdx == _selectedIndex)
                 {
                     _styles.resultsLabel.Draw(rect4, GUIContent.none, false, false, true, focus);
                 }
@@ -366,7 +337,7 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 每个项的矩形区域
         /// </summary>
-        private Rect ListItemCalcRect(int itemIdx)
+        private Rect RowRect(int itemIdx)
         {
             return new Rect(0f, itemIdx * 16f, listPosition.width, 16f);
         }
@@ -375,12 +346,12 @@ namespace NBC.ActionEditor.Views.IMGUI
         {
             GUI.Box(new Rect(0f, _topSize, position.width, _previewSize), string.Empty, _styles.previewBackground);
 
-            if (_editorWrapperCache == null)
+            if (_previewCache == null)
             {
-                _editorWrapperCache = new ObjectPreviewCache();
+                _previewCache = new ObjectPreviewCache();
             }
 
-            Object currentObject = _lastSelectedObject;
+            Object currentObject = _selectedObject;
             ObjectPreviewEditor editorWrapper = null;
 
             if (_previewSize < 75f)
@@ -388,7 +359,7 @@ namespace NBC.ActionEditor.Views.IMGUI
                 string text;
                 if (currentObject != null)
                 {
-                    editorWrapper = _editorWrapperCache[currentObject];
+                    editorWrapper = _previewCache[currentObject];
                     string str = ObjectNames.NicifyVariableName(currentObject.GetType().Name);
                     if (editorWrapper != null)
                     {
@@ -413,7 +384,7 @@ namespace NBC.ActionEditor.Views.IMGUI
                 string text3;
                 if (currentObject != null)
                 {
-                    editorWrapper = _editorWrapperCache[currentObject];
+                    editorWrapper = _previewCache[currentObject];
                     string text2 = ObjectNames.NicifyVariableName(currentObject.GetType().Name);
                     if (editorWrapper != null)
                     {
@@ -448,14 +419,14 @@ namespace NBC.ActionEditor.Views.IMGUI
 
                 WidePreview(_previewSize, text3, currentObject, editorWrapper);
             }
-            _editorWrapperCache.CleanupUntouchedEditors();
+            _previewCache.CleanupUntouchedEditors();
         }
 
         private void LinePreview(string s, Object o, ObjectPreviewEditor p)
         {
-            if (_lastSelectedObjectIcon != null)
+            if (_selectedIcon != null)
             {
-                GUI.DrawTexture(new Rect(2f, (int)(_topSize + 2f), 16f, 16f), _lastSelectedObjectIcon,
+                GUI.DrawTexture(new Rect(2f, (int)(_topSize + 2f), 16f, 16f), _selectedIcon,
                     ScaleMode.StretchToFill);
             }
 
@@ -492,7 +463,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             {
                 if (o != null)
                 {
-                    DrawObjectIcon(pos, _lastSelectedObjectIcon);
+                    DrawObjectIcon(pos, _selectedIcon);
                 }
             }
 
@@ -525,20 +496,27 @@ namespace NBC.ActionEditor.Views.IMGUI
             switch (Event.current.keyCode)
             {
                 case KeyCode.UpArrow:
-                    if (_lastSelectedIdx > 0)
+                    if (_selectedIndex > 0)
                     {
-                        _lastSelectedIdx--;
-                        SetSelectedAssetByIdx(_lastSelectedIdx);
+                        SelectIndex(_selectedIndex - 1);
                     }
-
+                    Event.current.Use();
                     break;
                 case KeyCode.DownArrow:
-                    if (_lastSelectedIdx < itemCount - 1)
+                    if (_selectedIndex < itemCount - 1)
                     {
-                        _lastSelectedIdx++;
-                        SetSelectedAssetByIdx(_lastSelectedIdx);
+                        SelectIndex(_selectedIndex + 1);
                     }
-
+                    Event.current.Use();
+                    break;
+                case KeyCode.Return:
+                case KeyCode.KeypadEnter:
+                    if (_selectedIndex >= 0 && _selectedIndex < itemCount)
+                    {
+                        Event.current.Use();
+                        Close();
+                        GUIUtility.ExitGUI();
+                    }
                     break;
             }
         }
@@ -546,14 +524,16 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 设置选中的索引
         /// </summary>
-        private void SetSelectedAssetByIdx(int selectedIdx, bool callback = true)
+        private void SelectIndex(int selectedIdx, bool callback = true)
         {
-            _lastSelectedIdx = selectedIdx;
+            if (selectedIdx < 0 || selectedIdx >= itemCount) return;
+            _selectedIndex = selectedIdx;
+            var row = RowRect(selectedIdx);
 
             if (_showNoneItem && selectedIdx == 0)
             {
-                _lastSelectedObject = null;
-                _lastSelectedObjectIcon = null;
+                _selectedObject = null;
+                _selectedIcon = null;
             }
             else
             {
@@ -562,33 +542,32 @@ namespace NBC.ActionEditor.Views.IMGUI
                     selectedIdx--;
                 }
 
-                if (_activeBuiltinList[selectedIdx].id > 0)
+                if (_visibleEntries[selectedIdx].id > 0)
                 {
-                    _lastSelectedObject = EditorUtility.InstanceIDToObject(_activeBuiltinList[selectedIdx].id);
+                    _selectedObject = EditorUtility.InstanceIDToObject(_visibleEntries[selectedIdx].id);
                 }
                 else
                 {
-                    _lastSelectedObject =
-                        AssetDatabase.LoadAssetAtPath<Object>(_activeBuiltinList[selectedIdx].path);
+                    _selectedObject =
+                        AssetDatabase.LoadAssetAtPath<Object>(_visibleEntries[selectedIdx].path);
                 }
 
-                _lastSelectedObjectIcon = AssetPreview.GetAssetPreview(_lastSelectedObject);
+                _selectedIcon = AssetPreview.GetAssetPreview(_selectedObject);
 
-                if (_editorWrapperCache != null && _lastSelectedObject)
+                if (_previewCache != null && _selectedObject)
                 {
-                    _editorWrapperCache.CleanupUntouchedEditors();
-                    _ = _editorWrapperCache[_lastSelectedObject];
+                    _previewCache.CleanupUntouchedEditors();
+                    _ = _previewCache[_selectedObject];
                 }
             }
 
-            Rect r = ListItemCalcRect(selectedIdx);
-            ScrollToPosition(AdjustRectForFraming(r));
+            ScrollToPosition(AdjustRectForFraming(row));
             Repaint();
 
             if (callback && _itemSelectedCallback != null)
             {
-                if (_lastSelectedObject == null || _assetPathFilter == null || _assetPathFilter(AssetDatabase.GetAssetPath(_lastSelectedObject)))
-                    _itemSelectedCallback(_lastSelectedObject);
+                if (_selectedObject == null || _assetPathFilter == null || _assetPathFilter(AssetDatabase.GetAssetPath(_selectedObject)))
+                    _itemSelectedCallback(_selectedObject);
             }
         }
 
@@ -635,32 +614,15 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 搜索字符串变化
         /// </summary>
-        private void FilterSettingsChanged()
+        private void ApplySearch()
         {
-            ObjectPickerCatalog.Entry[] array = _currentBuiltinResources;
-            if (array != null && array.Length > 0 && !string.IsNullOrEmpty(_searchFilter))
-            {
-                List<ObjectPickerCatalog.Entry> list3 = new List<ObjectPickerCatalog.Entry>();
-                string value = _searchFilter.ToLower();
-                ObjectPickerCatalog.Entry[] array2 = array;
-                for (int j = 0; j < array2.Length; j++)
-                {
-                    ObjectPickerCatalog.Entry builtinResource = array2[j];
-                    if (builtinResource.name.ToLower().Contains(value))
-                    {
-                        list3.Add(builtinResource);
-                    }
-                }
-
-                array = list3.ToArray();
-            }
-
-            _activeBuiltinList = array;
-
-            if (_lastSelectedObject)
-            {
-                ListItemFrame(_lastSelectedObject, true);
-            }
+            var matches = new List<ObjectPickerCatalog.Entry>();
+            foreach (var entry in _entries)
+                if (string.IsNullOrEmpty(_searchFilter) || entry.name.IndexOf(_searchFilter, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                    matches.Add(entry);
+            _visibleEntries = matches.ToArray();
+            _selectedIndex = _selectedObject == null ? 0 : IndexOfPath(AssetDatabase.GetAssetPath(_selectedObject));
+            if (_selectedIndex >= 0) ScrollToPosition(AdjustRectForFraming(RowRect(_selectedIndex)));
         }
 
         /// <summary>
@@ -687,24 +649,24 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 指定矩形定位后的区域
         /// </summary>
-        private static Rect AdjustRectForFraming(Rect r)
+        private Rect AdjustRectForFraming(Rect r)
         {
-            r.height += _sharedObjectSelector._styles.resultsGridLabel.fixedHeight * 2f;
-            r.y -= _sharedObjectSelector._styles.resultsGridLabel.fixedHeight;
+            r.height += _styles.resultsGridLabel.fixedHeight * 2f;
+            r.y -= _styles.resultsGridLabel.fixedHeight;
             return r;
         }
 
         /// <summary>
         /// 列表项定位
         /// </summary>
-        private bool ListItemFrame(string assetPath, bool frame)
+        private bool FrameSelection(string assetPath, bool frame)
         {
-            int num = ListItemIndexOf(assetPath);
+            int num = IndexOfPath(assetPath);
             if (num != -1)
             {
                 if (frame)
                 {
-                    SetSelectedAssetByIdx(num, false);
+                    SelectIndex(num, false);
                 }
 
                 return true;
@@ -716,20 +678,20 @@ namespace NBC.ActionEditor.Views.IMGUI
         /// <summary>
         /// 列表项定位
         /// </summary>
-        private bool ListItemFrame(Object obj, bool frame)
+        private bool FrameSelection(Object obj, bool frame)
         {
             if (obj == null || !AssetDatabase.Contains(obj))
             {
                 return false;
             }
 
-            return ListItemFrame(AssetDatabase.GetAssetPath(obj), frame);
+            return FrameSelection(AssetDatabase.GetAssetPath(obj), frame);
         }
 
         /// <summary>
         /// 根据路径查找所在的索引
         /// </summary>
-        private int ListItemIndexOf(string assetPath)
+        private int IndexOfPath(string assetPath)
         {
             int num = 0;
             if (_showNoneItem)
@@ -749,7 +711,7 @@ namespace NBC.ActionEditor.Views.IMGUI
                 }
             }
 
-            ObjectPickerCatalog.Entry[] activeBuiltinList = _activeBuiltinList;
+            ObjectPickerCatalog.Entry[] activeBuiltinList = _visibleEntries;
             for (int j = 0; j < activeBuiltinList.Length; j++)
             {
                 ObjectPickerCatalog.Entry builtinResource = activeBuiltinList[j];

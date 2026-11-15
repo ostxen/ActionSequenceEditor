@@ -6,7 +6,9 @@ namespace NBC.ActionEditor.Views.IMGUI
     public sealed class WelcomeView
     {
         private readonly Presentation.Presenters.DocumentPresenter documents;
-        public WelcomeView(Presentation.Presenters.DocumentPresenter documents) { this.documents = documents; }
+        private readonly System.Action<Rect> showSettings;
+        public WelcomeView(Presentation.Presenters.DocumentPresenter documents, System.Action<Rect> showSettings)
+        { this.documents = documents; this.showSettings = showSettings; }
         public void OnGUI()
         {
             var background = GUI.backgroundColor;
@@ -67,7 +69,7 @@ namespace NBC.ActionEditor.Views.IMGUI
 
             if (DrawCenteredButton(Lan.Seeting))
             {
-                PreferencesWindow.Show(new Rect(Styles.ScreenWidth - 5 - 400, 25, 400,
+                showSettings(new Rect(Styles.ScreenWidth - 5 - 400, 25, 400,
                     Styles.ScreenHeight - 70));
             }
 

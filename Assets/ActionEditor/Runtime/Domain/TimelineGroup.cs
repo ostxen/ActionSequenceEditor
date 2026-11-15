@@ -110,16 +110,7 @@ namespace NBC.ActionEditor.Domain
 
         public bool CanAddTrackOfType(Type type)
         {
-            if (type == null || !type.IsSubclassOf(typeof(TimelineTrack)) || type.IsAbstract) return false;
-
-            if (type.IsDefined(typeof(UniqueAttribute), true) &&
-                Tracks.FirstOrDefault(t => t.GetType() == type) != null)
-                return false;
-
-            var attachAtt = type.RTGetAttribute<AttachableAttribute>(true);
-            if (attachAtt == null || attachAtt.Types == null || attachAtt.Types.All(t => t != GetType())) return false;
-
-            return true;
+            return StructureRules.AttachmentError(this, type) == null;
         }
 
         public T AddTrack<T>(string _name = null) where T : TimelineTrack
@@ -129,6 +120,8 @@ namespace NBC.ActionEditor.Domain
 
         public TimelineTrack AddTrack(Type type, string _name = null)
         {
+            var error = StructureRules.AttachmentError(this, type);
+            if (error != null) throw new InvalidOperationException(error);
             var newTrack = Activator.CreateInstance(type);
             if (newTrack is TimelineTrack track)
             {

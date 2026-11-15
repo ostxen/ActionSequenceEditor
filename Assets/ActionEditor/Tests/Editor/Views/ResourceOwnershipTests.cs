@@ -139,7 +139,7 @@ namespace NBC.ActionEditor.Tests
             using var h = new StructureInputMatrixTests.WindowInput(false);
             yield return null; yield return null; yield return null;
             var baseline = h.Content;
-            var globalViews = ActionEditorHost.Views.Count;
+            var globalViews = EditorFixture.SharedViews.Count;
             var session = h.Context.Session;
             var changed = Subscribers(session, session.GetType(), "Changed");
             var contents = Subscribers(session, session.GetType(), "ContentChanged");
@@ -151,7 +151,7 @@ namespace NBC.ActionEditor.Tests
                 var other = ScriptableObject.CreateInstance<ToolkitWindow>();
                 try
                 {
-                    other.BindContext(h.Context, h.Views, h.Settings); other.Show();
+                    other.Bind((owner, repaint, changed) => h.Context.Bind(owner, repaint, changed, h.Views, h.Settings)); other.Show();
                     other.position = new Rect(1100, 60, 550, 300); other.CreateGUI();
                     h.Context.Player.Sample(.5f);
                     Assert.That(h.Context.Player.IsInitialized, Is.True);
@@ -166,7 +166,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(Subscribers(session, session.GetType(), "Changed"), Is.EqualTo(changed));
                 Assert.That(Subscribers(session, session.GetType(), "ContentChanged"), Is.EqualTo(contents));
                 Assert.That(Subscribers(h.Settings, typeof(SettingsSession), "Changed"), Is.EqualTo(settings));
-                Assert.That(ActionEditorHost.Views.Count, Is.EqualTo(globalViews));
+                Assert.That(EditorFixture.SharedViews.Count, Is.EqualTo(globalViews));
                 Assert.That(session.IsEditing || session.IsDirty, Is.False);
                 if (i % 10 == 0) yield return null;
             }

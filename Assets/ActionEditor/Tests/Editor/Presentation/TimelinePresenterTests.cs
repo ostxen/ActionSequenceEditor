@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Infrastructure.Serialization;
 using System;
 using System.Linq;
 using NBC.ActionEditor.Application.Documents;
@@ -54,7 +55,7 @@ namespace NBC.ActionEditor.Tests.Presentation
                 Presenter.Resize(new TimelineSize(1000, 500));
             }
             public TimelinePresenter Create(View view, TimelineWorkspace workspace) => new TimelinePresenter(Session, Selection,
-                Structure, Clipboard, new ClipEditing(Session), workspace, Playhead, () => Settings, view);
+                Structure, new NodeEditing(Session), Clipboard, new ClipEditing(Session), workspace, Playhead, () => Settings, view);
             public TimelineClipState First => Presenter.State.Clips.First();
             public void Pointer(PointerAction action, float x, float y, PointerButton button = PointerButton.Primary,
                 bool control = false, bool shift = false, TimelineRegion region = TimelineRegion.Body) =>
@@ -115,6 +116,15 @@ namespace NBC.ActionEditor.Tests.Presentation
             Assert.That(h.Clip.EndTime, Is.EqualTo(end).Within(.00001f));
             Assert.That(h.Clip.Length, Is.GreaterThanOrEqualTo(.01f));
             Assert.That(h.Clip.Length, Is.LessThan(.1f));
+            Assert.That(h.Clip.BlendIn, Is.InRange(0, h.Clip.Length));
+            Assert.That(h.Clip.BlendOut, Is.InRange(0, h.Clip.Length - h.Clip.BlendIn));
+            var shortened = JsonDocumentCodec.Encode(h.Document);
+            Undo.PerformUndo();
+            Assert.That(h.Clip.Length, Is.EqualTo(1.5f));
+            Assert.That(h.Clip.BlendIn, Is.EqualTo(.25f));
+            Assert.That(h.Clip.BlendOut, Is.EqualTo(.25f));
+            Undo.PerformRedo();
+            Assert.That(JsonDocumentCodec.Encode(h.Document), Is.EqualTo(shortened));
         }
         [Test] public void TwoWindowsShareAuthorsButNotRangeScrollCaptureOrDisposal()
         {
@@ -238,7 +248,7 @@ namespace NBC.ActionEditor.Tests.Presentation
                 first.Pointer(action, a.X + a.Width / 2 + offset, a.Y + 5);
                 second.Pointer(action, b.X + b.Width / 2 + offset, b.Y + 5);
             }
-            Assert.That(NBC.ActionEditor.Storage.JsonDocumentCodec.Content(first.Document), Is.EqualTo(NBC.ActionEditor.Storage.JsonDocumentCodec.Content(second.Document)));
+            Assert.That(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Content(first.Document), Is.EqualTo(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Content(second.Document)));
             Assert.That(first.View.State.Clips.Select(clip => clip.Bounds.X), Is.EqualTo(second.View.State.Clips.Select(clip => clip.Bounds.X)));
         }
         [Test] public void MinimumResizeBeyondEndRemainsFiniteAndAtLeastOneCentisecond()

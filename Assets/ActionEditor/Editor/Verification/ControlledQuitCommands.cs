@@ -18,8 +18,8 @@ namespace NBC.ActionEditor.Verification
             var blockers = new System.Collections.Generic.List<string>();
             if (EditorApplication.isCompiling || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isUpdating)
                 blockers.Add("Requires idle EditMode");
-            if (ActionEditorHost.Context.Session.IsEditing || ActionEditorHost.Context.Session.IsDirty) blockers.Add("ActionEditor has an active or unsaved edit");
-            if (ActionEditorHost.Context.Document != null && (string.IsNullOrEmpty(ActionEditorHost.Context.Session.Path) || !File.Exists(ActionEditorHost.Context.Session.Path)))
+            if (VerificationSession.Shared.Session.IsEditing || VerificationSession.Shared.Session.IsDirty) blockers.Add("ActionEditor has an active or unsaved edit");
+            if (VerificationSession.Shared.Document != null && (string.IsNullOrEmpty(VerificationSession.Shared.Session.Path) || !File.Exists(VerificationSession.Shared.Session.Path)))
                 blockers.Add("ActionEditor document has no existing disk source; SessionState does not survive process restart");
             for (var i = 0; i < SceneManager.sceneCount; i++)
                 if (SceneManager.GetSceneAt(i).isDirty) blockers.Add("dirty scene");

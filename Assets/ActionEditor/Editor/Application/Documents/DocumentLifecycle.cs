@@ -52,13 +52,23 @@ namespace NBC.ActionEditor.Application.Documents
         public DocumentOperationResult Open(string path)
         {
             if (string.IsNullOrEmpty(path)) return DocumentOperationResult.Cancel();
-            try { session.Open(repository.Read(path)); return DocumentOperationResult.Success(); }
+            try
+            {
+                RequireSwitch();
+                var source = repository.Read(path);
+                RequireSwitch();
+                session.Open(source); return DocumentOperationResult.Success();
+            }
             catch (Exception error) { return DocumentOperationResult.Failure(error); }
         }
         public DocumentOperationResult Open(DocumentOpenData source)
         {
-            try { session.Open(source); return DocumentOperationResult.Success(); }
+            try { RequireSwitch(); session.Open(source); return DocumentOperationResult.Success(); }
             catch (Exception error) { return DocumentOperationResult.Failure(error); }
+        }
+        private void RequireSwitch()
+        {
+            if (session.IsEditing) throw new InvalidOperationException("请先完成或取消当前编辑，再切换文档。");
         }
         public DocumentOperationResult Save(string target = null)
         {

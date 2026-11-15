@@ -1,8 +1,8 @@
-﻿using System;
-using System.Collections;
+﻿using NBC.ActionEditor.Presentation.Properties;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
+using NBC.ActionEditor.Presentation.Contracts;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -13,7 +13,7 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
     // IMGUI字段布局与折叠状态，不持有可写应用会话。
     public class InspectorsBase
     {
-        protected object target;
+        protected PropertyTargetState target;
         public PropertyPresenter Presenter { get; private set; }
         public void Bind(PropertyPresenter presenter)
         {
@@ -21,20 +21,19 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
             if (!ReferenceEquals(Presenter, presenter)) CancelInput();
             Presenter = presenter;
         }
-        private NBC.ActionEditor.Presentation.Contracts.PropertyDraft input;
-        private NBC.ActionEditor.Application.Editing.PropertyPath inputPath;
+        private NBC.ActionEditor.Presentation.Properties.PropertyDraft input;
+        private PropertyFieldId inputPath;
         public string InputError { get; private set; }
 
         private int drawDepth;
-        private readonly Dictionary<NBC.ActionEditor.Application.Editing.PropertyPath, bool> collectionFoldouts =
-            new Dictionary<NBC.ActionEditor.Application.Editing.PropertyPath, bool>();
+        private readonly Dictionary<object, bool> collectionFoldouts =
+            new Dictionary<object, bool>();
 
-        public void SetTarget(object t)
+        public void SetTarget(PropertyTargetState t)
         {
-            CancelInput();
-            InputError = null;
+            if (!ReferenceEquals(target?.Id.ViewKey, t?.Id.ViewKey))
+            { CancelInput(); InputError = null; collectionFoldouts.Clear(); }
             target = t;
-            collectionFoldouts.Clear();
         }
 
         public virtual void OnInspectorGUI()
@@ -47,47 +46,39 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
             DrawDefaultInspector(target);
         }
 
-        public void DrawDefaultInspector(object obj, NBC.ActionEditor.Application.Editing.PropertyPath rootPath = null)
+        public void DrawDefaultInspector(PropertyTargetState value) => DrawFields(value?.Fields);
+        private void DrawFields(IReadOnlyList<PropertyInputState> fields)
         {
-            if (obj == null) { EditorGUILayout.LabelField("null"); return; }
-            // 对象引用可能成环；与原生Toolkit相同，最多展开七层字段。
-            if (drawDepth > 6) return;
+            if (fields == null || drawDepth > 6) return;
             drawDepth++;
-            try
-            {
-                foreach (var state in Presenter.CaptureFields(obj, rootPath)) DrawField(state);
-            }
+            try { foreach (var state in fields) DrawField(state); }
             finally { drawDepth--; }
         }
-
-        protected void FieldDefaultInspector(FieldInfo field, object obj, NBC.ActionEditor.Application.Editing.PropertyPath rootPath = null)
-        {
-            DrawField(Presenter.Field(obj, field, rootPath));
-        }
+        protected void FieldDefaultInspector(PropertyInputState field) => DrawField(field);
 
         // 字段快照已确定可见性和子字段，绘制期间不再反射作者对象。
-        private void DrawField(NBC.ActionEditor.Presentation.Contracts.PropertyFieldState state)
+        private void DrawField(PropertyInputState state, bool element = false)
         {
             var mixed = EditorGUI.showMixedValue;
-            try { EditorGUI.showMixedValue = state.Mixed; DrawFieldValue(state); }
+            try { EditorGUI.showMixedValue = state.Mixed; DrawFieldValue(state, element); }
             finally { EditorGUI.showMixedValue = mixed; }
         }
-        private void DrawFieldValue(NBC.ActionEditor.Presentation.Contracts.PropertyFieldState state)
+        private void DrawFieldValue(PropertyInputState state, bool element)
         {
-            var propertyPath = state.Path;
+            var propertyPath = state.Id;
             var fieldType = state.Type;
             var showType = state.Type;
             var value = state.Value;
             var newValue = value;
 
-            var description = state.Description;
-            var name = state.Label;
+            var description = state;
+            var name = element ? "" : state.Label;
             List<object> args = new List<object>();
             if (description.HasRange && (fieldType == typeof(float) || fieldType == typeof(int))) { showType = typeof(RangeAttribute); args.Add(description.Minimum); args.Add(description.Maximum); }
-            if (description.OptionType != null) { showType = typeof(OptionParamAttribute); args = new List<object> { description.OptionType }; }
+            if (description.HasOptions) showType = typeof(OptionParamAttribute);
             if (description.ResourceType != null) { showType = typeof(SelectObjectPathAttribute); args = new List<object> { description.ResourceType }; }
 
-            if (IsCollection(fieldType)) DrawCollection(state.Label, fieldType, (IList)value, propertyPath);
+            if (IsCollection(fieldType)) DrawCollection(state, element ? "Items" : state.Label);
             else if (showType == typeof(int))
             {
                 DrawDelayed(name, fieldType, value, propertyPath);
@@ -102,7 +93,7 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
             }
             else if (showType == typeof(string))
             {
-                if (value != null && DrawNullButton(name)) Presenter.Write(propertyPath, null);
+                if (!element && value != null && DrawNullButton(name)) Presenter.Write(propertyPath, null);
                 DrawDelayed(name, fieldType, value, propertyPath);
             }
             else if (showType == typeof(Color))
@@ -171,12 +162,12 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
             else if (showType == typeof(OptionParamAttribute))
             {
                 var labels = state.OptionLabels;
-                if (labels.Length > 0)
+                if (labels.Count > 0)
                 {
                     var currentIndex = state.OptionIndex;
                     EditorGUI.BeginChangeCheck();
-                    var selected = EditorGUILayout.Popup(name, Mathf.Max(0, currentIndex), labels);
-                    if (EditorGUI.EndChangeCheck()) newValue = state.OptionValue(selected);
+                    var selected = EditorGUILayout.Popup(name, Mathf.Max(0, currentIndex), labels.ToArray());
+                    if (EditorGUI.EndChangeCheck()) Presenter.SelectOption(state.Id, selected);
                 }
             }
             else if (showType == typeof(SelectObjectPathAttribute))
@@ -197,32 +188,31 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
                     }
                 }
             }
-            else if (value != null)
+            else if (!state.IsNull)
             {
-                EditorGUILayout.LabelField(name);
-                EditorGUI.indentLevel++;
-                try { DrawDefaultInspector(value, propertyPath); }
-                finally { EditorGUI.indentLevel--; }
+                if (!element) { EditorGUILayout.LabelField(name); EditorGUI.indentLevel++; }
+                try { DrawFields(state.Children); }
+                finally { if (!element) EditorGUI.indentLevel--; }
             }
             else
             {
-                EditorGUILayout.LabelField(name, "null");
-                if (GUILayout.Button("创建 " + fieldType.Name)) newValue = Presenter.CreateElement(fieldType);
+                if (element) EditorGUILayout.LabelField("null (" + fieldType.Name + ")");
+                else EditorGUILayout.LabelField(name, "null");
+                if (GUILayout.Button(element ? "创建元素" : "创建 " + fieldType.Name)) Presenter.CreateValue(state.Id);
             }
 
             if (!Equals(value, newValue))
                 Presenter.Write(propertyPath, newValue);
         }
 
-        public object CreateElement(Type type) => Presenter.CreateElement(type);
 
         // 原生控件保留文本与焦点，作者提交和失效检查由Presenter持有。
-        private void DrawDelayed(string label, Type type, object value, NBC.ActionEditor.Application.Editing.PropertyPath path)
+        private void DrawDelayed(string label, Type type, object value, PropertyFieldId path)
         {
             // 撤销或换图后旧控件可能仍收到最后一次绘制，不能重新领取失效输入。
             if (!Presenter.CanInput(path))
             {
-                if (inputPath != null && inputPath.SameLocation(path)) CancelInput();
+                if (input != null && inputPath.Equals(path)) CancelInput();
                 using (new EditorGUI.DisabledScope(true)) EditorGUILayout.TextField(label, value?.ToString() ?? "");
                 return;
             }
@@ -239,14 +229,14 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
             {
                 if (!Equals(next, value))
                 {
-                    if (input == null || !inputPath.SameLocation(path))
+                    if (input == null || !ReferenceEquals(inputPath.ViewKey, path.ViewKey))
                     { input = Presenter.BeginDraft(path); inputPath = path; }
                     var committed = input;
-                    input = null; inputPath = null;
+                    input = null; inputPath = default;
                     Presenter.CommitDraft(committed, next);
                     InputError = null;
                 }
-                else if (focused && (input == null || !inputPath.SameLocation(path)))
+                else if (focused && (input == null || !inputPath.Equals(path)))
                 { input = Presenter.BeginDraft(path); inputPath = path; }
             }
             catch (Exception error) when (error is InvalidOperationException || error is ArgumentException)
@@ -259,65 +249,31 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
         public void CancelInput()
         {
             if (input != null) Presenter?.CancelDraft(input);
-            input = null; inputPath = null;
-        }
-
-        private object DrawElement(Type type, object value, NBC.ActionEditor.Application.Editing.PropertyPath propertyPath)
-        {
-            if (IsCollection(type)) { DrawCollection("Items", type, (IList)value, propertyPath); return value; }
-            if (type == typeof(string) || type == typeof(int) || type == typeof(float))
-            { DrawDelayed("", type, value, propertyPath); return value; }
-            if (type == typeof(bool)) return EditorGUILayout.Toggle(value != null && (bool)value);
-            if (type == typeof(Color)) return EditorGUILayout.ColorField(value == null ? Color.white : (Color)value);
-            if (type == typeof(Vector2)) return EditorGUILayout.Vector2Field("", value == null ? Vector2.zero : (Vector2)value);
-            if (type == typeof(Vector3)) return EditorGUILayout.Vector3Field("", value == null ? Vector3.zero : (Vector3)value);
-            if (type == typeof(Vector4)) return EditorGUILayout.Vector4Field("", value == null ? Vector4.zero : (Vector4)value);
-            if (type == typeof(Vector2Int)) return EditorGUILayout.Vector2IntField("", value == null ? Vector2Int.zero : (Vector2Int)value);
-            if (type == typeof(Vector3Int)) return EditorGUILayout.Vector3IntField("", value == null ? Vector3Int.zero : (Vector3Int)value);
-            if (type == typeof(Rect)) return EditorGUILayout.RectField(value == null ? default : (Rect)value);
-            if (type == typeof(RectInt)) return EditorGUILayout.RectIntField(value == null ? default : (RectInt)value);
-            if (type == typeof(Bounds)) return EditorGUILayout.BoundsField(value == null ? default : (Bounds)value);
-            if (type == typeof(BoundsInt)) return EditorGUILayout.BoundsIntField(value == null ? default : (BoundsInt)value);
-            if (type == typeof(AnimationCurve))
-            {
-                EditorGUI.BeginChangeCheck();
-                var copy = (AnimationCurve)NBC.ActionEditor.Presentation.Contracts.PropertyFieldState.CopyValue(value);
-                var curve = EditorGUILayout.CurveField(copy ?? new AnimationCurve());
-                return EditorGUI.EndChangeCheck() ? curve : value;
-            }
-            if (type.IsEnum) return EditorGUILayout.EnumPopup((Enum)(value ?? Activator.CreateInstance(type)));
-            if (typeof(Object).IsAssignableFrom(type)) return EditorGUILayout.ObjectField((Object)value, type, false);
-            if (value == null)
-            {
-                EditorGUILayout.LabelField("null (" + type.Name + ")");
-                if (GUILayout.Button("创建元素")) return CreateElement(type);
-                return null;
-            }
-            DrawDefaultInspector(value, propertyPath); return value;
+            input = null; inputPath = default;
         }
 
         protected virtual bool DrawRemoveButton() => GUILayout.Button("X", GUILayout.Width(20));
         protected virtual bool DrawAddButton() => GUILayout.Button("+", GUILayout.Width(30));
-        protected void SetExpanded(NBC.ActionEditor.Application.Editing.PropertyPath path, bool expanded) => collectionFoldouts[path] = expanded;
+        protected void SetExpanded(PropertyFieldId path, bool expanded) => collectionFoldouts[path.ViewKey] = expanded;
 
         private static bool IsCollection(Type type) => type.IsArray || type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>);
 
         // 数组与列表共享原生布局，删除后结束本次枚举，递归集合也使用稳定字段路径。
-        private void DrawCollection(string label, Type type, IList values, NBC.ActionEditor.Application.Editing.PropertyPath path)
+        private void DrawCollection(PropertyInputState state, string label)
         {
             if (drawDepth > 6) return;
+            var path = state.Id;
             var expanded = EditorGUILayout.Foldout(GetCollectionFoldout(path), label);
-            collectionFoldouts[path] = expanded;
+            collectionFoldouts[path.ViewKey] = expanded;
             if (!expanded) return;
-            if (values != null && DrawNullButton(label)) { Presenter.Write(path, null); return; }
-            var elementType = type.IsArray ? type.GetElementType() : type.GetGenericArguments()[0];
+            if (!state.IsNull && DrawNullButton(label)) { Presenter.Write(path, null); return; }
             drawDepth++;
             try
             {
                 GUILayout.Space(6);
                 using (new EditorGUILayout.VerticalScope(GUI.skin.box))
                 {
-                    for (var index = 0; index < (values?.Count ?? 0); index++)
+                    for (var index = 0; index < state.Children.Count; index++)
                     {
                         bool remove;
                         using (new EditorGUILayout.HorizontalScope())
@@ -325,25 +281,20 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
                             EditorGUILayout.LabelField("Element " + index);
                             remove = DrawRemoveButton();
                         }
-                        if (remove) { Presenter.Remove(path, type, index); break; }
+                        if (remove) { Presenter.Remove(path, index); return; }
                         using (new EditorGUILayout.HorizontalScope())
                         {
                             GUILayout.Space(12);
-                            using (new EditorGUILayout.VerticalScope())
-                            {
-                                var value = values[index];
-                                var elementPath = path.Element(index);
-                                var updated = DrawElement(elementType, value, elementPath);
-                                if (!Equals(value, updated)) Presenter.Write(elementPath, updated);
-                            }
+                            using (new EditorGUILayout.VerticalScope()) DrawField(state.Children[index], true);
                         }
+                        if (!Presenter.CanInput(path)) return;
                         DrawDivider();
                     }
                     GUILayout.Space(6);
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         GUILayout.FlexibleSpace();
-                        if (DrawAddButton()) Presenter.Append(path, type);
+                        if (DrawAddButton()) Presenter.Append(path);
                     }
                 }
             }
@@ -352,9 +303,9 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
 
         protected virtual bool DrawNullButton(string label) => GUILayout.Button("设为空值 " + label);
 
-        private bool GetCollectionFoldout(NBC.ActionEditor.Application.Editing.PropertyPath path)
+        private bool GetCollectionFoldout(PropertyFieldId path)
         {
-            return collectionFoldouts.TryGetValue(path, out var expanded) && expanded;
+            return collectionFoldouts.TryGetValue(path.ViewKey, out var expanded) && expanded;
         }
 
         private void DrawDivider()

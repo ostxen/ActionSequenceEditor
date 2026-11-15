@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Infrastructure.Assets;
 using NBC.ActionEditor.Views.IMGUI.Properties;
 using NBC.ActionEditor.Views.IMGUI.Properties.Standard;
 using ImguiWindow = NBC.ActionEditor.Views.IMGUI.ActionEditorWindow;
@@ -12,7 +13,7 @@ using System.Collections;
 using System.Linq;
 using System.Reflection;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -29,7 +30,7 @@ namespace NBC.ActionEditor.Tests
         private sealed class FieldInspector : InspectorsBase
         {
             public void Draw(object value, string field)
-            { if (Presenter == null) Bind(Composition.PropertyComposition.Create(ActionEditorHost.Context, Prefs.Session)); FieldDefaultInspector(value.GetType().GetField(field), value); }
+            { if (Presenter == null) Bind(EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings)); FieldDefaultInspector(Presenter.CaptureInputs(value).Single(f => f.Name == field)); }
         }
         private sealed class FieldWindow : EditorWindow
         {
@@ -50,15 +51,15 @@ namespace NBC.ActionEditor.Tests
         }
         [SetUp] public void SetUp()
         {
-            source = ActionEditorHost.Context.Source; recovery = ActionEditorHost.Context.Session.CaptureRecovery();
-            fixture = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument())); ActionEditorHost.Context.Open(fixture);
+            source = EditorFixture.Shared.Source; recovery = EditorFixture.Shared.Session.CaptureRecovery();
+            fixture = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument())); EditorFixture.Shared.Open(fixture);
         }
         [TearDown] public void TearDown()
         {
-            ActionEditorHost.Context.Session.CancelEdit(); ActionEditorHost.Context.Playback.Stop(); ActionEditorHost.Context.Open(source); ActionEditorHost.Context.Session.RestoreRecovery(recovery);
+            EditorFixture.Shared.Session.CancelEdit(); EditorFixture.Shared.Playback.Stop(); EditorFixture.Shared.Open(source); EditorFixture.Shared.Session.RestoreRecovery(recovery);
             UnityEngine.Object.DestroyImmediate(fixture);
         }
-        private static TimelineClip Last(int track) => ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track].Clips.Last();
+        private static TimelineClip Last(int track) => EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track].Clips.Last();
         private static int RowIndex(ToolkitCanvas canvas, IDirectable item) => canvas.State.Rows.ToList().FindIndex(row => row.Key == canvas.Presenter.KeyFor(item));
         private static void ImguiCreate(TimelineTrack track, Type type)
         {
@@ -81,7 +82,7 @@ namespace NBC.ActionEditor.Tests
         }
         private static void NativeCreate(ToolkitWindow window, int track, Type type)
         {
-            var canvas = window.Canvas; var target = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track];
+            var canvas = window.Canvas; var target = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track];
             var row = RowIndex(canvas, target);
             var position = canvas.LocalToWorld(new Vector2(canvas.X(6.5f), row * 28 + 13 - window.ScrollY));
             var menu = new DropdownMenu();
@@ -111,11 +112,11 @@ namespace NBC.ActionEditor.Tests
                 yield return null; yield return null;
                 for (var ui = 0; ui < 2; ui++)
                 {
-                    ActionEditorHost.Context.Open(fixture);
+                    EditorFixture.Shared.Open(fixture);
                     foreach (var track in new[] { 0, 2 })
                     {
                         var type = track == 0 ? typeof(FeatureSampleInterval) : typeof(FeatureSampleMarker);
-                        if (ui == 0) ImguiCreate(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track], type);
+                        if (ui == 0) ImguiCreate(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[track], type);
                         else NativeCreate(window, track, type);
                         var clip = Last(track);
                         Assert.That(clip.GetType(), Is.EqualTo(type)); Assert.That(clip.StartTime, Is.EqualTo(6.5f).Within(.0001f));
@@ -135,7 +136,8 @@ namespace NBC.ActionEditor.Tests
                         else
                         {
                             window.Focus(); window.Select(clip);
-                            var root = new VisualElement(); window.rootVisualElement.Add(root); new ToolkitProperties(Composition.PropertyComposition.Create(ActionEditorHost.Context, Prefs.Session)).DrawFields(root, clip, () => { }, 0);
+                            var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
+                            var root = new VisualElement(); window.rootVisualElement.Add(root); new ToolkitProperties(presenter).DrawFields(root, presenter.CaptureInputs(clip), () => { }, 0);
                             var text = root.Query<TextField>().ToList().Single(f => f.label == (track == 0 ? "标题" : "消息"));
                             var input = text.Q("unity-text-input").Q<TextElement>(); input.Focus(); yield return null;
                             Key(input, KeyCode.A, control: true); Key(input, KeyCode.Alpha7, '7'); Key(input, KeyCode.Return, '\n');
@@ -147,7 +149,7 @@ namespace NBC.ActionEditor.Tests
                         Undo.PerformUndo(); clip = Last(track); Assert.That(field.GetValue(clip), Is.EqualTo(initial));
                         Undo.PerformRedo(); Assert.That(field.GetValue(Last(track)), Is.EqualTo("7"));
                     }
-                    var encoded = JsonDocumentCodec.CreateSaveSnapshot(ActionEditorHost.Context.Document);
+                    var encoded = JsonDocumentCodec.CreateSaveSnapshot(EditorFixture.Shared.Document);
                     var reopened = JsonDocumentCodec.Decode(encoded);
                     Assert.That(reopened.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(), Is.TypeOf<FeatureSampleInterval>());
                     Assert.That(reopened.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[2].Clips.Last().Length, Is.Zero);
@@ -179,12 +181,12 @@ namespace NBC.ActionEditor.Tests
                 yield return null; yield return null;
                 for (var ui = 0; ui < 2; ui++)
                 {
-                    ActionEditorHost.Context.Open(fixture);
+                    EditorFixture.Shared.Open(fixture);
                     var type = typeof(FeatureSampleInterval);
-                    if (ui == 0) ImguiCreate(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], type);
+                    if (ui == 0) ImguiCreate(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0], type);
                     else NativeCreate(native, 0, type);
-                    var created = Last(0); ActionEditorHost.Context.ClipboardEditing.Copy(created);
-                    var copy = (TimelineClip)ActionEditorHost.Context.ClipboardEditing.Paste(created.Parent, 9);
+                    var created = Last(0); EditorFixture.Shared.ClipboardEditing.Copy(created);
+                    var copy = (TimelineClip)EditorFixture.Shared.ClipboardEditing.Paste(created.Parent, 9);
                     Assert.That(copy, Is.Not.SameAs(created));
                     native.Workspace.ViewTimeMax = 12; original.Workspace.ViewTimeMax = 12; native.SyncView();
                     native.Select(created, copy); yield return null;
@@ -208,9 +210,9 @@ namespace NBC.ActionEditor.Tests
                     }
                     Assert.That(created.StartTime, Is.EqualTo(start + .5f).Within(.001));
                     Assert.That(copy.StartTime - created.StartTime, Is.EqualTo(spacing).Within(.001));
-                    Undo.PerformUndo(); created = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8);
+                    Undo.PerformUndo(); created = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8);
                     Assert.That(created.StartTime, Is.EqualTo(start).Within(.001));
-                    Undo.PerformRedo(); created = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8);
+                    Undo.PerformRedo(); created = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8);
                     native.Select(created); var length = created.Length;
                     if (ui == 0)
                     {
@@ -232,33 +234,34 @@ namespace NBC.ActionEditor.Tests
                     }
                     Assert.That(created.Length, Is.EqualTo(length + .25f).Within(.001));
                     var field = type.GetField("Caption"); var initial = field.GetValue(created);
-                    var token = ActionEditorHost.Context.Session.BeginEdit(this); new NBC.ActionEditor.Application.Editing.PropertyPath(ActionEditorHost.Context.Properties, created).Field(field).Write("cancelled"); token.Cancel();
-                    created = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8);
+                    var token = EditorFixture.Shared.Session.BeginEdit(this); new NBC.ActionEditor.Application.Editing.PropertyPath(EditorFixture.Shared.Properties, created).Field(field).Write("cancelled"); token.Cancel();
+                    created = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8);
                     Assert.That(field.GetValue(created), Is.EqualTo(initial));
-                    token = ActionEditorHost.Context.Session.BeginEdit(this); new NBC.ActionEditor.Application.Editing.PropertyPath(ActionEditorHost.Context.Properties, created).Field(field).Write("Edited caption"); token.Commit();
+                    token = EditorFixture.Shared.Session.BeginEdit(this); new NBC.ActionEditor.Application.Editing.PropertyPath(EditorFixture.Shared.Properties, created).Field(field).Write("Edited caption"); token.Commit();
                     Undo.PerformUndo(); Undo.PerformRedo();
-                    var encoded = JsonDocumentCodec.CreateSaveSnapshot(ActionEditorHost.Context.Document);
+                    var encoded = JsonDocumentCodec.CreateSaveSnapshot(EditorFixture.Shared.Document);
                     var expected = JsonDocumentCodec.Content(JsonDocumentCodec.Decode(encoded));
                     var invalid = new TextAsset("not-json");
-                    try { Assert.Throws<System.IO.InvalidDataException>(() => ActionEditorHost.Context.Open(invalid)); }
+                    try { Assert.Throws<System.IO.InvalidDataException>(() => EditorFixture.Shared.Open(invalid)); }
                     finally { UnityEngine.Object.DestroyImmediate(invalid); }
-                    Assert.That(JsonDocumentCodec.Content(ActionEditorHost.Context.Document), Is.EqualTo(expected));
-                    ActionEditorHost.Context.Session.DiscardChanges(); original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close();
-                    ActionEditorHost.Context.Open(null); reopened = new TextAsset(encoded); ActionEditorHost.Context.Open(reopened);
+                    Assert.That(JsonDocumentCodec.Content(EditorFixture.Shared.Document), Is.EqualTo(expected));
+                    EditorFixture.Shared.Session.DiscardChanges(); original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close();
+                    EditorFixture.Shared.Open(null); reopened = new TextAsset(encoded); EditorFixture.Shared.Open(reopened);
                     original = ScriptableObject.CreateInstance<ImguiWindow>(); original.Show();
                     native = ScriptableObject.CreateInstance<ToolkitWindow>(); native.Show(); yield return null;
-                    Assert.That(original.Context.Document, Is.SameAs(native.Document));
-                    Assert.That(JsonDocumentCodec.Content(native.Document), Is.EqualTo(expected));
-                    Assert.That(((FeatureSampleInterval)native.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8)).Caption, Is.EqualTo("Edited caption"));
-                    var now = (float)EditorApplication.timeSinceStartup; ActionEditorHost.Context.Playback.Play(now); ActionEditorHost.Context.Playback.Update(now + .1f, 1);
-                    Assert.That(ActionEditorHost.Context.Playback.IsPlaying, Is.True); Assert.That(ActionEditorHost.Context.Player.CurrentTime, Is.GreaterThan(0));
-                    ActionEditorHost.Context.Playback.Stop(); Assert.That(ActionEditorHost.Context.Player.IsInitialized, Is.False); Assert.That(ActionEditorHost.Context.Player.CurrentTime, Is.Zero);
-                    ActionEditorHost.Context.Open(fixture); UnityEngine.Object.DestroyImmediate(reopened); reopened = null;
+                    Assert.That(original.Presenter.KeyFor(EditorFixture.Shared.Document.AllTracks.First().Clips.First()), Is.GreaterThan(0));
+                    Assert.That(native.Canvas.Presenter.KeyFor(EditorFixture.Shared.Document.AllTracks.First().Clips.First()), Is.GreaterThan(0));
+                    Assert.That(JsonDocumentCodec.Content(EditorFixture.Shared.Document), Is.EqualTo(expected));
+                    Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Last(c => c.StartTime < 8)).Caption, Is.EqualTo("Edited caption"));
+                    var now = (float)EditorApplication.timeSinceStartup; EditorFixture.Shared.Playback.Play(now); EditorFixture.Shared.Playback.Update(now + .1f, 1);
+                    Assert.That(EditorFixture.Shared.Playback.IsPlaying, Is.True); Assert.That(EditorFixture.Shared.Player.CurrentTime, Is.GreaterThan(0));
+                    EditorFixture.Shared.Playback.Stop(); Assert.That(EditorFixture.Shared.Player.IsInitialized, Is.False); Assert.That(EditorFixture.Shared.Player.CurrentTime, Is.Zero);
+                    EditorFixture.Shared.Open(fixture); UnityEngine.Object.DestroyImmediate(reopened); reopened = null;
                 }
             }
             finally
             {
-                original.Presenter?.Cancel(); ActionEditorHost.Context.Session.CancelEdit();
+                original.Presenter?.Cancel(); EditorFixture.Shared.Session.CancelEdit();
                 original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close();
 
                 if (reopened != null) UnityEngine.Object.DestroyImmediate(reopened);
@@ -272,8 +275,8 @@ namespace NBC.ActionEditor.Tests
             ImguiWindow imgui = null;
             try
             {
-                var group = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0);
-                group.Tracks.Clear(); ActionEditorHost.Context.Document.Init();
+                var group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0);
+                group.Tracks.Clear(); EditorFixture.Shared.Document.Init();
                 native = ScriptableObject.CreateInstance<ToolkitWindow>();
                 native.position = new Rect(60, 60, 1000, 600); native.Show(); native.Focus();
                 yield return null; yield return null;
@@ -287,11 +290,11 @@ namespace NBC.ActionEditor.Tests
                 Pointer(canvas, EventType.MouseDrag, new Vector2(90, 90));
                 Assert.That(canvas.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 Pointer(canvas, EventType.MouseUp, new Vector2(90, 90));
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(1), Is.SameAs(group));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(1), Is.SameAs(group));
                 native.DiscardChanges(); native.Close(); native = null;
 
-                group = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0);
-                group.Tracks.Clear(); ActionEditorHost.Context.Document.Init();
+                group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0);
+                group.Tracks.Clear(); EditorFixture.Shared.Document.Init();
                 imgui = ScriptableObject.CreateInstance<ImguiWindow>();
                 imgui.position = new Rect(60, 60, 1000, 600); imgui.Show(); imgui.Focus(); imgui.Repaint();
                 yield return null; yield return null; yield return null;
@@ -299,13 +302,13 @@ namespace NBC.ActionEditor.Tests
                 var start = offset + new Vector2(90, Styles.PlayControlHeight + 13);
                 var end = start + new Vector2(0, 70);
                 imgui.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
-                Assert.That(ActionEditorHost.Context.Selection.First, Is.SameAs(group));
+                Assert.That(EditorFixture.Shared.Selection.First, Is.SameAs(group));
                 imgui.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
                 Assert.That(imgui.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 Assert.That(imgui.Timeline.State.Insertion.Visible, Is.True);
                 imgui.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
                 imgui.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
-                group = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0);
+                group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0);
                 var wasCollapsed = imgui.Workspace.IsCollapsed(group);
                 var fold = offset + new Vector2(12, Styles.PlayControlHeight + 12);
                 imgui.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = fold });
@@ -439,7 +442,7 @@ namespace NBC.ActionEditor.Tests
             {
                 window.position = new Rect(60, 60, 1000, 600); window.Show(); yield return null; yield return null;
                 var canvas = window.Canvas;
-                var group = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0); var moving = group.Tracks[1]; var first = group.Tracks[0];
+                var group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0); var moving = group.Tracks[1]; var first = group.Tracks[0];
                 var start = new Vector2(90, RowIndex(canvas, moving) * 28 + 13);
                 var end = new Vector2(90, RowIndex(canvas, first) * 28 + 3);
                 Pointer(canvas, EventType.MouseDown, start);
@@ -452,32 +455,32 @@ namespace NBC.ActionEditor.Tests
                 Pointer(canvas, EventType.MouseUp, end);
                 Assert.That(window.LastError, Is.Null);
                 Assert.That(group.Tracks[0], Is.SameAs(moving), "Dropping on the upper half must insert before the target.");
-                Undo.PerformUndo(); Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(first.Name));
-                Undo.PerformRedo(); Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(moving.Name));
-                moving = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0];
+                Undo.PerformUndo(); Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(first.Name));
+                Undo.PerformRedo(); Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(moving.Name));
+                moving = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0];
                 start = new Vector2(90, RowIndex(canvas, moving) * 28 + 13);
                 end = new Vector2(5, start.y + 10);
                 Pointer(canvas, EventType.MouseDown, start); Pointer(canvas, EventType.MouseDrag, end);
                 Pointer(canvas, EventType.MouseUp, end);
                 Assert.That(window.LastError, Is.Null); Assert.That(moving.Group, Is.Null);
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
-                Assert.That(moving.Root, Is.SameAs(ActionEditorHost.Context.Document)); Assert.That(moving.Clips, Is.Not.Empty);
-                Assert.That(ActionEditorHost.Context.Document.RootItems[1], Is.SameAs(moving), "Root zone inserts after the whole first group block.");
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
+                Assert.That(moving.Root, Is.SameAs(EditorFixture.Shared.Document)); Assert.That(moving.Clips, Is.Not.Empty);
+                Assert.That(EditorFixture.Shared.Document.RootItems[1], Is.SameAs(moving), "Root zone inserts after the whole first group block.");
                 start = new Vector2(90, RowIndex(canvas, moving) * 28 + 13);
-                end = new Vector2(90, RowIndex(canvas, ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(1)) * 28 + 13);
+                end = new Vector2(90, RowIndex(canvas, EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(1)) * 28 + 13);
                 Pointer(canvas, EventType.MouseDown, start); Pointer(canvas, EventType.MouseDrag, end);
                 Key(canvas, KeyCode.Escape); Pointer(canvas, EventType.MouseUp, end);
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
                 Pointer(canvas, EventType.MouseDown, start); Pointer(canvas, EventType.MouseDrag, end);
                 var outside = new Vector2(-10, end.y);
                 Pointer(canvas, EventType.MouseUp, outside);
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().Single(), Is.SameAs(moving));
                 Pointer(canvas, EventType.MouseDown, start); Pointer(canvas, EventType.MouseDrag, end);
                 Pointer(canvas, EventType.MouseUp, end);
-                Assert.That(window.LastError, Is.Null); Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>(), Is.Empty);
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(1).Tracks[0], Is.SameAs(moving));
-                var encoded = JsonDocumentCodec.CreateSaveSnapshot(ActionEditorHost.Context.Document);
-                Assert.That(JsonDocumentCodec.Content(JsonDocumentCodec.Decode(encoded)), Is.EqualTo(JsonDocumentCodec.Content(ActionEditorHost.Context.Document)));
+                Assert.That(window.LastError, Is.Null); Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>(), Is.Empty);
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(1).Tracks[0], Is.SameAs(moving));
+                var encoded = JsonDocumentCodec.CreateSaveSnapshot(EditorFixture.Shared.Document);
+                Assert.That(JsonDocumentCodec.Content(JsonDocumentCodec.Decode(encoded)), Is.EqualTo(JsonDocumentCodec.Content(EditorFixture.Shared.Document)));
             }
             finally { window.DiscardChanges(); window.Close(); }
         }
@@ -490,14 +493,14 @@ namespace NBC.ActionEditor.Tests
                 window.Workspace.ScrollY = 0;
                 window.position = new Rect(60, 60, 1000, 600); window.Show(); window.Focus(); window.Repaint();
                 yield return null; yield return null; yield return null;
-                var moving = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
+                var moving = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
                 var name = moving.Name;
                 var pitch = Styles.LineHeight + Styles.Space;
                 var offset = Styles.PlayControlHeight + ((Vector2)typeof(ImguiWindow).GetProperty("ContentOffset", Instance).GetValue(window)).y;
                 var start = new Vector2(90, offset + 2 * pitch + 13);
                 var end = new Vector2(90, offset + pitch + 3);
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
-                Assert.That(ActionEditorHost.Context.Selection.First, Is.SameAs(moving), "Header event must reach the intended row; offset=" + offset);
+                Assert.That(EditorFixture.Shared.Selection.First, Is.SameAs(moving), "Header event must reach the intended row; offset=" + offset);
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = start + Vector2.down * 4 });
                 Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
@@ -507,109 +510,109 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle), "Release must end the captured gesture.");
                 Assert.That(window.Timeline.State.Insertion.Visible, Is.False);
                 Assert.That(window.Timeline.Error, Is.Null);
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(name));
-                Undo.PerformUndo(); Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Name, Is.EqualTo(name));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(name));
+                Undo.PerformUndo(); Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Name, Is.EqualTo(name));
                 Undo.PerformRedo();
                 window.Repaint(); yield return null; yield return null;
                 start = new Vector2(90, offset + pitch + 13); end = new Vector2(5, start.y + 10);
                 foreach (var type in new[] { EventType.MouseDown, EventType.MouseDrag, EventType.MouseUp })
                     window.SendEvent(new Event { type = type, button = 0, mousePosition = type == EventType.MouseDown ? start : end });
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().Single().Name, Is.EqualTo(name));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().Single().Name, Is.EqualTo(name));
                 window.Presenter.Scroll(0);
                 window.Repaint(); yield return null; yield return null;
-                var rootRow = window.Presenter.State.Rows.Single(row => row.Key == window.Presenter.KeyFor(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().First()));
-                var groupRow = window.Presenter.State.Rows.Single(row => row.Key == window.Presenter.KeyFor(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(1)));
+                var rootRow = window.Presenter.State.Rows.Single(row => row.Key == window.Presenter.KeyFor(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().First()));
+                var groupRow = window.Presenter.State.Rows.Single(row => row.Key == window.Presenter.KeyFor(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(1)));
                 start = new Vector2(90, offset + rootRow.Bounds.Y + 13);
                 end = new Vector2(90, offset + groupRow.Bounds.Y + 13);
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
-                Assert.That(ActionEditorHost.Context.Selection.First, Is.SameAs(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().ElementAt(0)), "Root row start=" + start + ", scroll=" + window.Workspace.ScrollY);
+                Assert.That(EditorFixture.Shared.Selection.First, Is.SameAs(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().ElementAt(0)), "Root row start=" + start + ", scroll=" + window.Workspace.ScrollY);
                 Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
                 Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
                 window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().Single().Name, Is.EqualTo(name));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().Single().Name, Is.EqualTo(name));
                 window.Repaint(); yield return null; yield return null;
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
-                Assert.That(ActionEditorHost.Context.Selection.First, Is.SameAs(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().ElementAt(0)), "Root row after cancel start=" + start);
+                Assert.That(EditorFixture.Shared.Selection.First, Is.SameAs(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().ElementAt(0)), "Root row after cancel start=" + start);
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = end });
                 Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = end });
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>(), Is.Empty);
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(1).Tracks[0].Name, Is.EqualTo(name));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>(), Is.Empty);
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(1).Tracks[0].Name, Is.EqualTo(name));
             }
             finally { window.DiscardChanges(); window.Close(); }
         }
 
         [Test] public void RootTracksPersistUndoPreviewAndRejectDuplicateOwnership()
         {
-            var track = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var clip = track.Clips[0];
-            ActionEditorHost.Context.Structure.MoveTrack(track, null, 0);
-            Assert.That(track.Parent, Is.Null); Assert.That(track.Root, Is.SameAs(ActionEditorHost.Context.Document));
+            var track = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var clip = track.Clips[0];
+            EditorFixture.Shared.Structure.MoveTrack(track, null, 0);
+            Assert.That(track.Parent, Is.Null); Assert.That(track.Root, Is.SameAs(EditorFixture.Shared.Document));
             Assert.That(track.IsActive, Is.True); Assert.That(clip.Parent, Is.SameAs(track));
-            var layout = new VisibleTimelineLayout();
-            layout.Build(ActionEditorHost.Context.Document, new NBC.ActionEditor.Application.Editing.SelectionState(), new TimelineWorkspace(), new TimelineSize(1000, 600), 0, null);
+            var layout = new TimelineLayout();
+            layout.Build(EditorFixture.Shared.Document, new NBC.ActionEditor.Application.Editing.SelectionState(), new TimelineWorkspace(), new TimelineSize(1000, 600), 0, null);
             Assert.That(layout.KeyFor(clip), Is.Not.Zero);
-            var encoded = JsonDocumentCodec.CreateSaveSnapshot(ActionEditorHost.Context.Document);
+            var encoded = JsonDocumentCodec.CreateSaveSnapshot(EditorFixture.Shared.Document);
             var decoded = JsonDocumentCodec.Decode(encoded);
             Assert.That(decoded.RootItems.OfType<TimelineTrack>().Single().Clips[0].StartTime, Is.EqualTo(.25f));
             Assert.That(decoded.RootItems.OfType<TimelineTrack>().ElementAt(0).Root, Is.SameAs(decoded));
-            ActionEditorHost.Context.Player.Sample(.75f); Assert.That(ActionEditorHost.Context.Player.IsInitialized, Is.True); ActionEditorHost.Context.Playback.Stop();
-            Undo.PerformUndo(); Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>(), Is.Empty);
-            Undo.PerformRedo(); Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().Count(), Is.EqualTo(1));
-            var moved = ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().ElementAt(0); moved.IsLocked = true;
-            Assert.That(ActionEditorHost.Context.Structure.Reorder(moved, ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0), 0).CanExecute(out _), Is.False);
+            EditorFixture.Shared.Player.Sample(.75f); Assert.That(EditorFixture.Shared.Player.IsInitialized, Is.True); EditorFixture.Shared.Playback.Stop();
+            Undo.PerformUndo(); Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>(), Is.Empty);
+            Undo.PerformRedo(); Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().Count(), Is.EqualTo(1));
+            var moved = EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().ElementAt(0); moved.IsLocked = true;
+            Assert.That(EditorFixture.Shared.Structure.Reorder(moved, EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0), 0).CanExecute(out _), Is.False);
             moved.IsLocked = false;
-            ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks.Add(moved);
-            Assert.Throws<System.IO.InvalidDataException>(() => JsonDocumentCodec.CreateSaveSnapshot(ActionEditorHost.Context.Document));
-            ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks.Remove(moved);
+            EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks.Add(moved);
+            Assert.Throws<System.IO.InvalidDataException>(() => JsonDocumentCodec.CreateSaveSnapshot(EditorFixture.Shared.Document));
+            EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks.Remove(moved);
         }
 
         [Test] public void RootTrackOrderingCopyCutLocksAndRecoveryKeepOneOwner()
         {
-            var first = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var second = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
-            ActionEditorHost.Context.Structure.MoveTrack(first, null, 0); ActionEditorHost.Context.Structure.MoveTrack(second, null, 1);
-            ActionEditorHost.Context.Structure.MoveTrack(second, null, 0);
-            Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>(), Is.EqualTo(new[] { second, first }));
-            ActionEditorHost.Context.Structure.MoveTrack(second, null, 2);
-            Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>(), Is.EqualTo(new[] { first, second }));
-            ActionEditorHost.Context.ClipboardEditing.Copy(first, true); first.IsLocked = true;
-            Assert.That(ActionEditorHost.Context.ClipboardEditing.CanPaste(null), Is.False);
-            Assert.Throws<InvalidOperationException>(() => ActionEditorHost.Context.ClipboardEditing.Paste(null));
-            first.IsLocked = false; ActionEditorHost.Context.ClipboardEditing.Duplicate(first);
-            Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().Count(), Is.EqualTo(3));
-            Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().Last().Clips[0], Is.Not.SameAs(first.Clips[0]));
-            var restored = ActionEditorHost.Context.Session.CaptureRecovery(); var expected = JsonDocumentCodec.Content(ActionEditorHost.Context.Document);
-            ActionEditorHost.Context.Structure.Delete(second); ActionEditorHost.Context.Session.RestoreRecovery(restored);
-            Assert.That(JsonDocumentCodec.Content(ActionEditorHost.Context.Document), Is.EqualTo(expected));
-            var lockedGroup = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(1); lockedGroup.IsLocked = true;
-            Assert.That(ActionEditorHost.Context.Structure.Reorder(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().ElementAt(0), lockedGroup, 0).CanExecute(out _), Is.False);
+            var first = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var second = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
+            EditorFixture.Shared.Structure.MoveTrack(first, null, 0); EditorFixture.Shared.Structure.MoveTrack(second, null, 1);
+            EditorFixture.Shared.Structure.MoveTrack(second, null, 0);
+            Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>(), Is.EqualTo(new[] { second, first }));
+            EditorFixture.Shared.Structure.MoveTrack(second, null, 2);
+            Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>(), Is.EqualTo(new[] { first, second }));
+            EditorFixture.Shared.ClipboardEditing.Copy(first, true); first.IsLocked = true;
+            Assert.That(EditorFixture.Shared.ClipboardEditing.CanPaste(null), Is.False);
+            Assert.Throws<InvalidOperationException>(() => EditorFixture.Shared.ClipboardEditing.Paste(null));
+            first.IsLocked = false; EditorFixture.Shared.ClipboardEditing.Duplicate(first);
+            Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().Count(), Is.EqualTo(3));
+            Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().Last().Clips[0], Is.Not.SameAs(first.Clips[0]));
+            var restored = EditorFixture.Shared.Session.CaptureRecovery(); var expected = JsonDocumentCodec.Content(EditorFixture.Shared.Document);
+            EditorFixture.Shared.Structure.Delete(second); EditorFixture.Shared.Session.RestoreRecovery(restored);
+            Assert.That(JsonDocumentCodec.Content(EditorFixture.Shared.Document), Is.EqualTo(expected));
+            var lockedGroup = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(1); lockedGroup.IsLocked = true;
+            Assert.That(EditorFixture.Shared.Structure.Reorder(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().ElementAt(0), lockedGroup, 0).CanExecute(out _), Is.False);
             lockedGroup.IsLocked = false;
-            ActionEditorHost.Context.Structure.MoveTrack(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().ElementAt(0), lockedGroup, 1);
+            EditorFixture.Shared.Structure.MoveTrack(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().ElementAt(0), lockedGroup, 1);
             Assert.That(lockedGroup.Tracks[1].Group, Is.SameAs(lockedGroup));
         }
 
         [Test] public void RootTrackDiskSnapshotReopensWithClipsAndExactOrder()
         {
-            var first = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var second = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
-            ActionEditorHost.Context.Structure.MoveTrack(first, null, 0); ActionEditorHost.Context.Structure.MoveTrack(second, null, 0);
-            var expected = JsonDocumentCodec.Content(ActionEditorHost.Context.Document);
+            var first = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0]; var second = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1];
+            EditorFixture.Shared.Structure.MoveTrack(first, null, 0); EditorFixture.Shared.Structure.MoveTrack(second, null, 0);
+            var expected = JsonDocumentCodec.Content(EditorFixture.Shared.Document);
             var directory = System.IO.Path.Combine(UnityEngine.Application.dataPath, "../Temp/RootTrack-" + Guid.NewGuid().ToString("N"));
             System.IO.Directory.CreateDirectory(directory);
             var path = System.IO.Path.Combine(directory, "Document.json"); TextAsset reopened = null;
             try
             {
-                new AtomicFileCommit().Save(path, () => System.Text.Encoding.UTF8.GetBytes(JsonDocumentCodec.CreateSaveSnapshot(ActionEditorHost.Context.Document)),
+                new AtomicFileCommit().Save(path, () => System.Text.Encoding.UTF8.GetBytes(JsonDocumentCodec.CreateSaveSnapshot(EditorFixture.Shared.Document)),
                     bytes => Assert.That(JsonDocumentCodec.Content(JsonDocumentCodec.Decode(System.Text.Encoding.UTF8.GetString(bytes))), Is.EqualTo(expected)), createOnly: true);
-                reopened = new TextAsset(System.IO.File.ReadAllText(path)); ActionEditorHost.Context.Open(reopened);
-                Assert.That(JsonDocumentCodec.Content(ActionEditorHost.Context.Document), Is.EqualTo(expected));
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().Select(t => t.Name), Is.EqualTo(new[] { second.Name, first.Name }));
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().ElementAt(1).Clips[0].StartTime, Is.EqualTo(.25f));
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineTrack>().All(t => t.Parent == null && t.Root == ActionEditorHost.Context.Document), Is.True);
+                reopened = new TextAsset(System.IO.File.ReadAllText(path)); EditorFixture.Shared.Open(reopened);
+                Assert.That(JsonDocumentCodec.Content(EditorFixture.Shared.Document), Is.EqualTo(expected));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().Select(t => t.Name), Is.EqualTo(new[] { second.Name, first.Name }));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().ElementAt(1).Clips[0].StartTime, Is.EqualTo(.25f));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineTrack>().All(t => t.Parent == null && t.Root == EditorFixture.Shared.Document), Is.True);
             }
             finally
             {
-                ActionEditorHost.Context.Open(fixture);
+                EditorFixture.Shared.Open(fixture);
                 if (reopened != null) UnityEngine.Object.DestroyImmediate(reopened);
                 if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
                 System.IO.Directory.Delete(directory);
@@ -630,7 +633,7 @@ namespace NBC.ActionEditor.Tests
                 var fraction = 100 / (original.position.width - Styles.TimelineLeftTotalWidth);
                 var anchor = 1 + 7 * fraction;
                 original.SendEvent(new Event { type = EventType.ScrollWheel, mousePosition = new Vector2(Styles.TimelineLeftTotalWidth + 100, 30) + offset, delta = Vector2.up });
-                Assert.That(original.Workspace.ViewTime, Is.EqualTo(Prefs.scrollWheelZooms ? 8.575f : 7).Within(.001f));
+                Assert.That(original.Workspace.ViewTime, Is.EqualTo(EditorFixture.SharedSettings.Current.ScrollWheelZooms ? 8.575f : 7).Within(.001f));
                 Assert.That(original.Workspace.ViewTimeMin + fraction * original.Workspace.ViewTime, Is.EqualTo(anchor).Within(.0001f));
                 native = ScriptableObject.CreateInstance<ToolkitWindow>();
                 native.position = new Rect(60, 60, 1000, 600); native.Show(); native.Focus();
@@ -639,9 +642,9 @@ namespace NBC.ActionEditor.Tests
                 var root = native.rootVisualElement; fraction = 100 / (root.contentRect.width - native.Canvas.Left); anchor = 1 + 7 * fraction;
                 using (var wheel = WheelEvent.GetPooled(new Event { type = EventType.ScrollWheel, mousePosition = root.LocalToWorld(new Vector2(native.Canvas.Left + 100, 30)), delta = Vector2.up }))
                 { wheel.target = root; root.SendEvent(wheel); }
-                Assert.That(native.Workspace.ViewTime, Is.EqualTo(Prefs.scrollWheelZooms ? 8.575f : 7).Within(.001f));
+                Assert.That(native.Workspace.ViewTime, Is.EqualTo(EditorFixture.SharedSettings.Current.ScrollWheelZooms ? 8.575f : 7).Within(.001f));
                 Assert.That(native.Workspace.ViewTimeMin + fraction * native.Workspace.ViewTime, Is.EqualTo(anchor).Within(.0001f));
-                Assert.That(ActionEditorHost.Context.Session.IsDirty || ActionEditorHost.Context.Session.IsEditing, Is.False);
+                Assert.That(EditorFixture.Shared.Session.IsDirty || EditorFixture.Shared.Session.IsEditing, Is.False);
             }
             finally
             {
@@ -655,13 +658,13 @@ namespace NBC.ActionEditor.Tests
             var window = ScriptableObject.CreateInstance<ToolkitWindow>();
             try
             {
-                var group = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().First(); group.Tracks.Clear(); ActionEditorHost.Context.Document.Validate();
+                var group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().First(); group.Tracks.Clear(); EditorFixture.Shared.Document.Validate();
                 window.position = new Rect(60, 60, 1000, 600); window.Show(); yield return null; yield return null;
                 var canvas = window.Canvas; var header = canvas.Q("timeline-row-headers").Children().First();
                 Assert.That(header.Q<Button>("timeline-fold"), Is.Null);
                 Pointer(canvas, EventType.MouseDown, new Vector2(12, 13)); Pointer(canvas, EventType.MouseUp, new Vector2(12, 13));
                 Assert.That(window.Workspace.IsCollapsed(group), Is.False);
-                ActionEditorHost.Context.Structure.AddTrack(group, typeof(FeatureSampleIntervalTrack)); yield return null; yield return null;
+                EditorFixture.Shared.Structure.AddTrack(group, typeof(FeatureSampleIntervalTrack)); yield return null; yield return null;
                 header = canvas.Q("timeline-row-headers").Children().First();
                 var fold = header.Q<Button>("timeline-fold"); Assert.That(fold, Is.Not.Null);
                 var point = fold.contentRect.center;
@@ -686,9 +689,9 @@ namespace NBC.ActionEditor.Tests
             {
                 window.position = new Rect(60, 60, 800, 250); window.Show(); yield return null; yield return null;
                 var canvas = window.Canvas; canvas.Presenter.Scroll(56); yield return null;
-                var group = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(1);
+                var group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(1);
                 var row = canvas.State.Rows.Single(value => value.Key == canvas.Presenter.KeyFor(group));
-                var before = JsonDocumentCodec.Content(ActionEditorHost.Context.Document);
+                var before = JsonDocumentCodec.Content(EditorFixture.Shared.Document);
                 Pointer(canvas, EventType.MouseDown, new Vector2(80, row.Bounds.Y + 13));
                 Pointer(canvas, EventType.MouseDrag, new Vector2(80, 12));
                 var scroll = window.ScrollY; canvas.Tick(.1);
@@ -697,13 +700,13 @@ namespace NBC.ActionEditor.Tests
                 Pointer(canvas, EventType.MouseDrag, new Vector2(-1, 12));
                 Assert.That(canvas.State.Insertion.Visible, Is.False);
                 Key(canvas, KeyCode.Escape);
-                Assert.That(canvas.PointerId, Is.EqualTo(-1)); Assert.That(JsonDocumentCodec.Content(ActionEditorHost.Context.Document), Is.EqualTo(before));
-                ActionEditorHost.Context.Session.Edit("sentinel", () => group.Name = "sentinel");
+                Assert.That(canvas.PointerId, Is.EqualTo(-1)); Assert.That(JsonDocumentCodec.Content(EditorFixture.Shared.Document), Is.EqualTo(before));
+                EditorFixture.Shared.Session.Edit("sentinel", () => group.Name = "sentinel");
                 row = canvas.State.Rows.Single(value => value.Key == canvas.Presenter.KeyFor(group));
                 Pointer(canvas, EventType.MouseDown, new Vector2(80, row.Bounds.Y + 13)); Pointer(canvas, EventType.MouseDrag, new Vector2(80, 70));
                 Key(canvas, KeyCode.Z, control: true);
                 Assert.That(canvas.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle)); Assert.That(canvas.State.Insertion.Visible, Is.False);
-                Assert.That(JsonDocumentCodec.Content(ActionEditorHost.Context.Document), Is.EqualTo(before));
+                Assert.That(JsonDocumentCodec.Content(EditorFixture.Shared.Document), Is.EqualTo(before));
             }
             finally { window.DiscardChanges(); window.Close(); }
         }
@@ -714,7 +717,7 @@ namespace NBC.ActionEditor.Tests
             var window = ScriptableObject.CreateInstance<ImguiWindow>();
             try
             {
-                var group = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().First(); group.Tracks.Clear(); ActionEditorHost.Context.Document.Validate();
+                var group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().First(); group.Tracks.Clear(); EditorFixture.Shared.Document.Validate();
                 window.position = new Rect(60, 60, 1000, 600); window.Show(); window.Focus(); window.Repaint();
                 yield return null; yield return null;
                 var offset = (Vector2)typeof(ImguiWindow).GetProperty("ContentOffset", Instance).GetValue(window);
@@ -723,7 +726,7 @@ namespace NBC.ActionEditor.Tests
                     window.SendEvent(new Event { type = kind, button = 0, mousePosition = fold });
                 Assert.That(window.Workspace.IsCollapsed(group), Is.False);
                 Assert.That(window.Timeline.State.Rows.First().CanFold, Is.False);
-                ActionEditorHost.Context.Structure.AddTrack(group, typeof(FeatureSampleIntervalTrack)); window.Repaint();
+                EditorFixture.Shared.Structure.AddTrack(group, typeof(FeatureSampleIntervalTrack)); window.Repaint();
                 yield return null; yield return null;
                 foreach (var kind in new[] { EventType.MouseDown, EventType.MouseUp })
                     window.SendEvent(new Event { type = kind, button = 0, mousePosition = fold });
@@ -747,8 +750,8 @@ namespace NBC.ActionEditor.Tests
                 yield return null; yield return null;
                 window.Presenter.Scroll(56); window.Repaint(); yield return null; yield return null;
                 var offset = (Vector2)typeof(ImguiWindow).GetProperty("ContentOffset", Instance).GetValue(window);
-                var group = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(1);
-                var before = JsonDocumentCodec.Content(ActionEditorHost.Context.Document);
+                var group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(1);
+                var before = JsonDocumentCodec.Content(EditorFixture.Shared.Document);
                 var row = window.Timeline.State.Rows.Single(r => r.Key == window.Presenter.KeyFor(group));
                 var start = offset + new Vector2(80, row.Bounds.Y + 53);
                 var end = offset + new Vector2(80, 52);
@@ -761,8 +764,8 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(window.Timeline.State.Insertion.Visible, Is.False);
                 window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
                 Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
-                Assert.That(JsonDocumentCodec.Content(ActionEditorHost.Context.Document), Is.EqualTo(before));
-                ActionEditorHost.Context.Session.Edit("sentinel", () => group.Name = "sentinel");
+                Assert.That(JsonDocumentCodec.Content(EditorFixture.Shared.Document), Is.EqualTo(before));
+                EditorFixture.Shared.Session.Edit("sentinel", () => group.Name = "sentinel");
                 row = window.Timeline.State.Rows.Single(r => r.Key == window.Presenter.KeyFor(group));
                 start = offset + new Vector2(80, row.Bounds.Y + 53);
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = start });
@@ -770,7 +773,7 @@ namespace NBC.ActionEditor.Tests
                 window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Z, control = true });
                 Assert.That(window.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Idle));
                 Assert.That(window.Timeline.State.Insertion.Visible, Is.False);
-                Assert.That(JsonDocumentCodec.Content(ActionEditorHost.Context.Document), Is.EqualTo(before));
+                Assert.That(JsonDocumentCodec.Content(EditorFixture.Shared.Document), Is.EqualTo(before));
             }
             finally { window.DiscardChanges(); window.Close(); }
         }
@@ -778,9 +781,9 @@ namespace NBC.ActionEditor.Tests
         [Test] public void ExistingSampleUsesMetadataAndOptionalAdaptersWithoutBusinessBranches()
         {
             Assert.That(DirectableTypeInfo.For(typeof(FeatureSampleMarker)).IsSignal, Is.True);
-            Assert.That(EditorExtensionFactory.GetHeader(ActionEditorHost.Context.Document), Is.TypeOf<Samples.FeatureSampleHeader>());
-            Assert.That(EditorExtensionFactory.GetToolkitHeader(ActionEditorHost.Context.Document).CreateGUI(
-                new EditorExtensionContext(() => ActionEditorHost.Context.Document, () => 0)), Is.Not.Null);
+            Assert.That(EditorExtensionFactory.GetHeader(EditorFixture.Shared.Document.GetType()), Is.TypeOf<Samples.FeatureSampleHeader>());
+            Assert.That(EditorExtensionFactory.GetToolkitHeader(EditorFixture.Shared.Document.GetType()).CreateGUI(
+                new EditorExtensionContext(new NBC.ActionEditor.Presentation.Presenters.ExtensionDocumentPresenter(() => EditorFixture.Shared.Document, () => 0).Capture)), Is.Not.Null);
             Assert.That(EditorExtensionFactory.GetInspectorType(typeof(FeatureSampleMarker)), Is.EqualTo(typeof(ClipInspector)), "The shared clip inspector inherits generic authored fields.");
             Assert.That(ActionEditorTypeCatalog.CreatePreview(typeof(FeatureSampleMarker)), Is.Null, "The sample state view has no scene side effects.");
         }

@@ -1,6 +1,5 @@
 using System;
-using System.Linq;
-using NBC.ActionEditor.Composition;
+using NBC.ActionEditor.Presentation.Contracts;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,18 +10,21 @@ namespace NBC.ActionEditor
     {
         private int selected;
         private string error;
-        private DocumentDialogComposition binding;
-        public static void ShowFor(ActionEditorContext context)
+        private IDocumentDialogCatalog binding;
+        private Func<string> documentName;
+        private Func<string, string, bool> export;
+        public static void ShowFor(IDocumentDialogCatalog catalog, Func<string> documentName, Func<string, string, bool> export)
         {
-            var binding = new DocumentDialogComposition(context);
-            binding.Presenter.RequireExport();
+            if (catalog == null) throw new ArgumentNullException(nameof(catalog));
             var window = CreateInstance<DocumentExportWindow>();
-            window.binding = binding;
+            window.binding = catalog;
+            window.documentName = documentName ?? throw new ArgumentNullException(nameof(documentName));
+            window.export = export ?? throw new ArgumentNullException(nameof(export));
             window.titleContent = new GUIContent(Lan.Export); window.minSize = new Vector2(360, 130); window.ShowUtility();
         }
         private void OnGUI()
         {
-            if (binding == null) { EditorGUILayout.HelpBox(Lan.NotSelectAsset, MessageType.Info); return; }
+            if (export == null) { EditorGUILayout.HelpBox(Lan.NotSelectAsset, MessageType.Info); return; }
             var formats = binding.ExportIds();
             EditorGUILayout.LabelField(Lan.Export, EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(Lan.ExportHint, MessageType.Info);
@@ -34,7 +36,7 @@ namespace NBC.ActionEditor
                 try
                 {
                     var format = formats[selected];
-                    var target = EditorUtility.SaveFilePanelInProject(Lan.Export, binding.DocumentName + "-Export", binding.ExportExtension(format), Lan.NewPathHint);
+                    var target = EditorUtility.SaveFilePanelInProject(Lan.Export, documentName() + "-Export", binding.ExportExtension(format), Lan.NewPathHint);
                     if (ExportTo(format, target)) Close();
                 }
                 catch (ExitGUIException) { throw; }
@@ -43,7 +45,7 @@ namespace NBC.ActionEditor
         }
         public bool ExportTo(string formatId, string target)
         {
-            return binding.Presenter.Export(target, formatId);
+            return export(target, formatId);
         }
     }
 }

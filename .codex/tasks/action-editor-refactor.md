@@ -2,11 +2,12 @@
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
-- 总体状态：RF01–RF15工程验收 `complete`（限各执行记录覆盖范围，非完全等价/性能认证），人工体验H01–H09全部待用户验收。RF16–RF23 `complete`（限执行记录范围，RF23记录GUI输入重放间歇性风险）。RF24–RF37工程范围complete，按各执行记录的证据和限制交付；Combat 专属实施与验收暂缓。
-- 当前执行任务：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30本地提交`b12720a`（278/278），RF31本地提交`015d687`（280/280），RF32本地提交`04e76c9`（303/303），RF33本地提交`069b887`（312/312及双UI持久探针）。RF34本地提交`51c6016`（281/281与最终双UI持久闭环）。RF35本地提交`08ff4cf`（299/299与双UI隔离持久闭环）。RF36本地提交`96157c5`（311/311、末次选择器收敛后13/13，受控冷Editor未测）。RF37工程范围complete（最终311/311及双UI教程重放通过）。具体规格以第4.3节及最新执行记录为准。
-- 下一步：RF37最终311/311及双UI连续重放通过，完成窄范围中文本地提交后交付；后续仅按用户新请求处理。H01–H09未代签，受控冷Editor与完整资源/Player Build未验，文档解析缺依赖仍blocked。不恢复已取消JSON修复，不替用户保存、放弃现场或操作许可证弹窗。
+- 总体状态：RF38–RF53本轮工程实施与约定的必要普通回归/交接完成；重复全基线余项按用户指示停止，不宣称301项完整通过。RF01–RF37历史证据保留，不等于结构质量或人工体验已获用户认可。统一产品验收（含H01–H09）待用户启动；Combat专属实施与验收暂缓。
+- 历史阶段摘要：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30本地提交`b12720a`（278/278），RF31本地提交`015d687`（280/280），RF32本地提交`04e76c9`（303/303），RF33本地提交`069b887`（312/312及双UI持久探针）。RF34本地提交`51c6016`（281/281与最终双UI持久闭环）。RF35本地提交`08ff4cf`（299/299与双UI隔离持久闭环）。RF36本地提交`96157c5`（311/311、末次选择器收敛后13/13，受控冷Editor未测）。RF37历史工程范围complete（最终311/311及双UI教程重放通过）。历史规格与证据见第4.3节；不代表本轮结构验收通过。
+- 下一步：架构review四项及Inspector异常修复已完成；用户本次要求“追踪提交一下”，允许将RF38–RF53及后续修复创建本地提交，仍不推送。完成后等待用户确定命名调整范围，不自动开始改名或统一产品验收；不替用户保存、放弃现场或操作许可证弹窗。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
+- 当前执行任务：RF38–RF53后架构review四项修复及Inspector失效目标异常修复complete，见第4.4节末补充记录；未新增测试身份、未补跑重复基线、未开始命名调整。RF38–RF53历史完成范围及统一产品验收待执行状态不变；文档完整解析缺依赖及选择器历史许可来源风险如实保留。未提交或推送。
 
 ## RF23后续：空目录清理（2026-11-12）
 
@@ -1246,7 +1247,391 @@ RF36本地提交`96157c5`，精确67文件，未包含受保护场景、用户JS
 | Editor/Resources/nbc/icon/Collapsed.png | 13c7a6b42b31a1d4fb62fedb021707cd | Styles及有轨组折叠控件，空组只占位，保留 |
 
 全Assets范围仅输出路径的源码搜索未发现ActionEditor外使用CreateUtilities/Easing/EaseType/RectUtility或FullSerializer的文件；这不等于已覆盖忽略资源、反射字符串或外部项目，Combat未改且不承担其兼容。当前不执行这些候选删除。Source mapping中“待外部核实”记录因此补充为“当前源码范围未发现外部调用，资源闭包仍待核实”。静态覆盖检查142/142目标处置存在、代码围栏配对，负载计算1088轨/69632片段；git diff --check通过。HeaderBoxImage/block已确认皮肤依赖；Preview.png在ActionEditor范围仅命中自身meta，仍保留至完整依赖审计。以上只有任务记录补充，无新增源码或资源变化，不需要据此冒跑受阻的Editor测试。
-## 5. 分项实施与验收（当前执行入口为第4.3节）
+## 4.4 按功能收敛职责 RF38–RF53（2026-11-15，当前执行入口）
+
+### 4.4.1 用户决策、执行范围与交接
+
+- 用户认为上一轮结构结果未达预期，要求先按行为时间轴的功能和职责讨论，再形成具体修改方案、可执行清单；最新要求将清单写入文档，准备另开会话实施。本次只编写交接，不启动C#修改、Unity操作或测试；任务初始均为planned，不将计划编写记成RF38完成。
+- 本阶段明确支持新会话按本清单依赖串行开展ActionEditor职责重构。实现保留已有正确算法和数据保障，不推倒重写，不仅搬目录/换名；历史“每项本地提交”“立即做双UI完整验收”等不自动沿用。默认不commit/push，需要时另获授权。
+- 六块功能：文档操作、结构编辑、片段时间编辑、参数编辑、时间轴工作区、播放与预览。三项公共能力：共享编辑状态、修改保障、类型与参数声明。目录表达职责，不为每个动作造类/接口，不建服务定位器、事件总线、万能Manager/Common或等价大容器。
+- 第4.4节覆盖旧阶段的当前入口、执行顺序和验收时机；第4.3节中当前产品能力、依赖方向、精简中文用途/边界注释、数据正确性和安全门禁继续有效。旧任务及真实失败/通过证据不追溯改写，不因历史测试通过判定本阶段结构完成。
+- 本轮不含Combat接入、新业务功能、格式变更、依赖升级、Player Build或大规模性能优化；既有严格actioneditor.json v2、float原始位、多态/null/集合/曲线/引用、回调隔离、原子提交、外部revision保护和“字节已提交但导入失败”语义不可退化。两个原生UI、根结构混排、结构拖放、时间约束、Undo/恢复、选择/剪贴板和预览生命周期能力保留。
+- 共享作者内容、选择、剪贴板、播放头和Undo；逐窗拥有Presenter、视域、滚动、折叠、焦点、捕获和输入草稿。只把所需能力交给调用者；可写作者图不交给View或UI扩展。允许内部领域对象可变，不强推全模型不可变。
+- 资源移动/改名/退役仍须固定清单、调用者与GUID核对，经AssetDatabase的preview→展示精确范围→取得真实确认→approve/apply；本计划不是任意删除或覆盖授权。安全必要的资源操作不属于延期的体验验收，不能据延期跳过审核或手改meta。
+- 编写时观察到两项未知来源删除`Assets/ActionEditor/Editor/Storage.meta`、`Assets/ActionEditor/Runtime/Assets.meta`，以及`Assets/Scenes/SampleScene.unity`修改；未跟踪`Assets/Main CameraTimeline.playable[.meta]`、`Assets/NewAction.json[.meta]`、`Assets/NewAction1.json[.meta]`、`ProjectSettings/SceneTemplateSettings.json`、`ProjectSettings/TimelineSettings.asset`、`ProjectSettings/WhootActionSequencer.txt`。仅记录路径状态，不读业务内容、不恢复/清理/暂存。新会话必须重查，不能假定现场未变。
+
+### 4.4.2 普通常规验证与延期验收
+
+1. RF38先重新发现测试，确认实际筛选方式，登记普通回归集、排除项、身份和基线结果；历史311不是本轮预期计数。Unity相关检查先读项目skill，唯一入口仍为`python .codex/scripts/workflow.py`，连接本工程唯一Editor/PID，操作串行。
+2. 每项修改后检查真实生成项目/Editor编译，运行直接相关的普通自动化测试；缺少覆盖则增加有针对性的用例。零用例、跳过、不确定和旧版本结果都不是通过。失败先修复，记录真实终态和必要重跑。
+3. 普通范围包含领域、会话/事务、Presenter/几何、格式/持久化/导出、安全/类型/设置，以及必要的自动化窗口、属性控件、输入、扩展和资源释放用例。这些测试可能由代码打开Editor窗口，但不做人工操作和截图验收；普通持久化回归的受控临时文件不等于专用验收探针。
+4. 本轮明确排除`InteractionMeasurementTests`、`DocumentWorkloadMeasurementTests`的测量用例；其他普通用例若混有大规模负载或测量，先拆清并登记，不为减轻负载弱化功能断言。不执行历史整程序集命令，避免把已排除测量重新带入；按当前实际工具支持的筛选器组织普通集合。
+5. 延期：人工编辑器体验、截图、教程连续重放、专用场景/持久操作探针、冷Editor/冷启动、大规模耗时/分配测量及整体性能验收。RF53只列待验清单，待代码与结构确认完善后由用户启动统一验收。历史受控冷启动、完整资源与Player Build缺口不冒充通过。
+6. 每项同时审查所有新建/实质改写生产文件的职责、规则唯一性、状态归属、依赖、命名和精简注释。不能仅凭编译/测试通过、文件变短或目录齐全勾选完成。本轮complete仅指该项代码、普通测试及源码职责复核，不指产品统一验收。
+7. 发生真实退化、数据风险、无法验证的关键行为或工具阻塞时，记录并暂停受影响任务；延期验收不代表允许带已知失败交付。不得为普通测试擅自保存/放弃用户现场、关闭许可证弹窗、强杀Editor或安装依赖。
+
+### 4.4.3 目标目录及现有代码去向
+
+```text
+Runtime/
+  Domain/                 作者模型、结构/时间规则及领域扩展
+  Metadata/               类型特性、挂载与字段声明/描述
+  Serialization/          当前格式、值树、编码和严格图校验
+  Samples/                当前业务示例
+Editor/
+  Application/
+    Documents/            文档操作、共享文档会话和事务
+    Editing/              结构、节点、片段时间、参数、选择和剪贴板
+    Playback/             播放控制，经窄端口使用采样和时钟
+    Settings/             设置会话和值
+    Ports/                内层实际需要的外部能力
+  Presentation/
+    Presenters/           各功能的意图与显示协调
+    Timeline/             工作区、交互过程、布局与命中
+    Properties/           属性显示、字段标识和输入草稿
+    Contracts/            中立输入输出及View契约
+  Infrastructure/
+    Documents/            文件提交、Unity导入、Undo和恢复
+    Serialization/        Editor格式上下文、资源引用和快照适配
+    Preview/              文档采样、预览执行和资源释放
+    Assets/               类型与资源发现
+    Settings/             偏好实际存储
+  Views/
+    IMGUI/                工具栏、时间轴、属性等原生区域
+    UIToolkit/            相同功能边界，保留原生控件与绘制
+    Localization/         UI显示文本
+  Composition/            仅创建、连接、订阅、解除和释放
+  Extensions/             双UI业务扩展契约及绑定
+  Resources/              样式/图标等资源，不为整齐强迁
+  Samples/
+  Verification/           仍有现行用途的固定范围验证命令
+Tests/Editor/             沿用实际功能/边界组织，排除测量单独登记
+```
+
+- 保留现有七程序集的有效边界，不为每个目录新建程序集：Serialization→Domain，Application→Domain及窄端口，Presentation→Application/Domain，Editor实现具体宿主依赖；Application/Presentation不得依赖UnityEditor或具体控件。必要UnityEngine值类型允许，不虚称完全脱离Unity的库。
+- `ActionEditorContext`按调用者迁移后退出，不改名为新的全能服务包；`WindowBinding`只持有逐窗连接与释放；`ActionEditorHost`保留默认宿主生命周期而不提供公开业务服务查询。
+- `AssetPlayer/Asset`按文档采样职责命名；`InspectorPreviewAsset`按Inspector选择代理命名；快照适配与隔离副本构造不用单复数区分。`VisibleTimelineLayout`名称必须符合真实处理范围，不暗示未实现的虚拟化。
+- `Editor/Serialization`及`NBC.ActionEditor.Storage`归到一致的基础设施职责；`Runtime/Attributes/Interfaces/Utility/Const`按Domain/Metadata等归位，不把混乱搬入Common。`Prefs`迁完调用者后退出静态业务入口。目录/类型调整需同步测试、样例、扩展、资源绑定，不顺带改动持久化类型身份或用户文件。
+- 两套窗口保留各自命名空间中的`ActionEditorWindow`；不再往返更改技术前缀。各目录只在有实际职责时建立，不造空层；移动随功能迁移实施，不先批量搬家留下接口断裂。
+
+### 4.4.4 任务、依赖与完成门槛
+
+| 状态 | 编号 | 交付 | 前置 |
+|---|---|---|---|
+| complete（基线余项按用户指示停止，不宣称全量通过） | RF38 | 修改基线、保护范围及普通测试清单 | 新会话按本节启动 |
+| complete（接口阶段，双UI迁移属RF40） | RF39 | 参数编辑接口收口 | RF38 |
+| complete | RF40 | 双UI属性与扩展迁移、旧写入口退出 | RF39 |
+| complete | RF41 | 结构规则、结构修改与节点编辑收敛 | RF40 |
+| complete | RF42 | 统一片段时间修改 | RF41 |
+| complete | RF43 | 时间轴交互、布局与显示状态整理 | RF42 |
+| complete | RF44 | 两套主窗口职责收紧 | RF43 |
+| complete | RF45 | 文档操作完整流程 | RF44 |
+| complete | RF46 | 播放控制与预览执行拆分 | RF45 |
+| complete | RF47 | 退出大Context、明确共享与逐窗对象 | RF40–RF46 |
+| complete | RF48 | 类型声明、扩展和设置入口整理 | RF47 |
+| complete | RF49 | 存储、快照适配与命名整理 | RF48 |
+| complete（搜索/导航无新增自动化，未代签人工体验） | RF50 | 对象选择器和辅助界面整理 | RF49 |
+| complete | RF51 | 目录、命名与依赖收尾 | RF50 |
+| complete（按后续指示不补全基线） | RF52 | 普通定向回归与最终源码职责复核 | RF51 |
+| complete（文档解析依赖缺口已登记） | RF53 | 当前说明及待统一验收交接 | RF52 |
+
+#### RF38｜建立本轮修改基线和普通测试清单
+
+- 范围：实际Git差异、测试发现及本文件，不实施其他功能改造。
+- 工作：核实用户保护文件和当前源码；登记普通集合/排除测量的实际筛选方式并运行普通基线。记录测试身份、执行/失败/跳过数、环境阻塞和已有失败，不改断言制造通过。
+- 完成条件：修改范围、保护范围、普通测试集合与原有失败可追溯。存在未处理必需基线失败时保持blocked，不以计划编写或历史结果替代。
+
+#### RF39｜收口参数编辑接口
+
+- 范围：PropertyPresenter、PropertyFieldState、PropertyPath、PropertyDraft、PropertyEditing。
+- 工作：用字段标识与独立显示值表达属性界面输入输出；标识只在Presenter内部解析，检查目标、选择和文档代次。反射路径、多选目标和结构体写回留在编辑内部；明确草稿开始/预览/提交/失效/取消。名称、时间等专门字段转交对应编辑能力。
+- 完成条件：新接口不交付作者对象、可写路径或可操作作者图的反射入口。已有生产调用可在RF40紧接迁完，但不增加兼容转发壳，RF39结束时保持编译与相关用例有效，不声称双UI收口已完成。
+- 普通测试：字段标识有效性、路径、多选、嵌套结构体、草稿失效、批量失败回滚；复用属性/集合事务相关测试并补缺口。
+
+#### RF40｜迁移两套属性界面和属性扩展
+
+- 范围：IMGUI InspectorsBase/标准Inspector、Toolkit PropertyView、业务属性扩展、Inspector选择代理。
+- 工作：全部读取字段显示状态并回传标识和值；移除对作者对象、PropertyPath和反射写入的直接访问；保留集合、曲线、资源引用、多选和自定义属性能力。默认界面与扩展同批迁移，删除RF39旧入口。
+- 完成条件：两套原生属性界面及扩展没有作者写旁路；旧控件/旧草稿不能提交到已变更目标；代理只桥接选择和界面生命周期。
+- 普通测试：PropertyEditingTests、PropertyControlsTests、PropertyCollectionTransactionTests及扩展相关用例，以当前发现身份为准。
+
+#### RF41｜统一结构规则和结构修改
+
+- 范围：StructureRules、StructureEditing、ActionDocument/TimelineGroup/TimelineTrack、结构菜单与StructureGesture。
+- 工作：创建、挂载、唯一性、删除和移动规则只有一个权威实现；预检和提交重调同一规则。模型维护结构与所属，应用层管理事务；整理名称/锁定/启用为内聚节点编辑能力，不为每个动作造类。
+- 完成条件：无重复规则，整组移动保留子树、根组/根轨混排正确；批量失败无部分写入，一次操作一次Undo。
+- 普通测试：DomainBehaviorTests、OrderedDocumentTests、SessionEditingTests、StructureGestureTests及结构输入相关用例。
+
+#### RF42｜统一片段时间修改
+
+- 范围：ClipTimingRules、ClipEditing、ClipGesture、属性和菜单时间入口。
+- 工作：规则负责时间边界；手势计算候选/吸附并管理过程；拖动、数值与菜单共用时间修改能力。多选移动/缩放/混合整批预检与提交；不将吸附视为合法性保障。
+- 完成条件：相同输入遵守相同约束；最小片段时长0.01等现行细则、取消、捕获丢失、批量失败和Undo语义不退化。
+- 普通测试：领域时间、会话片段编辑、TimelineGeometryTests、TimelinePresenterTests、属性时间及两套原生输入用例。
+
+#### RF43｜整理时间轴交互、布局和显示状态
+
+- 范围：TimelinePresenter、TimelineInteraction、StructureGesture/ClipGesture、TimelineWorkspace、布局/命中与RenderState。
+- 工作：工作区只存逐窗查看状态；交互只管过程/候选/提交/取消所有权；布局只算位置/命中/指示；Presenter连接编辑能力和显示。移除重复规则与无意义透传，显示状态不带可写节点，名称符合真实计算范围。
+- 完成条件：四项职责可分别定位，视域/折叠不修改内容，取消只影响本窗令牌，不靠改名声称已完成虚拟化。
+- 普通测试：Presenter、几何、结构手势、折叠/视域及多窗口取消场景。
+
+#### RF44｜收紧两套主窗口职责
+
+- 范围：两套ActionEditorWindow、工具栏、播放区域、时间轴表面、页脚、属性区域及原生输入适配。
+- 工作：按完整UI区域提取Toolkit集中的构建/同步；窗口只管整体布局、生命周期和连接。移除公开Context/Session/可写Document；原生适配只管事件/坐标/焦点/捕获。初始化失败、重建和关闭使用同一释放路径。
+- 完成条件：两套UI功能边界一致但不强求文件数量相等；窗口无直接作者修改入口。该步骤先切断View可见依赖，RF47完成内部Context退役，不建立新公开大容器过渡。
+- 普通测试：WindowLifecycleTests、WindowLayoutTests、ToolkitTimelineTests、ImguiTimelineTests、StructureInputMatrixTests、ResourceOwnershipTests相关用例。
+
+#### RF45｜整理文档操作完整流程
+
+- 范围：DocumentPresenter、DocumentLifecycle、新建/导出窗口、文档交互适配和相关Composition。
+- 工作：统一新建/打开/关闭/保存/另存/导出流程；对话框仅返回选择，业务顺序由文档流程负责；Composition退出运行期决策。辅助窗口不接整个Context，不临时创建Presenter执行保存。
+- 完成条件：取消无状态改变，读取失败保留旧文档，活动事务不被切换隐式结束；提交成功/导入失败语义保留。
+- 普通测试：DocumentEntryTests、DocumentSessionTests、DocumentPersistenceTests、DocumentExportTests、StorageSafetyTests相关用例。
+
+#### RF46｜拆开播放控制和预览执行
+
+- 范围：ActionEditorPlayback、AssetPlayer、ActionEditorPreviewSession、TimePointers、PlaybackPresenter/Composition、EditorUpdateDriver。
+- 工作：播放控制归Application，经时钟/采样端口执行；具体采样和资源归Infrastructure/Preview，使用文档采样词汇。手动定位与自动播放共用采样；Composition仅连接、驱动仅调度；保留重入/代次/异常/取消保障。
+- 完成条件：共享播放只推进一次；停止/变更/异常释放正确，预览不生成作者Undo；保留逐帧、范围循环等能力。
+- 普通测试：PreviewOwnershipTests、资源释放、播放/回调重入、会话变更及窗口关闭相关用例。
+
+#### RF47｜退出大Context，明确共享与逐窗对象
+
+- 范围：ActionEditorContext、ActionEditorHost、WindowBinding、ActionEditorViews和各Composition。
+- 工作：按使用方注入具体能力；文档操作、选择修整、预览失效回到所属功能；Binding仅创建/连接/注册/释放，Presenter订阅所需状态，清除多余通知转发。全部调用者迁移后退出Context，不改名为等价服务包；不将原集中协调简单删除而遗漏顺序和异常隔离。
+- 完成条件：创建/归属/订阅解除/销毁路径明确；共享与逐窗状态不混，默认和隔离宿主均可运行，没有View访问默认宿主业务状态的旁路。
+- 普通测试：会话共享、宿主隔离、多窗选择/剪贴板/播放、重建和窗口生命周期用例。
+
+#### RF48｜整理类型声明、扩展和设置入口
+
+- 范围：特性与字段描述、类型目录/发现、View扩展、设置会话/存储、Prefs和样例接入。
+- 工作：声明归Metadata，发现归Infrastructure，扩展只获所需显示与意图接口。设置调用者显式依赖，迁完退出Prefs静态业务入口；同步样例工具栏/属性/预览，不新增业务特例进入核心。
+- 完成条件：新业务不需修改通用规则，无扩展写旁路；设置失败不推进内存状态，既有配置值/键不无故丢失或重置。
+- 普通测试：TypeCatalogTests、SettingsPresenterTests、ApplicationAdapterTests、ExtensionEndToEndTests相关用例。
+
+#### RF49｜整理存储、快照适配及对应命名
+
+- 范围：Runtime格式层、Editor序列化/Storage命名空间、Documents/Editing适配文件及其调用者。
+- 工作：区分格式编解码、隔离副本、会话快照适配、可靠文件提交；消除快照单复数歧义，目录/命名空间对应，按内聚职责拆适配文件，不机械一类型一文件。不改变持久化类型身份、字段和v2契约，不自动转换用户数据。
+- 完成条件：存储调用链可直接追踪，严格校验、引用、回调隔离、版本保护和提交语义不变。
+- 普通测试：DocumentFormatTests、DocumentPersistenceTests、DocumentExportTests、StorageSafetyTests及恢复/剪贴板用例。
+
+#### RF50｜整理对象选择器和辅助界面
+
+- 范围：ObjectSelectorWindow、ObjectPickerCatalog、ObjectPreviewCache及辅助窗口。
+- 工作：明确搜索、列表/网格、键盘导航、选择/取消和预览布局；保留资源发现与缓存所有权分离。理顺局部命名和流程，有独立状态/生命周期才提取组件，不把长方法搬到一组仍操作窗口私有字段的类；退出旧上下文和静态业务依赖。
+- 完成条件：选择/取消/重开及预览释放路径明确，无额外作者写入口；修改第三方来源部分前核对可获上游修复与许可，不能声称未核查已通过。
+- 普通测试：窗口、文档入口、资源所有权及新增搜索/导航用例，不要求本轮人工点击OS对话框。
+
+#### RF51｜完成目录、命名及依赖收尾
+
+- 范围：本轮剩余迁移、程序集引用/命名空间、测试/样例和资源绑定。
+- 工作：落实第4.4.3节，退出旧入口/兼容壳/空层/无用透传；补View可写入口与内层具体UI依赖检查。移动/退役按固定审核清单，不手改meta，保留未知用户删除及未跟踪项。
+- 完成条件：每个生产文件有可解释的职责归属，无悬空引用和占位目录；文件更短或命名整齐不能替代职责检查。
+- 普通测试：编译、AssemblyBoundaryTests、类型发现和移动影响用例；对自动化难以表达的公开能力旁路做源码审查并记录。
+
+#### RF52｜普通回归与源码职责复核
+
+- 范围：RF38确定的普通集合及本轮新增/调整用例，本轮全部实质改写生产文件。
+- 工作：重新发现普通集合并核对最终身份，执行回归；记录失败与重跑，修复后结果对应最终源码。复核结构编辑、参数提交、文档保存、播放四条真实调用链，以及规则/状态/资源/异常边界。
+- 完成条件：普通回归通过、结构问题无未处理项，排除/跳过/阻塞准确列明。不得执行整程序集把测量夹带回来；不得把普通通过写成统一产品/性能验收通过。
+
+#### RF53｜同步当前说明，登记待统一验收事项
+
+- 范围：架构说明、当前唯一教程、扩展示例和本任务记录。
+- 工作：当前说明只反映最终实现，进度/历史证据只写本文件；记录普通结果和未验范围。列双UI实际操作、视觉/截图、人工H01–H09、教程重放、冷启动、大负载/分配及资源验收的后续清单和所需授权，不在本任务执行。
+- 完成条件：交付明确写“代码及普通测试完成，统一产品验收待执行”；不代签用户体验，不补造截图/性能证据，不将文档解析器缺失冒充通过。
+
+### 4.4.5 新会话启动与停止条件
+
+启动语句：`读取AGENTS.md和.codex/tasks/action-editor-refactor.md第4.4节，从RF38开始按RF38–RF53依赖串行实施。每项检查编译、直接相关普通自动化测试及职责可读性；不跑测量套件、不做人工作业/截图、教程重放或专用操作探针，统一验收延期。不默认commit/push，不动用户数据，资源移动严格走审核流程。`
+
+1. 重查真实工程路径、Git差异及更具体规则，先读相关实现；涉及Unity才读skill/doctor并确认唯一Editor/PID。不要沿用旧运行、审批、PID和历史测试数量。
+2. 一次只一项implementing/validating；任务按依赖推进，完成后更新状态、具体差异/文件去向、实际普通测试身份/结果、职责复核和下一项。内部命名/拆分由执行者依据本清单主动定案，不再把非阻塞设计问题交回用户。
+3. 连续执行只在本清单范围内，真实数据安全、依赖阻塞、缺少Unity能力/授权或必需验证失败时停下受影响项。不能用被延期的截图、性能或人工验收作为本轮完成条件，也不能以延期为由忽略已知失败。
+4. 本次交接仅更新文档；RF38尚未发现/执行新测试。后续统一验收需用户另行启动，本阶段不据旧“逐项本地提交”记录提交或推送。
+
+### RF38 执行记录（2026-11-15，范围登记完成）
+
+- 状态：validating。用户本次明确要求RF38–RF53按依赖串行实施；仅代码、编译、普通自动化测试和职责可读性复核，统一产品验收延期，不沿用旧commit授权。
+- 后续用户指示：“新的测试用例不用管了，继续往后执行任务”。据此不新增测试用例，继续实现并复用现有相关普通用例；必要编译、现有回归和职责复核仍执行，缺少新接口覆盖时明确登记，不把未覆盖视为通过。
+- 保护范围：开始前Git恰为本文件已有计划修改、`Editor/Storage.meta`与`Runtime/Assets.meta`删除、`Assets/Scenes/SampleScene.unity`修改，以及第4.4.1节列明的全部未跟踪资源/设置。本轮未读取这些业务文件内容，不恢复、移动、删除或暂存。只有本文件追加当前执行信息；未改C#、资源、场景、设置或包。
+- 环境：doctor `.codex/runs/20261114T171912Z-1f2ed7b0/report.json`，本工程唯一Unity 2022.3.62f3 / PID19280 / ready；Pipeline 0.10.0-exp.1、CLI 1.0.0-beta.16。运行目录使用工具UTC时间2026-11-14，任务日期沿用用户本地2026-11-15。命令发现`20261114T171935Z-f1496063`；只读窗口现场`20261114T172054Z-1a2b4d7c`没有产品窗口，未关闭任何用户窗口。
+- 新测试发现：`20261114T172011Z-7e11914e`为NBC.ActionEditor.Editor.Tests / EditMode 311项，无Explicit。当前工作流只支持单个不区分大小写的部分匹配testName/assembly或单类别；不支持正则、否定、多筛选表达式。采用`verify --profile unity --test-filter <实际完整类名或方法名> --filter-type testName --test-mode editor --timeout 240`逐组串行，按实际返回FullName去重核对，不运行整程序集。
+- 普通集合：301项。全部保留领域、会话、格式、保存/导出、属性、Presenter/几何、类型/设置、窗口/原生输入、扩展及释放回归。TimelineDensityTests的1001点用例只断言绘制/命中/端点/作者内容，不计时或采集分配，属于普通功能回归，保留。
+- 明确延期10项：DocumentWorkloadMeasurementTests两项；InteractionMeasurementTests一项；WindowLayoutTests的SharedLayoutEvidenceCapturesBothOwnedWindows和ImguiInspectorWelcomeAndSettingsHaveToolkitCounterparts；ToolkitTimelineTests.ToolkitMultiClipDragGuidesMatchBoundsSnappingAndGestureLifetime；ExtensionEndToEndTests的ImguiStructureInsertionPaintCoversFullBodyWithoutText及ToolkitStructureInsertionPaintCoversFullBodyWithoutText；StructureInputMatrixTests的ImguiInsertionBlueAndRedRasterCoversFullBody及ToolkitInsertionBlueAndRedRasterCoversFullBody。后三组混有截图/像素采集，不擅改断言，完整身份随发现报告保留；它们对应的非截图交互由其余普通用例继续覆盖，但本轮不宣称这些延期用例通过。
+- 已验证：`20261114T172139Z-2410861d`工作流48/48、真实Unity生成方案21项目/701源码构建0错误39警告（8.09秒，不是产品性能测量）；code整体blocked，仅因yaml/markdown_it缺失，未安装。`20261114T172231Z-ef37e50d`DocumentSessionTests 20/20、`20261114T172434Z-bb8c3c21`PropertyEditingTests 28/28，均Editor编译up_to_date、failed=false、errors=[]，0失败/跳过/不确定。控制台包含旧历史错误，不冒充当次编译失败或本轮测试结果。
+- 职责复核：RF38仅确立基线和范围，不实施属性或其他功能修改；已定位现有PropertyPresenter公开作者对象/PropertyPath/反射描述、PropertyDraft保留路径，作为RF39–RF40待收口入口，不把定位当成实现完成。
+- 最新范围调整：用户质疑重复基线并要求继续实施，停止补跑剩余基线，不新增用例。RF38 complete仅指保护范围、测试身份和已执行结果可追溯；当前去重289项通过，剩余12项未执行，不声称301项全过。后续每项仅编译和最小必要现有定向回归，不再铺开重叠子串筛选。
+- 中断恢复：AndWheel运行`20261114T175926Z-59581f14`未完成，未重放；查询初被editor.lock阻塞，核实锁所有者PID30060已不存在后仅移除本次失效锁。`20261114T180118Z-d84c21b3`返回completed的15项Native旧批次结果，无活动测试，不能拿它冒充AndWheel完成。
+- 下一任务：RF39参数编辑接口收口。无资源移动、专用探针、人工操作、截图、教程重放、性能测量、Player Build、提交或推送。
+- 筛选证据：`.codex/runs/rf38-baseline/selection.json`记录全部301普通/10延期FullName及29个实际单一子串筛选器；已静态核对普通身份全覆盖、延期身份零命中。为减少逐方法连接成本，部分普通筛选器会重叠；最终按FullName去重，不把执行次数相加当成用例数。
+
+### RF39 执行记录（2026-11-15，接口阶段完成）
+
+- 用户允许范围：参数接口收口，不新增测试用例；现有测试按调用变化迁移，保留原断言，不再重跑重复基线。
+- 实现：PropertyFieldId只含签发者身份、代次和索引；PropertyInputState交付独立值、只读子字段和复制声明值，没有作者对象、PropertyPath或FieldInfo。PropertyTargetState为名称/时间专用意图交付显示信息及不透明目标身份。
+- 字段注册和解析仅在PropertyPresenter内部，重验Presenter身份、文档Version、选择Version、目标所属和锁定；曲线复制，集合/复杂对象只给子字段，null独立表达。名称/时间/混合转交原StructureEditing/ClipEditing，不另造规则；追加/删除复用原批次候选和事务。新延迟草稿仅接受string/int/float，提交与预览均重验字段身份，失效只取消自己的输入。
+- 修改文件：Presentation/Contracts/PropertyFieldState.cs、PropertyDraft.cs及Presenters/PropertyPresenter.cs；现有PropertyEditingTests的两项草稿场景和PropertyCollectionTransactionTests三项批次场景改走字段ID，无新增测试身份或放宽断言。旧生产属性调用按RF39约定留待RF40迁移，不声明双UI写入口已收口。
+- 实际验证：`20261114T180425Z-8a6bd97e`真实方案构建通过、workflow48/48；整体code仍因缺文档解析器blocked。`20261114T180511Z-6287ea2c`现有PropertyEditingTests 28/28；改走ID后`20261114T180746Z-32087361`草稿提交/取消/并发场景1/1；`20261114T180933Z-c5500a42`集合批次3/3；最终`20261114T181153Z-f1419df9`锁定失效草稿1/1，均Editor编译通过、零失败/跳过/不确定。最终方案编译尚待收尾。
+- 职责复核：新显示契约不持有可写路径，字段表与输入草稿逐Presenter所有；编辑实现继续承担反射路径、多选、嵌套struct回写及事务。现有旧接口暂存是RF39明确过渡范围，不能据此将RF40标完成。没有资源移动/改名、meta写入、用户数据改动、截图/测量/探针或提交。
+- 最终方案构建：`dotnet build ActionEditor.sln --nologo -v:q -clp:ErrorsOnly`通过，0错误39既有警告；源码没有新增文件，真实生成项目覆盖未变。git diff --check通过。
+- 覆盖边界：新接口其他分支尚未由现有控件实际消费，RF40迁移时复用原控件场景验证；不补造新测试通过结论。下一任务RF40。
+
+### RF40 执行记录（2026-11-15）
+
+- 实现：IMGUI InspectorsBase及标准Inspector、Toolkit PropertyView、属性扩展契约/工厂和Inspector选择代理统一消费PropertyTargetState/PropertyInputState，并回传PropertyFieldId。生产属性View没有PropertyPath、FieldInfo或作者图输入；窗口只捕获当前文档/选择显示状态。删除旧公开作者对象、反射描述、可写路径入口和PropertyObjectState/PropertyFieldState旧类型；移除无调用者且已失去类型目标语义的三个泛型Inspector空壳。
+- 保留：多选、稀疏选项、嵌套struct、null集合、数组增删、资源引用、曲线独立副本、名称/时间/混合及Undo语义。IMGUI集合元素保持原无重复标签布局。折叠键仅为不透明对象，不携带作者引用，普通字段提交后保持折叠，换图/换选择后重建。字段写入仍按Presenter、文档/选择代次和所属/锁定校验；旧草稿不能因重绘领取新ID而被复活。
+- 调用迁移：现有PropertyEditing/PropertyControls/TypeCatalog/ExtensionEndToEnd/PreviewOwnership测试及DocumentLifecycleCommands编译调用同步；未新增测试，未执行持久探针。独立fixture的CaptureInputs/CaptureTarget只返回快照，实际写入继续受内部所属校验，正式View不接收fixture作者对象。
+- 编译及失败：中间编译发现字典初始化、旧扩展签名、曲线复制和旧Document断言调用，均已修正。首次测试命令误用filter-type=test，被参数解析拒绝，未执行；改为testName。`20261114T183007Z-72cf2120`属性28项27通过1失败，原因为迁移测试时将一个Presenter的ID交给另一个Presenter；修正为同一实例，不放宽ID校验或业务断言，`183317Z-b52e6d6e`失败用例1/1。
+- 实际验证：doctor `20261114T182842Z-07e5f751`唯一工程PID19280 ready。最终真实方案构建0错误39既有警告；最终属性`184253Z-fd60a80e`28/28、集合控件`184443Z-f577fe83`5/5；集合事务`183607Z-750c50d5`3/3、扩展目录`183756Z-af029e76`9/9、双UI菜单与属性闭环`183923Z-06ff181b`1/1。上述均Editor编译通过、0失败/跳过/不确定。按改动范围执行，不补跑301项基线；最后布局/草稿复核后仅复跑受影响的属性和集合控件。
+- 职责复核：View只保留控件/焦点/折叠和显示状态，Presenter管理字段登记/草稿/意图路由，Application保留路径解析/批次候选/事务；代理只管理Inspector生命周期。没有新增生产文件、资源移动、meta手改、Combat/用户数据/包/设置变更、截图/性能/人工验收、提交或推送。完整文档profile仍缺yaml/markdown_it，未安装、不宣称通过。下一项RF41。
+
+### RF41 执行记录（2026-11-15）
+
+- StructureRules统一类型挂载、唯一冲突、所属和整批删除预检；StructureEditing/ClipboardEditing、模型创建、菜单过滤及格式图校验消费同一规则。根轨不要求分组挂载，分组只能根级移动，整组带锁定子节点移动保持原语义。剪切唯一类型到同容器时排除自身；粘贴与创建使用相同分类约束。
+- 名称/锁定/启用迁到NodeEditing，预检和提交重调同一校验；同文件内按内聚职责分开，未新增资源或兼容转发入口。属性、时间轴、组合根及现有测试迁移全部调用；保持嵌套事务与一次Undo。Context中的Nodes仅为现阶段显式装配，Context整体退役仍属RF47，不宣称已完成。
+- 验证：doctor `20261114T224928Z-2d9eb548`通过；结构手势`224958Z-f8a1faa2`26/26，最终节点适配`225416Z-2986355a`7/7，根混排/v2手写格式`225548Z-7e5d4dcd`4/4，最终会话编辑`225707Z-a38ccb15`10/10；均Editor编译通过，零失败/跳过/不确定。方案最终0错误39既有警告。中间编译遗漏Rename方法组调用，已迁移至Nodes后通过，无测试断言削弱。
+- 职责复核：领域只处理结构约束/模型，应用处理事务，节点编辑不再混进结构修改，菜单不自行复制挂载规则；移动/删除保持先整批预检，事务失败仍回滚。未新增测试、未执行测量/截图/专用探针；无资源移动、用户数据改动或提交。RF42继续片段时间入口统一。
+
+### RF42 执行记录（2026-11-15）
+
+- ClipTimingRules统一有限非负时间、溢出及0.01秒最短长度与时间写入；属性和手势共用写入规则，点事件不改原始长度。批量移动在token.Update前预检全部候选，缩放明确拒绝不可缩放节点。保留属性先吸附/半长交叠边界以及手势临时候选/释放时整批重叠验收的现行交互差异，不将磁吸当作合法性检查。
+- ClipEditing负责手势最终提交/取消与菜单循环长度提交；ClipGesture只保留候选和过程，退出其绕过最终验收的Commit入口。菜单不再直接session.Edit调用模型长度修改；删除无调用者的三个TryMatch模型方法。名称/锁定/启用仍归RF41的NodeEditing。
+- 验证：真实方案构建0错误39既有警告；`20261114T230228Z-bd80ef6c`TimelinePresenterTests18/18，`230345Z-8819548e`属性时间2/2，`230616Z-acb2ab36`DomainBehaviorTests5/5；最终原生Toolkit拖动/缩放/取消/捕获丢失`231117Z-2dafcda8`1/1及IMGUI时间轴`231227Z-4a2b7d00`10/10，均Editor编译通过且零失败/跳过/不确定。git diff --check通过。
+- 覆盖边界：不新增用例，现有测试没有逐个菜单循环长度动作的直接断言，不把编译当作该分支动态验证；没有执行延期截图/测量。没有资源移动、用户数据/格式变化或提交。RF43继续时间轴过程、布局与状态职责整理。
+
+### RF43 执行记录（2026-11-15）
+
+- 复核并明确四项职责：TimelineWorkspace只持逐窗视域/滚动/折叠；TimelineInteraction和手势持过程/候选/取消；TimelineLayout生成展开行/全部片段几何及命中；TimelinePresenter连接会话、意图与只读渲染状态。布局没有可见区虚拟化，不再用Visible前缀暗示该能力。滚动/左宽拒绝非有限输入，取消用finally保证两个手势都释放；RF42已把片段最终合法性与事务提交从手势移到应用层。
+- 单文件资源改名：固定preview `20261114T231718Z-abf6eed6`展示VisibleTimelineLayout.cs→同目录TimelineLayout.cs，用户明确“确认本次改名并继续”；approval `233059Z-55b798bf`，apply `233120Z-13b1c770`通过。GUID c733897f3e89f5740876eeaf10c4442a、源码和meta字节在移动瞬间保持，IDE项目重新生成；随后源码类型及全部调用者同步。没有手改meta或借此授权其他移动。
+- 临时固定命令在执行后退出生产和白名单，现有拒绝重放用例增加该命令名（没有新增测试身份）；工作流定向12/12通过。真实方案0错误39既有警告，`233348Z-1134127a`几何16/16、`233615Z-3edebcae`Presenter18/18，均Editor编译通过，零失败/跳过/不确定。没有运行测量或截图。下一项RF44。
+
+### RF44 执行记录（2026-11-15，complete）
+
+- Toolkit窗口拆出完整TimelineHeader、TimelineViewport和TimelineProperties区域，分别拥有工具栏/播放显示、滚动与范围控件、属性面板注册和构建；窗口保留整体装配、生命周期和窄动作。区域暂与窗口同文件，后续目录归位仍按审批处理，不伪装成已经完成资源迁移。
+- 两窗口公开Context/Document退出，WindowBinding内部Context不再对View公开；DocumentPresenter仅补DocumentType显示元数据，扩展工厂按Type查找。既有测试迁移到Presenter状态/键与测试自有宿主；会话身份断言通过测试反射保留，不为测试开放生产作者入口。扩展上下文本身仍待RF48收紧。
+- 初始化、重绑、关闭统一释放窗口绑定和表面；Toolkit重建复用表面释放路径，暂停待执行刷新，清理旧控件及Inspector Presenter引用；关闭后补发GUI/Discard不解引用已释放绑定。保留原控件名称、尺寸、viewDataKey与Inspector行为。窗口不直接写作者图。
+- 验证：doctor `20261114T234827Z-f0401efe`通过；真实方案0错误39既有警告；`234851Z-41320800`窗口生命周期13/13、`235020Z-0354204a`Toolkit共享图/布局/属性Undo 1/1、`235255Z-682287e6`双UI另一窗口刷新关闭期间手势2/2。逐次Editor编译通过，终态身份/计数核对一致，零失败/跳过/不确定；diff-check通过。早期编译两处旧窗口入口漏迁已修复。没有新增测试、截图、测量、资源移动或提交。
+### RF45 执行记录（2026-11-15，complete）
+
+- 文档切换确认、保存后判定、选择回调重验和创建后打开归DocumentPresenter；原生交互仅返回Save/Discard/Cancel与选择结果。打开/创建弹窗的取消不再提前触发保存。Composition只装配依赖，不在运行期临时创建Presenter保存。
+- 新建/导出窗口仅持类型目录、显示名称回调和提交回调，不接整个Context。DocumentDialogComposition退出类型，改为无会话的DocumentDialogCatalog；DocumentInteraction/DocumentNavigation各归View与Infrastructure命名空间，文件物理拆分/移动留待固定审批，不宣称目录已全部归位。IDocumentNavigation处理不透明来源与Unity加载，业务顺序不回流到它。
+- DocumentLifecycle打开前后重验活动事务，拒绝切换隐式结束已有手势；创建/保存的字节已提交但导入失败仍抛原异常，不重复创建、不切换来源、不错误推进保存时间。既有适配测试与延期探针编译调用同步，未执行延期探针。现有Presenter测试改为驱动真实选择/创建回调，保留取消、失败、事务和计数断言。
+- 验证：最终方案0错误39既有警告；`20261115T000246Z-548a46ac`会话20/20、`000501Z-16fdcf92`适配7/7、`000743Z-bba12c7f`文档入口6/6、`000916Z-28f81783`导出5/5，Editor编译及终态身份核对通过，零失败/跳过/不确定，diff-check通过。RF44文档空态断言补null安全后`20261114T235635Z-002fe30e`入口6/6，RF45改变真实入口后才重跑，不是重复基线。没有新增测试、资源移动或提交。
+### RF46 执行记录（2026-11-15，implementing，等待固定迁移确认）
+
+- 已改写：DocumentPlayback通过IDocumentSampler获取时间/范围和采样，不再持有AssetPlayer/作者图；DocumentSampler、DocumentPreviewSession和TimePointers归Infrastructure.Preview命名空间，保留代次、回调重入和资源释放。PlaybackControl显式接收播放/采样/时钟/偏好；EditorUpdateDriver改为具体依赖调度，不再持Context。旧类型调用已迁移，无兼容转发壳。
+- 当前物理文件尚在旧目录，DocumentPlayback还未跨入Application程序集，不能宣称RF46完成。准备固定六文件迁移：Preview/ActionEditorPlayback.cs→Application/Playback/DocumentPlayback.cs；Preview/AssetPlayer.cs→Infrastructure/Preview/DocumentSampler.cs；Preview/ActionEditorPreviewSession.cs→Infrastructure/Preview/DocumentPreviewSession.cs；Preview/TimePointers.cs、PreviewBase.cs→Infrastructure/Preview/同名；Composition/DocumentDialogComposition.cs→Infrastructure/Documents/DocumentDialogCatalog.cs。仅新建Application/Playback和Infrastructure/Preview两目录，保留六个GUID及移动瞬间源码/meta字节，不删除旧目录、不触及用户资源。
+- Assets路径级GUID引用搜索仅命中六个自身meta；已读资源移动契约并准备固定零参数ArrangePlaybackSources临时命令，强制来源GUID、目标不存在、SHA256和AssetDatabase校验，随后重新生成IDE项目。迁移前必须preview→展示→用户真实确认→approve/apply；旧RF43授权不复用。
+- 当前方案0错误39既有警告。最初TimePointers命名空间迁移漏DomainBehaviorTests的using，已补后编译通过。现有工作流策略测试12/12通过（直接运行无main的测试文件实际零执行，未据此计数，随后unittest discover才实际执行12项）。Editor编译请求`20261115T002408Z-cbf19d46`因域重载连接关闭失败；未重放，查询`002511Z-7711fc85`确认同工程ready，`002551Z-5052e778`原编译终态completed且无错误。播放定向普通测试与新程序集边界验证待移动后执行，不冒称已通过。
+- 六文件迁移真实确认：用户选择“确认本次六文件移动并继续”；approval `20261115T003035Z-fd50ef1d`绑定原planHash。apply `003449Z-27425f53`失败，已创建两目录并仅完成首个DocumentPlayback移动，其他五项未动。失败为StartAssetEditing内即时GUID查询校验；随后源码/meta SHA256与原预览一致，GUID未变。原审批已消耗，不重放。
+- 恢复命令仅验证已完成首项并执行余五项，退出暂停导入期间的GUID查询。跨Application暴露noEngineReferences编译错误（`003731Z-aa03af49`），已移除UnityEngine依赖，以System.Math保留Min/Repeat计算，不改程序集配置。首项源码移动后正常修改，现SHA256 d1b9f0b958a9488b75969ed026e1daa751b8bd397894105ebd11aa62b12acb3c，meta未变。Editor编译`003923Z-c302228d`通过。余五项需新预览及真实确认，RF46仍未完成。
+
+- RF46完成：用户确认剩余五项后，恢复approval `20261115T004229Z-23e7ac11`、apply `004245Z-6ab2438d`通过，全部六项归位。源/meta移动瞬间字节保持、GUID保持，真实IDE项目已重新生成。临时迁移命令及白名单已退出，既有拒绝重放测试加入该名称，12/12通过。
+- RF46最终验证：方案0错误39既有警告，`20261115T004447Z-adffee16`预览/播放所有权26/26、`004632Z-25c470b3`程序集边界3/3，终态身份与计数一致，零失败/跳过/不确定，Editor编译通过。DocumentPlayback实际位于Application且无UnityEngine依赖；采样/预览/时间指针位于Infrastructure。重入、循环、暂停、步进、异常和唯一共享驱动已有断言通过。diff-check通过，无新增测试、截图、测量或提交。RF47继续退出Context，PlaybackControl/DocumentInteraction等同文件跨命名空间实现的物理归位仍待RF51。
+
+### RF47 执行记录（2026-11-15）
+
+- 状态：complete，限工程实现与下列普通回归。ActionEditorContext类型与所有调用已退出；原脚本暂承载EditorComposition，资源名归位保留RF51固定清单审批，不手动移动meta。
+- EditorComposition只创建/连接/销毁共享对象，全部服务字段private，无Document/Session/Selection等查询属性。ActionEditorHost仅公开CreateBinding，不再公开Context/Views。两窗口Bind接收逐窗绑定工厂，不拿共享服务集合；各Composition逐项注入具体用例/端口。
+- 选择修整由SelectionState订阅ContentChanged，采样器独立订阅Reset；Session原有逐监听器隔离保证任一失效不阻断另一项。DocumentNavigation持来源与打开流程，候选加载/校验成功后更新来源并停止播放，保存后来源仍按Session.Path加载。文档Presenter订阅会话状态，Binding从Presenter订阅并在Dispose解除，取消草稿、释放设置订阅、注销视图、最后视图停止播放的finally路径保持。
+- 测试EditorFixture及验证程序集VerificationSession只通过反射观察实际组合根，不新增生产可写入口、不加友元程序集、不新增测试。所有延期探针仅迁移编译调用，未执行。双UI默认/隔离宿主使用同一创建路径，原共享身份、Undo、通知警告、关闭与资源断言保留。
+- 验证：真实方案0错误39既有警告；doctor `20261115T012925Z-4be3a7e1`绑定原PID19280。`012952Z-fe3c7d91`域重载时连接中断未运行测试，查询`013108Z-a2cd83c6`确认原编译completed/failed=false，无重放未知操作。`013150Z-b26467a7`WindowLifecycle13/13；`013352Z-fff76ea0`PreviewOwnership26/26；`014016Z-2fad191f`ApplicationAdapter7/7。
+- SessionEditing首轮`013532Z-5a1d900f`5/10：旧事务失效用例错误调用带活动编辑保护的导航入口，随后同fixture受到未释放事务影响。该既有用例迁到其真正要验证的底层Session.Open（保留旧token失效及全部断言），不放松生产导航保护；`013744Z-a1530658`10/10。以上终态均核对零失败/跳过/不确定，git diff --check通过。
+- 未运行：全基线、人工操作、截图、教程/持久探针、冷启动和性能测量。RF48继续扩展显示边界与显式设置，RF51处理物理目录归位。
+
+### RF48 执行记录（2026-11-15）
+
+- 状态：complete，资源物理归位随RF51固定清单审批。Prefs类型及其静态业务入口已退出，原脚本暂承载仅创建会话的PreferencesComposition；默认SettingsSession由Host私有持有，所有设置Presenter必须显式给会话。双UI欢迎页、工具栏及设置窗口使用所属WindowBinding的创建委托，不再自行取默认会话，隔离宿主不会改默认偏好。
+- PreferencesStore原配置路径、字段、值及TrackListLeftMargin保留，提交失败不推进内存状态；没有实际写个人设置。类型目录/扩展解析/菜单元信息归Infrastructure.Assets命名空间，Runtime声明仍在原程序集与原持久身份，物理Attributes/Utility归Metadata待审核移动。
+- EditorExtensionContext不再公开Document/Time作者读取委托，只提供ExtensionDocumentState显示帧。通用ExtensionDocumentPresenter输出基础字段值、独立曲线副本、时间/权重/循环值，不携带作者节点、集合或路径。样例Presenter只消费显示帧，保留区间/循环/标记结果；核心投影无FeatureSample类型分支。属性扩展继续通过既有PropertyPresenter不透明字段身份提交，不新增写旁路。
+- 现有调用者及延期probe/measurement仅编译迁移。方案0错误39既有警告。`20261115T015709Z-02fe4ba5`SettingsPresenter8/8；`015858Z-a0223ae8`FeatureSampleProjection1/1；`020314Z-6b4bb3b7`TypeCatalog9/9；`020458Z-442e967d`ExistingSampleUsesMetadata1/1；`020923Z-eee1f3df`ExtensionContextsAndInspectorFactories1/1，全部终态completed、零失败/跳过/不确定。误筛选`020707Z-286e88d1`ExplicitExtension无匹配blocked，不计通过，改用既有真实身份后通过。git diff --check通过。
+- 下一任务：RF49收敛存储命名与职责；RF50选择器；RF51统一物理归位。未新增测试、未执行延期验收或提交。
+
+### RF49 执行记录（2026-11-15）
+
+- 状态：complete，目录物理归位随RF51固定清单审批。Editor Storage命名空间全部退出，统一为Infrastructure.Serialization；持久领域类型身份、字段、程序集及唯一v2契约未改。
+- 隔离复制/内容键/片段由DocumentCopy负责，会话IDocumentSnapshot端口由SessionSnapshotCodec实现，不再使用DocumentSnapshots/DocumentSnapshot单复数区分。片段及可变属性值编码留在序列化边界，DocumentFactory独立留在Documents；Undo及恢复封套不混入复制器。格式目录、受信任上下文和GUID/localFileId引用解析保持同一内聚格式入口，可靠文件提交仍由AtomicFileCommit承担。
+- 源码复核：保存先严格回读并可靠提交字节，Session再推进基线及revision，Import失败不能重建已提交文件；导出使用隔离副本、CreateOnly及严格回读，不推进源会话。剪贴板仍通过相同受控值树编码，未增加回调或放宽可变值复制。
+- 方案0错误39既有警告。`20261115T022221Z-e4cbe6ea`DocumentFormat15/15；`022432Z-6b34288c`DocumentPersistence9/9；`022638Z-998016ad`DocumentExport5/5；`022741Z-4f979304`StorageSafety10/10；最终DocumentFactory拆分后`023225Z-98dd742b`ApplicationAdapter7/7，终态completed且零失败/跳过/不确定，Editor编译通过。`023104Z-309a93be`因域重载暂缺目标PID而blocked，未编译/未运行测试；doctor `023200Z-d95d6937`重新绑定后才验证，不以连接中断冒充失败用例或通过。
+- 批量namespace迁移曾误加Application对Infrastructure的using及留下相对Storage调用，编译阶段已删除误依赖并修正调用；没有放宽Application asmdef。旧命名源码搜索无残留，git diff --check通过。未新增测试，未跑基线、持久探针或用户数据转换。
+
+### RF50 执行记录（2026-11-15）
+
+- 状态：工程实现complete，未声称搜索/导航或原生视觉体验已完整自动验证。选择器明确为16px列表，不虚称网格；Builtin旧局部命名改为条目/可见列表/选择索引/预览缓存。发现仍由ObjectPickerCatalog承担，缓存只拥有创建的Editor，不销毁借入的用户对象。
+- 每次打开清搜索、滚动、旧选择和预览缓存；空初选回到None且不触发回调。搜索按当前文化忽略大小写比较，隐藏当前选择时索引=-1而非指向错误行，保留已选择对象且搜索本身不提交作者修改。上下键只在可见索引内选择并消费事件，Enter关闭当前选择，Escape只关闭不额外回调。列表定位使用真实行索引（不因None偏移错一行），定位使用当前窗口样式而非静态Shared访问。关闭清回调、引用及缓存，空数组保持重绘安全；无新作者入口。
+- 上游/许可核查：[UnityCsReference LICENSE](https://github.com/Unity-Technologies/UnityCsReference/blob/master/LICENSE.md)指向[Unity Reference-Only License v1.1](https://unity.com/legal/licenses/unity-reference-only-license)，许可第1条明确不允许其他分发或修改。官方master已是7000系列，不能视作本项目2022.3兼容补丁。本地文件无来源/许可头，本地Git只有既有整理记录，不能据相似名称证明来源或合规。未复制/移植官方源码，PreviewResizer未改；本轮只基于现有项目代码做局部职责整理，不宣称历史来源风险已消除。
+- 编译0错误39既有警告；最终源码的Editor编译通过。`20261115T023830Z-9e69cda1`WindowLifecycle13/13（含两种发现路径及JSON过滤）；`023957Z-24037797`PickerPreviewChanges1/1（100次缓存切换，非计时测量）；`024109Z-1215c990`RejectedPreviewCapability1/1，终态completed且零失败/跳过/不确定。既有测试只迁反射成员名，断言保留；没有为搜索/导航新增测试，实际OS操作/重开视觉与输入体验延期。资源所有权的其他100次双窗/拖动用例未夹带重跑。
+- 辅助创建/导出/设置窗口已在RF45/48显式注入，不取Context或Prefs。未实际改个人偏好、运行探针/截图/性能测量、移动资源或提交。
+
+### RF51 执行记录（2026-11-15，complete）
+
+- 同文件跨层实现已按真实所有权拆开：DocumentInteraction在Views，DocumentNavigation在Infrastructure/Documents，PlaybackControl在Infrastructure/Preview；组合文件只创建/连接。Toolkit Header/Viewport/Properties各自持控件/同步/生命周期，独立成文件，不访问主窗私字段。ExtensionDocumentPresenter及显示帧与样例/属性状态分开；RecoveryCodec/RecoveryStore与Undo/时钟分开，设置存储归Infrastructure.Settings命名空间。
+- InspectorPreviewAsset及Inspector类型按真实编辑选择代理职责改为InspectorSelectionTarget/InspectorSelectionInspector，既有调用及延期断言同步，不新增友元或公开作者入口；文件名仍待保GUID移动。其他持久Domain类型/命名空间和七程序集不改。
+- 拆分阶段`20261115T024545Z-88534de1`AssemblyBoundary3/3通过，后续最终移动命令及上述适配归位`025425Z-0d59bd72`Editor编译completed、failed=false、errors=[]。临时命令arrange_source_layout只接受confirm/dry-run，新增路径/代码/force参数拒绝纳入既有离线测试，12/12通过，无新增测试身份。git diff --check通过。
+- 固定清单35项，源和目标无重复；本工具资源范围内没有这些GUID的asset/prefab/unity序列化引用，测试两处IDirectable.cs路径在移动后需迁Domain路径。ColorUtility仅UI调用，由Domain程序集移到Editor，其余目录移动保持程序集；不以目录查询冒充全工程资源引用验收。
+- 首次preview `20261115T025715Z-51f18a7a`passed，35个源/meta存在、GUID非空、目标及meta不存在，明确deletes=[]/overwrites=false；后续补本记录及操作说明改变工作区指纹，需重新preview后展示给用户。尚未approve/apply，RF46批准全部已消费，不继承。初次离线审计命令因PowerShell引号解析失败未执行，随后改专用读取/搜索工具核35项及引用成功，未作写入。
+- 待用户确认范围：仅临时命令内35项源码AssetDatabase移动、必要父目录、生成方案；不删除空目录、不动Combat/用户资产/场景/个人设置/包，不保存或放弃现场。物理移动后再校验GUID/字节、迁两处测试路径、编译及最小相关定向回归；退出临时命令需另列明确退役范围，不自动删未知资源。
+- 编译环境新增阻塞：`Temp/rf51-build.log`方案默认并行构建因MSB4166/OutOfMemoryException及页面文件不足失败；改`-m:1 -nr:false`的`Temp/rf51-build-serial.log`仍报CS0041写调试信息失败及系统资源不足（39警告/2错误），不记通过、不改系统配置、不清理/关闭用户进程。此前Unity真实编译通过仅对应其当时源码，最终属性命名空间改动另行验证。
+- 属性输入/身份/草稿/片段显示值已统一为Presentation.Properties命名空间，生产/测试/扩展调用同步，物理目录仍等待批准；不改变持久化身份。初次preview因后续源码变化已失效，必须新preview而非复用。
+- 最终属性归位验证：`20261115T030325Z-8934850c`编译发现PropertyText遗漏ClipPropertyWarning新命名空间，测试未运行；补正确using后`030504Z-4ba1a8f7`Editor编译通过，测试已启动但轮询中暂缺PID而blocked。会话等待随后被取消，不重放测试；doctor `072456Z-bbc80a26`恢复后查询原`test status`，`072534Z-2a76f9d8`核得completed、PropertyEditingTests完整28/28、零失败/跳过/不确定。没有把原blocked报告改成passed，另列终态证据。最终方案构建仍保留上述资源不足缺口。
+- 用户在35项完整源/目标展示后明确选择“批准这35项并继续”。新preview `20261115T072626Z-4b533c1e`→approval `072903Z-74653a36`→apply `072923Z-0c0662be`全部passed，35项全部完成；命令逐项校验GUID、源码/meta哈希、旧路径不存在，另按批准preview独立字节复核35项零差异。未覆盖任何目标或删除空目录；生成方案后两处既有测试路径同步到Runtime/Domain/IDirectable.cs。
+- 移动后最终方案`Temp/rf51-final-build.log`使用`-m:1 -nr:false`恢复0错误39既有警告，先前系统资源不足失败证据保留、不再作为当前未解阻塞。`073128Z-783ab98c`AssemblyBoundary3/3、`073339Z-c6a0daed`TypeCatalog9/9、`073507Z-6a2bda81`WindowLifecycle13/13、`073700Z-df726a6d`ApplicationAdapter7/7、`073833Z-5aa81171`PreviewOwnership26/26，全部核终态completed且零失败/跳过/不确定。曾在后台套件尚未结束时误读中间report为blocked并查询doctor，`073755Z-cc5822b3`被活动锁正确拒绝；没有删锁或重跑，等待原套件结束后核最终上述58/58通过。
+- 临时命令退役独立展示唯一脚本和GUID `9ac3bd6d044669443a98629672af82f8`，用户选择“批准退役并完成收尾”。删除preview `074223Z-9177c7dd`→approval `075115Z-af9634fa`→apply `075130Z-e0892c57`passed，只AssetDatabase删除SourceLayoutCommands.cs及meta；同步移除白名单/操作说明，将命令纳入原退役拒绝测试，12/12通过。未删除其他文件、用户改动或空目录。
+
+### RF52 执行记录（2026-11-15，complete，限约定普通回归）
+
+- 最终发现`20261115T074126Z-a05082bc`共311个EditMode测试；与RF38 selection.json逐身份比较新增0/删除0，普通301/延期10不变。首个比较脚本误把延期对象当字符串而TypeError，改按既有name字段后核一致，不改期望集合。遵用户后续指示不补跑重复基线、不新增测试、不夹带延期测量，RF38未补12项仍不宣称完整301/301通过。
+- 本次最终移动直接影响的58项、最终属性28项及RF39–RF50各项必要回归证据沿上记录；不将重叠执行相加冒充独立覆盖率。不再铺开全程序集或交叉筛选。
+- 结构链复核：双UI意图→TimelinePresenter/StructureGesture候选→StructureEditing→StructureRules→EditOperation双重预检→DocumentSession事务，释放先清手势，版本/挂载/锁定重验，原位不创建Undo。节点名称/启用/锁定由NodeEditing负责，未增加View作者入口。
+- 属性链复核：双UI/扩展输入快照与字段身份→PropertyPresenter私有路径解析与换代校验→PropertyPath整批候选→PropertyEditing/DocumentSession事务；延迟草稿在提交通知前释放、旧基线/选择/锁定拒绝，struct逐层回写，可变引用隔离，后目标失败不保留半批修改。View/扩展不收作者图或可写路径。
+- 保存链复核：原生DocumentInteraction只收输入→DocumentPresenter流程→DocumentLifecycle/Session→JsonDocumentRepository→JsonDocumentCodec/DocumentCopy→AtomicFileCommit，严格回读/revision检查先于提交；提交后先推进基线再Import，finally仅状态通知。导出使用独立CreateOnly目标，不推进源会话。
+- 播放链复核：唯一Host.Update→EditorUpdateDriver→Application.DocumentPlayback→IDocumentSampler→Infrastructure.DocumentSampler/DocumentPreviewSession，异常finally仍驱动视图，代次防回调重入；播放/采样/选择订阅由各自拥有者解除，最后窗口停止共享播放，非最后窗口不误释放。Application无UnityEngine引用且Presentation无Editor/原生控件依赖，未放宽asmdef。
+
+### RF53 执行记录（2026-11-15，complete，统一产品验收待执行）
+
+- 当前说明`Docs/ActionEditor-Contracts.md`及唯一教程`Assets/ActionEditor/Samples/FeatureSample/README.md`同步最终共享/逐窗归属、私有组合根、字段身份/显示帧、显式设置与目录；不修改独立格式示例、持久业务类型身份或用户数据。历史架构分析和历史验收文档不改成当前通过证据。
+- 文档profile `20261115T073559Z-f465b0d4`：工作流离线48/48通过；完整结构/链接解析仍blocked，缺yaml及markdown_it，不安装依赖、不宣称文档整体通过。最终退役策略另12/12通过；git diff --check通过。
+- 统一产品验收待用户启动：双UI完整操作与实际键盘/搜索/选择器取消重开、OS保存框；视觉/截图与插入线像素、H01–H09；唯一教程连续重放；冷Editor/冷启动、最大文档首次调用/耗时/分配；完整资源引用、持久探针及Player Build。上述均未在本轮执行或代签。资源/设置/包/平台/实际构建写入必须重新preview并获相应明确授权；教程和持久探针只用批准的新隔离目标，不能拿现有用户资源练习。
+- 选择器历史来源仍未证明，已核Unity Reference-Only许可且未复制其代码；历史来源/分发许可确认是交接风险，不把局部整理写成法律合规结论。Combat专属实施/验收继续暂缓，无自动后续任务或提交/推送。
+- 最终退役后的`20261115T075259Z-dca232e5`Editor编译通过、AssemblyBoundary3/3终态completed；`Temp/rf53-final-build.log`真实生成方案0错误39既有警告。临时源码/meta已不存在、生产旧入口/Storage/旧资源路径源码搜索无残留，git diff --check通过。原用户场景修改、两项既有meta删除和全部已列未跟踪资源/设置仍保留，未读取业务内容或替用户保存/丢弃；Git移动以旧删除/新未跟踪显示，未暂存、commit或push。
+- 旧空目录按用户批准“不删除目录”范围保留，不把它们冒充新架构占位层；未清理未知meta或用户数据。最终交付表述：代码及约定的必要普通定向测试完成，统一产品验收待执行；完整文档解析仍blocked，全部301普通集合未整套补跑，选择器新搜索/导航没有新增自动化覆盖。
+
+### RF53后架构review四项修复（2026-11-15）
+
+- 状态：complete（限四项修复及必要定向验证）。用户明确“那先把问题修一修吧，再进行到下一步。”，仅修本次review报告的四项；命名、常驻新建、空白文档及跨启动历史均未实施。保留全部既有和未跟踪用户工作，不移动/删除资源，不提交/推送。
+- 作者引用：`ITimelineDialogs.Rename`改为初始名称与`Action<string>`；目标闭包留在TimelineMenuPresenter，提交仍经NodeEditing重新验证所属/锁定。RenameItemWindow不再保存IDirectable，可显示陈旧目标拒绝错误。
+- 弹窗依赖：现有DocumentContracts增加窄目录契约，组合根创建目录后注入DocumentInteraction及创建/导出窗口；选择器路径过滤也通过该契约。Infrastructure目录不再引用Lan或具体样例，显示名和非法名称提示本地化留在创建显示侧，保持中英文样例名称。
+- 缩短规则：共享ApplyTiming仅在可缩放片段实际变短时收敛作者渐变，先渐出后渐入且不产生负上界；CrossBlendClip直接收敛作者字段，不把交叉缓存复制到作者字段，不改缓存。纯移动/不变长度、禁用渐变哨兵和点事件保留字段不受影响。
+- 循环菜单：仅匹配下一循环增加严格下一片段起点上界，越界保持旧行为no-op；相等边界允许，属性半长交叠策略不改。
+- 复现证据：`20261115T093731Z-a4b0e515`真实执行1项失败，样例属性缩短到0.2秒仍BlendIn=0.25；`20261115T094108Z-f7c8c680`同项执行1项失败，匹配下一循环把样例length从2.25改为3并越过下一起点。两份工作流概括为“Zero executed/passed”并不准确，实际test status均completed、total1/failed1，以终态为准。`20261115T094458Z-b0aef684`测试fixture短命名空间被Tests.Presentation遮蔽导致编译失败，已改完整限定名，未将未执行测试计为通过。
+- 现有用例补强，不新增测试文件或身份：PropertyEditingTests覆盖属性缩短、Undo/Redo、循环越界no-op/精确边界；TimelinePresenterTests原生Presenter边缘手势缩短及Undo/Redo；TypeCatalogTests覆盖禁用渐变、缓存分离及纯移动；ApplicationAdapterTests覆盖菜单名称提交/Undo后陈旧提交拒绝与窗口目录契约；WindowLifecycleTests保持双语真实窗口文案断言。
+- 已通过：doctor `20261115T093416Z-bbd70f89`、命令发现`20261115T093451Z-d9847d1f`，绑定本工程ready Editor PID13864；测试发现`20261115T093638Z-05114ddd`仍311身份。串行执行`verify --profile unity --test-filter "真实筛选器" --filter-type testName --test-mode editor --timeout 180`（PropertyEditingTests期限240），均核对completed及0失败/跳过/不确定：PropertyEditingTests `20261115T094601Z-f143a3e1`28/28；ApplicationAdapterTests `20261115T094848Z-6b68f10c`7/7；TypeCatalogTests `20261115T095031Z-9f84f7f5`9/9；ResizeUsesSharedMinimumAndLeftHandlePriority `20261115T095158Z-5a80415c`1/1；ProductTermsMatchBothLanguageCatalogsAndRealWindowEntrypoints `20261115T095318Z-496c10f3`1/1；AssemblyBoundaryTests `20261115T095445Z-d3c39d37`3/3。共49个互不重复身份全部通过，每次Editor编译通过。
+- 生成方案覆盖检查：现有`solution_inputs(Context())`确认21项目712源码，无Assets源码缺失。`dotnet build ActionEditor.sln --nologo -v:q -m:1 -nr:false`通过，0错误39既有警告，14.16秒，证据`Temp/review-fixes-build.log`；git diff --check最终通过。没有并行编译/测试或修改sln/csproj。
+- 额外未解决诊断：本次首轮域重载console曾记录InspectorSelectionInspector.OnEnable第19行InvalidCastException（09:38:39）；不属于四项修复，未改该文件或据此扩大实施范围。后续定向测试及当前编译通过不代表该重载诊断已消除，命名调整前应单独确认是否处理。
+- 未执行：重复全基线、测量/截图、统一产品验收H01–H09、OS模态框交互、教程/持久探针、冷启动、完整资源验证及Player Build；完整文档解析依旧缺yaml/markdown_it，未安装依赖。
+
+### InspectorSelectionInspector域重载诊断修复（2026-11-15）
+
+- 状态：complete，用户明确要求解决上项记录的InvalidCastException。只修改Inspector桥与现有PreviewOwnershipTests断言，不自动推进命名或人工产品验收；不新增测试身份、资源或程序集，不保存/丢弃用户现场，不提交/推送。
+- 根因与复现：OnEnable无条件把Unity恢复的Editor.target强转为InspectorSelectionTarget，旧类型目标无法转换。现有ExtensionContextsAndInspectorFactoriesUseOnlyTheirExplicitSession用真实Editor.CreateEditor(TextAsset, InspectorSelectionInspector)构造类型失配，`20261115T101150Z-a77d7e10`终态completed、1执行1失败，完整堆栈准确指向OnEnable第19行，复现同一InvalidCastException。该测试模拟恢复后的目标失配条件，不冒称重现过完整Unity重启。
+- 最小修复：OnEnable先检查目标托管类型与Unity对象存活状态，再调用已注入工厂；旧类型、已销毁及未绑定代理保留空Presenter，不恢复全局会话查询或捕获吞掉其他异常。原有OnDisable释放输入/草稿及正常Inspector绘制路径不改。
+- 覆盖：同一现有用例检查失配目标无异常/无Presenter、未绑定代理、绑定到指定隔离会话、重复Disable/Enable重新创建独立Presenter、销毁目标后Enable安全且无意外日志；原双会话版本/设置/写入隔离断言全部保留。
+- 验证：doctor `20261115T101005Z-f63abebe`、命令发现`20261115T101048Z-9f0f1159`、测试发现`20261115T101122Z-f5b1ea11`（仍311）。串行`verify --profile unity --test-filter "ExtensionContextsAndInspectorFactoriesUseOnlyTheirExplicitSession" --filter-type testName --test-mode editor --timeout 180`，`20261115T101412Z-ef52fe83`编译通过、1/1；正常IMGUI问题按钮真实绘制/点击用例ImguiIssueButtonSelectsClipWithoutChangingAuthorContent，`20261115T101604Z-9cdbbb34`编译通过、1/1；均completed、无失败/跳过/不确定，且无意外日志。
+- 真实生成方案`dotnet build ActionEditor.sln --nologo -v:q -m:1 -nr:false`通过，0错误39既有警告、22.04秒，`Temp/inspector-target-fix-build.log`；git diff --check通过。未新增/手改sln/csproj/meta，不运行重复全基线。
+- 上条“额外未解决诊断”为历史事实，本条补齐该具体异常的复现与修复证据。未执行完整Unity重启/跨启动恢复、统一人工产品验收、截图/性能、持久探针或Player Build；这些不因局部修复通过而代签。
+
+### RF38–RF53及修复本地追踪提交（2026-11-15）
+
+- 授权：用户明确“追踪提交一下”，本次仅创建本地Git提交，不推送或重写既有历史。沿用已完成实现与定向验证证据，不再补跑重复基线。
+- 提交范围：本阶段ActionEditor源码、迁移后的源码及meta、现有测试、契约/教程、唯一任务记录及维护命令退役测试；不把此前已消费的移动审批当成新资源操作授权，本次不执行任何AssetDatabase移动或删除。
+- 排除：既有SampleScene场景修改、Assets/Action.json及meta、ProjectSettings未跟踪个人文件、既有package.json及meta删除、旧目录meta删除均保留在工作区，不随本次提交。Git暂存前后逐项检查，不用git add -A全仓库收集未知工作。
+- 提交前检查：暂存差异/范围、git diff --cached --check；提交后核HEAD及剩余工作区，仅向用户报告实际结果。人工产品验收及完整文档解析缺依赖等限制不因提交而改变。
+
+## 5. 分项实施与验收（历史阶段，当前执行入口为第4.4节）
 
 ### A00｜重命名后环境、源码和行为基线
 

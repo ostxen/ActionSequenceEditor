@@ -4,7 +4,7 @@ using NBC.ActionEditor.Application.Settings;
 using NBC.ActionEditor.Domain;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 
 namespace NBC.ActionEditor.Tests
@@ -36,7 +36,7 @@ namespace NBC.ActionEditor.Tests
         {
             var document = new FeatureSampleDocument();
             var workspace = new TimelineWorkspace();
-            var layout = new VisibleTimelineLayout();
+            var layout = new TimelineLayout();
             var size = new TimelineSize(1000, 600);
             layout.Build(document, new SelectionState(), workspace, size, 0, null);
             var group = (TimelineGroup)document.RootItems[0]; var moving = group.Tracks[1];
@@ -115,7 +115,7 @@ namespace NBC.ActionEditor.Tests
         [Test] public void VisibleRowsHideCollapsedTracksWithoutChangingDocument()
         {
             var document = new FeatureSampleDocument(); var workspace = new TimelineWorkspace();
-            var layout = new VisibleTimelineLayout(); var selection = new SelectionState(); var size = new TimelineSize(1000, 600);
+            var layout = new TimelineLayout(); var selection = new SelectionState(); var size = new TimelineSize(1000, 600);
             workspace.Bind(document); workspace.SetCollapsed((TimelineGroup)document.RootItems[2], true);
             var json = JsonDocumentCodec.Encode(document);
             layout.Build(document, selection, workspace, size, 0, null);
@@ -136,7 +136,7 @@ namespace NBC.ActionEditor.Tests
             workspace.LeftWidth = 200; workspace.ScrollY = 14;
             var first = document.AllTracks.First().Clips.First(); first.StartTime = 1; first.Length = .01f;
             var marker = document.AllTracks.OfType<FeatureSampleMarkerTrack>().First().Clips.First(); marker.StartTime = 1;
-            var layout = new VisibleTimelineLayout();
+            var layout = new TimelineLayout();
             layout.Build(document, new SelectionState(), workspace, new TimelineSize(900, 100), 0, null);
             var bounds = layout.Bounds(first);
             Assert.That(bounds.X, Is.EqualTo(300)); Assert.That(bounds.Y, Is.EqualTo(17));

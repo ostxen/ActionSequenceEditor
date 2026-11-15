@@ -12,8 +12,9 @@ namespace NBC.ActionEditor.Presentation.Timeline
         private readonly HashSet<TimelineGroup> collapsed = new HashSet<TimelineGroup>();
         private float minimum;
         private float maximum = 7;
-        public float ScrollY { get; set; }
-        public float LeftWidth { get; set; } = 240;
+        private float scrollY, leftWidth = 240;
+        public float ScrollY { get => scrollY; set { RequireFinite(value); scrollY = Math.Max(0, value); } }
+        public float LeftWidth { get => leftWidth; set { RequireFinite(value); leftWidth = Math.Max(0, value); } }
         public float ViewTimeMin
         {
             get => minimum;

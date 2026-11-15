@@ -1,3 +1,5 @@
+using NBC.ActionEditor.Presentation.Properties;
+using NBC.ActionEditor.Infrastructure.Assets;
 using NBC.ActionEditor.Views.IMGUI;
 using NBC.ActionEditor.Views.IMGUI.Controls;
 using NBC.ActionEditor.Views.IMGUI.Properties;
@@ -18,6 +20,11 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class TypeCatalogTests
     {
+        private static InspectorsBase Inspector(object value)
+        {
+            var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
+            return EditorExtensionFactory.GetInspector(presenter.CaptureTarget(value), presenter);
+        }
         private class BaseAsset : ActionDocument { }
         private sealed class ChildAsset : BaseAsset { }
         [CustomHeader(typeof(BaseAsset))] private class ExactHeader : HeaderBase { public override void OnGUI(EditorExtensionContext context) { } }
@@ -28,18 +35,22 @@ namespace NBC.ActionEditor.Tests
         [CustomInspectors(typeof(TimelineClip), true)] private class InheritedInspector : InspectorsBase { }
         [CustomInspectors(typeof(PointClip), true)] private sealed class SignalInspector : InspectorsBase { }
         [Unique, Attachable(typeof(FeatureSampleGroup))] private sealed class UniqueTrack : TimelineTrack { }
-        private sealed class DisabledBlend : CrossBlendClip { public override float BlendIn { get => -1; set { } } }
+        private sealed class DisabledBlend : CrossBlendClip
+        {
+            public override float Length { get => length; set => length = value; }
+            public override float BlendIn { get => -1; set { } }
+        }
         [Serializable] public sealed class TestDocument : ActionDocument
         { public static int Constructors; public TestDocument() { Constructors++; } }
         [ToolkitHeader(typeof(BaseAsset), true)] private sealed class NativeHeader : ToolkitHeaderView
         { public override VisualElement CreateGUI(EditorExtensionContext context) => new Label("native"); }
         [ToolkitProperties(typeof(BaseAsset))] private class ExactProperties : ToolkitPropertyExtension
-        { public override void Populate(VisualElement root, object target, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter, Action refresh) => root.Add(new Label("exact")); }
+        { public override void Populate(VisualElement root, NBC.ActionEditor.Presentation.Properties.PropertyTargetState target, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter, Action refresh) => root.Add(new Label("exact")); }
         [ToolkitProperties(typeof(BaseAsset), true)] private class InheritedProperties : ToolkitPropertyExtension
-        { public override void Populate(VisualElement root, object target, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter, Action refresh) => root.Add(new Label("inherited")); }
+        { public override void Populate(VisualElement root, NBC.ActionEditor.Presentation.Properties.PropertyTargetState target, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter, Action refresh) => root.Add(new Label("inherited")); }
         private sealed class DerivedProperties : InheritedProperties { }
         [ToolkitProperties(typeof(BaseAsset), true)] private sealed class ConflictingProperties : ToolkitPropertyExtension
-        { public override void Populate(VisualElement root, object target, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter, Action refresh) { } }
+        { public override void Populate(VisualElement root, NBC.ActionEditor.Presentation.Properties.PropertyTargetState target, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter, Action refresh) { } }
 
         [Test] public void NativePropertyBindingsAreIndependentExactOrExplicitlyInheritedAndRejectConflicts()
         {
@@ -57,15 +68,15 @@ namespace NBC.ActionEditor.Tests
         {
             var calls = TestDocument.Constructors;
             Assert.That(ActionEditorTypeCatalog.DerivedFrom(typeof(ActionDocument)).Any(i => i.type == typeof(TestDocument)), Is.False);
-            var creation = new Composition.DocumentDialogComposition(ActionEditorHost.Context);
+            var creation = new Infrastructure.Documents.DocumentDialogCatalog();
             Assert.That(creation.CreationTypes().Contains(typeof(TestDocument)), Is.False);
             Assert.That(creation.CreationTypes(), Does.Contain(typeof(FeatureSampleDocument)));
-            Assert.Throws<System.IO.InvalidDataException>(() => NBC.ActionEditor.Storage.DocumentFormats.Context.RequireType(typeof(TestDocument), "$"));
+            Assert.Throws<System.IO.InvalidDataException>(() => NBC.ActionEditor.Infrastructure.Serialization.DocumentFormats.Context.RequireType(typeof(TestDocument), "$"));
             Assert.That(TestDocument.Constructors, Is.EqualTo(calls));
             Assert.That(typeof(PropertyDescription).Assembly, Is.SameAs(typeof(ActionDocument).Assembly));
             Assert.That(typeof(CustomHeader).Assembly, Is.SameAs(typeof(EditorExtensionFactory).Assembly));
             Assert.That(ExtensionResolver.ResolveExtension(new[] { typeof(NativeHeader), typeof(InheritedHeader) }, typeof(ChildAsset), typeof(ToolkitHeaderAttribute)), Is.EqualTo(typeof(NativeHeader)));
-            Assert.That(EditorExtensionFactory.GetToolkitHeader(new FeatureSampleDocument()), Is.TypeOf<Samples.FeatureSampleToolkitHeader>());
+            Assert.That(EditorExtensionFactory.GetToolkitHeader(typeof(FeatureSampleDocument)), Is.TypeOf<Samples.FeatureSampleToolkitHeader>());
             Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID("Assets/ActionEditor/Samples/FeatureSample/README.md"), Is.EqualTo("30542892b6cdb57489102ba2218a9a47"));
         }
 
@@ -105,16 +116,16 @@ namespace NBC.ActionEditor.Tests
             Assert.That(UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEditor.MonoScript>(imgui + "CreateDocumentWindow.cs").GetClass(), Is.EqualTo(typeof(CreateDocumentWindow)));
             Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID(imgui + "Properties/Standard/DocumentInspector.cs"), Is.EqualTo("1d716975a9a545de861fefb88b2c17a6"));
             Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID(imgui + "Properties/Standard/ClipInspector.cs"), Is.EqualTo("1d4a2bbcab364421fbac5f6dbe2fd18d"));
-            Assert.That(EditorExtensionFactory.GetInspector(new FeatureSampleDocument(), Composition.PropertyComposition.Create(ActionEditorHost.Context, Prefs.Session)), Is.TypeOf<DocumentInspector>());
+            Assert.That(Inspector(new FeatureSampleDocument()), Is.TypeOf<DocumentInspector>());
             Assert.That(UnityEditor.AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/ActionEditor/Editor/Views/UIToolkit/TimelineCanvas.uss"), Is.Not.Null);
             Assert.That(Resources.Load<GUISkin>("nbc/StyleSheet"), Is.Not.Null);
             Assert.That(Styles.WhiteTexture, Is.Not.Null);
             Assert.That(Styles.PlayIcon, Is.Not.Null);
             foreach (var field in typeof(Styles).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static).Where(field => field.FieldType == typeof(Texture2D)))
                 Assert.That(field.GetValue(null), Is.Not.Null, field.Name + "必须绑定实际纹理。");
-            Assert.That(EditorExtensionFactory.GetHeader(new FeatureSampleDocument()), Is.Not.Null);
-            Assert.That(EditorExtensionFactory.GetInspector(new FeatureSampleInterval(), Composition.PropertyComposition.Create(ActionEditorHost.Context, Prefs.Session)), Is.TypeOf<ClipInspector>());
-            Assert.That(typeof(Prefs).Assembly, Is.SameAs(typeof(Composition.WindowBinding).Assembly));
+            Assert.That(EditorExtensionFactory.GetHeader(typeof(FeatureSampleDocument)), Is.Not.Null);
+            Assert.That(Inspector(new FeatureSampleInterval()), Is.TypeOf<ClipInspector>());
+            Assert.That(typeof(Composition.PreferencesComposition).Assembly, Is.SameAs(typeof(Composition.WindowBinding).Assembly));
             Assert.That(typeof(ActionDocument).Assembly.GetReferencedAssemblies().Any(a => a.Name == typeof(Composition.WindowBinding).Assembly.GetName().Name), Is.False);
         }
 
@@ -153,8 +164,25 @@ namespace NBC.ActionEditor.Tests
             Assert.That(DirectableTypeInfo.For(marker.GetType()).IsSignal, Is.True);
             Assert.That(marker.CanScale() || marker.CanBlendIn(), Is.False);
             Assert.That(new DisabledBlend().CanBlendIn(), Is.False);
-            Assert.That(EditorExtensionFactory.GetInspector(clip, Composition.PropertyComposition.Create(ActionEditorHost.Context, Prefs.Session)), Is.TypeOf<ClipInspector>());
-            var root = new VisualElement(); new ToolkitProperties(Composition.PropertyComposition.Create(ActionEditorHost.Context, Prefs.Session)).Populate(root, clip, () => { });
+            var disabled = new DisabledBlend();
+            ClipTimingRules.ApplyTiming(disabled, 0, .01f);
+            Assert.That(disabled.BlendIn, Is.EqualTo(-1));
+            var cached = new FeatureSampleInterval { Length = 1, BlendIn = .25f, BlendOut = .25f };
+            cached.SetCrossBlendIn(.4f); cached.SetCrossBlendOut(.3f);
+            ClipTimingRules.ApplyTiming(cached, .5f, cached.Length);
+            cached.SetCrossBlendIn(0); cached.SetCrossBlendOut(0);
+            Assert.That(cached.BlendIn, Is.EqualTo(.25f));
+            Assert.That(cached.BlendOut, Is.EqualTo(.25f));
+            cached.SetCrossBlendIn(.4f); cached.SetCrossBlendOut(.3f);
+            ClipTimingRules.ApplyTiming(cached, .5f, .2f);
+            Assert.That(cached.BlendIn, Is.EqualTo(.4f));
+            Assert.That(cached.BlendOut, Is.EqualTo(.3f));
+            cached.SetCrossBlendIn(0); cached.SetCrossBlendOut(0);
+            Assert.That(cached.BlendIn, Is.EqualTo(.2f));
+            Assert.That(cached.BlendOut, Is.Zero);
+            Assert.That(Inspector(clip), Is.TypeOf<ClipInspector>());
+            var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
+            var root = new VisualElement(); new ToolkitProperties(presenter).Populate(root, presenter.CaptureTarget(clip), () => { });
             Assert.That(root.Q("timeline-clip-timing"), Is.Not.Null);
         }
         [Test] public void ParentAndUniqueConstraintsRemainExactAndInstanceAware()

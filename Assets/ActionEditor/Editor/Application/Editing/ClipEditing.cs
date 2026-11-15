@@ -38,13 +38,46 @@ namespace NBC.ActionEditor.Application.Editing
             foreach (var pair in starts) { RequireClip(pair.Key); RequireFinite(pair.Value); }
             delta = Math.Max(delta, -starts.Values.Min());
             var applied = delta;
-            token.Update(() => { foreach (var pair in starts) pair.Key.StartTime = pair.Value + applied; });
+            foreach (var pair in starts) ClipTimingRules.RequireTiming(pair.Key, pair.Value + applied, pair.Key.Length);
+            token.Update(() => { foreach (var pair in starts) ClipTimingRules.ApplyTiming(pair.Key, pair.Value + applied, pair.Key.Length); });
         }
         public void Resize(DocumentEditTransaction token, TimelineClip clip, float start, float length)
         {
             RequireToken(token); RequireClip(clip); RequireFinite(start); RequireFinite(length);
-            if (start < 0 || length < .01f) throw new ArgumentOutOfRangeException(nameof(length), "片段最短为0.01秒。");
-            token.Update(() => { clip.StartTime = start; clip.Length = length; });
+            if (!clip.CanScale()) throw new InvalidOperationException("片段不支持缩放。");
+            ClipTimingRules.RequireTiming(clip, start, length);
+            token.Update(() => ClipTimingRules.ApplyTiming(clip, start, length));
+        }
+        // 手势可暂时显示重叠候选；结束时整批验收，不在View复制合法性规则。
+        public bool Finish(DocumentEditTransaction token, IEnumerable<TimelineClip> candidates)
+        {
+            RequireToken(token);
+            try
+            {
+                foreach (var clip in candidates)
+                {
+                    RequireClip(clip);
+                    ClipTimingRules.RequireTiming(clip, clip.StartTime, clip.Length);
+                    if (!clip.CanValidTime()) { token.Cancel(); return false; }
+                }
+                token.Commit("Drag timeline clips");
+                return true;
+            }
+            catch { if (token.IsActive) token.Cancel(); throw; }
+        }
+        public void MatchLoop(TimelineClip clip, int direction)
+        {
+            RequirePropertyEdit(clip);
+            if (clip is not ISubClipContainable loop || loop.SubClipLength <= 0 || loop.SubClipSpeed <= 0)
+                throw new InvalidOperationException("片段没有有效的源循环。");
+            var length = direction < 0 ? loop.GetPreviousLoopLocalTime()
+                : direction > 0 ? loop.GetNextLoopLocalTime() : loop.SubClipLength / loop.SubClipSpeed;
+            ClipTimingRules.RequireTiming(clip, clip.StartTime, length);
+            var next = clip.GetNextSibling();
+            if (direction > 0 && next != null && clip.StartTime + length > next.StartTime) return;
+            if (!clip.CanValidTime(clip.StartTime, clip.StartTime + length))
+                throw new InvalidOperationException("目标时长超出相邻片段边界。");
+            session.Edit("Match clip loop", () => ClipTimingRules.ApplyTiming(clip, clip.StartTime, length));
         }
         private void RequireToken(DocumentEditTransaction token)
         { if (!session.Owns(token)) throw new InvalidOperationException("编辑令牌已失效或不属于此会话。"); }

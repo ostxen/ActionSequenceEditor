@@ -67,13 +67,11 @@ namespace NBC.ActionEditor.Serialization
         }
         private static void ParentType(Type child, Type parent, string path)
         {
-            var parents = DirectableTypeInfo.For(child).AttachableTypes;
-            Require(parents == null || parents.Contains(parent), path, "incompatible parent type.");
+            Require(StructureRules.AllowsParent(child, parent), path, "incompatible parent type.");
         }
         private static void Unique(object child, IEnumerable<object> siblings, string path)
         {
-            if (DirectableTypeInfo.For(child.GetType()).IsUnique)
-                Require(siblings.Count(item => item != null && item.GetType() == child.GetType()) == 1, path, "duplicate unique node.");
+            Require(!StructureRules.HasUniqueConflict(child.GetType(), siblings, child), path, "duplicate unique node.");
         }
     }
 }

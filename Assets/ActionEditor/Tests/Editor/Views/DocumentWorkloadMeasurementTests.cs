@@ -11,7 +11,7 @@ using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 using Unity.Profiling;
 using UnityEditor;
@@ -118,7 +118,7 @@ namespace NBC.ActionEditor.Tests
             for (var repetition = 0; repetition < 3; repetition++)
             {
                 FeatureSampleDocument document = null;
-                ActionEditorContext context = null; TimelinePresenter presenter = null;
+                EditorFixture context = null; TimelinePresenter presenter = null;
                 try
                 {
                     yield return Measure(report, repetition, "document-construction-and-init", () => document = Create(large));
@@ -130,13 +130,13 @@ namespace NBC.ActionEditor.Tests
                     report.Tracks = document.AllTracks.Count(); report.Clips = document.AllTracks.Sum(t => t.Clips.Count);
                     yield return Measure(report, repetition, "composition-and-session-open", () =>
                     {
-                        context = new ActionEditorContext(Composition.DocumentComposition.Create());
+                        context = new EditorFixture(Composition.DocumentComposition.Create());
                         context.Session.Open(new DocumentOpenData(document));
                     });
                     var workspace = new TimelineWorkspace();
                     var settings = new EditorSettings(TimeStepMode.Seconds, .1f, 30, false, true, 0, "Assets/");
                     yield return Measure(report, repetition, "presenter-construction-and-render-state", () =>
-                        presenter = new TimelinePresenter(context.Session, context.Selection, context.Structure, context.ClipboardEditing,
+                        presenter = new TimelinePresenter(context.Session, context.Selection, context.Structure, context.Nodes, context.ClipboardEditing,
                             context.Clips, workspace, new Playhead(), () => settings, new View()));
                     Assert.That(presenter.State.Clips.Count, Is.EqualTo(report.Clips));
                     report.Rows = presenter.State.Rows.Count; report.RenderClips = presenter.State.Clips.Count;

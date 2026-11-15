@@ -1,25 +1,20 @@
-﻿using NBC.ActionEditor.Domain;
+﻿using NBC.ActionEditor.Presentation.Properties;
+using NBC.ActionEditor.Domain;
 using NBC.ActionEditor.Presentation.Contracts;
 using UnityEditor;
 using UnityEngine;
 
 namespace NBC.ActionEditor.Views.IMGUI.Properties.Standard
 {
-    // 为片段属性扩展提供明确类型的目标访问。
-    public abstract class ClipInspector<T> : ClipInspector where T : TimelineClip
-    {
-        protected T action => (T)target;
-    }
-
     // 原生片段属性控件只绘制共享快照并上报时间或混合意图。
     [CustomInspectors(typeof(TimelineClip), true)]
     public class ClipInspector : InspectorsBase
     {
-        private TimelineClip Clip => (TimelineClip)target;
+        private PropertyFieldId Clip => target.Id;
         public override void OnInspectorGUI() => ShowCommonInspector();
         protected void ShowCommonInspector(bool showBaseInspector = true)
         {
-            var state = Presenter.ClipState(Clip);
+            var state = target.Clip;
             if (!state.Valid) EditorGUILayout.HelpBox("该剪辑无效。 请确保设置了所需的参数。", MessageType.Error);
             DrawTiming(state);
             DrawBlend(state);

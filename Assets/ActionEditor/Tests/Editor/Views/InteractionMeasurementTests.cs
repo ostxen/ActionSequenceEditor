@@ -86,9 +86,9 @@ namespace NBC.ActionEditor.Tests
         }
         private static IEnumerator Playback()
         {
-            using (var context = new ActionEditorContext(NBC.ActionEditor.Composition.DocumentComposition.Create()))
+            using (var context = new EditorFixture(NBC.ActionEditor.Composition.DocumentComposition.Create()))
             {
-                var fixture = new TextAsset(Storage.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
+                var fixture = new TextAsset(Infrastructure.Serialization.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
                 try
                 {
                     context.Open(fixture); context.Playback.Play(0);
@@ -104,8 +104,8 @@ namespace NBC.ActionEditor.Tests
         {
             var report = new Report { CapturedUtc = DateTime.UtcNow.ToString("O"), UnityVersion = UnityEngine.Application.unityVersion,
                 ProcessId = Process.GetCurrentProcess().Id, PixelsPerPoint = EditorGUIUtility.pixelsPerPoint,
-                FrameRate = Prefs.FrameRate, LeftWidth = Styles.TimelineLeftWidth, SnapInterval = Prefs.SnapInterval,
-                Magnet = Prefs.MagnetSnapping, WheelZoom = Prefs.scrollWheelZooms,
+                FrameRate = EditorFixture.SharedSettings.Current.FrameRate, LeftWidth = Styles.TimelineLeftWidth, SnapInterval = EditorFixture.SharedSettings.Current.SnapInterval,
+                Magnet = EditorFixture.SharedSettings.Current.MagnetSnapping, WheelZoom = EditorFixture.SharedSettings.Current.ScrollWheelZooms,
                 ThreadAllocationCounterSupported = AllocationCounterWorks() };
             using (var calibration = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC Allocated In Frame", 16))
             {

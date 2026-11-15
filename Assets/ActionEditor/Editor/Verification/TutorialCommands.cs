@@ -8,7 +8,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine.UIElements;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using Unity.Pipeline.Commands;
 using UnityEditor;
 using UnityEngine;
@@ -25,7 +25,7 @@ namespace NBC.ActionEditor.Verification
             VerificationGuard.Ready();
             const string root = "Assets/ActionEditorTutorialVerification";
             if (Directory.Exists(root) || File.Exists(root) || File.Exists(root + ".meta")) throw new IOException("Fixture exists, refusing overwrite.");
-            if (ActionEditorHost.Context.Session.IsEditing || ActionEditorHost.Context.Playback.IsPlaying || Resources.FindObjectsOfTypeAll<ImguiWindow>().Length != 0
+            if (VerificationSession.Shared.Session.IsEditing || VerificationSession.Shared.Playback.IsPlaying || Resources.FindObjectsOfTypeAll<ImguiWindow>().Length != 0
                 || Resources.FindObjectsOfTypeAll<ToolkitWindow>().Length != 0 || Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Length != 0
                 || Resources.FindObjectsOfTypeAll<Samples.FeatureSamplePreview>().Length != 0)
                 throw new InvalidOperationException("Requires no active edit/playback or existing product/preview/export windows; never reuse user windows.");
@@ -33,7 +33,7 @@ namespace NBC.ActionEditor.Verification
                 operations = new[] { "open both real menu methods in turn", "create preset via creation popup's shared confirmed action", "select and edit properties, move and resize using each window's gesture adapter", "Undo/Redo", "sample state preview and playback", "save via each window SaveChanges", "close/reopen same source", "open shared export menu and export independent copy", "restore prior session and delete only owned fixture folder" },
                 nativeFileDialogs = "not automated; fixed new paths replace OS path input only" };
             if (!confirm) throw new InvalidOperationException("Preview and explicit approval required.");
-            var recovery = ActionEditorHost.Context.Session.CaptureRecovery(); var previous = ActionEditorHost.Context.Source;
+            var recovery = VerificationSession.Shared.Session.CaptureRecovery(); var previous = VerificationSession.Shared.Source;
             var owns = false;
             ImguiWindow imgui = null; ToolkitWindow toolkitWindow = null; Samples.FeatureSamplePreview preview = null; DocumentExportWindow export = null;
             var results = new System.Collections.Generic.List<object>();
@@ -43,30 +43,30 @@ namespace NBC.ActionEditor.Verification
                 if (!owns) throw new IOException("Fixture folder creation failed.");
                 foreach (var toolkit in new[] { false, true })
                 {
-                    ActionEditorHost.Context.Open(null);
+                    VerificationSession.Shared.Open(null);
                     if (toolkit) { ToolkitWindow.Open(); toolkitWindow = Resources.FindObjectsOfTypeAll<ToolkitWindow>().Single(); toolkitWindow.position = new Rect(60, 60, 1000, 600); }
                     else { ImguiWindow.Open(); imgui = Resources.FindObjectsOfTypeAll<ImguiWindow>().Single(); imgui.position = new Rect(60, 60, 1000, 600); }
                     await TutorialFrames();
                     var path = root + (toolkit ? "/Toolkit.json" : "/IMGUI.json");
-                    new Composition.DocumentDialogComposition(ActionEditorHost.Context).CreateAndOpen(typeof(FeatureSampleDocument), path);
+                    VerificationSession.Shared.CreateDocuments().Create(typeof(FeatureSampleDocument), path);
                     await TutorialFrames();
-                    if (ActionEditorHost.Context.Session.Path != path || ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().Count() != 3 || ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().Sum(g => g.Tracks.Count) != 7
-                        || ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).Sum(t => t.Clips.Count) != 13 || ActionEditorHost.Context.Session.IsDirty
+                    if (VerificationSession.Shared.Session.Path != path || VerificationSession.Shared.Document.RootItems.OfType<TimelineGroup>().Count() != 3 || VerificationSession.Shared.Document.RootItems.OfType<TimelineGroup>().Sum(g => g.Tracks.Count) != 7
+                        || VerificationSession.Shared.Document.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).Sum(t => t.Clips.Count) != 13 || VerificationSession.Shared.Session.IsDirty
                         || (toolkit ? Resources.FindObjectsOfTypeAll<ImguiWindow>().Length != 0 : Resources.FindObjectsOfTypeAll<ToolkitWindow>().Length != 0))
                         throw new InvalidOperationException("Preset graph or originating view differs.");
-                    var clip = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; ActionEditorHost.Context.Selection.Set(new IDirectable[] { clip }, false);
+                    var clip = VerificationSession.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; VerificationSession.Shared.Selection.Set(new IDirectable[] { clip }, false);
                     if (toolkit)
                     {
                         toolkitWindow.Select(clip); var properties = toolkitWindow.CreatePropertyView(); toolkitWindow.rootVisualElement.Add(properties);
                         properties.Query<TextField>().ToList().Single(f => f.label == "标题").value = "Tutorial";
                         properties.RemoveFromHierarchy();
                     }
-                    else ActionEditorHost.Context.Session.Edit("Tutorial property", () => new NBC.ActionEditor.Application.Editing.PropertyPath(ActionEditorHost.Context.Properties, clip).Field(typeof(FeatureSampleInterval).GetField("Caption")).Write("Tutorial"));
+                    else VerificationSession.Shared.Session.Edit("Tutorial property", () => new NBC.ActionEditor.Application.Editing.PropertyPath(VerificationSession.Shared.Properties, clip).Field(typeof(FeatureSampleInterval).GetField("Caption")).Write("Tutorial"));
                     if (((FeatureSampleInterval)clip).Caption != "Tutorial") throw new InvalidOperationException("Property edit failed.");
                     await TutorialFrames();
                     for (var resize = 0; resize < 2; resize++)
                     {
-                        clip = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; ActionEditorHost.Context.Selection.Set(new IDirectable[] { clip }, false);
+                        clip = VerificationSession.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; VerificationSession.Shared.Selection.Set(new IDirectable[] { clip }, false);
                         if (toolkit)
                         {
                             var rect = toolkitWindow.Canvas.ClipRect(clip, 1);
@@ -86,33 +86,33 @@ namespace NBC.ActionEditor.Verification
                                 imgui.SendEvent(new Event { type = kind, button = 0, shift = true, mousePosition = kind == EventType.MouseDown ? down : up });
                             if (imgui.Timeline.Error != null) throw new InvalidOperationException(imgui.Timeline.Error);
                         }
-                        clip = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+                        clip = VerificationSession.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                         if (Mathf.Abs(clip.StartTime - .5f) > .0001f || Mathf.Abs(clip.Length - (resize == 0 ? 1.5f : 1.25f)) > .0001f)
                             throw new InvalidOperationException("Tutorial move/resize differs: " + (toolkit ? "Toolkit" : "IMGUI") + ", step=" + resize + ", start=" + clip.StartTime + ", length=" + clip.Length);
                         await TutorialFrames();
                     }
-                    var editedLength = ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length;
-                    Undo.PerformUndo(); if (ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length != 1.5f) throw new InvalidOperationException("Undo failed.");
-                    Undo.PerformRedo(); if (ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length != editedLength) throw new InvalidOperationException("Redo failed.");
+                    var editedLength = VerificationSession.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length;
+                    Undo.PerformUndo(); if (VerificationSession.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length != 1.5f) throw new InvalidOperationException("Undo failed.");
+                    Undo.PerformRedo(); if (VerificationSession.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length != editedLength) throw new InvalidOperationException("Redo failed.");
                     preview = ScriptableObject.CreateInstance<Samples.FeatureSamplePreview>();
-                    preview.Bind(new EditorExtensionContext(() => ActionEditorHost.Context.Document, () => ActionEditorHost.Context.Player.CurrentTime)); preview.Show(); preview.Repaint();
-                    var now = (float)EditorApplication.timeSinceStartup; ActionEditorHost.Context.Playback.Play(now); ActionEditorHost.Context.Playback.Update(now + .1f, 1);
-                    if (!ActionEditorHost.Context.Playback.IsPlaying || ActionEditorHost.Context.Player.CurrentTime <= 0) throw new InvalidOperationException("Playback failed.");
-                    ActionEditorHost.Context.Playback.Pause(true); ActionEditorHost.Context.Player.Sample(.75f); await TutorialFrames(); ActionEditorHost.Context.Playback.Stop(); preview.Close(); preview = null;
+                    preview.Bind(new EditorExtensionContext(new NBC.ActionEditor.Presentation.Presenters.ExtensionDocumentPresenter(() => VerificationSession.Shared.Document, () => VerificationSession.Shared.Player.CurrentTime).Capture)); preview.Show(); preview.Repaint();
+                    var now = (float)EditorApplication.timeSinceStartup; VerificationSession.Shared.Playback.Play(now); VerificationSession.Shared.Playback.Update(now + .1f, 1);
+                    if (!VerificationSession.Shared.Playback.IsPlaying || VerificationSession.Shared.Player.CurrentTime <= 0) throw new InvalidOperationException("Playback failed.");
+                    VerificationSession.Shared.Playback.Pause(true); VerificationSession.Shared.Player.Sample(.75f); await TutorialFrames(); VerificationSession.Shared.Playback.Stop(); preview.Close(); preview = null;
                     if (toolkit) toolkitWindow.SaveChanges(); else imgui.SaveChanges();
-                    if (ActionEditorHost.Context.Session.IsDirty) throw new InvalidOperationException("Real window save failed.");
-                    var expected = JsonDocumentCodec.Content(ActionEditorHost.Context.Document); var bytes = File.ReadAllBytes(path);
+                    if (VerificationSession.Shared.Session.IsDirty) throw new InvalidOperationException("Real window save failed.");
+                    var expected = JsonDocumentCodec.Content(VerificationSession.Shared.Document); var bytes = File.ReadAllBytes(path);
                     if (toolkit) { toolkitWindow.Close(); toolkitWindow = null; } else { imgui.Close(); imgui = null; }
-                    ActionEditorHost.Context.Open(null);
+                    VerificationSession.Shared.Open(null);
                     if (toolkit) { ToolkitWindow.Open(); toolkitWindow = Resources.FindObjectsOfTypeAll<ToolkitWindow>().Single(); }
                     else { ImguiWindow.Open(); imgui = Resources.FindObjectsOfTypeAll<ImguiWindow>().Single(); }
-                    Composition.DocumentPresenterComposition.OpenPicked(ActionEditorHost.Context, AssetDatabase.LoadAssetAtPath<TextAsset>(path)); await TutorialFrames();
-                    if (ActionEditorHost.Context.Session.Path != path || ActionEditorHost.Context.Session.IsDirty || JsonDocumentCodec.Content(ActionEditorHost.Context.Document) != expected) throw new InvalidOperationException("Reopened source differs.");
-                    var before = ActionEditorHost.Context.Session.CaptureRecovery(); var graph = ActionEditorHost.Context.Document;
-                    Action openExport = null; Composition.DocumentPresenterComposition.PopulateSaveMenu(Composition.DocumentPresenterComposition.Create(ActionEditorHost.Context), (label, action) => { if (label == Lan.Export) openExport = action; });
+                    VerificationSession.Shared.CreateDocuments().OpenPicked(AssetDatabase.LoadAssetAtPath<TextAsset>(path)); await TutorialFrames();
+                    if (VerificationSession.Shared.Session.Path != path || VerificationSession.Shared.Session.IsDirty || JsonDocumentCodec.Content(VerificationSession.Shared.Document) != expected) throw new InvalidOperationException("Reopened source differs.");
+                    var before = VerificationSession.Shared.Session.CaptureRecovery(); var graph = VerificationSession.Shared.Document;
+                    Action openExport = null; Composition.DocumentPresenterComposition.PopulateSaveMenu(VerificationSession.Shared.CreateDocuments(), (label, action) => { if (label == Lan.Export) openExport = action; });
                     openExport(); export = Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Single(); await TutorialFrames();
                     var target = path.Replace(".json", "-Export.json"); export.ExportTo("actioneditor.json", target); export.Close(); export = null;
-                    if (!ReferenceEquals(graph, ActionEditorHost.Context.Document) || ActionEditorHost.Context.Session.CaptureRecovery() != before || !File.ReadAllBytes(path).SequenceEqual(bytes)
+                    if (!ReferenceEquals(graph, VerificationSession.Shared.Document) || VerificationSession.Shared.Session.CaptureRecovery() != before || !File.ReadAllBytes(path).SequenceEqual(bytes)
                         || JsonDocumentCodec.Content(JsonDocumentCodec.Decode(File.ReadAllText(target))) != expected) throw new InvalidOperationException("Export not independent or readback differs.");
                     results.Add(new { ui = toolkit ? "UI Toolkit" : "IMGUI", source = path, exported = target, groups = 3, tracks = 7, clips = 13, start = .5f, length = 1.25f,
                         checks = "create origin/property/move/resize/Undo/Redo/playback/save/close/reopen/export readback", sourceBytes = bytes.Length });
@@ -126,10 +126,10 @@ namespace NBC.ActionEditor.Verification
             }
             finally
             {
-                ActionEditorHost.Context.Session.CancelEdit(); ActionEditorHost.Context.Playback.Stop();
+                VerificationSession.Shared.Session.CancelEdit(); VerificationSession.Shared.Playback.Stop();
                 if (preview != null) preview.Close(); if (export != null) export.Close();
                 if (imgui != null) { imgui.DiscardChanges(); imgui.Close(); } if (toolkitWindow != null) { toolkitWindow.DiscardChanges(); toolkitWindow.Close(); }
-                try { ActionEditorHost.Context.Open(previous); ActionEditorHost.Context.Session.RestoreRecovery(recovery); }
+                try { VerificationSession.Shared.Open(previous); VerificationSession.Shared.Session.RestoreRecovery(recovery); }
                 finally { if (owns && !AssetDatabase.DeleteAsset(root)) throw new IOException("Owned tutorial fixture cleanup failed."); }
             }
         }

@@ -20,48 +20,48 @@ namespace NBC.ActionEditor.Tests
         private string previousRecovery;
         [SetUp] public void SetUp()
         {
-            previousText = ActionEditorHost.Context.Source;
-            previousRecovery = ActionEditorHost.Context.Session.CaptureRecovery();
-            ActionEditorHost.Context.Open(null);
+            previousText = EditorFixture.Shared.Source;
+            previousRecovery = EditorFixture.Shared.Session.CaptureRecovery();
+            EditorFixture.Shared.Open(null);
         }
         [TearDown] public void TearDown()
         {
-            ActionEditorHost.Context.Session.CancelEdit();
-            ActionEditorHost.Context.Open(previousText);
-            ActionEditorHost.Context.Session.RestoreRecovery(previousRecovery);
+            EditorFixture.Shared.Session.CancelEdit();
+            EditorFixture.Shared.Open(previousText);
+            EditorFixture.Shared.Session.RestoreRecovery(previousRecovery);
         }
         [UnityTest]
         public IEnumerator SelectingDocumentDrawsImguiTimelineWithoutOpeningToolkit()
         {
-            var previous = ActionEditorHost.Context.Source;
+            var previous = EditorFixture.Shared.Source;
 
             var toolkitWindows = Resources.FindObjectsOfTypeAll<ToolkitWindow>();
             var sample = new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument();
             var group = new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleGroup { Name = "Reference" };
             group.Tracks.Add(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleIntervalTrack { Name = "Events" });
             sample.ClearRoots(); sample.AddRoot(group); sample.Init();
-            var json = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(sample));
+            var json = new TextAsset(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Encode(sample));
             var window = ScriptableObject.CreateInstance<ImguiWindow>();
             try
             {
                 window.Show(); window.position = new Rect(60, 60, 1000, 600);
-                Composition.DocumentPresenterComposition.OpenPicked(ActionEditorHost.Context, json);
+                EditorFixture.Shared.CreateDocuments().OpenPicked(json);
                 window.Repaint(); yield return null; yield return null;
-                Assert.That(ActionEditorHost.Context.Source, Is.SameAs(json));
-                Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo("Events"));
+                Assert.That(EditorFixture.Shared.Source, Is.SameAs(json));
+                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo("Events"));
                 var timeline = window.Timeline.State;
                 Assert.That(timeline.Size.Width, Is.EqualTo(window.position.width).Within(1), "IMGUI must use the actual window geometry.");
                 Assert.That(timeline.Size.Height, Is.GreaterThan(200));
                 Assert.That(timeline.Rows.Count, Is.EqualTo(2));
                 Assert.That(timeline.Rows[1].Title, Is.EqualTo("Events"));
                 Assert.That(Resources.FindObjectsOfTypeAll<ToolkitWindow>(), Is.EquivalentTo(toolkitWindows));
-                var documents = Composition.DocumentPresenterComposition.Create(ActionEditorHost.Context, _ => null);
+                var documents = EditorFixture.Shared.CreateDocuments(_ => null);
                 Assert.DoesNotThrow(() => documents.Invoke(DocumentIntent.Save), "Canceling the save path leaves the in-memory fixture unchanged.");
-                Assert.That(ActionEditorHost.Context.Source, Is.SameAs(json));
+                Assert.That(EditorFixture.Shared.Source, Is.SameAs(json));
             }
             finally
             {
-                window.Close(); ActionEditorHost.Context.Open(previous);
+                window.Close(); EditorFixture.Shared.Open(previous);
                 UnityEngine.Object.DestroyImmediate(json);
             }
         }
@@ -71,16 +71,16 @@ namespace NBC.ActionEditor.Tests
         {
             var imgui = Resources.FindObjectsOfTypeAll<ImguiWindow>();
             var toolkit = Resources.FindObjectsOfTypeAll<ToolkitWindow>();
-            var document = ActionEditorHost.Context.Document;
-            var target = ActionEditorHost.Context.Source;
-            var result = ActionEditorHost.Context.Lifecycle.Create(typeof(string), "Assets/InvalidDocumentCreation.json");
+            var document = EditorFixture.Shared.Document;
+            var target = EditorFixture.Shared.Source;
+            var result = EditorFixture.Shared.Lifecycle.Create(typeof(string), "Assets/InvalidDocumentCreation.json");
             Assert.That(result.Succeeded, Is.False);
             Assert.That(result.Exception, Is.TypeOf<ArgumentException>());
             Assert.That(result.BytesCommitted, Is.False);
             Assert.That(Resources.FindObjectsOfTypeAll<ImguiWindow>(), Is.EquivalentTo(imgui));
             Assert.That(Resources.FindObjectsOfTypeAll<ToolkitWindow>(), Is.EquivalentTo(toolkit));
-            Assert.That(ActionEditorHost.Context.Document, Is.SameAs(document));
-            Assert.That(ActionEditorHost.Context.Source, Is.SameAs(target));
+            Assert.That(EditorFixture.Shared.Document, Is.SameAs(document));
+            Assert.That(EditorFixture.Shared.Source, Is.SameAs(target));
         }
 
         [Test]
@@ -88,8 +88,8 @@ namespace NBC.ActionEditor.Tests
         {
             var existingImguiWindows = Resources.FindObjectsOfTypeAll<ImguiWindow>();
             var toolkitWindows = Resources.FindObjectsOfTypeAll<ToolkitWindow>();
-            var document = ActionEditorHost.Context.Document;
-            var target = ActionEditorHost.Context.Source;
+            var document = EditorFixture.Shared.Document;
+            var target = EditorFixture.Shared.Source;
             try
             {
                 Assert.DoesNotThrow(ImguiWindow.Open);
@@ -100,12 +100,12 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(typeof(ImguiWindow).GetField("_welcomeView", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(imguiWindow), Is.TypeOf<WelcomeView>());
                 Assert.DoesNotThrow(ToolkitWindow.Open);
                 Assert.That(Resources.FindObjectsOfTypeAll<ToolkitWindow>(), Is.Not.Empty);
-                Assert.That(ActionEditorHost.Context.Document, Is.SameAs(document));
-                Assert.That(ActionEditorHost.Context.Source, Is.SameAs(target));
-                foreach (var window in Resources.FindObjectsOfTypeAll<ToolkitWindow>()) Assert.That(window.Document, Is.SameAs(document));
-                var documents = Composition.DocumentPresenterComposition.Create(ActionEditorHost.Context, _ => null);
+                Assert.That(EditorFixture.Shared.Document, Is.SameAs(document));
+                Assert.That(EditorFixture.Shared.Source, Is.SameAs(target));
+                foreach (var window in Resources.FindObjectsOfTypeAll<ToolkitWindow>()) Assert.That(window.Documents.DocumentType, Is.EqualTo(document?.GetType()));
+                var documents = EditorFixture.Shared.CreateDocuments(_ => null);
                 Assert.DoesNotThrow(() => documents.Invoke(DocumentIntent.Save));
-                Assert.That(ActionEditorHost.Context.Document, Is.SameAs(document));
+                Assert.That(EditorFixture.Shared.Document, Is.SameAs(document));
             }
             finally
             {
@@ -124,7 +124,7 @@ namespace NBC.ActionEditor.Tests
         [Test]
         public void EmptyDocumentAutoSaveNeverUpdatesTimestampOrWrites()
         {
-            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            using var context = new EditorFixture(Composition.DocumentComposition.Create());
             var before = context.AutoSave.LastSaved;
             Assert.That(context.AutoSave.Tick(1), Is.Null);
             Assert.That(context.AutoSave.LastSaved, Is.EqualTo(before));
@@ -133,20 +133,20 @@ namespace NBC.ActionEditor.Tests
         [Test]
         public void FailedOpenDoesNotChangeDocumentOrTarget()
         {
-            var previous = ActionEditorHost.Context.Source;
-            var valid = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument()));
+            var previous = EditorFixture.Shared.Source;
+            var valid = new TextAsset(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Encode(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument()));
             var invalid = new TextAsset("not json");
             try
             {
-                ActionEditorHost.Context.Open(valid);
-                var document = ActionEditorHost.Context.Document;
-                Assert.Throws<System.IO.InvalidDataException>(() => ActionEditorHost.Context.Open(invalid));
-                Assert.That(ActionEditorHost.Context.Source, Is.SameAs(valid));
-                Assert.That(ActionEditorHost.Context.Document, Is.SameAs(document));
+                EditorFixture.Shared.Open(valid);
+                var document = EditorFixture.Shared.Document;
+                Assert.Throws<System.IO.InvalidDataException>(() => EditorFixture.Shared.Open(invalid));
+                Assert.That(EditorFixture.Shared.Source, Is.SameAs(valid));
+                Assert.That(EditorFixture.Shared.Document, Is.SameAs(document));
             }
             finally
             {
-                ActionEditorHost.Context.Open(previous);
+                EditorFixture.Shared.Open(previous);
                 UnityEngine.Object.DestroyImmediate(valid);
                 UnityEngine.Object.DestroyImmediate(invalid);
             }

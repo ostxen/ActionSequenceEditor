@@ -8,7 +8,7 @@ using NBC.ActionEditor.Application.Settings;
 using NBC.ActionEditor.Domain;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -28,7 +28,7 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator DensePointsPaintAndHitInBothNativeWindowsWithoutChangingContent()
         {
 
-            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            using var context = new EditorFixture(Composition.DocumentComposition.Create());
             var document = new FeatureSampleDocument(); document.ClearRoots();
             var track = new FeatureSampleMarkerTrack { Name = "Dense points" };
             for (var i = 0; i <= 1000; i++) track.Clips.Add(new FeatureSampleMarker { StartTime = i / 200f });
@@ -45,12 +45,12 @@ namespace NBC.ActionEditor.Tests
                     if (native)
                     {
                         toolkit = ScriptableObject.CreateInstance<ToolkitWindow>();
-                        toolkit.BindContext(context, views, settings); toolkit.position = new Rect(60, 60, 1000, 500); toolkit.Show();
+                        toolkit.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, settings)); toolkit.position = new Rect(60, 60, 1000, 500); toolkit.Show();
                     }
                     else
                     {
                         imgui = ScriptableObject.CreateInstance<ImguiWindow>();
-                        imgui.BindContext(context, views, settings); imgui.position = new Rect(60, 60, 1000, 500); imgui.Show();
+                        imgui.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, settings)); imgui.position = new Rect(60, 60, 1000, 500); imgui.Show();
                     }
                     yield return null; yield return null;
                     var presenter = native ? toolkit.Canvas.Presenter : imgui.Presenter;
@@ -104,14 +104,14 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator BothNativeMenusSelectAndRevealCreatedTracksWithoutScrollingTheOtherWindow()
         {
 
-            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            using var context = new EditorFixture(Composition.DocumentComposition.Create());
             context.Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
             var views = new ActionEditorViews(); var settings = new SettingsSession(new Preferences());
             ImguiWindow imgui = null; ToolkitWindow toolkit = null;
             try
             {
-                imgui = ScriptableObject.CreateInstance<ImguiWindow>(); imgui.BindContext(context, views, settings);
-                toolkit = ScriptableObject.CreateInstance<ToolkitWindow>(); toolkit.BindContext(context, views, settings);
+                imgui = ScriptableObject.CreateInstance<ImguiWindow>(); imgui.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, settings));
+                toolkit = ScriptableObject.CreateInstance<ToolkitWindow>(); toolkit.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, settings));
                 imgui.position = new Rect(60, 60, 1000, 400); toolkit.position = new Rect(90, 90, 1000, 400);
                 imgui.Show(); toolkit.Show(); yield return null; yield return null;
                 foreach (var native in new[] { false, true })

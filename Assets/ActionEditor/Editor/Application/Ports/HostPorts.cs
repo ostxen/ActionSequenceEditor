@@ -17,4 +17,17 @@ namespace NBC.ActionEditor.Application.Ports
         string Read();
         void Write(string snapshot);
     }
+
+    // 播放只消费采样能力与时间范围，不持有具体预览资源或作者图。
+    public interface IDocumentSampler
+    {
+        event Action Faulted;
+        bool HasDocument { get; }
+        float CurrentTime { get; set; }
+        float Length { get; }
+        float RangeMin { get; }
+        float RangeMax { get; }
+        void Sample(float time);
+        void Reset();
+    }
 }

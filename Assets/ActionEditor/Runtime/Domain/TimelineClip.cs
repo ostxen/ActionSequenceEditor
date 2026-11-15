@@ -102,6 +102,13 @@ namespace NBC.ActionEditor.Domain
 
         public virtual bool CanCrossBlend { get; }
 
+        internal virtual void ConstrainAuthoredBlends()
+        {
+            var maximumOut = Mathf.Max(0, Length - Mathf.Max(0, BlendIn));
+            if (this.CanBlendOut() && BlendOut > maximumOut) BlendOut = maximumOut;
+            var maximumIn = Mathf.Max(0, Length - Mathf.Max(0, BlendOut));
+            if (this.CanBlendIn() && BlendIn > maximumIn) BlendIn = maximumIn;
+        }
 
         public virtual void OnBeforeSerialize()
         {
@@ -144,31 +151,6 @@ namespace NBC.ActionEditor.Domain
             return this.GetWeight(time, blendIn, blendOut);
         }
         
-        #region 长度匹配
-
-        public void TryMatchSubClipLength()
-        {
-            if (this is ISubClipContainable)
-                Length = ((ISubClipContainable)this).SubClipLength / ((ISubClipContainable)this).SubClipSpeed;
-        }
-
-        public void TryMatchPreviousSubClipLoop()
-        {
-            if (this is ISubClipContainable) Length = (this as ISubClipContainable).GetPreviousLoopLocalTime();
-        }
-
-        public void TryMatchNexSubClipLoop()
-        {
-            if (this is ISubClipContainable)
-            {
-                var targetLength = (this as ISubClipContainable).GetNextLoopLocalTime();
-                var nextClip = GetNextClip();
-                if (nextClip == null || StartTime + targetLength <= nextClip.StartTime) Length = targetLength;
-            }
-        }
-
-        #endregion
-
         #region 混合切片
 
         public virtual void SetCrossBlendIn(float value)
@@ -211,6 +193,14 @@ namespace NBC.ActionEditor.Domain
 
         public override bool CanCrossBlend => true;
 
+        // 只收敛作者渐变，不能把邻接计算缓存写回作者字段。
+        internal override void ConstrainAuthoredBlends()
+        {
+            var maximumOut = Mathf.Max(0, Length - Mathf.Max(0, blendIn));
+            if (this.CanBlendOut() && blendOut > maximumOut) blendOut = maximumOut;
+            var maximumIn = Mathf.Max(0, Length - Mathf.Max(0, blendOut));
+            if (this.CanBlendIn() && blendIn > maximumIn) blendIn = maximumIn;
+        }
         [MenuName("渐入时间")]
         public override float BlendIn
         {

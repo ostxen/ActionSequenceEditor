@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Presentation.Properties;
 using System;
 using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Domain;
@@ -5,15 +6,13 @@ using UnityEngine.UIElements;
 
 namespace NBC.ActionEditor
 {
-    // 扩展借用所属窗口的文档与播放头读取，不寻找另一全局会话。
+    // 扩展只捕获显示值，不取得作者图、路径或默认宿主。
     public sealed class EditorExtensionContext
     {
-        private readonly Func<ActionDocument> document;
-        private readonly Func<float> time;
-        public ActionDocument Document => document();
-        public float Time => time();
-        public EditorExtensionContext(Func<ActionDocument> document, Func<float> time)
-        { this.document = document ?? throw new ArgumentNullException(nameof(document)); this.time = time ?? throw new ArgumentNullException(nameof(time)); }
+        private readonly Func<NBC.ActionEditor.Presentation.Contracts.ExtensionDocumentState> capture;
+        public NBC.ActionEditor.Presentation.Contracts.ExtensionDocumentState Capture() => capture();
+        public EditorExtensionContext(Func<NBC.ActionEditor.Presentation.Contracts.ExtensionDocumentState> capture)
+        { this.capture = capture ?? throw new ArgumentNullException(nameof(capture)); }
     }
 
     // 编辑器扩展绑定明确目标类型与子类策略，不进入Runtime业务声明。
@@ -40,5 +39,5 @@ namespace NBC.ActionEditor
     { public abstract VisualElement CreateGUI(EditorExtensionContext context); }
     // 业务属性扩展只获得所属属性Presenter及显式目标。
     public abstract class ToolkitPropertyExtension
-    { public abstract void Populate(VisualElement root, object target, PropertyPresenter presenter, Action refresh); }
+    { public abstract void Populate(VisualElement root, NBC.ActionEditor.Presentation.Properties.PropertyTargetState target, PropertyPresenter presenter, Action refresh); }
 }

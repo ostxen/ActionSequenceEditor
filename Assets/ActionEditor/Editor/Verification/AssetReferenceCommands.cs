@@ -2,7 +2,7 @@ using NBC.ActionEditor.Domain;
 using System;
 using System.IO;
 using NBC.ActionEditor.Serialization;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using Unity.Pipeline.Commands;
 using UnityEditor;
 using UnityEngine;

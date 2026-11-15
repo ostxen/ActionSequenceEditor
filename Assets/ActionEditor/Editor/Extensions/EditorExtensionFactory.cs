@@ -1,4 +1,6 @@
-﻿using NBC.ActionEditor.Views.IMGUI.Properties;
+﻿using NBC.ActionEditor.Presentation.Properties;
+using NBC.ActionEditor.Infrastructure.Assets;
+using NBC.ActionEditor.Views.IMGUI.Properties;
 using NBC.ActionEditor.Domain;
 using System;
 using System.Collections.Generic;
@@ -14,17 +16,17 @@ namespace NBC.ActionEditor
         private static readonly Dictionary<Type, Type> inspectorBindings = new Dictionary<Type, Type>();
         private static Type[] Discover(Type type) => ActionEditorTypeCatalog.DerivedFrom(type).Select(i => i.type).ToArray();
 
-        public static HeaderBase GetHeader(ActionDocument asset)
+        public static HeaderBase GetHeader(Type asset)
         {
             if (asset == null) return null;
             headers ??= Discover(typeof(HeaderBase));
-            if (!headerBindings.TryGetValue(asset.GetType(), out var type))
-                headerBindings[asset.GetType()] = type = ExtensionResolver.ResolveExtension(headers, asset.GetType(), false);
+            if (!headerBindings.TryGetValue(asset, out var type))
+                headerBindings[asset] = type = ExtensionResolver.ResolveExtension(headers, asset, false);
             return type == null ? null : (HeaderBase)Activator.CreateInstance(type);
         }
-        public static InspectorsBase GetInspector(IData value, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter)
+        public static InspectorsBase GetInspector(NBC.ActionEditor.Presentation.Properties.PropertyTargetState value, NBC.ActionEditor.Presentation.Presenters.PropertyPresenter presenter)
         {
-            var type = GetInspectorType(value.GetType());
+            var type = GetInspectorType(value.Type);
             var inspector = type == null ? new InspectorsBase() : (InspectorsBase)Activator.CreateInstance(type);
             inspector.Bind(presenter); inspector.SetTarget(value); return inspector;
         }
@@ -37,9 +39,9 @@ namespace NBC.ActionEditor
             return type;
         }
 
-        public static ToolkitHeaderView GetToolkitHeader(ActionDocument document)
+        public static ToolkitHeaderView GetToolkitHeader(Type document)
         {
-            var type = document == null ? null : ExtensionResolver.ResolveExtension(Discover(typeof(ToolkitHeaderView)), document.GetType(), typeof(ToolkitHeaderAttribute));
+            var type = document == null ? null : ExtensionResolver.ResolveExtension(Discover(typeof(ToolkitHeaderView)), document, typeof(ToolkitHeaderAttribute));
             return type == null ? null : (ToolkitHeaderView)Activator.CreateInstance(type);
         }
         public static ToolkitPropertyExtension GetToolkitProperties(Type target)

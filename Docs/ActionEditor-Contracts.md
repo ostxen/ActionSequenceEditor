@@ -8,13 +8,19 @@
 
 被动视图只绘制显示状态并上报意图。Application负责会话、事务和用例；Presentation负责Presenter、交互与几何；Infrastructure实现文件、Undo、时钟、偏好和AssetDatabase端口；Composition显式建立依赖并拥有Editor生命周期。Domain及Serialization不依赖UnityEditor，Application和Presentation不依赖具体视图。`ActionEditorHost`只作为组合根，不提供业务门面转发。
 
+`EditorComposition`私有拥有共享会话、选择、剪贴板、播放与采样，只通过显式工厂创建逐窗绑定和Presenter，不公开服务查询包。`WindowBinding`拥有逐窗订阅和释放；Toolkit的`TimelineHeader`、`TimelineViewport`、`TimelineProperties`分别拥有原生控件和同步。默认设置会话由宿主私有持有，隔离宿主显式注入自己的`SettingsSession`，设置窗口不自行获取全局业务状态。
+
+目录按职责对应：Runtime的`Domain`、`Metadata`、`Serialization`分别放作者规则、声明及格式；Editor的`Infrastructure/Documents`、`Serialization`、`Preview`、`Assets`、`Settings`分别实现文档外部能力、格式适配、预览、发现及偏好存储。属性输入状态与草稿位于`Presentation/Properties`，语言文本位于`Views/Localization`。旧`ActionEditorContext`、`Prefs`、`AssetPlayer`及`NBC.ActionEditor.Storage`不再作为业务入口。
+
 组和独立轨道按 `ActionDocument.RootItems` 任意交错排列，组不嵌套；组持有轨道，轨道持有片段。结构拖动超过3px显示覆盖主体全宽的蓝/红插入线，不显示拖动文本。最左20px是独立根区，组移动携带完整子树，空组无折叠按钮但保留对齐占位。边缘24px按0–300px/s自动滚动。提交重验锁定、Attachable、Unique及版本，一次有效释放对应一步Undo，同位与相邻边界不产生空Undo。
 
 两UI滚轮缩放以鼠标时间为锚点，最小跨度0.25秒、步进225；保持锚点时视域可为负，作者时间不得为负。中键平移保持跨度并在零点夹紧。片段最短可编辑区间0.01秒，点事件不可伸缩。Esc、失焦、捕获丢失及文档替换只取消本窗口拥有的操作。
 
 创建、保存、另存与自动保存进入 `DocumentLifecycle`，经同一 `JsonDocumentRepository` 和 `AtomicFileCommit` 完成快照、校验、完整读回及revision保护。字节提交后先推进来源与基线再导入，导入失败明确报告已提交，禁止自动重放。导出使用同一格式目录和隔离快照，只写独立新目标，不切来源、不清脏、不改变Undo、选择或播放。新建/另存/导出拒绝现存目标及meta，取消不写文件。
 
-属性字段由共享描述和`PropertyPath`解释，原生控件不直接持久化作者对象。集合增删先为每个目标构造隔离候选，整批预检通过后一次事务提交；后部目标失败不改变前部目标，Undo/Redo恢复完整批次。路径处理嵌套struct时逐层回写，陈旧对象、锁定和活动编辑边界在真实提交处重验。
+属性字段由共享描述和Presenter私有的`PropertyPath`解释。原生控件只得到`PropertyInputState`、`PropertyTargetState`和不透明`PropertyFieldId`，不能拿路径或作者图；文档/选择换代使旧字段身份及草稿失效。集合增删先为每个目标构造隔离候选，整批预检通过后一次事务提交；后部目标失败不改变前部目标，Undo/Redo恢复完整批次。路径处理嵌套struct时逐层回写，陈旧对象、锁定和活动编辑边界在真实提交处重验。
+
+业务Header和状态窗口通过`EditorExtensionContext.Capture()`得到`ExtensionDocumentState`显示帧，不接收可写文档。显示帧只包含基础值、独立曲线副本、时间、权重及循环值；复杂作者对象和集合不跨此边界。通用投影没有业务样例分支，属性扩展仍通过共享Presenter的字段身份提交。
 
 播放只有一个Editor时钟驱动。预览会话拥有创建的预览实例，不拥有借入的作者图或Unity资源；回调引发替换/取消时，旧代次不能继续求值或清理新会话。逐窗订阅、原生捕获和选择器Editor缓存随各自所有者释放，关闭非最后窗口不停止共享播放。
 
@@ -25,7 +31,7 @@
 
 - Runtime `Serialization` 定义 `IActionDocumentFormat`：不可变 `Id`、`DisplayName`、`Extension`，独立的 `CanRead`、`CanWrite`、`CanExport`，以及 `Serialize(ActionDocument, options, context) → byte[]` / `Deserialize(byte[], context) → ActionDocument`。不支持的方向明确失败；不要求未来只写导出器实现可用的读回。失败抛有非空错误的异常，包含字段路径/类型身份但不包含作者字段值；禁止返回空字符串、空字节或 null 冒充成功。`options` 首期仅压缩/美化，编码为 UTF-8 无 BOM，context 只提供受控类型解析及 Unity 引用解析，不提供路径写入或会话操作。
 - 首个且唯一生产注册：`Id = actioneditor.json`，显示 `JSON (.json)`，扩展名 `.json`，读、写、导出均支持。Editor 格式目录显式注册实际实现，ID/扩展名冲突整体拒绝并列双方来源；创建/打开筛选 `CanRead && CanWrite`，导出筛选 `CanExport && CanWrite`，没有实现就不显示。文件扩展名选择候选，内容标识再次核实，大小写扩展名沿当前规则；不做旧格式探测或回退。
-- 格式实现只做数据转换。Editor `Serialization` 协调类型目录、图校验、隔离快照和作者内容比较；`Infrastructure/Documents` 通过 `JsonDocumentRepository` 负责路径、版本、`AtomicFileCommit` 和导入，导出用例消费相同格式与快照边界。Session 仍是唯一图、事务、Undo、Recovery 与保存基线的所有者。类型目录、磁盘格式、UI 各有职责，不新增第二份可编辑文档或万能注册框架。
+- 格式实现只做数据转换。Editor `Infrastructure/Serialization` 协调受信任格式上下文、图校验、资源引用、隔离快照和作者内容比较；`DocumentCopy`构造隔离副本与内容键，`SessionSnapshotCodec`实现会话快照端口，`JsonDocumentCodec`负责文档JSON入口。`Infrastructure/Documents` 通过 `JsonDocumentRepository` 负责路径、版本、`AtomicFileCommit` 和导入，导出用例消费相同格式与快照边界。Session 仍是唯一图、事务、Undo、Recovery 与保存基线的所有者。类型目录、磁盘格式、UI 各有职责，不新增第二份可编辑文档或万能注册框架。
 
 ### 唯一 JSON 结构与类型身份
 

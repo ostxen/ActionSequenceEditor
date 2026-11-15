@@ -6,8 +6,16 @@ using NBC.ActionEditor.Domain;
 namespace NBC.ActionEditor.Application.Editing
 {
     // 选择归共享作者会话，捕获和悬停不在这里保存。
-    public sealed class SelectionState
+    public sealed class SelectionState : IDisposable
     {
+        private readonly Documents.DocumentSession session;
+        public SelectionState(Documents.DocumentSession session = null)
+        {
+            this.session = session;
+            if (session != null) session.ContentChanged += OnContentChanged;
+        }
+        private void OnContentChanged() => Retain(session.Document);
+        public void Dispose() { if (session != null) session.ContentChanged -= OnContentChanged; }
         private readonly List<IDirectable> items = new List<IDirectable>();
         public IDirectable[] Items => items.ToArray();
         public int Count => items.Count;

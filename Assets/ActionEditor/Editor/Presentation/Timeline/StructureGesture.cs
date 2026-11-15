@@ -10,7 +10,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
     {
         private readonly DocumentSession session;
         private readonly StructureEditing editing;
-        private readonly VisibleTimelineLayout layout;
+        private readonly TimelineLayout layout;
         private readonly TimelineWorkspace workspace;
         private TimelineRootItem source;
         private StructureDrop drop;
@@ -19,7 +19,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
         public bool Active => source != null;
         public bool Dragging { get; private set; }
         public InsertionIndicator Indicator { get; private set; }
-        public StructureGesture(DocumentSession session, StructureEditing editing, VisibleTimelineLayout layout, TimelineWorkspace workspace)
+        public StructureGesture(DocumentSession session, StructureEditing editing, TimelineLayout layout, TimelineWorkspace workspace)
         { this.session = session; this.editing = editing; this.layout = layout; this.workspace = workspace; }
         public bool Begin(TimelineRootItem item, float pointerX, float pointerY)
         {

@@ -8,7 +8,7 @@ using System.Reflection;
 using System.Text;
 using NBC.ActionEditor.Serialization;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -156,15 +156,15 @@ namespace NBC.ActionEditor.Tests
         {
             var source = new PayloadAsset(); var group = new CallbackGroup(); source.AddRoot(group); source.Init();
             var workspace = new TimelineWorkspace(); workspace.Bind(source); workspace.ViewTimeMax = 7;
-            var clone = DocumentSnapshots.Capture(source, true, Context);
+            var clone = DocumentCopy.Capture(source, true, Context);
             Assert.That(group.Counter, Is.Zero); Assert.That(((CallbackGroup)clone.RootItems.OfType<TimelineGroup>().ElementAt(0)).Counter, Is.EqualTo(1));
-            var before = DocumentSnapshots.Content(source, Context);
+            var before = DocumentCopy.Content(source, Context);
             workspace.ViewTimeMax = 9; workspace.SetCollapsed(group, true);
-            Assert.That(DocumentSnapshots.Content(source, Context), Is.EqualTo(before));
-            var restored = DocumentSnapshots.Capture(source, false, Context);
+            Assert.That(DocumentCopy.Content(source, Context), Is.EqualTo(before));
+            var restored = DocumentCopy.Capture(source, false, Context);
             Assert.That(workspace.ViewTimeMax, Is.EqualTo(9)); Assert.That(workspace.IsCollapsed(group), Is.True);
             Assert.That(Text(restored), Does.Not.Contain("viewTime").And.Not.Contain("isCollapsed"));
-            group.Counter = 7; Assert.That(DocumentSnapshots.Content(source, Context), Is.Not.EqualTo(before));
+            group.Counter = 7; Assert.That(DocumentCopy.Content(source, Context), Is.Not.EqualTo(before));
         }
         [Test] public void ProductionContextRejectsTestTypesAndUnresolvedTemporaryReferences()
         {
@@ -191,7 +191,7 @@ namespace NBC.ActionEditor.Tests
         [Test] public void ClipboardUsesSameConverterAndPreservesNestedPayload()
         {
             var source = new FeatureSampleDocument(); var track = source.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0];
-            var restored = (TimelineTrack)DocumentSnapshots.RestoreFragment(track.GetType(), DocumentSnapshots.CaptureFragment(track));
+            var restored = (TimelineTrack)DocumentCopy.RestoreFragment(track.GetType(), DocumentCopy.CaptureFragment(track));
             Assert.That(restored.Clips.Count, Is.EqualTo(3));
             Assert.That(DocumentValueConverter.Capture(restored, typeof(TimelineTrack), Context).ContentKey(), Is.EqualTo(DocumentValueConverter.Capture(track, typeof(TimelineTrack), Context).ContentKey()));
         }

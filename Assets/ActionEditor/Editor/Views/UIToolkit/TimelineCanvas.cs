@@ -47,7 +47,7 @@ namespace NBC.ActionEditor.Views.UIToolkit
             var open = new Button(owner.OpenDocument) { text = Lan.SelectAsset };
             foreach (var button in new[] { create, open }) { button.style.width = 220; button.style.height = 40; welcome.Add(button); }
             create.style.backgroundColor = new Color(.56f, .56f, .63f); welcome.Add(new Label(Lan.WelcomeHelp));
-            var preferences = new Button(() => PreferencesWindow.ShowFor(owner)) { text = Lan.Seeting }; preferences.style.width = 220; preferences.style.height = 40; welcome.Add(preferences);
+            var preferences = new Button(owner.ShowSettings) { text = Lan.Seeting }; preferences.style.width = 220; preferences.style.height = 40; welcome.Add(preferences);
             Add(welcome);
             headers = new VisualElement { name = "timeline-row-headers", pickingMode = PickingMode.Ignore };
             headers.style.position = Position.Absolute; headers.style.left = headers.style.top = 0; Add(headers);

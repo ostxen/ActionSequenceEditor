@@ -3,7 +3,7 @@ using System;
 using System.IO;
 using NBC.ActionEditor.Serialization;
 using NBC.ActionEditor.Application.Ports;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 
 namespace NBC.ActionEditor.Infrastructure.Documents
 {
@@ -24,7 +24,7 @@ namespace NBC.ActionEditor.Infrastructure.Documents
             if (!string.IsNullOrEmpty(sourcePath) && string.Equals(target, JsonDocumentRepository.ValidatePath(sourcePath), StringComparison.OrdinalIgnoreCase))
                 throw new IOException(Lan.ExportSourceTarget);
             store.ValidateNewPath(target, format);
-            var snapshot = DocumentSnapshots.Capture(document, true);
+            var snapshot = DocumentCopy.Capture(document, true);
             var expected = DocumentValueConverter.Capture(snapshot, typeof(ActionDocument), DocumentFormats.Context).ContentKey();
             new AtomicFileCommit(files).Save(target, () => format.Serialize(snapshot, new DocumentFormatOptions(false), DocumentFormats.Context), bytes =>
             {

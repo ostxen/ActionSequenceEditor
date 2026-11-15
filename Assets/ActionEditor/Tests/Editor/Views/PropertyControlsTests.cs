@@ -12,7 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -84,11 +84,11 @@ namespace NBC.ActionEditor.Tests
             }
             public void Expand(CollectionFixture value, string name)
             {
-                if (Presenter == null) Bind(Composition.PropertyComposition.Create(ActionEditorHost.Context, Prefs.Session));
-                SetExpanded(Presenter.Path(value).Field(typeof(CollectionFixture).GetField(name)), true);
+                if (Presenter == null) Bind(EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings));
+                SetExpanded(Presenter.CaptureInputs(value).Single(f => f.Name == name).Id, true);
             }
             public void DrawField(CollectionFixture value, string name)
-            { if (Presenter == null) Bind(Composition.PropertyComposition.Create(ActionEditorHost.Context, Prefs.Session)); FieldDefaultInspector(typeof(CollectionFixture).GetField(name), value); }
+            { if (Presenter == null) Bind(EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings)); FieldDefaultInspector(Presenter.CaptureInputs(value).Single(f => f.Name == name)); }
         }
 
         private sealed class CollectionWindow : EditorWindow
@@ -163,6 +163,6 @@ namespace NBC.ActionEditor.Tests
 
         [TestCase(typeof(string), "")]
         [TestCase(typeof(int), 0)]
-        public void CollectionDefaultCreationSupportsPrimitives(Type type, object expected) => Assert.That(Composition.PropertyComposition.Create(ActionEditorHost.Context, Prefs.Session).CreateElement(type), Is.EqualTo(expected));
+        public void CollectionDefaultCreationSupportsPrimitives(Type type, object expected) => Assert.That(EditorFixture.Shared.Properties.CreateElement(type), Is.EqualTo(expected));
     }
 }

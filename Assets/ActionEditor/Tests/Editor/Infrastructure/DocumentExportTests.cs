@@ -7,7 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NBC.ActionEditor.Serialization;
 using NUnit.Framework;
 using UnityEditor;

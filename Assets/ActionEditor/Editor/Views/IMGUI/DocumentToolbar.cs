@@ -24,7 +24,7 @@ namespace NBC.ActionEditor.Views.IMGUI
         private void DrawAssetsHeader()
         {
             if (!binding.Documents.HasDocument) return;
-            var customAssetHeader = EditorExtensionFactory.GetHeader(binding.Context.Document);
+            var customAssetHeader = EditorExtensionFactory.GetHeader(binding.Documents.DocumentType);
             customAssetHeader?.OnGUI(binding.Extensions);
         }
 
@@ -77,7 +77,7 @@ namespace NBC.ActionEditor.Views.IMGUI
                     EditorStyles.toolbarButton, GUILayout.Width(26)))
             {
                 PreferencesWindow.Show(new Rect(Styles.ScreenWidth - 5 - 400 - Styles.TimelineLeftTotalWidth, 25, 400,
-                    Styles.ScreenHeight - 70));
+                    Styles.ScreenHeight - 70), binding.CreateSettings);
             }
         }
     }

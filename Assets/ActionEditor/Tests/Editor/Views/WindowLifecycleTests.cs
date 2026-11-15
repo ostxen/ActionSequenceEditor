@@ -1,3 +1,5 @@
+using NBC.ActionEditor.Application.Playback;
+using NBC.ActionEditor.Infrastructure.Preview;
 using NBC.ActionEditor.Views.IMGUI;
 using ImguiWindow = NBC.ActionEditor.Views.IMGUI.ActionEditorWindow;
 using ToolkitWindow = NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow;
@@ -11,7 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using NBC.ActionEditor.Samples.FeatureSample;
-using NBC.ActionEditor.Storage;
+using NBC.ActionEditor.Infrastructure.Serialization;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -24,12 +26,12 @@ namespace NBC.ActionEditor.Tests
     {
         [Test] public void JsonPickerRejectsNonJsonBeforeDecodingAndKeepsCurrentDocument()
         {
-            var before = ActionEditorHost.Context.Document;
-            var script = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/ActionEditor/Runtime/Interfaces/IDirectable.cs");
+            var before = EditorFixture.Shared.Document;
+            var script = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/ActionEditor/Runtime/Domain/IDirectable.cs");
             Assert.That(script, Is.Not.Null);
             LogAssert.Expect(LogType.Warning, "请选择 .json 格式的 ActionEditor 文档。");
-            Composition.DocumentPresenterComposition.OpenPicked(ActionEditorHost.Context, script);
-            Assert.That(ActionEditorHost.Context.Document, Is.SameAs(before));
+            EditorFixture.Shared.CreateDocuments().OpenPicked(script);
+            Assert.That(EditorFixture.Shared.Document, Is.SameAs(before));
         }
 
         [Test] public void DocumentPickerFiltersBothDiscoveryPathsWithoutRestrictingGenericResources()
@@ -38,11 +40,11 @@ namespace NBC.ActionEditor.Tests
             const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             var type = typeof(ObjectSelectorWindow);
             var filter = type.GetField("_assetPathFilter", flags);
-            var init = type.GetMethod("InitBuiltinList", flags);
-            var list = type.GetField("_currentBuiltinResources", flags);
+            var init = type.GetMethod("DiscoverEntries", flags);
+            var list = type.GetField("_entries", flags);
             try
             {
-                var script = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/ActionEditor/Runtime/Interfaces/IDirectable.cs");
+                var script = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/ActionEditor/Runtime/Domain/IDirectable.cs");
                 type.GetField("_folderPath", flags).SetValue(selector, "Assets/ActionEditor");
                 filter.SetValue(selector, (Predicate<string>)NBC.ActionEditor.Infrastructure.Documents.JsonDocumentRepository.IsDocumentPath);
                 init.Invoke(selector, new object[] { "TextAsset", null });
@@ -80,13 +82,13 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(blockers.Any(b => b.Contains("no existing disk source")), Is.True);
                 Assert.Throws<System.Reflection.TargetInvocationException>(() => command.Invoke(null, new object[] { true, false }));
                 Assert.That(pending.GetValue(null), Is.False);
-                ActionEditorHost.Context.Open(null);
+                EditorFixture.Shared.Open(null);
                 var before = ((Delegate)update.GetValue(null)).GetInvocationList();
                 command.Invoke(null, new object[] { true, false });
                 Assert.That(pending.GetValue(null), Is.True);
                 var added = ((Delegate)update.GetValue(null)).GetInvocationList().Where(d => !before.Contains(d)).ToArray();
                 Assert.That(added.Length, Is.EqualTo(2), "our guard must precede Pipeline Tick");
-                ActionEditorHost.Context.Open(fixture);
+                EditorFixture.Shared.Open(fixture);
                 added[0].DynamicInvoke();
                 Assert.That(pending.GetValue(null), Is.False, "new unsaved document cancels scheduled exit");
                 added[0].DynamicInvoke();
@@ -101,14 +103,14 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void SharedContextOwnsStateAndServicesWithoutAnEditorWindow()
         {
-            using (var context = new ActionEditorContext(NBC.ActionEditor.Composition.DocumentComposition.Create()))
+            using (var context = new EditorFixture(NBC.ActionEditor.Composition.DocumentComposition.Create()))
             {
                 context.Open(fixture);
                 var clip = context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
                 context.Selection.Set(new IDirectable[] { clip }, false);
                 context.Clipboard.Item = clip;
                 Assert.That(context.Source, Is.SameAs(fixture));
-                Assert.That(context.Document, Is.Not.SameAs(ActionEditorHost.Context.Document));
+                Assert.That(context.Document, Is.Not.SameAs(EditorFixture.Shared.Document));
                 Assert.That(context.Selection.First, Is.SameAs(clip));
                 Assert.That(context.Clipboard.Item, Is.SameAs(clip));
                 context.Playback.Play(10);
@@ -127,22 +129,22 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void FailedOpenKeepsContextAndInjectedPlayer()
         {
-            var context = ActionEditorHost.Context; var document = context.Document;
+            var context = EditorFixture.Shared; var document = context.Document;
             var clip = document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
-            ActionEditorHost.Context.Selection.Set(new IDirectable[] { clip }, false);
+            EditorFixture.Shared.Selection.Set(new IDirectable[] { clip }, false);
             var invalid = new TextAsset("{}");
             try
             {
-                Assert.Throws<System.IO.InvalidDataException>(() => ActionEditorHost.Context.Open(invalid));
+                Assert.Throws<System.IO.InvalidDataException>(() => EditorFixture.Shared.Open(invalid));
                 Assert.That(context.Document, Is.SameAs(document));
                 Assert.That(context.Source, Is.SameAs(fixture));
                 Assert.That(context.Selection.First, Is.SameAs(clip));
-                Assert.That(typeof(AssetPlayer).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static), Is.Empty);
-                ActionEditorHost.Context.ClipboardEditing.Copy(clip);
-                Assert.That(context.Clipboard.Item, Is.SameAs(ActionEditorHost.Context.Clipboard.Item));
+                Assert.That(typeof(DocumentSampler).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static), Is.Empty);
+                EditorFixture.Shared.ClipboardEditing.Copy(clip);
+                Assert.That(context.Clipboard.Item, Is.SameAs(EditorFixture.Shared.Clipboard.Item));
                 Assert.That(context.Clipboard.Type, Is.EqualTo(clip.GetType()));
-                ActionEditorHost.Context.Playback.Pause(true); Assert.That(context.Playback.IsPaused, Is.True);
-                context.Playback.Pause(false); Assert.That(ActionEditorHost.Context.Playback.IsPaused, Is.False);
+                EditorFixture.Shared.Playback.Pause(true); Assert.That(context.Playback.IsPaused, Is.True);
+                context.Playback.Pause(false); Assert.That(EditorFixture.Shared.Playback.IsPaused, Is.False);
             }
             finally { UnityEngine.Object.DestroyImmediate(invalid); }
         }
@@ -168,9 +170,9 @@ namespace NBC.ActionEditor.Tests
 
         [UnityTest] public IEnumerator BothWindowOpenOrdersShareContextAndRebuildWithoutRegistrationLeaks()
         {
-            var count = ActionEditorHost.Views.Count;
+            var count = EditorFixture.SharedViews.Count;
             ImguiWindow original = null; ToolkitWindow native = null;
-            var alternate = new TextAsset(NBC.ActionEditor.Storage.JsonDocumentCodec.Encode(new FeatureSampleDocument { Version = 7 }));
+            var alternate = new TextAsset(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Encode(new FeatureSampleDocument { Version = 7 }));
             try
             {
                 foreach (var nativeFirst in new[] { false, true })
@@ -186,25 +188,25 @@ namespace NBC.ActionEditor.Tests
                         native = ScriptableObject.CreateInstance<ToolkitWindow>(); native.Show();
                     }
                     yield return null; yield return null;
-                    Assert.That(ActionEditorHost.Views.Count, Is.EqualTo(count + 2));
-                    Assert.That(original.Context, Is.SameAs(native.Context));
-                    Assert.That(original.Context.Session, Is.SameAs(ActionEditorHost.Context.Session));
+                    Assert.That(EditorFixture.SharedViews.Count, Is.EqualTo(count + 2));
+                    Assert.That(Session(original.Documents), Is.SameAs(Session(native.Documents)));
+                    Assert.That(Session(original.Documents), Is.SameAs(EditorFixture.Shared.Session));
                     native.CreateGUI(); native.CreateGUI();
-                    Assert.That(ActionEditorHost.Views.Count, Is.EqualTo(count + 2));
+                    Assert.That(EditorFixture.SharedViews.Count, Is.EqualTo(count + 2));
                     const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
                     typeof(ToolkitWindow).GetMethod("OnEnable", flags).Invoke(native, null);
                     typeof(ImguiWindow).GetMethod("OnEnable", flags).Invoke(original, null);
-                    Assert.That(ActionEditorHost.Views.Count, Is.EqualTo(count + 2), "Repeated enable must replace registrations rather than duplicate them.");
-                    native.Select(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]);
-                    Assert.That(original.Context.Selection.First, Is.SameAs(ActionEditorHost.Context.Selection.First));
-                    ActionEditorHost.Context.Open(alternate);
-                    Assert.That(original.Context.Document, Is.SameAs(native.Document));
-                    Assert.That(((FeatureSampleDocument)native.Document).Version, Is.EqualTo(7));
-                    Assert.That(ActionEditorHost.Context.Selection.Count, Is.Zero);
-                    ActionEditorHost.Context.Open(fixture);
+                    Assert.That(EditorFixture.SharedViews.Count, Is.EqualTo(count + 2), "Repeated enable must replace registrations rather than duplicate them.");
+                    native.Select(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]);
+                    Assert.That(original.Presenter.State.Clips.Single(c => c.Selected).Key, Is.EqualTo(original.Presenter.KeyFor(EditorFixture.Shared.Selection.First)));
+                    EditorFixture.Shared.Open(alternate);
+                    Assert.That(Session(original.Documents).Document, Is.SameAs(Session(native.Documents).Document));
+                    Assert.That(((FeatureSampleDocument)Session(native.Documents).Document).Version, Is.EqualTo(7));
+                    Assert.That(EditorFixture.Shared.Selection.Count, Is.Zero);
+                    EditorFixture.Shared.Open(fixture);
                     if (nativeFirst) { native.Close(); native = null; original.Close(); original = null; }
                     else { original.Close(); original = null; native.Close(); native = null; }
-                    Assert.That(ActionEditorHost.Views.Count, Is.EqualTo(count));
+                    Assert.That(EditorFixture.SharedViews.Count, Is.EqualTo(count));
                 }
             }
             finally
@@ -214,6 +216,10 @@ namespace NBC.ActionEditor.Tests
                 UnityEngine.Object.DestroyImmediate(alternate);
             }
         }
+
+        private static NBC.ActionEditor.Application.Documents.DocumentSession Session(NBC.ActionEditor.Presentation.Presenters.DocumentPresenter presenter)
+            => (NBC.ActionEditor.Application.Documents.DocumentSession)typeof(NBC.ActionEditor.Presentation.Presenters.DocumentPresenter)
+                .GetField("session", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(presenter);
 
         [UnityTest] public IEnumerator DiscardFromEitherWindowRestoresSharedBaselineAndClearsPendingUndo()
         {
@@ -225,28 +231,28 @@ namespace NBC.ActionEditor.Tests
                 original.Show(); native.Show(); yield return null; yield return null;
                 foreach (var window in new EditorWindow[] { original, native })
                 {
-                    ActionEditorHost.Context.Session.Edit("discard payload", () => ((FeatureSampleDocument)ActionEditorHost.Context.Document).Version = 19);
-                    ActionEditorHost.Context.Session.BeginEdit();
-                    ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime = 1;
+                    EditorFixture.Shared.Session.Edit("discard payload", () => ((FeatureSampleDocument)EditorFixture.Shared.Document).Version = 19);
+                    EditorFixture.Shared.Session.BeginEdit();
+                    EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime = 1;
                     window.DiscardChanges();
-                    Assert.That(((FeatureSampleDocument)ActionEditorHost.Context.Document).Version, Is.EqualTo(1));
-                    Assert.That(ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
-                    Assert.That(ActionEditorHost.Context.Session.IsDirty, Is.False);
-                    Assert.That(ActionEditorHost.Context.Session.IsEditing, Is.False);
-                    Assert.That(native.Document, Is.SameAs(ActionEditorHost.Context.Document));
+                    Assert.That(((FeatureSampleDocument)EditorFixture.Shared.Document).Version, Is.EqualTo(1));
+                    Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(.25f));
+                    Assert.That(EditorFixture.Shared.Session.IsDirty, Is.False);
+                    Assert.That(EditorFixture.Shared.Session.IsEditing, Is.False);
+                    Assert.That(Session(native.Documents).Document, Is.SameAs(EditorFixture.Shared.Document));
                     Undo.PerformUndo(); Undo.PerformRedo();
-                    Assert.That(((FeatureSampleDocument)ActionEditorHost.Context.Document).Version, Is.EqualTo(1), "Discarded changes must not return through Undo/Redo.");
+                    Assert.That(((FeatureSampleDocument)EditorFixture.Shared.Document).Version, Is.EqualTo(1), "Discarded changes must not return through Undo/Redo.");
                     yield return null; yield return null;
                     Assert.That(original.hasUnsavedChanges, Is.False);
                     Assert.That(native.hasUnsavedChanges, Is.False);
                 }
-                ActionEditorHost.Context.Session.Edit("new edit", () => ((FeatureSampleDocument)ActionEditorHost.Context.Document).Version = 7);
-                Undo.PerformUndo(); Assert.That(((FeatureSampleDocument)ActionEditorHost.Context.Document).Version, Is.EqualTo(1));
-                Undo.PerformRedo(); Assert.That(((FeatureSampleDocument)ActionEditorHost.Context.Document).Version, Is.EqualTo(7));
+                EditorFixture.Shared.Session.Edit("new edit", () => ((FeatureSampleDocument)EditorFixture.Shared.Document).Version = 7);
+                Undo.PerformUndo(); Assert.That(((FeatureSampleDocument)EditorFixture.Shared.Document).Version, Is.EqualTo(1));
+                Undo.PerformRedo(); Assert.That(((FeatureSampleDocument)EditorFixture.Shared.Document).Version, Is.EqualTo(7));
             }
             finally
             {
-                ActionEditorHost.Context.Open(fixture);
+                EditorFixture.Shared.Open(fixture);
                 original.DiscardChanges(); native.DiscardChanges(); original.Close(); native.Close();
             }
         }
@@ -254,7 +260,7 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator ClosingEitherWindowPreservesPlaybackUntilLastViewCloses()
         {
 
-            var existingViews = ActionEditorHost.Views.Count;
+            var existingViews = EditorFixture.SharedViews.Count;
             var native = ScriptableObject.CreateInstance<ToolkitWindow>();
             var original = ScriptableObject.CreateInstance<ImguiWindow>();
             var stops = 0;
@@ -262,33 +268,33 @@ namespace NBC.ActionEditor.Tests
             try
             {
                 original.Show(); native.Show(); yield return null; yield return null;
-                ActionEditorHost.Context.Playback.Stopped += stopped;
-                ActionEditorHost.Context.Playback.Play(ActionEditorHost.Context.Clock.PlaybackTime); ActionEditorHost.Context.Player.Sample(1); ActionEditorHost.Context.Playback.Pause(true);
-                Assert.That(ActionEditorHost.Context.Playback.IsPlaying && ActionEditorHost.Context.Playback.IsPaused, Is.True);
+                EditorFixture.Shared.Playback.Stopped += stopped;
+                EditorFixture.Shared.Playback.Play(EditorFixture.Shared.Clock.PlaybackTime); EditorFixture.Shared.Player.Sample(1); EditorFixture.Shared.Playback.Pause(true);
+                Assert.That(EditorFixture.Shared.Playback.IsPlaying && EditorFixture.Shared.Playback.IsPaused, Is.True);
                 original.Close(); original = null;
-                Assert.That(ActionEditorHost.Context.Playback.IsPlaying && ActionEditorHost.Context.Playback.IsPaused, Is.True);
-                Assert.That(ActionEditorHost.Context.Player.CurrentTime, Is.EqualTo(1));
-                Assert.That(ActionEditorHost.Context.Player.IsInitialized, Is.True);
+                Assert.That(EditorFixture.Shared.Playback.IsPlaying && EditorFixture.Shared.Playback.IsPaused, Is.True);
+                Assert.That(EditorFixture.Shared.Player.CurrentTime, Is.EqualTo(1));
+                Assert.That(EditorFixture.Shared.Player.IsInitialized, Is.True);
                 Assert.That(stops, Is.Zero);
                 yield return null; yield return null;
-                Assert.That(ActionEditorHost.Context.Playback.IsPlaying && ActionEditorHost.Context.Playback.IsPaused, Is.True, "The remaining view owns the same paused playback.");
+                Assert.That(EditorFixture.Shared.Playback.IsPlaying && EditorFixture.Shared.Playback.IsPaused, Is.True, "The remaining view owns the same paused playback.");
                 original = ScriptableObject.CreateInstance<ImguiWindow>(); original.Show();
                 yield return null; yield return null;
-                Assert.That(ActionEditorHost.Context.Playback.IsPlaying && ActionEditorHost.Context.Playback.IsPaused, Is.True);
-                Assert.That(ActionEditorHost.Context.Player.CurrentTime, Is.EqualTo(1));
+                Assert.That(EditorFixture.Shared.Playback.IsPlaying && EditorFixture.Shared.Playback.IsPaused, Is.True);
+                Assert.That(EditorFixture.Shared.Player.CurrentTime, Is.EqualTo(1));
                 native.Close(); native = null;
-                Assert.That(ActionEditorHost.Context.Playback.IsPlaying && ActionEditorHost.Context.Playback.IsPaused, Is.True);
-                ActionEditorHost.Context.Playback.Play(ActionEditorHost.Context.Clock.PlaybackTime); ActionEditorHost.Context.Player.Sample(1);
+                Assert.That(EditorFixture.Shared.Playback.IsPlaying && EditorFixture.Shared.Playback.IsPaused, Is.True);
+                EditorFixture.Shared.Playback.Play(EditorFixture.Shared.Clock.PlaybackTime); EditorFixture.Shared.Player.Sample(1);
                 original.Close(); original = null;
-                Assert.That(ActionEditorHost.Views.Count, Is.EqualTo(existingViews), "The test must release exactly its own two views.");
-                Assert.That(ActionEditorHost.Context.Playback.IsPlaying, Is.EqualTo(existingViews != 0));
-                Assert.That(ActionEditorHost.Context.Player.IsInitialized, Is.EqualTo(existingViews != 0));
-                Assert.That(ActionEditorHost.Context.Player.CurrentTime, Is.EqualTo(existingViews == 0 ? 0 : 1));
+                Assert.That(EditorFixture.SharedViews.Count, Is.EqualTo(existingViews), "The test must release exactly its own two views.");
+                Assert.That(EditorFixture.Shared.Playback.IsPlaying, Is.EqualTo(existingViews != 0));
+                Assert.That(EditorFixture.Shared.Player.IsInitialized, Is.EqualTo(existingViews != 0));
+                Assert.That(EditorFixture.Shared.Player.CurrentTime, Is.EqualTo(existingViews == 0 ? 0 : 1));
                 Assert.That(stops, Is.EqualTo(existingViews == 0 ? 1 : 0));
             }
             finally
             {
-                ActionEditorHost.Context.Playback.Stopped -= stopped;
+                EditorFixture.Shared.Playback.Stopped -= stopped;
                 if (original != null) { original.DiscardChanges(); original.Close(); }
                 if (native != null) { native.DiscardChanges(); native.Close(); }
 
@@ -305,7 +311,7 @@ namespace NBC.ActionEditor.Tests
             {
                 foreach (var language in new[] { typeof(LanCHS), typeof(LanEN) })
                 {
-                    ActionEditorHost.Context.Open(null);
+                    EditorFixture.Shared.Open(null);
                     original = ScriptableObject.CreateInstance<ImguiWindow>(); original.Show();
                     native = ScriptableObject.CreateInstance<ToolkitWindow>(); native.Show();
                     foreach (var field in fields)
@@ -323,8 +329,8 @@ namespace NBC.ActionEditor.Tests
                     Assert.That(buttons.Select(b => b.text), Does.Contain(Lan.CreateAsset).And.Contain(Lan.SelectAsset));
                     var labels = native.rootVisualElement.Q("timeline-welcome").Query<Label>().ToList();
                     Assert.That(labels.Select(l => l.text), Does.Contain(Lan.WelcomeHint).And.Contain(Lan.WelcomeHelp));
-                    Assert.That(new Composition.DocumentDialogComposition(ActionEditorHost.Context).TypeName(typeof(FeatureSampleDocument)), Is.EqualTo(Lan.FeatureSample));
-                    var menu = new System.Collections.Generic.List<string>(); Composition.DocumentPresenterComposition.PopulateSaveMenu(Composition.DocumentPresenterComposition.Create(ActionEditorHost.Context), (label, action) => menu.Add(label));
+                    Assert.That(Views.IMGUI.CreateDocumentWindow.TypeName(typeof(FeatureSampleDocument)), Is.EqualTo(Lan.FeatureSample));
+                    var menu = new System.Collections.Generic.List<string>(); Composition.DocumentPresenterComposition.PopulateSaveMenu(EditorFixture.Shared.CreateDocuments(), (label, action) => menu.Add(label));
                     Assert.That(menu, Is.EqualTo(new[] { Lan.Save, Lan.SaveAs, Lan.Export }));
                     Assert.That(string.Join(" ", menu) + Lan.WelcomeHint + Lan.CreateSafety + Lan.FeatureSample, Does.Not.Contain("JSON").And.Not.Contain("旧版").And.Not.Contain("新版"));
                     native.Close(); original.Close(); native = null; original = null;
@@ -341,7 +347,7 @@ namespace NBC.ActionEditor.Tests
         [Test] public void BothSaveChangesEntrypointsUseTheSameCancelablePathRequest()
         {
 
-            using var context = new ActionEditorContext(Composition.DocumentComposition.Create());
+            using var context = new EditorFixture(Composition.DocumentComposition.Create());
             context.Session.Open(new NBC.ActionEditor.Application.Documents.DocumentOpenData(new FeatureSampleDocument()));
             var views = new ActionEditorViews();
             var original = ScriptableObject.CreateInstance<ImguiWindow>();
@@ -350,8 +356,8 @@ namespace NBC.ActionEditor.Tests
             try
             {
                 Func<bool, string> choosePath = saveAs => { Assert.That(saveAs, Is.False); requests++; return null; };
-                original.BindContext(context, views, Prefs.Session, choosePath);
-                native.BindContext(context, views, Prefs.Session, choosePath);
+                original.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, EditorFixture.SharedSettings, choosePath));
+                native.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, EditorFixture.SharedSettings, choosePath));
                 context.Session.Edit("change", () => ((FeatureSampleDocument)context.Document).Version = 9);
                 var source = context.Document; var before = context.Session.CaptureRecovery();
                 original.SaveChanges(); native.SaveChanges();
@@ -375,13 +381,13 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void PreviewResetDisposesOwnedCallbacksAndAllowsRebuild()
         {
-            ActionEditorHost.Context.Player.Reset(); ActionEditorHost.Context.Player.Sample(0);
-            Assert.That(ActionEditorHost.Context.Player.IsInitialized, Is.True, "First sample at zero must initialize preview.");
-            ActionEditorHost.Context.Player.Sample(1); Assert.That(ActionEditorHost.Context.Player.IsInitialized, Is.True);
-            ActionEditorHost.Context.Player.Reset(); Assert.That(ActionEditorHost.Context.Player.IsInitialized, Is.False);
-            ActionEditorHost.Context.Player.Sample(2); Assert.That(ActionEditorHost.Context.Player.IsInitialized, Is.True);
-            ActionEditorHost.Context.Session.Edit("remove", () => ActionEditorHost.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.RemoveAt(0));
-            Assert.That(ActionEditorHost.Context.Player.IsInitialized, Is.False);
+            EditorFixture.Shared.Player.Reset(); EditorFixture.Shared.Player.Sample(0);
+            Assert.That(EditorFixture.Shared.Player.IsInitialized, Is.True, "First sample at zero must initialize preview.");
+            EditorFixture.Shared.Player.Sample(1); Assert.That(EditorFixture.Shared.Player.IsInitialized, Is.True);
+            EditorFixture.Shared.Player.Reset(); Assert.That(EditorFixture.Shared.Player.IsInitialized, Is.False);
+            EditorFixture.Shared.Player.Sample(2); Assert.That(EditorFixture.Shared.Player.IsInitialized, Is.True);
+            EditorFixture.Shared.Session.Edit("remove", () => EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.RemoveAt(0));
+            Assert.That(EditorFixture.Shared.Player.IsInitialized, Is.False);
         }
 
         [UnityTest] public IEnumerator ImguiRepaintKeepsOwnedPanelsAndCloseReleasesThem()

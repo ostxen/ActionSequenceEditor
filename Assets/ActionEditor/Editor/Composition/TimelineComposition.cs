@@ -1,3 +1,4 @@
+using NBC.ActionEditor.Infrastructure.Assets;
 using NBC.ActionEditor.Views.IMGUI;
 using System;
 using System.Collections.Generic;
@@ -6,18 +7,21 @@ using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Presentation.Timeline;
 using UnityEditor;
+using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Editing;
+using NBC.ActionEditor.Application.Ports;
 
 namespace NBC.ActionEditor.Composition
 {
-    // 逐窗装配Presenter，作者会话和播放头由显式共享上下文提供。
+    // 逐窗装配Presenter，逐项注入编辑能力与共享播放头。
     public static class TimelineComposition
     {
         private sealed class Playhead : ITimelinePlayhead
         {
-            private readonly ActionEditorContext context;
-            public Playhead(ActionEditorContext context) { this.context = context; }
-            public float Time => context.Player.CurrentTime;
-            public void Seek(float time) => context.Player.Sample(time);
+            private readonly IDocumentSampler sampler;
+            public Playhead(IDocumentSampler sampler) { this.sampler = sampler; }
+            public float Time => sampler.CurrentTime;
+            public void Seek(float time) => sampler.Sample(time);
         }
         private sealed class Catalog : ITimelineTypeCatalog
         {
@@ -26,19 +30,19 @@ namespace NBC.ActionEditor.Composition
         }
         private sealed class Dialogs : ITimelineDialogs
         {
-            private readonly ActionEditorContext context;
-            public Dialogs(ActionEditorContext context) { this.context = context; }
             public void Delete(string title, Action confirmed)
             { if (EditorUtility.DisplayDialog(title, title == Lan.GroupDelete ? Lan.GroupDeleteTips : Lan.TrackDeleteTips, Lan.TipsConfirm, Lan.TipsCancel)) confirmed(); }
-            public void Rename(IDirectable item) => RenameItemWindow.Show(item, context.Structure.Rename);
+            public void Rename(string initialName, Action<string> submit) => RenameItemWindow.Show(initialName, submit);
         }
-        public static TimelinePresenter Create(ActionEditorContext context, TimelineWorkspace workspace, ITimelineView view,
+        public static TimelinePresenter Create(DocumentSession session, SelectionState selection, StructureEditing structure,
+            NodeEditing nodes, ClipboardEditing clipboardEditing, ClipEditing clips, ClipboardState clipboard, IDocumentSampler sampler,
+            TimelineWorkspace workspace, ITimelineView view,
             Application.Settings.SettingsSession settings, DocumentPresenter documents)
         {
-            var presenter = new TimelinePresenter(context.Session, context.Selection, context.Structure, context.ClipboardEditing,
-                context.Clips, workspace, new Playhead(context), () => settings.Current, view);
-            presenter.Menus = new TimelineMenuPresenter(context.Session, context.Structure, context.ClipboardEditing, context.Clipboard,
-                context.Selection, new Catalog(), new Dialogs(context), Text, presenter.Reveal);
+            var presenter = new TimelinePresenter(session, selection, structure, nodes, clipboardEditing,
+                clips, workspace, new Playhead(sampler), () => settings.Current, view);
+            presenter.Menus = new TimelineMenuPresenter(session, structure, nodes, clips, clipboardEditing, clipboard,
+                selection, new Catalog(), new Dialogs(), Text, presenter.Reveal);
             presenter.HostAction += key =>
             {
                 if (key == TimelineKey.Save) documents.Invoke(DocumentIntent.Save);

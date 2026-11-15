@@ -17,7 +17,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
         private readonly DocumentSession session;
         private readonly SelectionState selection;
         private readonly TimelineWorkspace workspace;
-        private readonly VisibleTimelineLayout layout;
+        private readonly TimelineLayout layout;
         private readonly ClipGesture clip;
         private readonly StructureGesture structure;
         private readonly ITimelinePlayhead playhead;
@@ -34,7 +34,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
         public bool ResizeCursor { get; private set; }
         public bool Captured => Mode != TimelineGestureMode.Idle;
         public TimelineInteraction(DocumentSession session, SelectionState selection, TimelineWorkspace workspace,
-            VisibleTimelineLayout layout, ClipEditing editing, StructureEditing structureEditing, ITimelinePlayhead playhead, Func<EditorSettings> settings, Action<bool> capture)
+            TimelineLayout layout, ClipEditing editing, StructureEditing structureEditing, ITimelinePlayhead playhead, Func<EditorSettings> settings, Action<bool> capture)
         { this.session = session; this.selection = selection; this.workspace = workspace; this.layout = layout;
             this.playhead = playhead; this.settings = settings; this.capture = capture; clip = new ClipGesture(session, editing);
             structure = new StructureGesture(session, structureEditing, layout, workspace); }
@@ -137,7 +137,11 @@ namespace NBC.ActionEditor.Presentation.Timeline
             var selected = Mode == TimelineGestureMode.Marquee ? selectionBefore : null;
             selectionBefore = null;
             try { Clear(); }
-            finally { structure.Cancel(); clip.Cancel(); }
+            finally
+            {
+                try { structure.Cancel(); }
+                finally { clip.Cancel(); }
+            }
             if (selected != null) selection.Set(selected.Where(item => session.Document != null && session.Document.directables.Contains(item)).ToArray(), false);
             if (seek) playhead.Seek(seekBefore);
         }
