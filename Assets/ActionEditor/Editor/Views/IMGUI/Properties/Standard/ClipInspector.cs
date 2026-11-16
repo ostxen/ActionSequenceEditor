@@ -1,5 +1,5 @@
 ﻿using NBC.ActionEditor.Presentation.Properties;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using NBC.ActionEditor.Presentation.Contracts;
 using UnityEditor;
 using UnityEngine;
@@ -7,10 +7,10 @@ using UnityEngine;
 namespace NBC.ActionEditor.Views.IMGUI.Properties.Standard
 {
     // 原生片段属性控件只绘制共享快照并上报时间或混合意图。
-    [CustomInspectors(typeof(TimelineClip), true)]
-    public class ClipInspector : InspectorsBase
+    [CustomInspectors(typeof(ActionClip), true)]
+    public class ClipInspector : PropertyInspectorBase
     {
-        private PropertyFieldId Clip => target.Id;
+        private PropertyFieldId ClipId => target.Id;
         public override void OnInspectorGUI() => ShowCommonInspector();
         protected void ShowCommonInspector(bool showBaseInspector = true)
         {
@@ -41,8 +41,8 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties.Standard
                 if (state.ShowRange) EditorGUILayout.MinMaxSlider(ref start, ref end, state.Minimum, state.Maximum);
             }
             else { start = EditorGUILayout.Slider("IN", start, 0, state.PointMaximum); end = start; }
-            if (EditorGUI.EndChangeCheck()) Presenter.Timing(Clip, start, length != state.Length ? start + length : end);
-            var warning = PropertyText.Warning(state.Warning);
+            if (EditorGUI.EndChangeCheck()) Presenter.Timing(ClipId, start, length != state.Length ? start + length : end);
+            var warning = PropertyWarningText.Warning(state.Warning);
             if (warning != null) EditorGUILayout.HelpBox(warning, MessageType.Warning);
             GUILayout.EndVertical();
         }
@@ -54,11 +54,11 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties.Standard
             if (state.BlendOutEnabled) DrawBlendSlider(false, state.BlendOut, state.BlendOutMaximum);
             GUILayout.EndHorizontal();
         }
-        private void DrawBlendSlider(bool incoming, float value, float maximum)
+        private void DrawBlendSlider(bool isBlendIn, float value, float maximum)
         {
-            GUILayout.BeginVertical(); GUILayout.Label(incoming ? "Blend In" : "Blend Out");
+            GUILayout.BeginVertical(); GUILayout.Label(isBlendIn ? "Blend In" : "Blend Out");
             EditorGUI.BeginChangeCheck(); var next = EditorGUILayout.Slider(value, 0, maximum);
-            if (EditorGUI.EndChangeCheck()) Presenter.Blend(Clip, incoming, next);
+            if (EditorGUI.EndChangeCheck()) Presenter.Blend(ClipId, isBlendIn, next);
             GUILayout.EndVertical();
         }
     }

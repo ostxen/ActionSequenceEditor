@@ -10,7 +10,7 @@ namespace NBC.ActionEditor.Verification
         public static object SyncProjects([CliArg("confirm", "Regenerate generated project files.")] bool confirm = false,
             [CliArg("dry-run", "Preview only.")] bool dryRun = false)
         {
-            VerificationGuard.Ready();
+            VerificationGuard.RequireReady();
             if (dryRun) return new { operation = "Unity.CodeEditor.CodeEditor.CurrentEditor.SyncAll", scope = "generated solution and project files only" };
             if (!confirm) throw new InvalidOperationException("Preview and explicit approval required.");
             Unity.CodeEditor.CodeEditor.CurrentEditor.SyncAll(); return new { status = "passed" };

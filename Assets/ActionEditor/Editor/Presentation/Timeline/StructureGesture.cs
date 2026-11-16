@@ -1,27 +1,27 @@
 using System;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Editing;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 
 namespace NBC.ActionEditor.Presentation.Timeline
 {
     // 按下到释放只保存候选，成功释放才开启一次作者事务。
     public sealed class StructureGesture
     {
-        private readonly DocumentSession session;
+        private readonly SequenceSession session;
         private readonly StructureEditing editing;
         private readonly TimelineLayout layout;
         private readonly TimelineWorkspace workspace;
-        private TimelineRootItem source;
+        private ActionContainer source;
         private StructureDrop drop;
         private long version;
         private float downX, downY, x, y;
         public bool Active => source != null;
         public bool Dragging { get; private set; }
         public InsertionIndicator Indicator { get; private set; }
-        public StructureGesture(DocumentSession session, StructureEditing editing, TimelineLayout layout, TimelineWorkspace workspace)
+        public StructureGesture(SequenceSession session, StructureEditing editing, TimelineLayout layout, TimelineWorkspace workspace)
         { this.session = session; this.editing = editing; this.layout = layout; this.workspace = workspace; }
-        public bool Begin(TimelineRootItem item, float pointerX, float pointerY)
+        public bool Begin(ActionContainer item, float pointerX, float pointerY)
         {
             if (item is not IDirectable directable || directable.IsLocked || session.IsEditing) return false;
             source = item; version = session.Version; downX = x = pointerX; downY = y = pointerY;
@@ -50,7 +50,7 @@ namespace NBC.ActionEditor.Presentation.Timeline
         }
         private void Update(TimelineSize size)
         {
-            drop = Dragging ? StructureDropGeometry.Hit(session.Document, source, layout, workspace, size, x, y) : default;
+            drop = Dragging ? StructureDropGeometry.Hit(session.Sequence, source, layout, workspace, size, x, y) : default;
             var visible = drop.Hit && drop.Y >= 0 && drop.Y <= size.Height;
             Indicator = new InsertionIndicator(visible, drop.Hit && editing.MoveError(source, drop.Owner, drop.Boundary, version) == null, drop.Y, size.Width);
         }

@@ -6,7 +6,7 @@ using System.Linq;
 using System.Reflection;
 using NBC.ActionEditor.Application.Editing;
 using NBC.ActionEditor.Application.Settings;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using NBC.ActionEditor.Presentation.Contracts;
 
 namespace NBC.ActionEditor.Presentation.Presenters
@@ -23,11 +23,11 @@ namespace NBC.ActionEditor.Presentation.Presenters
         private readonly object fieldIssuer = new object();
         private readonly Dictionary<PropertyFieldId, PropertyPath> inputPaths = new Dictionary<PropertyFieldId, PropertyPath>();
         private readonly Dictionary<PropertyPath, PropertyFieldId> inputIds = new Dictionary<PropertyPath, PropertyFieldId>();
-        private readonly Dictionary<PropertyFieldId, PropertyDescription> inputDescriptions = new Dictionary<PropertyFieldId, PropertyDescription>();
+        private readonly Dictionary<PropertyFieldId, PropertyFieldMetadata> inputDescriptions = new Dictionary<PropertyFieldId, PropertyFieldMetadata>();
         private readonly Dictionary<PropertyFieldId, Type> inputTypes = new Dictionary<PropertyFieldId, Type>();
         private readonly Dictionary<PropertyPath, object> viewKeys = new Dictionary<PropertyPath, object>();
-        private ActionDocument inputDocument;
-        private long inputVersion = -1, inputSelection = -1, inputGeneration;
+        private ActionSequence inputSequence;
+        private long inputSequenceVersion = -1, inputSelectionVersion = -1, inputGeneration;
         public PropertyPresenter(PropertyEditing editing, NodeEditing nodes, ClipEditing clips, Func<EditorSettings> settings, SelectionState selection = null)
         {
             this.editing = editing ?? throw new ArgumentNullException(nameof(editing));
@@ -39,14 +39,14 @@ namespace NBC.ActionEditor.Presentation.Presenters
         private string Title(object value) => value == null ? string.Empty
             : value.GetType().GetCustomAttribute<NameAttribute>(true)?.name ?? value.GetType().Name;
         private string Description(object value) => value?.GetType().GetCustomAttribute<DescriptionAttribute>(true)?.description;
-        public float DocumentLength => editing.Document?.Length ?? 0;
+        public float SequenceLength => editing.Sequence?.Length ?? 0;
         private bool Locked(object value) => value is IDirectable item && item.IsLocked;
         public EditorSettings Settings => settings();
 
         // 正式界面从当前文档/选择捕获，不把目标图传给调用方。
-        public IReadOnlyList<PropertyInputState> CaptureDocumentInputs() => CaptureInputs(editing.Document);
+        public IReadOnlyList<PropertyInputState> CaptureSequenceInputs() => CaptureInputs(editing.Sequence);
         public IReadOnlyList<PropertyInputState> CaptureSelectionInputs() => CaptureInputs(selection?.First);
-        public PropertyTargetState CaptureDocumentTarget() => CaptureTarget(editing.Document);
+        public PropertyTargetState CaptureSequenceTarget() => CaptureTarget(editing.Sequence);
         public PropertyTargetState CaptureSelectionTarget() => CaptureTarget(selection?.First);
         public PropertyTargetState CaptureTarget(object owner)
         {
@@ -59,8 +59,8 @@ namespace NBC.ActionEditor.Presentation.Presenters
                 inputIds.Add(path, id); inputPaths.Add(id, path);
             }
             return new PropertyTargetState(id, owner.GetType(), Title(owner), Description(owner),
-                (owner as IDirectable)?.Name, Locked(owner), owner is TimelineGroup || owner is TimelineTrack,
-                owner is TimelineClip clip ? ClipState(clip) : null, CaptureInputs(owner, path, 0));
+                (owner as IDirectable)?.Name, Locked(owner), owner is ActionGroup || owner is ActionTrack,
+                owner is ActionClip clip ? ClipState(clip) : null, CaptureInputs(owner, path, 0));
         }
         public IReadOnlyList<PropertyInputState> CaptureInputs(object owner)
         {
@@ -72,7 +72,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
             : Fields(owner).Select(d => CaptureInput(path.Field(d.Field), d.Field.FieldType,
                 d.Field.Name, d.Label ?? d.Field.Name, d, depth)).ToArray();
         private PropertyInputState CaptureInput(PropertyPath path, Type type, string name, string label,
-            PropertyDescription description, int depth)
+            PropertyFieldMetadata description, int depth)
         {
             if (!inputIds.TryGetValue(path, out var id))
             {
@@ -112,10 +112,10 @@ namespace NBC.ActionEditor.Presentation.Presenters
         private void SynchronizeInputs()
         {
             var selected = selection?.Version ?? 0;
-            if (inputVersion == editing.Version && inputSelection == selected) return;
-            if (!ReferenceEquals(inputDocument, editing.Document) || inputSelection != selected) viewKeys.Clear();
-            inputDocument = editing.Document;
-            inputVersion = editing.Version; inputSelection = selected; inputGeneration++;
+            if (inputSequenceVersion == editing.Version && inputSelectionVersion == selected) return;
+            if (!ReferenceEquals(inputSequence, editing.Sequence) || inputSelectionVersion != selected) viewKeys.Clear();
+            inputSequence = editing.Sequence;
+            inputSequenceVersion = editing.Version; inputSelectionVersion = selected; inputGeneration++;
             inputPaths.Clear(); inputIds.Clear();
             inputDescriptions.Clear(); inputTypes.Clear();
         }
@@ -142,13 +142,13 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public void Rename(PropertyFieldId id, string value) => Rename(ResolveInput(id).Read() as IDirectable, value);
         public void Timing(PropertyFieldId id, float start, float end)
         {
-            var clip = ResolveInput(id).Read() as TimelineClip;
+            var clip = ResolveInput(id).Read() as ActionClip;
             if (clip == null) throw new InvalidOperationException("时间编辑目标已失效。");
             Timing(clip, start, end);
         }
         public void Blend(PropertyFieldId id, bool incoming, float value)
         {
-            var clip = ResolveInput(id).Read() as TimelineClip;
+            var clip = ResolveInput(id).Read() as ActionClip;
             if (clip == null) throw new InvalidOperationException("混合编辑目标已失效。");
             Blend(clip, incoming, value);
         }
@@ -184,17 +184,17 @@ namespace NBC.ActionEditor.Presentation.Presenters
             Write(path, description.Constants[index].GetRawConstantValue());
         }
         // 业务有效性与存储结构分开：有限但无效的参数仍可定位并通过普通事务修正。
-        public IReadOnlyList<PropertyIssueState> CaptureIssues() => editing.Document == null
+        public IReadOnlyList<PropertyIssueState> CaptureIssues() => editing.Sequence == null
             ? Array.Empty<PropertyIssueState>()
-            : editing.Document.directables.Select((item, key) => (item, key))
-                .Where(entry => entry.item is TimelineClip clip && !clip.IsValid)
+            : editing.Sequence.directables.Select((item, key) => (item, key))
+                .Where(entry => entry.item is ActionClip clip && !clip.IsValid)
                 .Select(entry => new PropertyIssueState(entry.key, editing.Version, "检查片段参数：" + entry.item.Name)).ToArray();
         public void SelectIssue(PropertyIssueState issue)
         {
-            if (issue.Version != editing.Version || editing.Document == null || issue.Key < 0
-                || issue.Key >= editing.Document.directables.Count)
+            if (issue.Version != editing.Version || editing.Sequence == null || issue.Key < 0
+                || issue.Key >= editing.Sequence.directables.Count)
                 throw new InvalidOperationException("诊断目标已改变，请刷新列表。");
-            var item = editing.Document.directables[issue.Key] as TimelineClip;
+            var item = editing.Sequence.directables[issue.Key] as ActionClip;
             if (item == null || item.IsValid) throw new InvalidOperationException("诊断已失效，请刷新列表。");
             CancelDraft();
             selection?.Set(new IDirectable[] { item }, false);
@@ -207,7 +207,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
             return new PropertyPath(editing, owner, selection.Items.Where(item => item.GetType() == owner.GetType()).Cast<object>(),
                 () => selection.Version == version);
         }
-        private IReadOnlyList<PropertyDescription> Fields(object owner) => PropertyDescription.For(owner.GetType())
+        private IReadOnlyList<PropertyFieldMetadata> Fields(object owner) => PropertyFieldMetadata.For(owner.GetType())
             .Where(d => !d.Field.IsInitOnly && d.Visible(owner)).OrderBy(d => d.Field.DeclaringType == d.Field.ReflectedType ? 1 : 0).ToArray();
         // 曲线控件可以原位修改，显示副本必须与作者对象分离。
         private static object CopyDisplayValue(object value) => value is UnityEngine.AnimationCurve curve
@@ -297,7 +297,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
         }
 
         // 父级溢出、邻居边界与混合能力只在共享显示层解释一次。
-        private ClipPropertyState ClipState(TimelineClip clip)
+        private ClipPropertyState ClipState(ActionClip clip)
         {
             var parentStart = clip.Parent?.StartTime ?? 0;
             var parentEnd = clip.Parent?.EndTime ?? clip.EndTime;
@@ -316,7 +316,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
                 warning: warning);
         }
 
-        private void Timing(TimelineClip clip, float start, float end) => clips.SetTiming(clip, start, end, Settings.SnapInterval);
-        private void Blend(TimelineClip clip, bool incoming, float value) => clips.SetBlend(clip, incoming, value);
+        private void Timing(ActionClip clip, float start, float end) => clips.SetTiming(clip, start, end, Settings.SnapInterval);
+        private void Blend(ActionClip clip, bool incoming, float value) => clips.SetBlend(clip, incoming, value);
     }
 }

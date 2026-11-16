@@ -1,10 +1,10 @@
 using NBC.ActionEditor.Views.IMGUI;
 using ImguiWindow = NBC.ActionEditor.Views.IMGUI.ActionEditorWindow;
 using ToolkitWindow = NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow;
-using ToolkitPreferences = NBC.ActionEditor.Views.UIToolkit.PreferencesWindow;
-using NBC.ActionEditor.Infrastructure.Documents;
+using ToolkitSettings = NBC.ActionEditor.Views.UIToolkit.SettingsWindow;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using NBC.ActionEditor.Presentation.Timeline;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using System;
 using System.Collections;
 using System.IO;
@@ -61,10 +61,10 @@ namespace NBC.ActionEditor.Tests
             {
                 CapturedUtc = DateTime.UtcNow.ToString("O"), UnityVersion = UnityEngine.Application.unityVersion,
                 PixelsPerPoint = EditorGUIUtility.pixelsPerPoint, SnapInterval = EditorFixture.SharedSettings.Current.SnapInterval,
-                FrameRate = EditorFixture.SharedSettings.Current.FrameRate, TimeStepMode = (int)EditorFixture.SharedSettings.Current.TimeStepMode, AutoSaveSeconds = EditorFixture.SharedSettings.Current.AutoSaveSeconds,
+                FrameRate = EditorFixture.SharedSettings.Current.FrameRate, TimeStepMode = (int)EditorFixture.SharedSettings.Current.TimeStepMode, AutoSaveSeconds = EditorFixture.SharedSettings.Current.AutoSaveIntervalSeconds,
                 MagnetSnapping = EditorFixture.SharedSettings.Current.MagnetSnapping, ScrollWheelZooms = EditorFixture.SharedSettings.Current.ScrollWheelZooms,
-                Groups = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().Count(), Tracks = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().Sum(g => g.Tracks.Count),
-                Clips = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).Sum(t => t.Clips.Count)
+                Groups = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().Count(), Tracks = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().Sum(g => g.Tracks.Count),
+                Clips = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().SelectMany(g => g.Tracks).Sum(t => t.Clips.Count)
             };
             try
             {
@@ -139,7 +139,7 @@ namespace NBC.ActionEditor.Tests
             try
             {
                 original.Workspace.LeftWidth = 320; original.Workspace.ScrollY = 0;
-                original.Workspace.SetRange(0, 7); native.Workspace.SetRange(0, 7); EditorFixture.Shared.Playback.Stop(); EditorFixture.Shared.Playback.IsRange = false; EditorFixture.Shared.Selection.Set(new IDirectable[] {  }, false);
+                original.Workspace.SetRange(0, 7); native.Workspace.SetRange(0, 7); EditorFixture.Shared.Playback.Stop(); EditorFixture.Shared.Playback.RangePlaybackEnabled = false; EditorFixture.Shared.Selection.Set(new IDirectable[] {  }, false);
                 original.Show(); original.position = new Rect(60, 60, 1000, 600);
                 yield return null; yield return null; yield return null; original.Repaint(); yield return null;
                 Capture(original, "shared-json-original.png");
@@ -152,7 +152,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(native.Canvas.Scale, Is.EqualTo((1000 - 329) / 7f).Within(1));
                 Assert.That(native.rootVisualElement.Q("timeline-loop-start"), Is.Null);
                 Assert.That(native.rootVisualElement.Query<IMGUIContainer>().ToList(), Is.Empty);
-                Assert.That(native.rootVisualElement.Q("timeline-custom-header").Q<Button>().text, Is.EqualTo(Lan.PreviewTitle));
+                Assert.That(native.rootVisualElement.Q("timeline-custom-header").Q<Button>().text, Is.EqualTo(EditorText.PreviewTitle));
                 foreach (var width in new[] { 850, 1024, 1400 })
                 {
                     native.position = new Rect(60, 60, width, 600); yield return null; yield return null;
@@ -160,14 +160,14 @@ namespace NBC.ActionEditor.Tests
                     Assert.That(native.rootVisualElement.Q("timeline-ruler").worldBound.xMin - native.rootVisualElement.worldBound.xMin, Is.EqualTo(native.Canvas.Left).Within(1));
                 }
                 original.position = native.position = new Rect(60, 60, 1000, 600);
-                var selected = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; EditorFixture.Shared.Selection.Set(new IDirectable[] { selected }, false);
-                EditorFixture.Shared.Playback.Play(EditorFixture.Shared.Clock.PlaybackTime); EditorFixture.Shared.Playback.Pause(true); EditorFixture.Shared.Player.Sample(1); EditorFixture.Shared.Playback.IsRange = true;
+                var selected = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0]; EditorFixture.Shared.Selection.Set(new IDirectable[] { selected }, false);
+                EditorFixture.Shared.Playback.Play(EditorFixture.Shared.Clock.PlaybackTime); EditorFixture.Shared.Playback.SetPaused(true); EditorFixture.Shared.Sampler.Sample(1); EditorFixture.Shared.Playback.RangePlaybackEnabled = true;
                 original.Focus(); original.Repaint(); yield return null; yield return null;
                 Capture(original, "shared-json-original-selected.png");
                 native.Refresh(); native.Focus(); native.Repaint(); yield return null; yield return null;
                 Capture(native, "shared-json-native-selected.png");
-                EditorFixture.Shared.Playback.Stop(); EditorFixture.Shared.Playback.IsRange = false;
-                original.Workspace.SetCollapsed(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(2), false); native.Workspace.SetCollapsed(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(2), false); EditorFixture.SharedViews.Repaint();
+                EditorFixture.Shared.Playback.Stop(); EditorFixture.Shared.Playback.RangePlaybackEnabled = false;
+                original.Workspace.SetCollapsed(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(2), false); native.Workspace.SetCollapsed(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(2), false); EditorFixture.SharedViews.Repaint();
                 original.position = native.position = new Rect(60, 60, 1000, 240);
                 original.Workspace.ScrollY = 60; native.ScrollY = 60;
                 original.Focus(); original.Repaint(); yield return null; yield return null;
@@ -187,12 +187,12 @@ namespace NBC.ActionEditor.Tests
         {
             var original = ScriptableObject.CreateInstance<ImguiWindow>(); var native = ScriptableObject.CreateInstance<ToolkitWindow>();
             var originalProperty = ScriptableObject.CreateInstance<PropertyEvidenceWindow>(); originalProperty.Imgui = true;
-            var nativeProperty = ScriptableObject.CreateInstance<PropertyEvidenceWindow>(); var preferences = ScriptableObject.CreateInstance<ToolkitPreferences>();
+            var nativeProperty = ScriptableObject.CreateInstance<PropertyEvidenceWindow>(); var preferences = ScriptableObject.CreateInstance<ToolkitSettings>();
 
             try
             {
                 native.Show(); native.position = new Rect(60, 60, 1000, 600); yield return null; yield return null;
-                native.Select(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]);
+                native.Select(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0]);
                 originalProperty.Show(); originalProperty.position = new Rect(60, 60, 640, 850); originalProperty.Initialize(native);
                 originalProperty.Repaint(); yield return null; yield return null;
                 Capture(originalProperty, "shared-json-original-inspector.png");
@@ -204,9 +204,9 @@ namespace NBC.ActionEditor.Tests
                 if (frames) nativeProperty.rootVisualElement.Q<IntegerField>("timeline-clip-length").value = Mathf.RoundToInt(1.2f * EditorFixture.SharedSettings.Current.FrameRate);
                 else nativeProperty.rootVisualElement.Q<FloatField>("timeline-clip-length").value = 1.2f;
                 yield return null;
-                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length, Is.EqualTo(1.2f).Within(EditorFixture.SharedSettings.Current.SnapInterval));
+                Assert.That(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0].Length, Is.EqualTo(1.2f).Within(EditorFixture.SharedSettings.Current.SnapInterval));
                 Undo.PerformUndo(); yield return null;
-                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].Length, Is.EqualTo(1.5f));
+                Assert.That(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0].Length, Is.EqualTo(1.5f));
                 preferences.Bind(EditorFixture.SharedSettings); preferences.Show(); preferences.position = new Rect(60, 60, 400, 310); yield return null; yield return null;
                 Assert.That(preferences.rootVisualElement.Query<IMGUIContainer>().ToList(), Is.Empty);
                 Assert.That(preferences.rootVisualElement.Query<Toggle>().ToList().Count, Is.EqualTo(2));

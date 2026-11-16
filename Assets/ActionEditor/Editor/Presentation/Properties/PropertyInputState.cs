@@ -38,7 +38,7 @@ namespace NBC.ActionEditor.Presentation.Properties
         public int OptionIndex { get; }
         public IReadOnlyList<PropertyInputState> Children { get; }
         internal PropertyInputState(PropertyFieldId id, string name, string label, Type type, object value,
-            bool isNull, bool mixed, PropertyDescription description, string[] options, int optionIndex, PropertyInputState[] children)
+            bool isNull, bool mixed, PropertyFieldMetadata description, string[] options, int optionIndex, PropertyInputState[] children)
         {
             Id = id; Name = name; Label = label; Type = type; Value = value; IsNull = isNull; Mixed = mixed;
             HasRange = description?.HasRange ?? false; Minimum = description?.Minimum ?? 0;

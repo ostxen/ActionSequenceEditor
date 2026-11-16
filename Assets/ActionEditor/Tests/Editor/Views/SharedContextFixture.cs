@@ -1,10 +1,10 @@
 using NBC.ActionEditor.Views.IMGUI;
 using ImguiWindow = NBC.ActionEditor.Views.IMGUI.ActionEditorWindow;
 using ToolkitWindow = NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow;
-using ToolkitPreferences = NBC.ActionEditor.Views.UIToolkit.PreferencesWindow;
-using NBC.ActionEditor.Infrastructure.Documents;
+using ToolkitSettings = NBC.ActionEditor.Views.UIToolkit.SettingsWindow;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using NBC.ActionEditor.Presentation.Timeline;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using System;
 using System.Collections;
 using System.IO;
@@ -20,27 +20,54 @@ using UnityEngine.UIElements;
 
 namespace NBC.ActionEditor.Tests
 {
+    internal static class NativeMenuInput
+    {
+        public static IEnumerator Choose(ToolkitWindow window, Vector2 local, string suffix)
+        {
+            window.Focus(); yield return null; yield return null;
+            var canvas = window.Canvas;
+            var path = canvas.Presenter.Menu(local.x, local.y).Single(entry => entry.Text.EndsWith("/" + suffix) || entry.Text == suffix).Text;
+            using (var open = PointerUpEvent.GetPooled(new Event { type = EventType.MouseUp, button = 1, mousePosition = canvas.LocalToWorld(local) }))
+            { open.target = canvas; canvas.SendEvent(open); }
+            yield return null; yield return null;
+            var parts = path.Split('/');
+            for (var depth = 0; depth < parts.Length; depth++)
+            {
+                var dropdown = window.rootVisualElement.Q(className: GenericDropdownMenu.ussClassName);
+                Assert.That(dropdown, Is.Not.Null, "native menu depth=" + depth + ", path=" + path);
+                var label = dropdown.Query<Label>().ToList().Single(item => item.text == parts[depth] + (depth < parts.Length - 1 ? " ›" : ""));
+                var row = label.parent;
+                for (var frame = 0; frame < 30 && (float.IsNaN(row.worldBound.width) || row.worldBound.width <= 0); frame++)
+                { window.Repaint(); yield return null; }
+                Assert.That(row.worldBound.width, Is.GreaterThan(0), "menu row must complete layout");
+                var point = row.worldBound.center;
+                using (var move = PointerMoveEvent.GetPooled(new Event { type = EventType.MouseMove, mousePosition = point })) { move.target = row; row.SendEvent(move); }
+                using (var choose = PointerUpEvent.GetPooled(new Event { type = EventType.MouseUp, button = 0, mousePosition = point })) { choose.target = row; row.SendEvent(choose); }
+                yield return null; yield return null;
+            }
+        }
+    }
     // 仅测试使用反射观察组合根私有状态，不为断言恢复生产服务查询入口。
     public sealed class EditorFixture : IDisposable
     {
-        public readonly Composition.EditorComposition Composition;
-        public EditorFixture(NBC.ActionEditor.Application.Documents.DocumentSession session, JsonDocumentRepository repository = null)
-            => Composition = new Composition.EditorComposition(session, repository);
-        private EditorFixture(Composition.EditorComposition composition) => Composition = composition;
-        public static EditorFixture Shared => new EditorFixture((Composition.EditorComposition)typeof(ActionEditorHost)
+        public readonly Composition.EditorCompositionRoot Composition;
+        public EditorFixture(NBC.ActionEditor.Application.Sequences.SequenceSession session, SequenceFileRepository repository = null)
+            => Composition = new Composition.EditorCompositionRoot(session, repository);
+        private EditorFixture(Composition.EditorCompositionRoot composition) => Composition = composition;
+        public static EditorFixture Shared => new EditorFixture((Composition.EditorCompositionRoot)typeof(ActionEditorHost)
             .GetField("composition", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null));
-        public static ActionEditorViews SharedViews => (ActionEditorViews)typeof(ActionEditorHost)
+        public static EditorViewRegistry SharedViews => (EditorViewRegistry)typeof(ActionEditorHost)
             .GetField("views", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null);
         public static NBC.ActionEditor.Application.Settings.SettingsSession SharedSettings => (NBC.ActionEditor.Application.Settings.SettingsSession)typeof(ActionEditorHost)
             .GetField("settings", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null);
-        private T Read<T>(string name) => (T)typeof(Composition.EditorComposition)
+        private T Read<T>(string name) => (T)typeof(Composition.EditorCompositionRoot)
             .GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(Composition);
-        public NBC.ActionEditor.Application.Documents.DocumentSession Session => Read<NBC.ActionEditor.Application.Documents.DocumentSession>("session");
-        public ActionDocument Document => Session.Document;
-        public DocumentNavigation Navigation => Read<DocumentNavigation>("navigation");
+        public NBC.ActionEditor.Application.Sequences.SequenceSession Session => Read<NBC.ActionEditor.Application.Sequences.SequenceSession>("session");
+        public ActionSequence Sequence => Session.Sequence;
+        public SequenceNavigation Navigation => Read<SequenceNavigation>("navigation");
         public TextAsset Source => Navigation.Source;
-        public NBC.ActionEditor.Application.Documents.DocumentLifecycle Lifecycle => Read<NBC.ActionEditor.Application.Documents.DocumentLifecycle>("lifecycle");
-        public NBC.ActionEditor.Application.Documents.DocumentAutoSave AutoSave => Read<NBC.ActionEditor.Application.Documents.DocumentAutoSave>("autoSave");
+        public NBC.ActionEditor.Application.Sequences.SequenceLifecycle Lifecycle => Read<NBC.ActionEditor.Application.Sequences.SequenceLifecycle>("lifecycle");
+        public NBC.ActionEditor.Application.Sequences.SequenceAutoSave AutoSave => Read<NBC.ActionEditor.Application.Sequences.SequenceAutoSave>("autoSave");
         public NBC.ActionEditor.Application.Editing.SelectionState Selection => Read<NBC.ActionEditor.Application.Editing.SelectionState>("selection");
         public NBC.ActionEditor.Application.Editing.ClipboardState Clipboard => Read<NBC.ActionEditor.Application.Editing.ClipboardState>("clipboard");
         public NBC.ActionEditor.Application.Editing.StructureEditing Structure => Read<NBC.ActionEditor.Application.Editing.StructureEditing>("structure");
@@ -49,12 +76,12 @@ namespace NBC.ActionEditor.Tests
         public NBC.ActionEditor.Application.Editing.PropertyEditing Properties => Read<NBC.ActionEditor.Application.Editing.PropertyEditing>("properties");
         public NBC.ActionEditor.Application.Editing.ClipEditing Clips => Read<NBC.ActionEditor.Application.Editing.ClipEditing>("clips");
         public NBC.ActionEditor.Application.Ports.IEditorClock Clock => Read<NBC.ActionEditor.Application.Ports.IEditorClock>("clock");
-        public NBC.ActionEditor.Application.Playback.DocumentPlayback Playback => Read<NBC.ActionEditor.Application.Playback.DocumentPlayback>("playback");
-        public NBC.ActionEditor.Infrastructure.Preview.DocumentSampler Player => Read<NBC.ActionEditor.Infrastructure.Preview.DocumentSampler>("player");
+        public NBC.ActionEditor.Application.Playback.SequencePlayback Playback => Read<NBC.ActionEditor.Application.Playback.SequencePlayback>("playback");
+        public NBC.ActionEditor.Infrastructure.Preview.SequenceSampler Sampler => Read<NBC.ActionEditor.Infrastructure.Preview.SequenceSampler>("sampler");
         public void Open(TextAsset value) => Navigation.Open(value);
-        public NBC.ActionEditor.Presentation.Presenters.DocumentPresenter CreateDocuments(Func<bool, string> choose = null) => Composition.CreateDocuments(choose);
+        public NBC.ActionEditor.Presentation.Presenters.SequencePresenter CreateSequencePresenter(Func<bool, string> choose = null) => Composition.CreateSequencePresenter(choose);
         public NBC.ActionEditor.Presentation.Presenters.PropertyPresenter CreateProperties(NBC.ActionEditor.Application.Settings.SettingsSession settings) => Composition.CreateProperties(settings);
-        public Composition.WindowBinding Bind(object owner, Action repaint, Action changed, ActionEditorViews views,
+        public Composition.WindowBinding Bind(object owner, Action repaint, Action changed, EditorViewRegistry views,
             NBC.ActionEditor.Application.Settings.SettingsSession settings, Func<bool, string> choose = null)
             => Composition.CreateBinding(owner, repaint, changed, views, settings, choose);
         public void Dispose() => Composition.Dispose();
@@ -63,7 +90,7 @@ namespace NBC.ActionEditor.Tests
     {
         protected static readonly TimelineWorkspace Workspace = new TimelineWorkspace();
 
-        protected static Vector2 ImguiPoint(ImguiWindow window, TimelineClip clip, bool right = false)
+        protected static Vector2 ImguiPoint(ImguiWindow window, ActionClip clip, bool right = false)
         {
             var rect = window.Timeline.State.Clips.Single(c => c.Key == window.Presenter.KeyFor(clip)).Bounds;
             var offset = (Vector2)typeof(ImguiWindow).GetProperty("ContentOffset", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(window);
@@ -78,9 +105,9 @@ namespace NBC.ActionEditor.Tests
         {
             previous = EditorFixture.Shared.Source;
             recovery = EditorFixture.Shared.Session.CaptureRecovery();
-            fixture = new TextAsset(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
+            fixture = new TextAsset(NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.Encode(new FeatureSampleSequence()));
             EditorFixture.Shared.Open(fixture);
-            Workspace.Bind(null); Workspace.Bind(EditorFixture.Shared.Document); Workspace.SetRange(0, 7);
+            Workspace.Bind(null); Workspace.Bind(EditorFixture.Shared.Sequence); Workspace.SetRange(0, 7);
         }
 
         [TearDown] public void Teardown()

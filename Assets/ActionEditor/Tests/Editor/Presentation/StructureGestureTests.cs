@@ -1,11 +1,11 @@
 using NBC.ActionEditor.Infrastructure.Serialization;
 using System;
 using System.Linq;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Editing;
 using NBC.ActionEditor.Application.Settings;
-using NBC.ActionEditor.Domain;
-using NBC.ActionEditor.Infrastructure.Documents;
+using NBC.ActionEditor.Model;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Presentation.Timeline;
@@ -18,7 +18,7 @@ namespace NBC.ActionEditor.Tests.Presentation
 {
     public sealed class StructureGestureTests
     {
-        [Serializable, Unique, Attachable(typeof(FeatureSampleGroup))] private sealed class UniqueTrack : TimelineTrack { }
+        [Serializable, Unique, Attachable(typeof(FeatureSampleGroup))] private sealed class UniqueTrack : ActionTrack { }
         private sealed class View : ITimelineView
         {
             public bool Captured;
@@ -31,26 +31,26 @@ namespace NBC.ActionEditor.Tests.Presentation
         { public float Time => 0; public void Seek(float value) { } }
         private sealed class Harness : IDisposable
         {
-            public readonly DocumentSession Session = Composition.DocumentComposition.Create();
+            public readonly SequenceSession Session = Composition.SequenceComposition.Create();
             public readonly SelectionState Selection = new SelectionState();
             public readonly StructureEditing Editing;
             public readonly View View = new View();
             public readonly TimelinePresenter Presenter;
-            public ActionDocument Document => Session.Document;
+            public ActionSequence Sequence => Session.Sequence;
             public Harness(int height = 500)
             {
-                Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
+                Session.Open(new SequenceOpenData(new FeatureSampleSequence()));
                 Editing = new StructureEditing(Session, () => Selection.Items);
                 var clipboard = new ClipboardEditing(Session, Editing, new ClipboardState(), new FragmentCodec(), item => Selection.Set(new[] { item }, false));
                 Presenter = new TimelinePresenter(Session, Selection, Editing, new NodeEditing(Session), clipboard, new ClipEditing(Session), new TimelineWorkspace(),
                     new Playhead(), () => new EditorSettings(TimeStepMode.Seconds, .1f, 30, false, true, 0, "Assets/"), View);
                 Presenter.Resize(new TimelineSize(1000, height));
             }
-            public TimelineGroup Group(int index) => Document.RootItems.OfType<TimelineGroup>().ElementAt(index);
+            public ActionGroup Group(int index) => Sequence.RootContainers.OfType<ActionGroup>().ElementAt(index);
             public void Pointer(PointerAction action, float x, float y, PointerButton button = PointerButton.Primary) => Presenter.Pointer(new PointerInput(action, x, y, button));
             public float Y(IDirectable item) => Presenter.State.Rows.Single(row => row.Key == Key(item)).Bounds.Y + 14;
             private int Key(IDirectable item) => Presenter.State.Rows.Single(row => row.Title == item.Name).Key;
-            public string Content => NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Content(Document);
+            public string Content => NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.GetContentKey(Sequence);
             public void Dispose() { Presenter.Dispose(); Session.Dispose(); }
         }
 
@@ -58,13 +58,13 @@ namespace NBC.ActionEditor.Tests.Presentation
         public void GroupMoveUsesPreRemovalBoundaryAndOneUndo(int boundary)
         {
             using var h = new Harness(); var before = h.Content; var version = h.Session.Version;
-            var groups = h.Document.RootItems.ToArray(); var first = groups[0]; var children = ((TimelineGroup)first).Tracks.ToArray();
+            var groups = h.Sequence.RootContainers.ToArray(); var first = groups[0]; var children = ((ActionGroup)first).Tracks.ToArray();
             var changed = h.Editing.Move(first, null, boundary, version);
             if (boundary < 2)
             { Assert.That(changed, Is.False); Assert.That(h.Session.Version, Is.EqualTo(version)); Assert.That(h.Session.IsDirty, Is.False); return; }
             var expected = boundary == 2 ? new[] { groups[1], groups[0], groups[2] } : new[] { groups[1], groups[2], groups[0] };
-            Assert.That(h.Document.RootItems, Is.EqualTo(expected));
-            Assert.That(((TimelineGroup)first).Tracks, Is.EqualTo(children));
+            Assert.That(h.Sequence.RootContainers, Is.EqualTo(expected));
+            Assert.That(((ActionGroup)first).Tracks, Is.EqualTo(children));
             var after = h.Content; Undo.PerformUndo(); Assert.That(h.Content, Is.EqualTo(before));
             Undo.PerformRedo(); Assert.That(h.Content, Is.EqualTo(after));
         }
@@ -75,14 +75,14 @@ namespace NBC.ActionEditor.Tests.Presentation
             h.Editing.Move(track, target, 1, h.Session.Version);
             Assert.That(target.Tracks[1], Is.SameAs(track)); Assert.That(track.Parent, Is.SameAs(target));
             h.Editing.Move(track, null, 1, h.Session.Version);
-            Assert.That(h.Document.RootItems[1], Is.SameAs(track)); Assert.That(track.Parent, Is.Null);
-            var encoded = NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Encode(h.Document);
-            var loaded = NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Decode(encoded);
-            Assert.That(loaded.RootItems.Select(item => ((IDirectable)item).Name), Is.EqualTo(h.Document.RootItems.Select(item => ((IDirectable)item).Name)));
-            Assert.That(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Content(loaded), Is.EqualTo(h.Content));
+            Assert.That(h.Sequence.RootContainers[1], Is.SameAs(track)); Assert.That(track.Parent, Is.Null);
+            var encoded = NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.Encode(h.Sequence);
+            var loaded = NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.Decode(encoded);
+            Assert.That(loaded.RootContainers.Select(item => ((IDirectable)item).Name), Is.EqualTo(h.Sequence.RootContainers.Select(item => ((IDirectable)item).Name)));
+            Assert.That(NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.GetContentKey(loaded), Is.EqualTo(h.Content));
             h.Editing.Move(track, first, 0, h.Session.Version);
             Assert.That(h.Content, Is.EqualTo(original)); Assert.That(track.Clips, Is.EqualTo(clips));
-            Undo.PerformUndo(); Assert.That(h.Document.RootItems[1], Is.TypeOf<FeatureSampleIntervalTrack>());
+            Undo.PerformUndo(); Assert.That(h.Sequence.RootContainers[1], Is.TypeOf<FeatureSampleIntervalTrack>());
             Undo.PerformUndo(); Assert.That(h.Group(1).Tracks[1], Is.TypeOf<FeatureSampleIntervalTrack>());
             Undo.PerformUndo(); Assert.That(h.Content, Is.EqualTo(original));
         }
@@ -98,7 +98,7 @@ namespace NBC.ActionEditor.Tests.Presentation
         [Test] public void LockedSourceTargetAndStaleVersionAreRecheckedAtRelease()
         {
             using var h = new Harness(); var source = h.Group(0).Tracks[0]; var target = h.Group(1);
-            var version = h.Session.Version; var operation = h.Editing.Reorder(source, target, 0);
+            var version = h.Session.Version; var operation = h.Editing.MoveOperation(source, target, 0);
             target.IsLocked = true; var before = h.Content;
             Assert.That(operation.CanExecute(out _), Is.False); Assert.Throws<InvalidOperationException>(operation.Execute);
             Assert.That(h.Content, Is.EqualTo(before)); target.IsLocked = false;
@@ -109,22 +109,22 @@ namespace NBC.ActionEditor.Tests.Presentation
         }
         [Test] public void UniqueAttachableNestedGroupAndInvalidBoundariesRejectWithoutMutation()
         {
-            var document = new FeatureSampleDocument(); var first = (TimelineGroup)document.RootItems[0]; var second = (TimelineGroup)document.RootItems[1];
+            var document = new FeatureSampleSequence(); var first = (ActionGroup)document.RootContainers[0]; var second = (ActionGroup)document.RootContainers[1];
             var unique = new UniqueTrack(); first.Tracks.Add(unique); second.Tracks.Add(new UniqueTrack()); document.Validate();
-            Assert.That(StructureRules.Error(document, unique, second, 0), Is.Not.Null);
-            Assert.That(StructureRules.Error(document, unique, first, 0), Is.Null);
-            var other = new TimelineGroup(); document.AddRoot(other); document.Validate();
-            Assert.That(StructureRules.Error(document, unique, other, 0), Is.Not.Null);
-            Assert.That(StructureRules.Error(document, first, second, 0), Is.Not.Null);
-            Assert.That(StructureRules.Error(document, first, null, -1), Is.Not.Null);
-            Assert.That(StructureRules.Error(document, first, null, 99), Is.Not.Null);
+            Assert.That(StructureRules.MoveError(document, unique, second, 0), Is.Not.Null);
+            Assert.That(StructureRules.MoveError(document, unique, first, 0), Is.Null);
+            var other = new ActionGroup(); document.AddRootContainer(other); document.Validate();
+            Assert.That(StructureRules.MoveError(document, unique, other, 0), Is.Not.Null);
+            Assert.That(StructureRules.MoveError(document, first, second, 0), Is.Not.Null);
+            Assert.That(StructureRules.MoveError(document, first, null, -1), Is.Not.Null);
+            Assert.That(StructureRules.MoveError(document, first, null, 99), Is.Not.Null);
         }
         [Test] public void UnlockedGroupMovesWholeSubtreeEvenWhenChildLockedOrInactive()
         {
             using var h = new Harness(); var group = h.Group(2); var tracks = group.Tracks.ToArray();
             Assert.That(tracks[0].IsLocked, Is.True);
             h.Editing.Move(group, null, 0, h.Session.Version);
-            Assert.That(h.Document.RootItems[0], Is.SameAs(group)); Assert.That(group.Tracks, Is.EqualTo(tracks));
+            Assert.That(h.Sequence.RootContainers[0], Is.SameAs(group)); Assert.That(group.Tracks, Is.EqualTo(tracks));
         }
         [Test] public void ThresholdWrongButtonCancelAndOutsideReleaseNeverMutateGraph()
         {
@@ -149,7 +149,7 @@ namespace NBC.ActionEditor.Tests.Presentation
             h.Pointer(PointerAction.Move, 800, h.Y(first.Tracks[2]));
             Assert.That(h.Presenter.State.Insertion.Y, Is.EqualTo(112));
             h.Pointer(PointerAction.Up, 800, h.Y(first.Tracks[2]));
-            Assert.That(h.Document.RootItems, Is.EqualTo(new[] { first, third, second }));
+            Assert.That(h.Sequence.RootContainers, Is.EqualTo(new[] { first, third, second }));
         }
         [Test] public void RootTwentyPixelZoneIsDisjointFromGroupContentAndCollapsedReceiverExpands()
         {
@@ -215,7 +215,7 @@ namespace NBC.ActionEditor.Tests.Presentation
             h.Pointer(PointerAction.Down, 70, h.Y(track)); h.Pointer(PointerAction.Move, 1200, 400);
             Assert.That(h.Presenter.State.Insertion.Visible, Is.False);
             h.Pointer(PointerAction.Move, 700, 450); h.Pointer(PointerAction.Up, 700, 450);
-            Assert.That(h.Document.RootItems.Last(), Is.SameAs(track)); Assert.That(track.Parent, Is.Null);
+            Assert.That(h.Sequence.RootContainers.Last(), Is.SameAs(track)); Assert.That(track.Parent, Is.Null);
         }
         [Test] public void RepeatedCancelAndNoOpLeavePriorUndoEntryIntact()
         {

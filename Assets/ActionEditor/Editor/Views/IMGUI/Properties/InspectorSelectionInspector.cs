@@ -12,16 +12,16 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
     public class InspectorSelectionInspector : Editor
     {
         private PropertyPresenter presenter;
-        private NBC.ActionEditor.Presentation.Properties.PropertyTargetState document, selected;
-        private InspectorsBase documentView, selectedView;
+        private NBC.ActionEditor.Presentation.Properties.PropertyTargetState sequenceTarget, selectionTarget;
+        private PropertyInspectorBase sequenceView, selectionView;
         private bool expanded = true;
 
         // 域重载恢复的Editor可能仍指向旧类型或已销毁代理，不能强制转换。
         private void OnEnable() => presenter = target is InspectorSelectionTarget proxy && proxy != null ? proxy.CreatePresenter() : null;
         private void OnDisable()
         {
-            documentView?.CancelInput(); selectedView?.CancelInput(); presenter?.CancelDraft();
-            documentView = selectedView = null; document = selected = null; presenter = null;
+            sequenceView?.CancelInput(); selectionView?.CancelInput(); presenter?.CancelDraft();
+            sequenceView = selectionView = null; sequenceTarget = selectionTarget = null; presenter = null;
         }
         protected override void OnHeaderGUI() => GUILayout.Space(18);
 
@@ -30,45 +30,45 @@ namespace NBC.ActionEditor.Views.IMGUI.Properties
             if (presenter != null)
                 foreach (var issue in presenter.CaptureIssues())
                     if (GUILayout.Button(issue.Message)) presenter.SelectIssue(issue);
-            var nextSelected = presenter?.CaptureSelectionTarget();
-            var nextDocument = presenter?.CaptureDocumentTarget();
-            if (nextSelected == null)
+            var nextSelectionTarget = presenter?.CaptureSelectionTarget();
+            var nextSequenceTarget = presenter?.CaptureSequenceTarget();
+            if (nextSelectionTarget == null)
             {
-                documentView?.CancelInput(); selectedView?.CancelInput();
-                documentView = selectedView = null; document = selected = null;
-                EditorGUILayout.HelpBox(Lan.NotSelectAsset, MessageType.Info); return;
+                sequenceView?.CancelInput(); selectionView?.CancelInput();
+                sequenceView = selectionView = null; sequenceTarget = selectionTarget = null;
+                EditorGUILayout.HelpBox(EditorText.NoSelection, MessageType.Info); return;
             }
-            if (!ReferenceEquals(document?.Id.ViewKey, nextDocument?.Id.ViewKey))
+            if (!ReferenceEquals(sequenceTarget?.Id.ViewKey, nextSequenceTarget?.Id.ViewKey))
             {
-                documentView?.CancelInput(); selectedView?.CancelInput();
-                documentView = nextDocument == null ? null : EditorExtensionFactory.GetInspector(nextDocument, presenter);
-                selected = null; selectedView = null;
+                sequenceView?.CancelInput(); selectionView?.CancelInput();
+                sequenceView = nextSequenceTarget == null ? null : EditorExtensionFactory.CreateInspector(nextSequenceTarget, presenter);
+                selectionTarget = null; selectionView = null;
             }
-            if (!ReferenceEquals(selected?.Id.ViewKey, nextSelected.Id.ViewKey))
+            if (!ReferenceEquals(selectionTarget?.Id.ViewKey, nextSelectionTarget.Id.ViewKey))
             {
-                selectedView?.CancelInput();
-                selectedView = EditorExtensionFactory.GetInspector(nextSelected, presenter);
+                selectionView?.CancelInput();
+                selectionView = EditorExtensionFactory.CreateInspector(nextSelectionTarget, presenter);
             }
-            document = nextDocument; selected = nextSelected;
-            documentView?.SetTarget(document); selectedView?.SetTarget(selected);
+            sequenceTarget = nextSequenceTarget; selectionTarget = nextSelectionTarget;
+            sequenceView?.SetTarget(sequenceTarget); selectionView?.SetTarget(selectionTarget);
             var color = GUI.color;
             var richText = GUI.skin.label.richText;
             try
             {
                 GUI.skin.GetStyle("label").richText = true;
                 GUILayout.Space(5);
-                using (new EditorGUI.DisabledScope(selected.Locked))
+                using (new EditorGUI.DisabledScope(selectionTarget.Locked))
                 {
-                    expanded = EditorGUILayout.Foldout(expanded, string.Format(Lan.InsBaseInfo, document.Title), true);
-                    if (expanded) documentView?.OnInspectorGUI();
-                    EditorTools.BoldSeparator();
-                    if (selected != null)
+                    expanded = EditorGUILayout.Foldout(expanded, string.Format(EditorText.InsBaseInfo, sequenceTarget.Title), true);
+                    if (expanded) sequenceView?.OnInspectorGUI();
+                    EditorGUIControls.BoldSeparator();
+                    if (selectionTarget != null)
                     {
-                        EditorGUILayout.LabelField(selected.Title, EditorStyles.boldLabel);
-                        var description = selected.Description;
+                        EditorGUILayout.LabelField(selectionTarget.Title, EditorStyles.boldLabel);
+                        var description = selectionTarget.Description;
                         if (!string.IsNullOrEmpty(description)) EditorGUILayout.HelpBox(description, MessageType.None);
                     }
-                    selectedView?.OnInspectorGUI();
+                    selectionView?.OnInspectorGUI();
                 }
             }
             finally { GUI.color = color; GUI.skin.label.richText = richText; }

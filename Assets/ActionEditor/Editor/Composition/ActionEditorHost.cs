@@ -9,9 +9,9 @@ namespace NBC.ActionEditor
     [InitializeOnLoad]
     public static class ActionEditorHost
     {
-        private static readonly Composition.EditorComposition composition = new Composition.EditorComposition(Composition.DocumentComposition.Create());
-        private static readonly ActionEditorViews views = new ActionEditorViews();
-        private static readonly Application.Settings.SettingsSession settings = Composition.PreferencesComposition.Create();
+        private static readonly Composition.EditorCompositionRoot composition = new Composition.EditorCompositionRoot(Composition.SequenceComposition.Create());
+        private static readonly EditorViewRegistry views = new EditorViewRegistry();
+        private static readonly Application.Settings.SettingsSession settings = Composition.SettingsSessionComposition.Create();
         public static Composition.WindowBinding CreateBinding(object owner, Action repaint, Action changed)
             => composition.CreateBinding(owner, repaint, changed, views, settings);
         private static InspectorSelectionTarget inspectorPreview;

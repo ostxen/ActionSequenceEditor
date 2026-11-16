@@ -13,9 +13,9 @@
 
 | 模块 | 当前职责与边界 |
 |---|---|
-| Runtime/Domain、Metadata | 作者图、所有权、时间与能力规则、业务声明 |
+| Runtime/Model、Metadata | 作者图、所有权、时间与能力规则、业务声明 |
 | Runtime/Serialization | 唯一version 2格式、字段值树、严格图/类型/数值校验及引用解析端口 |
-| Editor/Application | DocumentSession、事务、选择/剪贴板、结构/属性/片段用例、文档与播放协调 |
+| Editor/Application | SequenceSession、事务、选择/剪贴板、结构/属性/片段用例、文档与播放协调 |
 | Editor/Presentation | 逐窗Presenter、只读显示状态、交互状态机、布局和命中；不依赖UnityEditor或具体控件 |
 | Editor/Infrastructure、Serialization | 文件提交、revision、AssetDatabase、Undo、时钟、恢复、偏好与类型/引用适配 |
 | Editor/Views/IMGUI、UIToolkit | 各自原生绘制、布局、焦点/捕获与输入适配，消费同一Presenter实现 |
@@ -25,29 +25,29 @@
 
 Domain与Serialization单向依赖。Application只依赖Domain及窄端口；Presentation依赖Application/Domain。Editor组合这些程序集并实现基础设施。验证程序集不进入产品类型目录。
 
-MVP是总体组织方式，具体实现按内聚职责分开，不是只有Model、View、Presenter三个类。当前七个程序集为`NBC.ActionEditor.Domain`、`NBC.ActionEditor.Serialization`、`NBC.ActionEditor.Application`、`NBC.ActionEditor.Presentation`、`NBC.ActionEditor.Editor`、`NBC.ActionEditor.Editor.Tests`和`NBC.ActionEditor.Verification.Editor`。Application和Presentation位于Editor目录，但仍通过程序集约束隔离UnityEditor、具体控件和文件系统；Presentation只使用必要的UnityEngine值类型。测试和固定验收命令不进入生产业务目录。
+MVP是总体组织方式，具体实现按内聚职责分开，不是只有Model、View、Presenter三个类。当前七个程序集为`NBC.ActionEditor.Model`、`NBC.ActionEditor.Serialization`、`NBC.ActionEditor.Application`、`NBC.ActionEditor.Presentation`、`NBC.ActionEditor.Editor`、`NBC.ActionEditor.Editor.Tests`和`NBC.ActionEditor.Verification.Editor`。Application和Presentation位于Editor目录，但仍通过程序集约束隔离UnityEditor、具体控件和文件系统；Presentation只使用必要的UnityEngine值类型。测试和固定验收命令不进入生产业务目录。
 
 共享状态只有一份作者文档、选择、剪贴板、播放头及Undo。每个窗口拥有独立工作区、Presenter、订阅和捕获所有者；依赖由WindowBinding传入，不通过服务定位器取得。ActionEditorHost只承担组合根和Editor生命周期，不承包业务用例。
 
 四条调用链分别是：
 
-- 结构编辑：原生输入适配 → TimelinePresenter/StructureGesture → StructureEditing → StructureRules重验/DocumentSession事务 → 变更通知 → VisibleTimelineLayout → 原生绘制。
+- 结构编辑：原生输入适配 → TimelinePresenter/StructureGesture → StructureEditing → StructureRules重验/SequenceSession事务 → 变更通知 → VisibleTimelineLayout → 原生绘制。
 - 属性编辑：原生字段意图 → PropertyPresenter/PropertyPath → PropertyEditing批次校验/事务 → 会话通知 → 字段值快照 → 控件更新。
-- 保存：原生保存意图 → DocumentPresenter → DocumentLifecycle → JsonDocumentRepository/可靠字节提交 → 记录来源与基线 → AssetDatabase导入 → 显示结果。
+- 保存：原生保存意图 → SequencePresenter → SequenceLifecycle → SequenceFileRepository/可靠字节提交 → 记录来源与基线 → AssetDatabase导入 → 显示结果。
 - 播放：唯一EditorUpdateDriver → Playback协调 → AssetPlayer/预览会话 → 显式资源求值与释放 → 逐窗刷新；最后一个窗口离开才停止共享播放。
 
 ### 状态、失败与资源边界
 
-- `DocumentSession`拥有作者图、版本、活动事务、Undo和保存基线。结构、片段、属性用例共用领域规则；菜单可用性、手势预检和释放提交都调用同一规则。无效候选不进入作者图，同位结构移动不制造空Undo。
+- `SequenceSession`拥有作者图、版本、活动事务、Undo和保存基线。结构、片段、属性用例共用领域规则；菜单可用性、手势预检和释放提交都调用同一规则。无效候选不进入作者图，同位结构移动不制造空Undo。
 - `PropertyPresenter`组织字段描述和路径；集合操作先复制每个目标的候选，整批预检后才提交。嵌套值类型沿路径回写，一次提交对应一步Undo，失败不留下前半批修改。
 - `TimelinePresenter`协调逐窗`TimelineInteraction`、`StructureGesture`和`VisibleTimelineLayout`，View只接收显示状态并适配原生输入。捕获带owner，取消不得结束另一窗口事务；文档版本变化使陈旧候选失效。
-- `JsonDocumentRepository`使用隔离快照、严格读回与`AtomicFileCommit`，暂存后仍重验磁盘revision。成功字节提交先推进会话来源和基线，再导入；导入失败报告已提交，不能自动重放。独立导出不切换来源、不清脏、不改Undo和播放。
-- 生产类型目录只扫描已加载类型，不调用构造器进行发现，不从文件内容加载程序集。`DocumentFormatContext`的类型身份映射属于当前受信任上下文，字段元数据缓存不对外暴露可改数组。
-- `ActionEditorPreviewSession`独占本代预览与时间指针，回调之间重验代次，释放重入不能覆盖更新会话。对象选择器的`ObjectPickerCatalog`只发现资源，`ObjectPreviewCache`只拥有创建的Editor；借入资源不销毁，窗口关闭释放缓存及回调。
+- `SequenceFileRepository`使用隔离快照、严格读回与`AtomicFileCommit`，暂存后仍重验磁盘revision。成功字节提交先推进会话来源和基线，再导入；导入失败报告已提交，不能自动重放。独立导出不切换来源、不清脏、不改Undo和播放。
+- 生产类型目录只扫描已加载类型，不调用构造器进行发现，不从文件内容加载程序集。`SequenceFormatContext`的类型身份映射属于当前受信任上下文，字段元数据缓存不对外暴露可改数组。
+- `ActionEditorPreviewSession`独占本代预览与时间指针，回调之间重验代次，释放重入不能覆盖更新会话。对象选择器的`AssetPickerDiscovery`只发现资源，`ObjectPreviewCache`只拥有创建的Editor；借入资源不销毁，窗口关闭释放缓存及回调。
 
 ### 当前能力与使用边界
 
-作者图只有有序`RootItems`，组和独立轨道可交错，组不嵌套。两个界面共享编辑规则、最短0.01秒区间、鼠标锚点缩放和完整组块拖动，但各自使用原生控件、绘制和捕获，不通过IMGUIContainer代绘。业务通过领域类型/Attribute、双UI扩展绑定及可选预览接入，不要求修改核心分支；缺少Toolkit自定义适配时明确提示，不转换IMGUI控件。
+作者图只有有序`RootContainers`，组和独立轨道可交错，组不嵌套。两个界面共享编辑规则、最短0.01秒区间、鼠标锚点缩放和完整组块拖动，但各自使用原生控件、绘制和捕获，不通过IMGUIContainer代绘。业务通过领域类型/Attribute、双UI扩展绑定及可选预览接入，不要求修改核心分支；缺少Toolkit自定义适配时明确提示，不转换IMGUI控件。
 
 唯一磁盘格式是严格`actioneditor.json` version 2，完整字段/类型身份、有限float原始位及GUID/localFileId引用遵循当前合同。工作区不进入文档，恢复快照不是另一种磁盘格式。样例只读显示播放状态，不执行Combat或游戏逻辑。合成大图的完整快照和显示状态仍有显著成本；功能与结构验证不等于性能预算、全堆泄漏或所有第三方扩展认证。
 

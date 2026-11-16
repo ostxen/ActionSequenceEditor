@@ -3,12 +3,12 @@ using ToolkitWindow = NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow;
 using System;
 using System.IO;
 using System.Linq;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Ports;
 using NBC.ActionEditor.Application.Settings;
 using NBC.ActionEditor.Composition;
-using NBC.ActionEditor.Domain;
-using NBC.ActionEditor.Infrastructure.Documents;
+using NBC.ActionEditor.Model;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Samples.FeatureSample;
 using NBC.ActionEditor.Infrastructure.Serialization;
@@ -55,7 +55,7 @@ namespace NBC.ActionEditor.Verification
                 touchesUserSession = false, writesPreferences = false, nativeFileDialogs = false
             };
             if (!confirm) throw new InvalidOperationException("需要预览与真实审批。");
-            var graph = VerificationSession.Shared.Document;
+            var graph = VerificationSession.Shared.Sequence;
             var source = VerificationSession.Shared.Source;
             var recovery = VerificationSession.Shared.Session.CaptureRecovery();
 
@@ -67,7 +67,7 @@ namespace NBC.ActionEditor.Verification
                 if (!owned) throw new IOException("无法创建验证目录。");
                 Run(false);
                 Run(true);
-                Require(ReferenceEquals(VerificationSession.Shared.Document, graph) && VerificationSession.Shared.Source == source
+                Require(ReferenceEquals(VerificationSession.Shared.Sequence, graph) && VerificationSession.Shared.Source == source
                     && VerificationSession.Shared.Session.CaptureRecovery() == recovery && VerificationSession.SharedViews.Count == originalViews, "用户会话或窗口注册发生变化。");
                 return new { status = "passed", interfaces = 2, cleanup = "owned windows and folder only", checks = "mixed roots/property/SaveChanges/Undo/Redo/reopen/save-as/recovery/autosave/export/locked target/import failure/external conflict" };
             }
@@ -85,13 +85,13 @@ namespace NBC.ActionEditor.Verification
             var path = Root + "/" + name + ".json";
             var copy = Root + "/" + name + "-Copy.json";
             var exported = Root + "/" + name + "-Export.json";
-            var repository = new JsonDocumentRepository();
-            using var context = new VerificationSession(DocumentComposition.Create(repository), repository);
-            var views = new ActionEditorViews();
+            var repository = new SequenceFileRepository();
+            using var context = new VerificationSession(SequenceComposition.Create(repository), repository);
+            var views = new EditorViewRegistry();
             var settings = new SettingsSession(new Preferences());
             ImguiWindow imgui = null;
             ToolkitWindow native = null;
-            DocumentExportWindow export = null;
+            SequenceExportWindow export = null;
             try
             {
                 if (toolkit)
@@ -104,25 +104,25 @@ namespace NBC.ActionEditor.Verification
                     imgui = ScriptableObject.CreateInstance<ImguiWindow>();
                     imgui.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, settings)); imgui.Show();
                 }
-                context.CreateDocuments().Create(typeof(FeatureSampleDocument), path);
-                var clip = (FeatureSampleInterval)context.Document.AllTracks.First().Clips.First();
+                context.CreateSequencePresenter().Create(typeof(FeatureSampleSequence), path);
+                var clip = (FeatureSampleInterval)context.Sequence.AllTracks.First().Clips.First();
                 var properties = context.CreateProperties(settings);
                 properties.Write(properties.CaptureInputs(clip).Single(f => f.Name == "Count").Id, 27);
-                var group = context.Document.RootItems.OfType<TimelineGroup>().First();
+                var group = context.Sequence.RootContainers.OfType<ActionGroup>().First();
                 context.Structure.Move(group.Tracks[0], null, 1, context.Session.Version);
-                Require(context.Document.RootItems[1] is TimelineTrack, "根结构未形成组/轨交错。");
+                Require(context.Sequence.RootContainers[1] is ActionTrack, "根结构未形成组/轨交错。");
                 if (toolkit) native.SaveChanges(); else imgui.SaveChanges();
                 Require(!context.Session.IsDirty, "窗口SaveChanges未保存。");
-                var saved = JsonDocumentCodec.Content(context.Document);
+                var saved = SequenceJsonCodec.GetContentKey(context.Sequence);
                 Undo.PerformUndo(); Require(context.Session.IsDirty, "保存后Undo没有恢复脏状态。");
-                Undo.PerformRedo(); Require(!context.Session.IsDirty && JsonDocumentCodec.Content(context.Document) == saved, "Redo未回到保存基线。");
+                Undo.PerformRedo(); Require(!context.Session.IsDirty && SequenceJsonCodec.GetContentKey(context.Sequence) == saved, "Redo未回到保存基线。");
                 if (toolkit) { native.Close(); native = null; }
                 else { imgui.Close(); imgui = null; }
                 Require(views.Count == 0, "保存后关闭窗口未释放注册。");
                 context.Open(null); context.Open(AssetDatabase.LoadAssetAtPath<TextAsset>(path));
-                Require(JsonDocumentCodec.Content(context.Document) == saved, "磁盘重开内容不符。");
-                Require(context.Document.RootItems.Count == 4 && context.Document.RootItems[1] is TimelineTrack
-                    && ((FeatureSampleInterval)((TimelineTrack)context.Document.RootItems[1]).Clips[0]).Count == 27,
+                Require(SequenceJsonCodec.GetContentKey(context.Sequence) == saved, "磁盘重开内容不符。");
+                Require(context.Sequence.RootContainers.Count == 4 && context.Sequence.RootContainers[1] is ActionTrack
+                    && ((FeatureSampleInterval)((ActionTrack)context.Sequence.RootContainers[1]).Clips[0]).Count == 27,
                     "磁盘重开未保留明确期望的混排和属性值。");
                 if (toolkit)
                 {
@@ -135,21 +135,21 @@ namespace NBC.ActionEditor.Verification
                     imgui.Bind((owner, repaint, changed) => context.Bind(owner, repaint, changed, views, settings)); imgui.Show();
                 }
                 Require(context.Lifecycle.SaveAs(copy).Succeeded && context.Session.Path == copy, "另存失败。");
-                context.Session.Edit("Recovery value", () => ((FeatureSampleDocument)context.Document).Version = 17);
-                using (var restored = DocumentComposition.Create())
+                context.Session.Edit("Recovery value", () => ((FeatureSampleSequence)context.Sequence).Version = 17);
+                using (var restored = SequenceComposition.Create())
                 {
                     restored.RestoreRecovery(context.Session.CaptureRecovery());
-                    Require(restored.IsDirty && ((FeatureSampleDocument)restored.Document).Version == 17, "恢复丢失未保存值。");
-                    restored.DiscardChanges(); Require(JsonDocumentCodec.Content(restored.Document) == saved, "恢复丢失保存基线。");
+                    Require(restored.IsDirty && ((FeatureSampleSequence)restored.Sequence).Version == 17, "恢复丢失未保存值。");
+                    restored.DiscardChanges(); Require(SequenceJsonCodec.GetContentKey(restored.Sequence) == saved, "恢复丢失保存基线。");
                 }
                 var clock = new Clock();
-                var autoSave = new DocumentAutoSave(context.Session, context.Lifecycle, clock);
+                var autoSave = new SequenceAutoSave(context.Session, context.Lifecycle, clock);
                 clock.Now = 10; Require(autoSave.Tick(10)?.Succeeded == true, "自动保存未提交。");
-                var windows = Resources.FindObjectsOfTypeAll<DocumentExportWindow>();
-                context.CreateDocuments().Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Export);
-                export = Resources.FindObjectsOfTypeAll<DocumentExportWindow>().Except(windows).Single();
+                var windows = Resources.FindObjectsOfTypeAll<SequenceExportWindow>();
+                context.CreateSequencePresenter().Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Export);
+                export = Resources.FindObjectsOfTypeAll<SequenceExportWindow>().Except(windows).Single();
                 Require(export.ExportTo("actioneditor.json", exported), "导出失败。");
-                Require(JsonDocumentCodec.Content(JsonDocumentCodec.Decode(File.ReadAllText(exported))) == JsonDocumentCodec.Content(context.Document), "导出独立读回不符。");
+                Require(SequenceJsonCodec.GetContentKey(SequenceJsonCodec.Decode(File.ReadAllText(exported))) == SequenceJsonCodec.GetContentKey(context.Sequence), "导出独立读回不符。");
                 VerifyFailures(context, copy);
             }
             finally
@@ -164,7 +164,7 @@ namespace NBC.ActionEditor.Verification
         // 每种失败都核对实际字节和基线，不重试未知提交。
         private static void VerifyFailures(VerificationSession context, string path)
         {
-            context.Session.Edit("Locked target", () => ((FeatureSampleDocument)context.Document).Version = 18);
+            context.Session.Edit("Locked target", () => ((FeatureSampleSequence)context.Sequence).Version = 18);
             var before = File.ReadAllBytes(path);
             using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
@@ -172,17 +172,17 @@ namespace NBC.ActionEditor.Verification
                 Require(!result.Succeeded && !result.BytesCommitted && context.Session.IsDirty && File.ReadAllBytes(path).SequenceEqual(before), "提交前失败破坏字节或基线。");
             }
             Require(context.Lifecycle.Save().Succeeded, "解除占用后保存失败。");
-            var failedRepository = new JsonDocumentRepository(import: _ => throw new IOException("Injected import failure"));
-            using (var failed = new VerificationSession(DocumentComposition.Create(failedRepository), failedRepository))
+            var failedRepository = new SequenceFileRepository(import: _ => throw new IOException("Injected import failure"));
+            using (var failed = new VerificationSession(SequenceComposition.Create(failedRepository), failedRepository))
             {
                 failed.Open(AssetDatabase.LoadAssetAtPath<TextAsset>(path));
-                failed.Session.Edit("Import failure", () => ((FeatureSampleDocument)failed.Document).Version = 19);
+                failed.Session.Edit("Import failure", () => ((FeatureSampleSequence)failed.Sequence).Version = 19);
                 var result = failed.Lifecycle.Save();
                 Require(!result.Succeeded && result.BytesCommitted && !failed.Session.IsDirty, "导入失败丢失已提交语义。");
-                Require(((FeatureSampleDocument)JsonDocumentCodec.Decode(File.ReadAllText(path))).Version == 19, "导入失败没有保留已提交字节。");
+                Require(((FeatureSampleSequence)SequenceJsonCodec.Decode(File.ReadAllText(path))).Version == 19, "导入失败没有保留已提交字节。");
             }
             var external = File.ReadAllBytes(path);
-            context.Session.Edit("Conflict", () => ((FeatureSampleDocument)context.Document).Version = 20);
+            context.Session.Edit("Conflict", () => ((FeatureSampleSequence)context.Sequence).Version = 20);
             var conflict = context.Lifecycle.Save();
             Require(!conflict.Succeeded && !conflict.BytesCommitted && File.ReadAllBytes(path).SequenceEqual(external), "外部版本保护失败。");
         }

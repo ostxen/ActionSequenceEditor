@@ -1,7 +1,7 @@
 using System.Linq;
 using NBC.ActionEditor.Application.Editing;
 using NBC.ActionEditor.Application.Settings;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Samples.FeatureSample;
 using NBC.ActionEditor.Infrastructure.Serialization;
@@ -34,12 +34,12 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void TrackDropResolvesBeforeAfterGroupAndRootFromScrolledCoordinates()
         {
-            var document = new FeatureSampleDocument();
+            var document = new FeatureSampleSequence();
             var workspace = new TimelineWorkspace();
             var layout = new TimelineLayout();
             var size = new TimelineSize(1000, 600);
             layout.Build(document, new SelectionState(), workspace, size, 0, null);
-            var group = (TimelineGroup)document.RootItems[0]; var moving = group.Tracks[1];
+            var group = (ActionGroup)document.RootContainers[0]; var moving = group.Tracks[1];
             var before = StructureDropGeometry.Hit(document, moving, layout, workspace, size, 90, 31);
             var after = StructureDropGeometry.Hit(document, moving, layout, workspace, size, 90, 53);
             Assert.That(before.Owner, Is.SameAs(group)); Assert.That(before.Boundary, Is.Zero);
@@ -76,7 +76,7 @@ namespace NBC.ActionEditor.Tests
         [TestCase(false, 1f)] [TestCase(true, 1.25f)]
         public void ReferenceSnappingExcludesExactThresholdAndKeepsFirstEqualDistance(bool tied, float expected)
         {
-            var document = new FeatureSampleDocument();
+            var document = new FeatureSampleSequence();
             foreach (var track in document.AllTracks) track.Clips.Clear();
             var interval = new FeatureSampleInterval { StartTime = 1, Length = 2 };
             document.AllTracks.First().Clips.Add(interval);
@@ -84,10 +84,10 @@ namespace NBC.ActionEditor.Tests
             markers.Clips.Add(new FeatureSampleMarker { StartTime = tied ? 3.25f : 1.25f });
             if (tied) markers.Clips.Add(new FeatureSampleMarker { StartTime = .75f });
             document.Init();
-            using var session = Composition.DocumentComposition.Create();
-            session.Open(new NBC.ActionEditor.Application.Documents.DocumentOpenData(document));
+            using var session = Composition.SequenceComposition.Create();
+            session.Open(new NBC.ActionEditor.Application.Sequences.SequenceOpenData(document));
             var gesture = new ClipGesture(session, new ClipEditing(session));
-            var baseline = JsonDocumentCodec.Content(document);
+            var baseline = SequenceJsonCodec.GetContentKey(document);
             try
             {
                 Assert.That(gesture.Begin(this, interval, new[] { interval }, 0, 0, 6), Is.True);
@@ -95,7 +95,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(interval.StartTime, Is.EqualTo(expected).Within(.00001f));
             }
             finally { gesture.Cancel(); }
-            Assert.That(JsonDocumentCodec.Content(session.Document), Is.EqualTo(baseline));
+            Assert.That(SequenceJsonCodec.GetContentKey(session.Sequence), Is.EqualTo(baseline));
             Assert.That(session.IsEditing || session.IsDirty, Is.False);
         }
 
@@ -114,25 +114,25 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void VisibleRowsHideCollapsedTracksWithoutChangingDocument()
         {
-            var document = new FeatureSampleDocument(); var workspace = new TimelineWorkspace();
+            var document = new FeatureSampleSequence(); var workspace = new TimelineWorkspace();
             var layout = new TimelineLayout(); var selection = new SelectionState(); var size = new TimelineSize(1000, 600);
-            workspace.Bind(document); workspace.SetCollapsed((TimelineGroup)document.RootItems[2], true);
-            var json = JsonDocumentCodec.Encode(document);
+            workspace.Bind(document); workspace.SetCollapsed((ActionGroup)document.RootContainers[2], true);
+            var json = SequenceJsonCodec.Encode(document);
             layout.Build(document, selection, workspace, size, 0, null);
-            var group = (TimelineGroup)document.RootItems[0];
+            var group = (ActionGroup)document.RootContainers[0];
             Assert.That(layout.Rows.Count, Is.EqualTo(8));
             Assert.That(layout.Rows.Take(4), Is.EqualTo(new IDirectable[] { group, group.Tracks[0], group.Tracks[1], group.Tracks[2] }));
             Assert.That(layout.HitClip(400, 280), Is.Null);
-            Assert.That(JsonDocumentCodec.Encode(document), Is.EqualTo(json));
+            Assert.That(SequenceJsonCodec.Encode(document), Is.EqualTo(json));
             workspace.SetCollapsed(group, true);
             layout.Build(document, selection, workspace, size, 0, null);
             Assert.That(layout.Rows.Count, Is.EqualTo(5));
-            Assert.That(JsonDocumentCodec.Encode(document), Is.EqualTo(json));
+            Assert.That(SequenceJsonCodec.Encode(document), Is.EqualTo(json));
         }
 
         [Test] public void ShortIntervalsPointsAndReverseMarqueeUseActualLayoutBounds()
         {
-            var document = new FeatureSampleDocument(); var workspace = new TimelineWorkspace();
+            var document = new FeatureSampleSequence(); var workspace = new TimelineWorkspace();
             workspace.LeftWidth = 200; workspace.ScrollY = 14;
             var first = document.AllTracks.First().Clips.First(); first.StartTime = 1; first.Length = .01f;
             var marker = document.AllTracks.OfType<FeatureSampleMarkerTrack>().First().Clips.First(); marker.StartTime = 1;

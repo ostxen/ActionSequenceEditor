@@ -16,11 +16,11 @@ namespace NBC.ActionEditor.Views.IMGUI
         }
 
         private WelcomeView _welcomeView;
-        private TimelineHeaderView header;
+        private EditorToolbar header;
         public TimelineSurface Timeline { get; private set; }
         public Presentation.Presenters.TimelinePresenter Presenter => Timeline?.Presenter;
         public Presentation.Presenters.PlaybackPresenter Playback => Binding.Playback;
-        public Presentation.Presenters.DocumentPresenter Documents => Binding.Documents;
+        public Presentation.Presenters.SequencePresenter Sequence => Binding.Sequence;
         private double lastTick;
         internal Vector2 ContentOffset { get; private set; }
 
@@ -30,7 +30,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             OnDisable();
             try
             {
-                Binding = createBinding(this, Repaint, OnDocumentChanged);
+                Binding = createBinding(this, Repaint, OnSequenceChanged);
                 InitializeWindow();
             }
             catch { OnDisable(); throw; }
@@ -40,11 +40,11 @@ namespace NBC.ActionEditor.Views.IMGUI
 
         void InitializeAll()
         {
-            Lan.Load();
+            EditorText.Load();
             Styles.Load();
             Workspace.LeftWidth = Styles.TimelineLeftWidth;
-            _welcomeView = new WelcomeView(Documents, rect => PreferencesWindow.Show(rect, Binding.CreateSettings));
-            header = new TimelineHeaderView(Binding, Workspace);
+            _welcomeView = new WelcomeView(Sequence, rect => SettingsWindow.Show(rect, Binding.CreateSettings));
+            header = new EditorToolbar(Binding, Workspace);
             Timeline?.Dispose(); Timeline = new TimelineSurface(this, Binding, Workspace);
         }
 
@@ -54,7 +54,7 @@ namespace NBC.ActionEditor.Views.IMGUI
         void OnEnable()
         {
             OnDisable();
-            try { Binding = ActionEditorHost.CreateBinding(this, Repaint, OnDocumentChanged); InitializeWindow(); }
+            try { Binding = ActionEditorHost.CreateBinding(this, Repaint, OnSequenceChanged); InitializeWindow(); }
             catch { OnDisable(); throw; }
         }
 
@@ -67,7 +67,7 @@ namespace NBC.ActionEditor.Views.IMGUI
 
             InitializeAll();
             lastTick = EditorApplication.timeSinceStartup;
-            titleContent = new GUIContent(Lan.Title);
+            titleContent = new GUIContent(EditorText.Title);
         }
 
         void OnDisable()
@@ -90,20 +90,20 @@ namespace NBC.ActionEditor.Views.IMGUI
             if (Binding == null) return;
             var now = EditorApplication.timeSinceStartup;
             Presenter?.Tick(now - lastTick); lastTick = now;
-            Presenter?.PlaybackState(Playback.Playing, Playback.Range);
+            Presenter?.SetPlaybackState(Playback.Playing, Playback.RangePlaybackEnabled);
         }
 
-        private void OnDocumentChanged() { if (Binding == null) return; hasUnsavedChanges = Documents.Dirty; Repaint(); }
+        private void OnSequenceChanged() { if (Binding == null) return; hasUnsavedChanges = Sequence.Dirty; Repaint(); }
 
         void OnGUI()
         {
             ContentOffset = GUIUtility.GUIToScreenPoint(Vector2.zero) - position.position;
-            if (titleContent.text != Lan.Title) titleContent = new GUIContent(Lan.Title);
+            if (titleContent.text != EditorText.Title) titleContent = new GUIContent(EditorText.Title);
             try { DrawEditor(); }
             catch { CancelOwnEdit(); throw; }
             finally
             {
-                if (Binding != null) hasUnsavedChanges = Documents.Dirty;
+                if (Binding != null) hasUnsavedChanges = Sequence.Dirty;
             }
         }
 
@@ -111,7 +111,7 @@ namespace NBC.ActionEditor.Views.IMGUI
         {
             // 关闭/重载已释放表面后，宿主仍可能补发一次GUI事件。
             if (Timeline == null) return;
-            if (!Documents.HasDocument)
+            if (!Sequence.HasSequence)
             {
                 _welcomeView.OnGUI();
                 return;
@@ -130,11 +130,11 @@ namespace NBC.ActionEditor.Views.IMGUI
             });
         }
 
-        public override void SaveChanges() { Documents.Invoke(Presentation.Contracts.DocumentIntent.Save); if (!Documents.Dirty) base.SaveChanges(); }
+        public override void SaveChanges() { Sequence.Invoke(Presentation.Contracts.SequenceIntent.Save); if (!Sequence.Dirty) base.SaveChanges(); }
         public override void DiscardChanges()
         {
             CancelOwnEdit();
-            Binding?.Documents.Discard();
+            Binding?.Sequence.Discard();
             base.DiscardChanges();
         }
 

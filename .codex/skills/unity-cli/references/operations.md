@@ -34,8 +34,7 @@ python .codex/scripts/workflow.py verify --profile unity --test-filter "Your.Tes
 
 ## 写入审批
 
-
-
+`actioneditor.verification menu_layout_probe`为固定零参数Toolkit菜单布局探针：已有窗口则使用，没有则打开并保留窗口；临时设置16/20/24字号，经真实右键事件打开并取消轨道/保存菜单，测量Label字号、文字内容边界及行高，finally恢复字号与原焦点。不点击业务菜单、不编辑作者图、不写资产/偏好/文件，不接受路径/代码/字号覆盖。必须preview展示→真实验证授权→approve/apply，不是测试套件或人工视觉验收。
 
 `actioneditor.verification document_lifecycle_probe`固定零参数隔离持久探针，只新建不存在的Assets/ActionEditorLifecycleVerification目录及IMGUI/Toolkit两组Source、Copy、Export JSON（实际来源名IMGUI.json/Toolkit.json）。两个真实窗口显式注入独立会话，验证属性、根混排、SaveChanges、Undo/Redo、磁盘重开、另存、Recovery、定时自动保存、导出读回及锁文件/导入失败/外部冲突。保留既有窗口和全局作者图，不写个人偏好；finally只关闭本次窗口并通过AssetDatabase删除本次目录。拒绝活动编辑/播放、路径/代码/force覆盖；独立preview展示六个目标、approve引用RF24–RF37连续授权、apply，超时先查证而非重放。
 

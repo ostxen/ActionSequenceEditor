@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Settings;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Presentation.Timeline;
@@ -53,30 +53,30 @@ namespace NBC.ActionEditor.Tests
         private static readonly Func<long> Allocated = (Func<long>)Delegate.CreateDelegate(typeof(Func<long>),
             typeof(GC).GetMethod("GetAllocatedBytesForCurrentThread", Type.EmptyTypes));
 
-        private static FeatureSampleDocument Create(bool large)
+        private static FeatureSampleSequence Create(bool large)
         {
-            var document = new FeatureSampleDocument();
+            var document = new FeatureSampleSequence();
             if (!large) return document;
-            document.ClearRoots();
+            document.ClearRootContainers();
             for (var groupIndex = 0; groupIndex < 64; groupIndex++)
             {
                 var group = new FeatureSampleGroup { Name = "Group " + groupIndex };
                 for (var trackIndex = 0; trackIndex < 16; trackIndex++) group.Tracks.Add(Track(trackIndex, "Track " + trackIndex));
-                document.AddRoot(group);
-                document.AddRoot(Track(groupIndex, "Root " + groupIndex));
+                document.AddRootContainer(group);
+                document.AddRootContainer(Track(groupIndex, "Root " + groupIndex));
             }
             // 空组额外加入，不能通过减少非空组改变已选69632片段负载。
-            document.AddRoot(new FeatureSampleGroup { Name = "Empty" });
+            document.AddRootContainer(new FeatureSampleGroup { Name = "Empty" });
             document.Init(); document.RangeMin = 0; document.RangeMax = 16;
             return document;
         }
-        private static TimelineTrack Track(int index, string name)
+        private static ActionTrack Track(int index, string name)
         {
-            TimelineTrack track = index % 2 == 0 ? new FeatureSampleIntervalTrack() : new FeatureSampleMarkerTrack();
+            ActionTrack track = index % 2 == 0 ? new FeatureSampleIntervalTrack() : new FeatureSampleMarkerTrack();
             track.Name = name;
             for (var i = 0; i < 64; i++)
                 track.Clips.Add(index % 2 == 0
-                    ? (TimelineClip)new FeatureSampleInterval { Name = "Interval " + i, StartTime = i * .25f, Length = .125f, Caption = "Fixed interval" }
+                    ? (ActionClip)new FeatureSampleInterval { Name = "Interval " + i, StartTime = i * .25f, Length = .125f, Caption = "Fixed interval" }
                     : new FeatureSampleMarker { Name = "Point " + i, StartTime = i * .25f, EventCode = i, Message = "Fixed point" });
             return track;
         }
@@ -117,21 +117,21 @@ namespace NBC.ActionEditor.Tests
             GC.KeepAlive(probe);
             for (var repetition = 0; repetition < 3; repetition++)
             {
-                FeatureSampleDocument document = null;
+                FeatureSampleSequence document = null;
                 EditorFixture context = null; TimelinePresenter presenter = null;
                 try
                 {
                     yield return Measure(report, repetition, "document-construction-and-init", () => document = Create(large));
-                    Assert.That(document.RootItems.OfType<TimelineGroup>().Count(), Is.EqualTo(large ? 65 : 3));
+                    Assert.That(document.RootContainers.OfType<ActionGroup>().Count(), Is.EqualTo(large ? 65 : 3));
                     Assert.That(document.AllTracks.Count(), Is.EqualTo(large ? 1088 : 7));
                     Assert.That(document.AllTracks.Sum(t => t.Clips.Count), Is.EqualTo(large ? 69632 : 13));
-                    report.Groups = document.RootItems.OfType<TimelineGroup>().Count();
-                    report.EmptyGroups = document.RootItems.OfType<TimelineGroup>().Count(g => g.Tracks.Count == 0);
+                    report.Groups = document.RootContainers.OfType<ActionGroup>().Count();
+                    report.EmptyGroups = document.RootContainers.OfType<ActionGroup>().Count(g => g.Tracks.Count == 0);
                     report.Tracks = document.AllTracks.Count(); report.Clips = document.AllTracks.Sum(t => t.Clips.Count);
                     yield return Measure(report, repetition, "composition-and-session-open", () =>
                     {
-                        context = new EditorFixture(Composition.DocumentComposition.Create());
-                        context.Session.Open(new DocumentOpenData(document));
+                        context = new EditorFixture(Composition.SequenceComposition.Create());
+                        context.Session.Open(new SequenceOpenData(document));
                     });
                     var workspace = new TimelineWorkspace();
                     var settings = new EditorSettings(TimeStepMode.Seconds, .1f, 30, false, true, 0, "Assets/");
@@ -143,14 +143,14 @@ namespace NBC.ActionEditor.Tests
                     yield return Measure(report, repetition, "expanded-render-state-refresh", presenter.Refresh);
                     yield return Measure(report, repetition, "complete-save-snapshot-and-readback", () =>
                     {
-                        var json = JsonDocumentCodec.CreateSaveSnapshot(document);
-                        var decoded = JsonDocumentCodec.Decode(json);
+                        var json = SequenceJsonCodec.CreateSaveSnapshot(document);
+                        var decoded = SequenceJsonCodec.Decode(json);
                         report.JsonCharacters = json.Length;
-                        Assert.That(decoded.RootItems.Count, Is.EqualTo(document.RootItems.Count));
+                        Assert.That(decoded.RootContainers.Count, Is.EqualTo(document.RootContainers.Count));
                         Assert.That(decoded.AllTracks.Sum(t => t.Clips.Count), Is.EqualTo(report.Clips));
-                        Assert.That(JsonDocumentCodec.Content(decoded), Is.EqualTo(JsonDocumentCodec.Content(document)));
+                        Assert.That(SequenceJsonCodec.GetContentKey(decoded), Is.EqualTo(SequenceJsonCodec.GetContentKey(document)));
                     });
-                    workspace.SetCollapsed(document.RootItems.OfType<TimelineGroup>().First(), true);
+                    workspace.SetCollapsed(document.RootContainers.OfType<ActionGroup>().First(), true);
                     yield return Measure(report, repetition, "collapsed-render-state-refresh", presenter.Refresh);
                     Assert.That(presenter.State.Clips.Count, Is.EqualTo(report.Clips - (large ? 1024 : 8)));
                     Assert.That(context.Session.IsEditing, Is.False);

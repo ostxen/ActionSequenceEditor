@@ -1,5 +1,4 @@
-using NBC.ActionEditor.Infrastructure.Assets;
-using NBC.ActionEditor.Views.IMGUI;
+using NBC.ActionEditor.Infrastructure.Discovery;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +6,7 @@ using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Presentation.Timeline;
 using UnityEditor;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Editing;
 using NBC.ActionEditor.Application.Ports;
 
@@ -18,8 +17,8 @@ namespace NBC.ActionEditor.Composition
     {
         private sealed class Playhead : ITimelinePlayhead
         {
-            private readonly IDocumentSampler sampler;
-            public Playhead(IDocumentSampler sampler) { this.sampler = sampler; }
+            private readonly ISequenceSampler sampler;
+            public Playhead(ISequenceSampler sampler) { this.sampler = sampler; }
             public float Time => sampler.CurrentTime;
             public void Seek(float time) => sampler.Sample(time);
         }
@@ -30,24 +29,26 @@ namespace NBC.ActionEditor.Composition
         }
         private sealed class Dialogs : ITimelineDialogs
         {
+            private readonly Views.IEditorDialogs dialogs;
+            public Dialogs(Views.IEditorDialogs dialogs) { this.dialogs = dialogs; }
             public void Delete(string title, Action confirmed)
-            { if (EditorUtility.DisplayDialog(title, title == Lan.GroupDelete ? Lan.GroupDeleteTips : Lan.TrackDeleteTips, Lan.TipsConfirm, Lan.TipsCancel)) confirmed(); }
-            public void Rename(string initialName, Action<string> submit) => RenameItemWindow.Show(initialName, submit);
+            { if (EditorUtility.DisplayDialog(title, title == EditorText.GroupDelete ? EditorText.GroupDeleteTips : EditorText.TrackDeleteTips, EditorText.TipsConfirm, EditorText.TipsCancel)) confirmed(); }
+            public void Rename(string initialName, Action<string> submit) => dialogs.Rename(initialName, submit);
         }
-        public static TimelinePresenter Create(DocumentSession session, SelectionState selection, StructureEditing structure,
-            NodeEditing nodes, ClipboardEditing clipboardEditing, ClipEditing clips, ClipboardState clipboard, IDocumentSampler sampler,
+        public static TimelinePresenter Create(SequenceSession session, SelectionState selection, StructureEditing structure,
+            NodeEditing nodes, ClipboardEditing clipboardEditing, ClipEditing clips, ClipboardState clipboard, ISequenceSampler sampler,
             TimelineWorkspace workspace, ITimelineView view,
-            Application.Settings.SettingsSession settings, DocumentPresenter documents)
+            Application.Settings.SettingsSession settings, SequencePresenter sequencePresenter, Views.IEditorDialogs dialogs)
         {
             var presenter = new TimelinePresenter(session, selection, structure, nodes, clipboardEditing,
                 clips, workspace, new Playhead(sampler), () => settings.Current, view);
             presenter.Menus = new TimelineMenuPresenter(session, structure, nodes, clips, clipboardEditing, clipboard,
-                selection, new Catalog(), new Dialogs(), Text, presenter.Reveal);
+                selection, new Catalog(), new Dialogs(dialogs), Text, presenter.Reveal);
             presenter.HostAction += key =>
             {
-                if (key == TimelineKey.Save) documents.Invoke(DocumentIntent.Save);
-                else if (key == TimelineKey.Undo) documents.Invoke(DocumentIntent.Undo);
-                else if (key == TimelineKey.Redo) documents.Invoke(DocumentIntent.Redo);
+                if (key == TimelineKey.Save) sequencePresenter.Invoke(SequenceIntent.Save);
+                else if (key == TimelineKey.Undo) sequencePresenter.Invoke(SequenceIntent.Undo);
+                else if (key == TimelineKey.Redo) sequencePresenter.Invoke(SequenceIntent.Redo);
             };
             return presenter;
         }
@@ -55,24 +56,24 @@ namespace NBC.ActionEditor.Composition
         {
             switch (key)
             {
-                case "AddTrack": return Lan.MenuAddTrack;
-                case "PasteTrack": return Lan.MenuPasteTrack;
-                case "Rename": return Lan.Rename;
-                case "GroupDisable": return Lan.GroupDisable;
-                case "GroupLocked": return Lan.GroupLocked;
-                case "GroupDelete": return Lan.GroupDelete;
-                case "TrackDisable": return Lan.TrackDisable;
-                case "TrackLocked": return Lan.TrackLocked;
-                case "TrackCopy": return Lan.TrackCopy;
-                case "TrackReplica": return Lan.TrackReplica;
-                case "TrackDelete": return Lan.TrackDelete;
-                case "ClipCopy": return Lan.ClipCopy;
-                case "ClipCut": return Lan.ClipCut;
-                case "ClipPaste": return Lan.ClipPaste;
-                case "ClipDelete": return Lan.ClipDelete;
-                case "MatchPreviousLoop": return Lan.MatchPreviousLoop;
-                case "MatchClipLength": return Lan.MatchClipLength;
-                case "MatchNextLoop": return Lan.MatchNextLoop;
+                case "AddTrack": return EditorText.MenuAddTrack;
+                case "PasteTrack": return EditorText.MenuPasteTrack;
+                case "Rename": return EditorText.Rename;
+                case "GroupDisable": return EditorText.GroupDisable;
+                case "GroupLocked": return EditorText.GroupLocked;
+                case "GroupDelete": return EditorText.GroupDelete;
+                case "TrackDisable": return EditorText.TrackDisable;
+                case "TrackLocked": return EditorText.TrackLocked;
+                case "TrackCopy": return EditorText.TrackCopy;
+                case "TrackReplica": return EditorText.TrackReplica;
+                case "TrackDelete": return EditorText.TrackDelete;
+                case "ClipCopy": return EditorText.ClipCopy;
+                case "ClipCut": return EditorText.ClipCut;
+                case "ClipPaste": return EditorText.ClipPaste;
+                case "ClipDelete": return EditorText.ClipDelete;
+                case "MatchPreviousLoop": return EditorText.MatchPreviousLoop;
+                case "MatchClipLength": return EditorText.MatchClipLength;
+                case "MatchNextLoop": return EditorText.MatchNextLoop;
                 default: throw new ArgumentException("未知菜单文本：" + key);
             }
         }

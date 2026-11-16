@@ -3,9 +3,9 @@ using ToolkitWindow = NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow;
 using ToolkitCanvas = NBC.ActionEditor.Views.UIToolkit.TimelineCanvas;
 using System.Collections;
 using System.Linq;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Settings;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Samples.FeatureSample;
 using NBC.ActionEditor.Infrastructure.Serialization;
@@ -28,14 +28,14 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator DensePointsPaintAndHitInBothNativeWindowsWithoutChangingContent()
         {
 
-            using var context = new EditorFixture(Composition.DocumentComposition.Create());
-            var document = new FeatureSampleDocument(); document.ClearRoots();
+            using var context = new EditorFixture(Composition.SequenceComposition.Create());
+            var document = new FeatureSampleSequence(); document.ClearRootContainers();
             var track = new FeatureSampleMarkerTrack { Name = "Dense points" };
             for (var i = 0; i <= 1000; i++) track.Clips.Add(new FeatureSampleMarker { StartTime = i / 200f });
-            document.AddRoot(track); document.Init();
-            context.Session.Open(new DocumentOpenData(document));
-            var before = JsonDocumentCodec.Content(document);
-            var views = new ActionEditorViews(); var settings = new SettingsSession(new Preferences());
+            document.AddRootContainer(track); document.Init();
+            context.Session.Open(new SequenceOpenData(document));
+            var before = SequenceJsonCodec.GetContentKey(document);
+            var views = new EditorViewRegistry(); var settings = new SettingsSession(new Preferences());
             ImguiWindow imgui = null;
             ToolkitWindow toolkit = null;
             try
@@ -84,7 +84,7 @@ namespace NBC.ActionEditor.Tests
                         Assert.That(context.Selection.First, Is.TypeOf<FeatureSampleMarker>());
                         var scale = (state.Size.WindowWidth - state.ContentLeft) / span;
                         Assert.That(Mathf.Abs(context.Selection.First.StartTime - 1) * scale, Is.LessThanOrEqualTo(6.01f));
-                        Assert.That(JsonDocumentCodec.Content(document), Is.EqualTo(before));
+                        Assert.That(SequenceJsonCodec.GetContentKey(document), Is.EqualTo(before));
                         Assert.That(context.Session.IsDirty || context.Session.IsEditing, Is.False);
                     }
                     Assert.That(presenter.State.Clips.Any(c => c.Key == presenter.KeyFor(track.Clips[0])), Is.True);
@@ -104,9 +104,9 @@ namespace NBC.ActionEditor.Tests
         [UnityTest] public IEnumerator BothNativeMenusSelectAndRevealCreatedTracksWithoutScrollingTheOtherWindow()
         {
 
-            using var context = new EditorFixture(Composition.DocumentComposition.Create());
-            context.Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
-            var views = new ActionEditorViews(); var settings = new SettingsSession(new Preferences());
+            using var context = new EditorFixture(Composition.SequenceComposition.Create());
+            context.Session.Open(new SequenceOpenData(new FeatureSampleSequence()));
+            var views = new EditorViewRegistry(); var settings = new SettingsSession(new Preferences());
             ImguiWindow imgui = null; ToolkitWindow toolkit = null;
             try
             {
@@ -119,7 +119,7 @@ namespace NBC.ActionEditor.Tests
                     var presenter = native ? toolkit.Canvas.Presenter : imgui.Presenter;
                     var other = native ? imgui.Presenter : toolkit.Canvas.Presenter;
                     presenter.Scroll(0); other.Scroll(0);
-                    var group = context.Document.RootItems.OfType<TimelineGroup>().First();
+                    var group = context.Sequence.RootContainers.OfType<ActionGroup>().First();
                     for (var index = 0; index < 22; index++)
                     {
                         presenter.Reveal(group);
@@ -128,13 +128,7 @@ namespace NBC.ActionEditor.Tests
                         var suffix = DirectableTypeInfo.For(typeof(FeatureSampleIntervalTrack)).MenuName;
                         if (native)
                         {
-                            var menu = new DropdownMenu();
-                            using var trigger = MouseUpEvent.GetPooled(new Event { type = EventType.MouseUp, button = 1,
-                                mousePosition = toolkit.Canvas.LocalToWorld(new Vector2(x, y)) });
-                            using var e = ContextualMenuPopulateEvent.GetPooled(trigger, menu, toolkit.Canvas, null);
-                            typeof(ToolkitCanvas).GetMethod("Menu", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-                                .Invoke(toolkit.Canvas, new object[] { e });
-                            menu.MenuItems().OfType<DropdownMenuAction>().Single(a => a.name.EndsWith("/" + suffix)).Execute();
+                            yield return NativeMenuInput.Choose(toolkit, new Vector2(x, y), suffix);
                         }
                         else
                         {
@@ -156,9 +150,9 @@ namespace NBC.ActionEditor.Tests
                     Assert.That(other.Workspace.ScrollY, Is.Zero);
                     var before = group.Tracks.Count;
                     UnityEditor.Undo.PerformUndo();
-                    Assert.That(context.Document.RootItems.OfType<TimelineGroup>().First().Tracks.Count, Is.EqualTo(before - 1));
+                    Assert.That(context.Sequence.RootContainers.OfType<ActionGroup>().First().Tracks.Count, Is.EqualTo(before - 1));
                     UnityEditor.Undo.PerformRedo();
-                    Assert.That(context.Document.RootItems.OfType<TimelineGroup>().First().Tracks.Count, Is.EqualTo(before));
+                    Assert.That(context.Sequence.RootContainers.OfType<ActionGroup>().First().Tracks.Count, Is.EqualTo(before));
                 }
             }
             finally

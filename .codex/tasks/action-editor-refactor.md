@@ -4,10 +4,125 @@
 - 创建日期：2026-11-09
 - 总体状态：RF38–RF53本轮工程实施与约定的必要普通回归/交接完成；重复全基线余项按用户指示停止，不宣称301项完整通过。RF01–RF37历史证据保留，不等于结构质量或人工体验已获用户认可。统一产品验收（含H01–H09）待用户启动；Combat专属实施与验收暂缓。
 - 历史阶段摘要：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30本地提交`b12720a`（278/278），RF31本地提交`015d687`（280/280），RF32本地提交`04e76c9`（303/303），RF33本地提交`069b887`（312/312及双UI持久探针）。RF34本地提交`51c6016`（281/281与最终双UI持久闭环）。RF35本地提交`08ff4cf`（299/299与双UI隔离持久闭环）。RF36本地提交`96157c5`（311/311、末次选择器收敛后13/13，受控冷Editor未测）。RF37历史工程范围complete（最终311/311及双UI教程重放通过）。历史规格与证据见第4.3节；不代表本轮结构验收通过。
-- 下一步：架构review四项及Inspector异常修复已完成；用户本次要求“追踪提交一下”，允许将RF38–RF53及后续修复创建本地提交，仍不推送。完成后等待用户确定命名调整范围，不自动开始改名或统一产品验收；不替用户保存、放弃现场或操作许可证弹窗。
+- 下一步：已完成的命名整理、Toolkit原生交互和菜单字体适配按用户2026-11-16“提交一下”授权本地提交；不推送、不重跑测试、不自动开始统一产品验收。程序集仅Runtime/Editor的收敛尚未实施。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
-- 当前执行任务：RF38–RF53后架构review四项修复及Inspector失效目标异常修复complete，见第4.4节末补充记录；未新增测试身份、未补跑重复基线、未开始命名调整。RF38–RF53历史完成范围及统一产品验收待执行状态不变；文档完整解析缺依赖及选择器历史许可来源风险如实保留。未提交或推送。
+- 当前执行任务：RF38–RF53及后续修复已本地提交8669312fbc04ed57e8f03b9cbaa15a7680590893，未推送。三轮命名整理、ActionContainer与API内部命名、Toolkit主流程原生交互及菜单字体适配complete，纳入本次授权提交（哈希以Git历史为准）；第三轮52个独立现有测试身份通过，后续命名及字体轮未重跑测试，不把历史结果当本轮回归。程序集收敛尚未实施；统一产品验收、文档完整解析依赖及选择器历史许可风险保持原状态。
+
+## RF53后续：本地提交授权（2026-11-16）
+
+- 用户“提交一下”覆盖前述不提交限制，仅授权本地Git提交，不推送。范围为前轮未提交的职责/目录/Action模型与Sequence命名、ActionContainer及API内部命名整理、Toolkit原生交互、菜单字号布局适配及配套测试调用/合同/任务记录/固定操作清单。
+- 排除用户场景、Assets/Action.json、Assets/NewAction1.json及meta、ProjectSettings个人配置、既有package.json及meta删除、未参与本系列GUID移动的旧目录meta删除。工作区保留这些内容，不覆盖、不删除、不纳入提交。
+- 已核验最终Editor编译、菜单6组真实布局及.NET构建证据；提交阶段只检查差异和暂存边界，不重跑测试。程序集合并尚未实施，Host/Session保持当前名称。具体提交哈希以Git历史为准。
+
+## RF53后续：Toolkit右键菜单字体与尺寸适配（2026-11-16）
+
+- 状态：complete，范围为源码、编译和真实菜单几何检查，不代签人工视觉验收。最初仅固定280宽度未改变字号，用户截图反馈文字仍小，进一步要求适配字体并允许自行验证；窗口消失后用户明确选择“允许你打开Toolkit窗口并验证”。
+- 实施：时间轴右键/添加组/行标题/逐级菜单及保存按钮菜单共用TimelineDropdown.DropDown。文字至少16逻辑字号，尊重更大的来源字号；按真实Label字体测量内容宽度，最小宽度随字号变化，窗口宽度限制下允许换行；Label和行都取消固定高度，行高至少字号1.8倍并给文字上下留白。未改菜单项、勾选/禁用、回调、层级、主窗口尺寸或作者数据。
+- 验证：doctor `20261116T140400Z-9869932d`恢复ready，本工程PID5836；命令发现`140440Z-3d319aa1`通过。最初.NET缺MeasureMode类型限定编译失败，改为VisualElement.MeasureMode；Editor编译`141356Z-ef41e80b`通过。第一次现场测量暴露固定Label高度，补Auto/minHeight；后续失败包含用户窗口不存在，以及探针Esc发到菜单外层导致旧菜单未关闭、20字号读到16字号旧菜单。取消事件改发原生ScrollView内容区后通过，未用放宽断言掩盖问题。
+- 固定菜单探针加在既有WindowDiagnostics与最小工作流白名单中，不新增脚本资源。preview `145648Z-a8c16de2`→引用用户打开/验证授权的approval `145750Z-cccb1ca7`→apply `145805Z-edd4e9b5`passed。真实轨道右键5项/保存右键3项均通过16/20/24字号字体、内容边界和行高检查：轨道宽/行高192/30、240/38、288/44.67；保存192/29.33、240/37.33、288/44。finally恢复字号与焦点，窗口保留打开。没有点击业务操作、不修改序列或写资产；未运行Unity/Python测试套件，未使用verify。最小参数拒绝检查源码同步但未运行。
+- 最终Editor编译`145534Z-6e1dfc9e`completed/failed=false/errors=[]；dotnet完整生成方案最终构建退出0，0错误39既有警告、13.94秒，日志Temp/menu-font-final-build.log。尚未人工视觉签收，未独立测量长分类标签及极窄屏幕边缘，不把几何通过当完整UI验收。
+- 不改Host/Session，不夹带程序集收敛。程序集仅Runtime/Editor的最新要求已确认，尚未实施；ActionEditorHost及SequenceSession保留原名。不安装依赖、不改用户文件、不提交推送。
+
+## RF53后续：全量审查后的API与内部命名清理（2026-11-16）
+
+- 状态：complete（静态与编译范围，不含测试回归）。用户“那就列任务计划列表，开始逐一执行”授权按上一答建议实施：先处理语义明确的API和内部命名；公开扩展声明类型/PreviewBase目标属性等独立契约暂缓。不是批准功能修复、持久格式迁移或资源移动。
+- 基线：195份产品/固定验证源码已完整通读，31份测试重点核调用/反射/固定身份，7份asmdef已核对；当前226份C#。保留前轮全部未提交改动与用户现场。
+- [x] NR01：记录唯一计划、检查状态与规则，固定边界和当前源码基线。
+- [x] NR02：统一Sequence、SourceName、CurrentSettings、内容比较键，联动生产/双UI/验证和测试调用。
+- [x] NR03：修正结构操作、片段时间/循环、播放开关/暂停、采样器和扩展工厂方法名及命名实参。
+- [x] NR04：整理属性令牌/草稿、手势、选择器/分栏器、弹窗和活动文案标识符；保留原行为和资源/UI/偏好定位字符串，内部反射成员字符串随改名同步。
+- [x] NR05：静态核对源码标识符、持久字段/字符串、程序集/meta/测试身份不变；真实Editor编译和生成方案构建，不执行Unity/Python测试，不使用verify。同步当前文档引用并记录最终证据。
+- 保留：核心模型/目录/七程序集、JSON封套与业务字段（含rootItems及CrossBlendIn/Out）、恢复/偏好DTO、资源/UI/菜单/CLI键、Unity回调、测试类方法身份。无效参数/重复刷新等静态事实不借改名修功能；不新增别名、框架、文件移动或删除。
+- 暂缓：ConstantOptions/ShowWhen/AssetPath等Attribute类型与公开字段、PreviewBase.Target、扩展绑定Attribute等独立公开扩展契约；第五节可选低收益项只在对应家族有直接收益时处理，不全量样式化。
+- 实施：121份C#相对本轮前源码快照修改，无新增/移动/删除文件，仍226份C#、7份asmdef。作者图/显示帧/窗口绑定使用Sequence，来源资源名SourceName，当前设置CurrentSettings；快照比较GetContentKey、提交ContentKey。结构CreateOperation/DeleteOperation/MoveOperation及MoveError/IsMoveNoOp/TryGetOwningGroup，片段DeleteClip/FitsSiblingTiming/循环对齐长度/MatchLoopLength，播放RangePlaybackEnabled/SetPaused/SetPlaybackState，采样器sampler/PreviousTime，工厂CreateHeader/CreateInspector/ResolveInspectorType/CreateToolkitHeader/CreateToolkitPropertyExtension同步调用。无参UI调度Pause保持，不误改外部Unity API。
+- 内部整理：属性draft/fieldId/ClipId、手势原始时间/事务/吸附距离、双UI创建/导出catalog与tryCreate/tryExport、来源选择器、IMGUI选择器行/预览布局及PreviewResizer语义名；三份语言声明活动字段同步。内存设置AutoSaveIntervalSeconds/DefaultSaveDirectory，格式Compact只表示紧凑排版；SettingsFileStore.Data的AutoSaveSeconds/SavePath及Recovery DTO保持原键。当前合同补充这些API语义，历史执行记录不追改。
+- 静态证据：以Temp/naming-review-before-20261116.zip逐个basename候选匹配，不用它覆盖恢复（该存档扁平且有重名）。349份meta与7份asmdef字节保持；所有修改源码移除字符串/注释后非单词标点序列不变、类型声明与SerializeField声明保持，测试类/方法身份保持；另核Runtime及设置/恢复端口91条显式字段声明无变化。此为源码检查，不是行为验证。五组字面量变化仅为两观察桥player→sampler、导出窗口反射binding→catalog、两处插值引用同步；资源/UI/菜单/偏好/CLI及JSON键不变。中文/英文各108个活动字段与EditorText一致，未漏语言反射字段。末次静态检查发现并修正ApplicationAdapterTests导出catalog反射字符串遗漏。
+- 编译证据：doctor `20261116T015327Z-4c97373a`及恢复后`020248Z-9d114383`通过，绑定本工程唯一ready PID13864。首次编译流程`015801Z-9b46b7b8`在editor status连接中断而failed，未拿失败报告当编译结论；未重放原请求，`020317Z-642b3d5f`查询原recompile_status确认completed/failed=false/errors=[]。最终源码再编译`020630Z-b621aab4`passed，completed/failed=false/errors=[]/compilationFailed=false，当前groundTruth consoleErrors=0；报告附带的旧console测试/错误条目是历史记录，不算本轮执行。
+- 最终构建：真实生成方案21项目742源码覆盖检查通过；`dotnet build ActionEditor.sln --nologo -v:q -m:1 -nr:false`退出0、0错误39既有警告、7.12秒，日志`Temp/naming-review-final-build.log`。git diff --check通过。按用户要求，本轮零Unity/Python测试用例，未使用verify；Python仅执行自定义只读源码比较及solution_inputs，不把历史52/311结果当本轮回归。
+- 边界：未改作者持久格式/具体类型身份、程序集/meta、用户JSON/场景/配置，不新增兼容层、不运行持久探针、PlayerBuild或人工UI验收，不安装依赖、不提交推送。公开扩展契约与低收益可选项继续暂缓；全资源引用、跨启动恢复/H01–H09、缺失文档解析依赖及IMGUI选择器历史许可风险不因本轮编译通过而消失。
+
+## RF53后续：ActionContainer定名（2026-11-16）
+
+- 状态：complete。用户最终确定ActionContainer，并要求“相应的命名也对应调整一下，但不要重跑测试用例了”。只调整类型/同名文件、RootContainers及根容器增删API/调用/当前文档；序列私有持久字段rootItems及JSON错误路径保留，不改业务规则、程序集、类型兼容或用户数据。
+- 不运行Unity或Python测试用例，不使用verify触发测试；只做静态核对、GUID/meta哈希校验与编译/生成方案检查。测试源码只同步调用和固定文件路径，不改变测试身份，不宣称测试通过。
+- 固定移动通过现有ProjectSyncCommands中临时零参数rename_action_container完成，仅ActionRootItem.cs→ActionContainer.cs，GUID 8aa9d69a014c1824b9d9c3e374a01b91，拒绝目标已存在，绑定源码/meta哈希；preview后展示并真实确认。完成后直接移除本次临时方法与白名单，不新增待删除临时脚本，不复用已退役旧命令。
+- doctor `20261115T160308Z-38e1c88d`与list `160342Z-95cc8f72`通过（工具UTC日期仍15日，用户上下文日期16日）；保留全部未提交工作。准备编译/预览，尚未移动模型文件。
+- 固定移动完成：准备编译`160441Z-2377ddd1`通过；preview `160538Z-451b8faf`展示唯一源/目标、GUID及源码/meta哈希后，用户“批准并继续”；approval `165350Z-58589ada`→apply `165406Z-a54e13b4`passed，GUID与移动当时源码/meta字节不变。随后仅代码工具同步40份C#中的类型/API/调用及固定资源路径，当前合同、架构和验收阅读入口同步，历史记录不追改。RootItems→RootContainers，InsertRoot/AddRoot/RemoveRoot/ClearRoots对应InsertRootContainer/AddRootContainer/RemoveRootContainer/ClearRootContainers；根容器参数名container，私有序列字段rootItems及错误路径保持。
+- 临时能力已直接从既有ProjectSyncCommands移除，白名单/参数入口同时移除，无新增待删除脚本。最终编译`170217Z-5ccd1d4d`completed/failed=false/errors=[]；发现`170418Z-4b1f2a84`明确不再注册rename_action_container。生产源码旧类型/集合/增删API无残留；旧路径及meta不存在，新meta SHA256仍为16405d19ac47d5833785b18be0fd76a98a82fbbd6201f4ec1918b03ce7cceb50。
+- 只做静态与编译验证：生成21项目742源码覆盖通过，工作流Python语法核对通过，git diff --check通过；`dotnet build ActionEditor.sln --nologo -v:q -m:1 -nr:false`0错误39既有警告、6.99秒，日志`Temp/action-container-build.log`。按用户要求，本轮没有运行任何Unity/Python测试用例，也没有把上一轮通过结果当成本轮回归。未覆盖用户JSON/场景/配置、不新增兼容层、不提交推送。
+
+## RF53后续：Action模型与Sequence术语统一（2026-11-15）
+
+- 状态：complete，固定62项移动/3目录、源码与当前文档同步、52个独立现有测试及最终构建通过，临时能力已独立批准退役。用户“那就这样再改一下”批准前述ActionSequence/ActionGroup/ActionTrack/ActionClip、序列窗口Sequence…Window及Model目录方案；随后明确选择“完整改名，接受旧身份失效，不加兼容层”，允许Domain命名空间和程序集同步Model。未授权覆盖或迁移任何用户JSON。
+- 范围：模型及根项ActionRootItem统一Action前缀；Domain目录/命名空间/程序集→Model；内容编辑会话/播放/预览/交互/格式服务及窗口使用Sequence；通用JSON值树/文本/数值编码按Json职责命名。不机械替换磁盘封套document、version、format、业务字段、UI元素键、恢复/偏好键；保留Timeline界面、ActionEditorWindow、AssetPickerWindow、RenameWindow、SettingsWindow与样例预览窗口。FeatureSampleDocument随业务内容语义改FeatureSampleSequence。
+- 持久边界：类型身份仍为完整Type.FullName加程序集短名，不增加别名/迁移/回退/双写。模型程序集改名会使依赖它的旧具体类型身份失效；用户已明确接受。v2封套及字段不变。已有JSON/场景/个人配置和前两轮全部未提交工作保留，不读取用户内容或强制恢复旧会话，不保存/放弃用户数据。
+- 验收：固定移动保GUID/meta且不覆盖/删除；七程序集依赖方向不变（仅模型程序集名称改名）；源码/调用/现有测试/当前文档同步，测试身份保持，不新增/重复全基线；独立验证旧身份拒绝及新格式读回、双UI操作。真实生成方案构建通过后退役临时命令，删除另预览确认。
+- 环境：doctor `20261115T142431Z-f5aa1cb0`、list `142709Z-e4be305a`passed；根AGENTS/skill/operations及Pipeline创建命令、安全和AssetDatabase移动规程已读。尚未移动资源或更改产品代码。临时固定命令仅用于本清单，不接收路径/代码/force、不开放通用移动。
+- 固定清单：`.codex/action-sequence-layout.json`列明62项（61 C#加模型asmdef）与3新目录；仅AssetDatabase移动，源码/meta字节及GUID逐项绑定。临时ActionSequenceLayoutCommands/最小白名单/现有固定操作测试已准备，离线48/48。首次编译`144139Z-f482d93c`因SyncVS内部API不可访问失败，改用既有ProjectSyncCommands相同的Unity.CodeEditor.CurrentEditor.SyncAll；`144254Z-78312506`completed/failed=false/errors=[]，准备预览等待真实确认。
+- 移动完成：preview `20261115T144427Z-ae2a1d6a`完整展示62项和3目录，用户选择“批准，按清单执行并继续”；approval `144818Z-74315b54`→apply `144834Z-f08e7531`passed，62项移动/3目录创建。停止导入后GUID及源码/meta哈希核验通过；改名后再次离线逐项核对62份meta与原预览相等，旧源和meta不存在。没有直接修改meta或覆盖用户文件。
+- 源码完成：150份源码/asmdef同步类型、命名空间、程序集和调用，通用JSON值/引用按Json/AssetReference命名，业务窗口/服务统一Sequence。只模型程序集名称改Model，七程序集依赖方向保留。测试类和方法身份不改，封套document/业务字段/UI与恢复偏好键保留；既有上下文的Document内容属性不机械替换成磁盘字段变化。当前合同两份独立JSON样本、教程及扩展示例同步新身份，历史记录保留。
+- 编译纠错：`150910Z-e6cc0f1a`暴露SelectionState中的相对Documents.SequenceSession未同步，`151307Z-4ab23c75`暴露既有测试Domain.ActionGroup短引用，均修正；`151433Z-f7854d51`completed/failed=false/errors=[]。历史console不作为当前编译失败。发现`151555Z-68b4e017`仍311项；现有格式fixture测试增加新完整身份及旧根名/旧程序集/旧组身份拒绝断言，固定GUID测试补齐本轮62目标覆盖，不新增测试身份。
+- 首次构建：生成21项目743源码覆盖通过，`dotnet build ActionEditor.sln --nologo -v:q -m:1 -nr:false`0错误39既有警告、11.67秒，`Temp/action-sequence-build.log`。离线工作流48/48、git diff --check通过；Unity定向回归运行中，尚不宣称通过，临时命令仍待独立删除批准。
+- 定向回归完成：52个独立现有身份通过、0失败/跳过/不确定，所有verify编译终态通过。格式15 `151652Z-96257a8b`（含独立合同fixture、新完整身份和四种旧身份拒绝）；目录/GUID/扩展9 `151843Z-8f739dca`；程序集3 `152212Z-4cf074fe`；应用适配7 `152346Z-b9340f55`；会话编辑10 `152709Z-9fdfabb0`；双UI完整复制拖动取消重开播放1 `152843Z-edd2aad9`；Toolkit真实菜单/重命名/导出1 `153009Z-fc5b3558`；双选择器1 `153129Z-262e9498`；Recovery3 `153345Z-42f79830`；样例投影1 `153523Z-be00f9ac`；播放适配1 `153649Z-c9d571ba`。与第二轮发现逐项比较311个完整测试身份无增删；没有重复全量基线。
+- 筛选纠错：`152023Z-5a57553a`和`152515Z-059385da`分别因误写AssemblyBoundary/SessionEditing的namespace而blocked、未执行测试；按发现的实际身份更正后通过，不把零执行计入通过。产品代码无测试失败。资源级验证仍未执行，不以profile中的asset-validation skipped宣称资产通过。
+- 下一步只退役本轮ActionSequenceLayoutCommands.cs及meta（GUID b4a94ddc0122c024a9106f5657311281），另行preview展示并等待真实用户确认；不复用移动或前两轮删除审批。删除后移除临时白名单/说明并做最终构建。未改用户JSON/场景/配置、不迁移、不提交推送；样例预览窗口仍IMGUI，H01–H09、全重启/冷启动及PlayerBuild不在本轮证据内。
+- 退役完成：preview `20261115T153848Z-fb2ee96e`展示唯一临时脚本/meta和GUID后，用户明确选择“批准退役并完成验证”；approval `153950Z-4f685080`→apply `154007Z-f6b1e3db`passed。移除mutation白名单、固定参数入口与临时说明，既有consumed-maintenance测试纳入arrange_action_sequence_layout，离线48/48通过。脚本及meta不存在，`154139Z-7774023d`capabilities不再包含临时命令、编译通过、资源绑定测试再验证1/1（重复不增独立计数）。
+- 最终证据：真实生成21项目742源码覆盖通过，`Temp/action-sequence-final-build.log`构建0错误39既有警告、3.61秒，git diff --check通过。七asmdef保持，仅Domain明确改Model；最终产品源码226份，临时命令已移除。既有用户现场及此前未提交修改保留，没有提交/推送或安装依赖。52/52是定向工程验证，不替代311全量、人工体验/OS模态、完整资源引用、跨启动恢复、持久/教程写探针或PlayerBuild；文档完整解析缺yaml/markdown_it及历史IMGUI选择器许可风险仍未解决。
+
+## RF53后续：第二轮语义命名与目录归属（2026-11-15）
+
+- 状态：complete，固定28项移动与7目录创建、类型改名、12份独立文件、两项独立确认删除及临时能力退役已完成；43个独立现有身份通过，删除后选择器再验证1/1，最终生成方案构建通过。领域术语、Styles拆职责及样例预览原生化逐项评估保留，不夹带格式迁移或功能重写。
+- 验收：每个建议有明确处理结果；名称、文件名与真实职责对应；固定GUID和meta不变；七程序集与持久格式/字段身份不变；现有调用、测试和当前文档同步；补强现有身份而不增加测试身份，不跑重复全基线。
+- 环境：doctor `20261115T131625Z-c8e28a17`、命令发现`20261115T131716Z-2e385da1`passed。保留既有全部未提交命名/原生化工作和用户场景、JSON、配置现场。只根AGENTS，已重读skill/operations及Pipeline命令/变更规则。
+- A01–A15高收益命名（已实施）：Toolkit ObjectSelectorWindow→DocumentPickerWindow；IMGUI ObjectSelectorWindow→AssetPickerWindow；两UI CreateDocumentWindow→DocumentCreationWindow；两UI RenameItemWindow→RenameWindow；Toolkit DialogWindow→DialogWindowBase；DocumentCreationInput→DocumentCreationPrompt；两UI EditorDialogs→EditorDialogAdapter；AssetPickerCatalog→AssetPickerDiscovery；PropertyText→PropertyWarningText；ColorUtility→ColorExtensions；RecoveryStore→SessionStateRecoveryStore；RecoveryCodec→JsonRecoveryCodec；PlaybackControl→PlaybackControlAdapter；CommitFiles→PhysicalCommitFiles；FeatureSamplePreview→FeatureSamplePreviewWindow。
+- B01–B04补充候选（前三已改名，WindowBinding保留）：PropertyDescription→PropertyFieldMetadata；ActionDocumentGraph→DocumentGraphValidation；DocumentNumber→DocumentFloatEncoding；WindowBinding评估后保留（当前上下文已足够明确，上一轮建议不塞入首批）。前三者是辅助API而不是持久图具体类型，改调用而不改文档类型身份。
+- C01–C04目录（已实施）：Toolkit六份弹窗/适配归Dialogs；共享交互与外观分成Shared/Dialogs及Appearance，DocumentInteraction归共享交互；样例Presenter归Presentation/Samples/FeatureSample且留原程序集，窗口/样例装配归Editor/Samples/FeatureSample；PreviewBase归Extensions/Preview，采样/预览所有权和边界调度仍留Infrastructure。
+- D01–D06文件可发现性（已实施）：DocumentFormats抽DocumentFormatRegistry/AssetReferenceResolver；DocumentValue抽DocumentJson；IActionDocumentFormat抽DocumentFormatContext及引用契约；TimelineLayout抽TimeTransform；ViewExtensionContracts抽EditorExtensionContext/ToolkitHeaderView/ToolkitPropertyExtension并合理保留绑定Attribute组；FeatureSamplePreview抽双UI Header。另抽PhysicalCommitFiles，使新名称与文件对应，接口仍为ICommitFiles，不强拆所有几行小值类型。
+- E01单行转发（已完成）：唯一调用改为共享AssetPickerDiscovery；独立preview/真实确认后通过AssetDatabase删除ObjectPickerCatalog.cs及meta，删除后双选择器回归通过。不直接文件系统删除。
+- F01领域术语（评估保留）：IData/IDirectable/IDirector/ISubClipContainable属于公开领域接口；上一轮明确不夹带批量替换，本轮记录真实职责和保留理由，不引入别名/兼容层或改持久类型。
+- F02共享Styles（评估保留）：上一轮建议先保持名称与行为，不能仅改成EditorResources掩盖纹理/颜色/布局/DPI/偏好混合；本轮只归Appearance，保留NBSkillWidth及Resources路径，不引入未批准职责重构。
+- F03样例预览（评估分开）：FeatureSamplePreviewWindow仍是IMGUI业务样例窗口，Toolkit Header可达；不得声称全部Toolkit可达窗口都已原生化。上一轮明确单列功能修改，当前命名轮不夹带重写；最终需再次说明而不是漏项。
+- 保持项：ActionDocument/TimelineGroup/TimelineTrack/TimelineClip、DocumentSession/Lifecycle/EditTransaction、DocumentSampler/PreviewSession/Playback、TimelinePresenter/Layout/Interaction、EditorCompositionRoot/ViewRegistry/SettingsFileStore及双UI TimelineControls维持原职责名称；目录不机械同步namespace；不改asmdef、业务字段或$type，不删空目录。
+- 授权边界：源码编辑和固定临时命令/策略/现有测试扩展用于落实本轮请求；28项资源移动独立preview→展示→真实确认→approve/apply；单行转发和临时脚本删除各需新预览/确认，不复用历史审批。命令只移动指定清单及创建7目录，不接收路径/代码/force，不安装依赖或扩大通用写能力。
+
+- 本轮移动证据：preview `20261115T132447Z-8335d7fc`展示固定28项/7目录后，用户选择“批准，按预览执行并继续”；approval `132632Z-29f1a442`→apply `132653Z-054c8bf2`passed，28/28移动、7目录创建，停止导入后校验GUID及源码/meta SHA256保持。随后同步类型与调用，不改namespace/asmdef/持久作者图字段；IMGUI预览分栏偏好键ObjectSelectorWindow保留，避免重置用户偏好。
+- A–D已逐项实施：高收益与三项辅助API改名；WindowBinding保留。12份独立文件：DocumentFormatRegistry、AssetReferenceResolver、DocumentJson、DocumentFormatContext、IDocumentReferenceResolver（同文件保留DocumentReference小值类型）、TimeTransform、EditorExtensionContext、ToolkitHeaderView、ToolkitPropertyExtension、FeatureSampleHeader、FeatureSampleToolkitHeader、PhysicalCommitFiles。原文件保留主职责/小选项/Attribute组，新增meta由Unity生成。E唯一调用已直接使用AssetPickerDiscovery，旧转发文件无调用，待独立删除确认；F三项保留结论不变。
+- 编译及首批验证：`133639Z-dc0728a5`编译completed/failed=false/errors=[]；`134000Z-e446d505`发现仍311项。现有身份TypeCatalog9 `134102Z-f8345f98`（固定28GUID及样例窗口MonoScript）、DocumentFormat15 `134333Z-dfbf3920`、ApplicationAdapter7 `134704Z-2e4c9ddb`、双选择器1 `134857Z-6db34f21`、坐标独立公式3 `135053Z-f674ac1f`均0失败/跳过/不确定。不新增身份、不跑重复全基线。
+- 当前离线：工作流48/48、diff-check通过；Unity真实生成21项目744源码覆盖通过；dotnet串行构建0错39既有警告、7.13秒，Temp/semantic-layout-build.log（删除后需最终重建）。教程、字段声明和架构当前阅读区同步新名，明确样例仍为IMGUI；历史执行记录不改写。
+- 追加定向8个现有身份通过，合计本轮43/43、0失败/跳过/不确定：真实物理提交锁文件/验证失败1 `135249Z-b5d4b39c`；恢复3 `135417Z-9e689f04`；样例显示帧1 `135541Z-439265a3`；扩展上下文/Inspector显式会话1 `135723Z-5fd81701`；播放适配1 `135855Z-e13b6dde`；Toolkit真实菜单/重命名/导出及双UI布局1 `140025Z-9be97458`。28份目标meta的SHA256再次与原预览逐项相等，旧源及meta均不存在。拆分后228份C#（含待退役临时命令与转发），全部meta由Unity生成。
+- E删除完成：preview `140259Z-ec6df5a1`只列ObjectPickerCatalog.cs和meta/GUID `8aca862faf9b7954eaff7a89bcddaaf5`；展示后用户选择“批准删除并继续”，approval `140420Z-eaaeb787`→apply `140437Z-c5e63c16`passed。唯一调用此前已直接使用共享发现实现，无其他删除。下一步独立预览临时SemanticLayoutCommands退役，删除后移除白名单并完成最终验证。
+
+- 临时能力退役完成：preview `140537Z-cd0c8e1b`只列SemanticLayoutCommands.cs及meta/GUID `1eabcc925f5d48a489971aff666154e5`；展示后用户选择“批准退役并完成验证”，approval `140725Z-2d011334`→apply `140743Z-4a3c6439`passed。随后移除临时mutation/固定参数白名单/operations说明，现有退役检查纳入arrange_semantic_layout，48/48通过。没有留下通用移动能力。
+- 最终验证：`140917Z-ef0b60c2`编译通过、删除后双选择器1/1（重复不增加独立计数），capabilities明确不再注册arrange_semantic_layout；两份删除脚本和meta实际不存在。真实生成21项目742源码覆盖通过；最终dotnet串行构建0错误39既有警告、9.10秒，`Temp/semantic-layout-final-build.log`；diff-check通过。最终ActionEditor源码226份（原215+12拆分−1冗余转发，临时命令已删除），七asmdef不变。
+- 范围边界：未改作者图持久类型身份/业务字段、用户场景/JSON/配置/偏好键/资源路径；未安装依赖、改Combat、提交或推送。没有重跑311全量、OS桌面模态、完整重启/跨启动恢复、持久/教程写探针、Player Build、完整资源引用或H01–H09人工验收；缺yaml/markdown_it及IMGUI选择器历史许可风险仍保留。样例FeatureSamplePreviewWindow仍为IMGUI且Toolkit Header可达，原生化是独立功能任务，并非本轮漏改或已完成。
+
+## RF53后续：Toolkit交互原生化补齐（2026-11-15）
+
+- 授权：用户指出Toolkit仍残留IMGUI并明确要求立即处理。范围为四类自有弹窗、原生菜单和文字布局、共享资源/IMGUI样式拆分；保留IMGUI入口、文档规则和选择器搜索/键盘/预览/取消语义，不新增测试身份、不提交推送。
+- 准备：doctor `20261115T115801Z-ebfb26c4`、命令发现 `20261115T115851Z-63352a13` passed；精读组合根、共享交互、四类弹窗、选择器发现/筛选/回调/预览与相关现有测试。命名轮及用户既有现场保留。
+- 实施完成：窗口显式声明交互适配，组合根为文档及时间轴注入同一逐窗适配；Toolkit自有CreateGUI弹窗，不用IMGUIContainer或IMGUI预览Editor；共享创建输入顺序/目录规则，原生资源列表、搜索、None、实时回调、分栏图标/只读文本预览及键盘；原生菜单分类逐级展开/返回、保留勾选/禁用；水印用原生Label居中，拖动标签按自身字体测量；GUISkin/GUIStyle收进IMGUI专用类。Unity系统保存/确认/文件夹框保留，不把标题GUIContent或EditorGUIUtility资源API误判成IMGUI绘制。
+- 修复与失败记录：首次编译`121049Z-38a059d3`因LocalToWorld扩展缺this失败，修正后`121254Z-ddbf5a9d`编译completed/failed=false/errors=[]；选择器首次`121720Z-c7d3f3e1`实际1执行1失败（封装显示Zero executed/passed并非零执行），发现清空列表选择也触发None回调，已过滤空集合。真实菜单探针`123239Z-6704e221`、`123525Z-b2d98038`、`123744Z-bb92aad1`暴露测试未聚焦/布局未完成，改为聚焦并有界等待真实行布局，不使用NaN坐标或放宽创建时间断言。分类后续菜单排到旧菜单关闭之后显示，避免焦点恢复相互干扰。Esc同步断言`124946Z-54837cba`失败，既有身份改UnityTest等待窗口关闭生命周期；`125203Z-ce7f3c5b`域重载暂不可达blocked，doctor `125236Z-afe6cc96`恢复后重新执行，未当成功。
+- 最终定向46个独立现有身份全部通过，0失败/跳过/不确定（重复只计一次，以下均20261115）：ApplicationAdapterTests7 `125500Z-d5edbfae`；ToolkitTimelineTests9 `122437Z-7a75a1e5`；ImguiTimelineTests10 `122701Z-8046487d`；SettingsPresenterTests8 `122910Z-5eb57ad1`；真实菜单与属性双UI等价1 `123936Z-b4f0ea07`；反复原生菜单创建/逐窗揭示1 `124143Z-b4ece34a`；TypeCatalogTests9 `124426Z-e9f7b4ac`；原生/IMGUI选择器过滤、None、搜索与焦点内Esc取消1 `125307Z-53b7f8bb`。菜单旧反射探针同步为真实原生指针操作，不留下已移除的Menu方法调用。
+- 最终离线/编译：Unity生成21项目731源码覆盖检查通过；`dotnet build ActionEditor.sln --nologo -v:q -m:1 -nr:false`0错误39既有警告、9.07秒，日志`Temp/toolkit-native-build.log`。工作流48/48、git diff --check通过。Toolkit目录源码搜索无Views.IMGUI、GenericMenu、EditorStyles、CalcSize、IMGUIContainer、GUIStyle/GUISkin、GUILayout/EditorGUILayout依赖。新增12份源码meta由Unity生成；无脚本资源移动、手改meta、安装依赖、用户数据覆盖、提交或推送。
+- 未宣称：完整311基线、OS全桌面保存/确认模态人工操作、H01–H09、完整重启/跨启动恢复、Player Build及完整资源引用验收。未重跑需独立写入授权的持久/教程探针；历史选择器许可风险仍保留，新Toolkit实现未复制Unity Reference-Only源码。
+
+## RF53后续：职责命名与源码可发现性（2026-11-15）
+
+- 授权：用户认可上一轮有限命名建议并要求实施；另明确选择“允许，准备固定清单预览”，准许本次固定42项移动命令、最小工作流白名单及补强现有离线检查，真实AssetDatabase移动需preview后再次确认。使用后退役临时命令，不开放通用移动或任意代码能力。
+- 范围：Discovery类型发现目录；组合根/视图注册表；Settings口径；双UI工具栏、属性面板与渲染器；语言声明；Timeline/Properties/Dialogs/Shared归位；NodeEditing、ClipboardState、SessionSnapshotCodec、PropertyValueFactory、Toolkit Inspector代理与VerificationSession独立文件。
+- 不变量：Runtime模型、类型持久身份、七程序集和序列化字段不改；偏好文件路径、EditorPrefs键与显示名不改；UI菜单/布局/元素键/操作、USS路径、单一作者会话不改。保留现有未提交/未跟踪工作，不删空目录，不提交/推送。
+- 准备证据：doctor `20261115T103554Z-5361d149`、命令发现 `20261115T103648Z-3a79ed4d` passed。当前无移动能力白名单，已消费的旧命令保持退役，不复用审批。42项源脚本GUID已核对；待完成离线检查、Editor编译及新命令preview。
+- 准备检查：现有离线策略检查12/12通过，Editor编译 `20261115T104313Z-6ba6972a` completed/failed=false/errors=[]。preview `104441Z-8322a735`列明42项和6个目录，用户展示后选择“批准，按预览继续”，审批`104718Z-0c6d9d41`已消费。
+- 首次apply `104737Z-11c5d8f2`失败，已创建6目录并仅移动第一份TypeMenuInfo；因StartAssetEditing期间提前查询目标GUID而中止。实际源码/meta SHA256均与preview相等，源及源meta已不存在，目标meta GUID保持。未重放旧审批；将GUID检查移到StopAssetEditing后，固定校验已完成首项，准备剩余41项新preview并再次确认。其余产品代码尚未改名。
+- 移动完成：修正命令编译`105025Z-00f2a703`通过；剩余41项preview `105118Z-bf3a6ba7`与原清单余项的路径/GUID/源码及meta哈希逐项完全相等，用户选择“批准剩余41项并继续”→approval `105253Z-ee00a0ec`→apply `105312Z-f5c02852`passed。42份目标meta离线SHA256复核全部等于原preview，旧源及meta不存在；不删空旧目录。
+- 实施：42项归位并同步职责类型名；只有Infrastructure.Assets命名空间同步为Infrastructure.Discovery，其余归位不机械变更命名空间。7个类型独立文件，文件内实现保持；现有TypeCatalog资源测试补充新路径与两份Toolkit Inspector MonoScript.GetClass绑定，不新增测试身份。教程、业务扩展说明与合同当前阅读区同步，历史测量/执行证据不追溯改写。
+- 行为约束检查：对原139份Editor生产源码，应用批准的标识符替换后，按非空代码行多重集合比较（排除using、namespace及独立大括号、统一BOM），与当前生产源码一致，无意外业务语句增删。该检查不替代运行验证。Runtime源码、7份asmdef、USS资源及偏好键/路径无新增差异；旧用户变更不纳入本轮工作。
+- 首批运行：Editor编译`110630Z-b39d10f5`completed/failed=false/errors=[]；发现`110821Z-40787b75`仍311项。现有定向32/32、0失败/跳过/不确定：TypeCatalog9 `111001Z-a1246e95`；AssemblyBoundary3 `111123Z-2825149f`；SettingsPresenter8 `111237Z-a95cb96e`；SessionEditing10 `111353Z-0e516488`；双语真实入口1 `111515Z-83cd4ef9`；Inspector显式会话1 `111627Z-d57865ab`。
+- 临时能力退役：首次preview因参数文件尚不存在在dispatch阶段失败`111830Z-62ed6d67`，未接触Editor删除；创建固定参数后preview `111857Z-da737ff8`明确唯一NamingLayoutCommands.cs及GUID cfb37d8cb096c5d40b415e18e0f30132。展示后用户选择“批准退役并完成验证”→approval `112205Z-6880df43`→apply `112222Z-ad2ffdcd`passed，仅AssetDatabase删除临时脚本与meta。移除临时白名单和操作说明，现有退役拒绝测试纳入arrange_naming_layout，工作流48/48通过，未留下通用移动能力。
+- 离线构建：最终Unity生成21项目/719源码覆盖检查通过；`dotnet build ActionEditor.sln --nologo -v:q -m:1 -nr:false`0错39既有警告、8.80秒，日志`Temp/naming-layout-build.log`。当前ActionEditor源码203份（原196+拆分7），临时脚本已不存在；diff-check通过。
+- 最终原生UI定向4/4、0失败/跳过/不确定：ViewRegistrationIsIdempotentAndDetachesNotifications `112417Z-6aa9305c`；BothRulersZoomAroundHoveredTimeWithoutAuthorChanges `112541Z-9188b96e`；NativeIssueButtonSelectsInvalidClipAndParameterEditClearsDiagnosticWithUndo `112704Z-9e7cf430`；ImguiIssueButtonSelectsClipWithoutChangingAuthorContent `112825Z-d227dc87`。合计36个独立现有身份通过，各verify均确认编译终态。最终命令发现`113035Z-4d0b2867`不再注册arrange_naming_layout。工程整理完成，不代签人工验收。
+- 未执行/不宣称：311全量、重复RF38基线、Player Build、完整资源引用、完整重启和H01–H09人工验收。没有安装缺失文档解析依赖、覆盖用户数据、修改Combat或提交/推送。文档完整解析缺依赖及选择器历史许可风险仍保留。
 
 ## RF23后续：空目录清理（2026-11-12）
 

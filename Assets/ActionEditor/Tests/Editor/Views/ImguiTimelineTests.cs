@@ -1,10 +1,10 @@
 using NBC.ActionEditor.Views.IMGUI;
 using ImguiWindow = NBC.ActionEditor.Views.IMGUI.ActionEditorWindow;
 using ToolkitWindow = NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow;
-using ToolkitPreferences = NBC.ActionEditor.Views.UIToolkit.PreferencesWindow;
-using NBC.ActionEditor.Infrastructure.Documents;
+using ToolkitSettings = NBC.ActionEditor.Views.UIToolkit.SettingsWindow;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using NBC.ActionEditor.Presentation.Timeline;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using System;
 using System.Collections;
 using System.IO;
@@ -30,8 +30,8 @@ namespace NBC.ActionEditor.Tests
             {
                 window.Show(); window.position = new Rect(60, 60, 1000, 600); window.Focus();
                 yield return null; yield return null;
-                var first = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
-                var second = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Clips[0];
+                var first = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0];
+                var second = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[1].Clips[0];
                 first.StartTime = 1; second.StartTime = 3;
                 EditorFixture.Shared.Selection.Set(new IDirectable[] { first, second }, false); window.Presenter.Refresh();
                 var down = ImguiPoint(window, first);
@@ -48,8 +48,8 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(first.StartTime, Is.EqualTo(2).Within(.0001f));
                 Assert.That(second.StartTime, Is.EqualTo(4).Within(.0001f));
                 window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape });
-                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(1).Within(.0001f));
-                first = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; second = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Clips[0];
+                Assert.That(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(1).Within(.0001f));
+                first = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0]; second = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[1].Clips[0];
                 EditorFixture.Shared.Selection.Set(new IDirectable[] { first, second }, false); window.Presenter.Refresh(); down = ImguiPoint(window, first);
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = down, shift = true });
                 window.SendEvent(new Event { type = EventType.MouseDrag, button = 0, mousePosition = down + new Vector2(scale * .5f, 0), shift = true });
@@ -57,22 +57,22 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(first.StartTime, Is.EqualTo(1.5f).Within(.0001f));
                 Assert.That(second.StartTime, Is.EqualTo(3.5f).Within(.0001f));
                 Undo.PerformUndo(); yield return null;
-                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(1).Within(.0001f));
-                Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[1].Clips[0].StartTime, Is.EqualTo(3).Within(.0001f));
+                Assert.That(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0].StartTime, Is.EqualTo(1).Within(.0001f));
+                Assert.That(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[1].Clips[0].StartTime, Is.EqualTo(3).Within(.0001f));
             }
             finally { window.Presenter?.Cancel(); window.DiscardChanges(); window.Close(); }
         }
 
         [Test] public void CollapsedClipsCannotBeHitThroughRetainedDrawGeometry()
         {
-            var group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0); var track = group.Tracks[0]; var clip = track.Clips[0];
+            var group = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0); var track = group.Tracks[0]; var clip = track.Clips[0];
             var layout = new TimelineLayout(); var size = new TimelineSize(1000, 500);
-            var state = layout.Build(EditorFixture.Shared.Document, EditorFixture.Shared.Selection, Workspace, size, 0, null);
+            var state = layout.Build(EditorFixture.Shared.Sequence, EditorFixture.Shared.Selection, Workspace, size, 0, null);
             var rect = state.Clips.Single(c => c.Key == layout.KeyFor(clip)).Bounds;
             var x = rect.X + rect.Width * .5f; var y = rect.Y + 8;
             Assert.That(layout.HitClip(x, y), Is.SameAs(clip));
             Workspace.SetCollapsed(group, true);
-            state = layout.Build(EditorFixture.Shared.Document, EditorFixture.Shared.Selection, Workspace, size, 0, null);
+            state = layout.Build(EditorFixture.Shared.Sequence, EditorFixture.Shared.Selection, Workspace, size, 0, null);
             Assert.That(layout.HitClip(x, y), Is.Not.SameAs(clip));
             Assert.That(state.Clips.Any(c => c.Key == layout.KeyFor(clip)), Is.False);
             CollectionAssert.DoesNotContain(layout.In(rect), clip);
@@ -85,10 +85,10 @@ namespace NBC.ActionEditor.Tests
             var transform = new TimeTransform(0, 7, 700);
             try
             {
-                var clip = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; EditorFixture.Shared.Selection.Set(new IDirectable[] { clip }, false);
+                var clip = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0]; EditorFixture.Shared.Selection.Set(new IDirectable[] { clip }, false);
                 Assert.That(gesture.Begin(this, clip, new[] { clip }, 1, 175, 12345), Is.True);
                 gesture.Cancel();
-                clip = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+                clip = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0];
                 Assert.That(gesture.Begin(this, clip, new[] { clip }, 1, 175, 0), Is.True);
                 gesture.Move(247, false, transform, settings);
                 Assert.That(clip.EndTime, Is.EqualTo(2.5f), "First resize must use the current unselected clip references.");
@@ -103,7 +103,7 @@ namespace NBC.ActionEditor.Tests
             var window = ScriptableObject.CreateInstance<ImguiWindow>();
             try
             {
-                var clip = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; EditorFixture.Shared.Selection.Set(new IDirectable[] { clip }, false);
+                var clip = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0]; EditorFixture.Shared.Selection.Set(new IDirectable[] { clip }, false);
                 var presenter = window.Presenter; presenter.Resize(new TimelineSize(1000, 500));
                 var rect = presenter.State.Clips.Single(c => c.Key == presenter.KeyFor(clip)).Bounds;
                 var x = rect.X + rect.Width * .5f; var y = rect.Y + 8;
@@ -145,7 +145,7 @@ namespace NBC.ActionEditor.Tests
         {
 
             var window = ScriptableObject.CreateInstance<ImguiWindow>();
-            var clip = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]; EditorFixture.Shared.Selection.Set(new IDirectable[] { clip }, false);
+            var clip = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0]; EditorFixture.Shared.Selection.Set(new IDirectable[] { clip }, false);
             try
             {
                 var presenter = window.Presenter; presenter.Resize(new TimelineSize(1000, 500));
@@ -171,12 +171,12 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(first.Presenter, Is.Not.SameAs(second.Presenter));
                 Assert.That(first.Workspace, Is.Not.SameAs(second.Workspace));
                 first.Workspace.SetRange(-1, 12); first.Workspace.ScrollY = 55; first.Workspace.LeftWidth = 310;
-                first.Workspace.SetCollapsed(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().First(), true);
+                first.Workspace.SetCollapsed(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().First(), true);
                 Assert.That(second.Workspace.ViewTimeMin, Is.Zero); Assert.That(second.Workspace.ViewTimeMax, Is.EqualTo(7));
                 Assert.That(second.Workspace.ScrollY, Is.Zero); Assert.That(second.Workspace.LeftWidth, Is.Not.EqualTo(310));
-                Assert.That(second.Workspace.IsCollapsed(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().First()), Is.False);
-                first.Workspace.SetCollapsed(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().First(), false);
-                var clip = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+                Assert.That(second.Workspace.IsCollapsed(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().First()), Is.False);
+                first.Workspace.SetCollapsed(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().First(), false);
+                var clip = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0];
                 EditorFixture.Shared.Selection.Set(new IDirectable[] { clip }, false);
                 first.Presenter.Resize(new TimelineSize(1000, 500));
                 var rect = first.Timeline.State.Clips.Single(c => c.Key == first.Presenter.KeyFor(clip)).Bounds;
@@ -196,23 +196,23 @@ namespace NBC.ActionEditor.Tests
         [Test] public void ZoomAndFoldDoNotDirtyAuthoringData()
         {
             Workspace.ViewTimeMin = 1; Workspace.ViewTimeMax = 10;
-            Workspace.SetCollapsed(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0), true);
+            Workspace.SetCollapsed(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0), true);
             Assert.That(EditorFixture.Shared.Session.IsDirty, Is.False);
             Assert.That(Workspace.ViewTimeMin, Is.EqualTo(1)); Assert.That(Workspace.ViewTimeMax, Is.EqualTo(10));
         }
 
         [Test] public void ImguiInvalidStretchRestoresLengthAndTrackReorderIsUndoable()
         {
-            var group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0); var track = group.Tracks[0]; var clip = track.Clips[0];
+            var group = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0); var track = group.Tracks[0]; var clip = track.Clips[0];
             var gesture = new ClipGesture(EditorFixture.Shared.Session, EditorFixture.Shared.Clips);
             Assert.That(gesture.Begin(this, clip, new[] { clip }, 1, 175, 0), Is.True);
             gesture.Move(1025, true, new TimeTransform(0, 7, 700), new NBC.ActionEditor.Application.Settings.EditorSettings(NBC.ActionEditor.Application.Settings.TimeStepMode.Seconds, .01f, 30, false, true, 0, "Assets/"));
             gesture.Finish();
-            group = EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0); track = group.Tracks[0];
+            group = EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0); track = group.Tracks[0];
             Assert.That(track.Clips[0].Length, Is.EqualTo(1.5f));
             EditorFixture.Shared.Structure.MoveTrack(track, group, 3);
             Assert.That(group.Tracks[2], Is.SameAs(track));
-            Undo.PerformUndo(); Assert.That(EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(track.Name));
+            Undo.PerformUndo(); Assert.That(EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Name, Is.EqualTo(track.Name));
         }
 
         [UnityTest] public IEnumerator ImguiInputNeedsPressAndEndsOutside()

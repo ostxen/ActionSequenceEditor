@@ -2,12 +2,12 @@ using System;
 using System.Collections;
 using System.Linq;
 using System.Reflection;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Ports;
 using NBC.ActionEditor.Application.Settings;
 using NBC.ActionEditor.Composition;
-using NBC.ActionEditor.Domain;
-using NBC.ActionEditor.Infrastructure.Documents;
+using NBC.ActionEditor.Model;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Samples.FeatureSample;
@@ -34,60 +34,60 @@ namespace NBC.ActionEditor.Tests
         }
 
         [Serializable, Unique, Attachable(typeof(FeatureSampleGroup))]
-        private sealed class UniqueTrack : TimelineTrack { }
+        private sealed class UniqueTrack : ActionTrack { }
 
         // 仅显式注入测试类型目录，不能把测试业务加入生产注册表。
-        private sealed class TestSnapshots : IDocumentSnapshot
+        private sealed class TestSnapshots : ISequenceSnapshot
         {
-            private readonly DocumentFormatContext context = DocumentFormats.CreateContext(typeof(UniqueTrack));
-            private readonly ActionDocumentJsonFormat format = new ActionDocumentJsonFormat();
-            public string Capture(ActionDocument document) => System.Text.Encoding.UTF8.GetString(format.Serialize(
-                DocumentCopy.Capture(document, false, context), new DocumentFormatOptions(false), context));
-            public ActionDocument Restore(string snapshot) => format.Deserialize(System.Text.Encoding.UTF8.GetBytes(snapshot), context);
-            public string Content(ActionDocument document) => DocumentCopy.Content(document, context);
-            public void ValidateAndInitialize(ActionDocument document) => ActionDocumentGraph.Initialize(document, context);
+            private readonly SequenceFormatContext context = SequenceFormats.CreateContext(typeof(UniqueTrack));
+            private readonly SequenceJsonFormat format = new SequenceJsonFormat();
+            public string Capture(ActionSequence document) => System.Text.Encoding.UTF8.GetString(format.Serialize(
+                SequenceCopy.Capture(document, false, context), new SequenceFormatOptions(false), context));
+            public ActionSequence Restore(string snapshot) => format.Deserialize(System.Text.Encoding.UTF8.GetBytes(snapshot), context);
+            public string GetContentKey(ActionSequence document) => SequenceCopy.GetContentKey(document, context);
+            public void ValidateAndInitialize(ActionSequence document) => SequenceGraphValidation.Initialize(document, context);
         }
 
         internal sealed class WindowInput : IDisposable
         {
             public readonly EditorFixture Context;
-            public readonly ActionEditorViews Views = new ActionEditorViews();
+            public readonly EditorViewRegistry Views = new EditorViewRegistry();
             public readonly SettingsSession Settings = new SettingsSession(new Preferences());
             public readonly ImguiWindow Imgui;
             public readonly ToolkitWindow Toolkit;
             private readonly int globalViews;
-            private readonly IDocumentSnapshot snapshots;
+            private readonly ISequenceSnapshot snapshots;
             private bool closed;
             public EditorWindow Window => (EditorWindow)Imgui ?? Toolkit;
             public TimelinePresenter Presenter => Imgui != null ? Imgui.Presenter : Toolkit.Canvas.Presenter;
             public TimelineWorkspace Workspace => Presenter.Workspace;
-            public string Content => snapshots.Content(Context.Document);
+            public string Content => snapshots.GetContentKey(Context.Sequence);
             public string Error => Imgui != null ? Imgui.Timeline.Error : Toolkit.LastError;
-            public TimelineGroup Group(string name) => Context.Document.RootItems.OfType<TimelineGroup>().Single(g => g.Name == name);
-            public TimelineTrack Track(string name) => Context.Document.AllTracks.Single(t => t.Name == name);
+            public ActionGroup Group(string name) => Context.Sequence.RootContainers.OfType<ActionGroup>().Single(g => g.Name == name);
+            public ActionTrack Track(string name) => Context.Sequence.AllTracks.Single(t => t.Name == name);
             public float Y(IDirectable item, float fraction = .5f) => Presenter.State.Rows.Single(r => r.Key == Presenter.KeyFor(item)).Bounds.Y + fraction * 28;
 
             public WindowInput(bool toolkit, int height = 650, bool unique = false)
             {
                 globalViews = EditorFixture.SharedViews.Count;
-                snapshots = unique ? (IDocumentSnapshot)new TestSnapshots() : new SessionSnapshotCodec();
-                Context = new EditorFixture(new DocumentSession(snapshots, new JsonDocumentRepository(), new UnityUndoHistory(), new RecoveryCodec()));
-                var document = new FeatureSampleDocument();
+                snapshots = unique ? (ISequenceSnapshot)new TestSnapshots() : new SessionSnapshotCodec();
+                Context = new EditorFixture(new SequenceSession(snapshots, new SequenceFileRepository(), new UnityUndoHistory(), new JsonRecoveryCodec()));
+                var document = new FeatureSampleSequence();
                 for (var i = 0; i < 3; i++)
                 {
-                    var group = (TimelineGroup)document.RootItems[i]; group.Name = ((char)('A' + i)).ToString();
+                    var group = (ActionGroup)document.RootContainers[i]; group.Name = ((char)('A' + i)).ToString();
                     for (var j = 0; j < group.Tracks.Count; j++) group.Tracks[j].Name = group.Name + j;
                 }
-                document.AddRoot(new FeatureSampleIntervalTrack { Name = "R" });
-                document.AddRoot(new FeatureSampleGroup { Name = "E" });
+                document.AddRootContainer(new FeatureSampleIntervalTrack { Name = "R" });
+                document.AddRootContainer(new FeatureSampleGroup { Name = "E" });
                 if (unique)
                 {
-                    ((TimelineGroup)document.RootItems[0]).Tracks.Add(new UniqueTrack { Name = "U0" });
-                    ((TimelineGroup)document.RootItems[1]).Tracks.Add(new UniqueTrack { Name = "U1" });
-                    document.AddRoot(new TimelineGroup { Name = "N" });
+                    ((ActionGroup)document.RootContainers[0]).Tracks.Add(new UniqueTrack { Name = "U0" });
+                    ((ActionGroup)document.RootContainers[1]).Tracks.Add(new UniqueTrack { Name = "U1" });
+                    document.AddRootContainer(new ActionGroup { Name = "N" });
                 }
                 document.Validate();
-                Context.Session.Open(new DocumentOpenData(document));
+                Context.Session.Open(new SequenceOpenData(document));
                 if (toolkit)
                 {
                     Toolkit = ScriptableObject.CreateInstance<ToolkitWindow>();
@@ -149,7 +149,7 @@ namespace NBC.ActionEditor.Tests
                 if (Toolkit != null) Assert.That(Toolkit.Canvas.PointerId, Is.EqualTo(-1));
                 else Assert.That(GUIUtility.hotControl, Is.Zero);
             }
-            public void Roots(params string[] names) => Assert.That(Context.Document.RootItems.Cast<IDirectable>().Select(i => i.Name), Is.EqualTo(names));
+            public void Roots(params string[] names) => Assert.That(Context.Sequence.RootContainers.Cast<IDirectable>().Select(i => i.Name), Is.EqualTo(names));
             public void Tracks(string group, params string[] names) => Assert.That(Group(group).Tracks.Select(t => t.Name), Is.EqualTo(names));
             public void Close()
             {
@@ -309,11 +309,11 @@ namespace NBC.ActionEditor.Tests
             finally { other.Close(); }
             h.Window.Focus(); yield return null;
             h.Begin(h.Track("A0"), end);
-            h.Context.Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
+            h.Context.Session.Open(new SequenceOpenData(new FeatureSampleSequence()));
             h.AssertReleased(); Assert.That(h.Context.Session.IsDirty, Is.False);
             h.Window.Repaint(); yield return null;
-            end = new Vector2(90, h.Y(h.Context.Document.RootItems.OfType<TimelineGroup>().ElementAt(1)));
-            h.Begin(h.Context.Document.AllTracks.First(), end);
+            end = new Vector2(90, h.Y(h.Context.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(1)));
+            h.Begin(h.Context.Sequence.AllTracks.First(), end);
             h.Close(); Assert.That(h.Context.Session.IsEditing, Is.False);
         }
 
@@ -418,7 +418,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(h.Context.Session.Version, Is.EqualTo(version));
                 Assert.That(h.Context.Session.IsDirty, Is.False);
             }
-            Assert.Throws<System.IO.InvalidDataException>(() => JsonDocumentCodec.Encode(h.Context.Document),
+            Assert.Throws<System.IO.InvalidDataException>(() => SequenceJsonCodec.Encode(h.Context.Sequence),
                 "显式测试类型不能进入生产可保存目录。");
         }
 
@@ -480,13 +480,13 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(h.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure));
                 Assert.That(h.Content, Is.EqualTo(before));
                 // 非所有者关闭不调用Discard，不能触碰共享作者会话或当前捕获。
-                var graph = h.Context.Document; var version = h.Context.Session.Version;
+                var graph = h.Context.Sequence; var version = h.Context.Session.Version;
                 other.GetType().GetMethod("OnDisable", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(other, null);
                 Assert.That(h.Views.Count, Is.EqualTo(1));
                 Assert.That(h.Presenter.Mode, Is.EqualTo(TimelineGestureMode.Structure), "非所有者释放不能取消当前手势。");
                 Assert.That(h.Context.Session.IsDirty, Is.False); other.Close(); other = null;
                 Assert.That(h.Views.Count, Is.EqualTo(1));
-                Assert.That(h.Context.Document, Is.SameAs(graph), $"关闭干净非所有者不应替换共享图，version={version}->{h.Context.Session.Version}");
+                Assert.That(h.Context.Sequence, Is.SameAs(graph), $"关闭干净非所有者不应替换共享图，version={version}->{h.Context.Session.Version}");
                 // Unity关闭独立窗口可能把焦点交给Inspector；真实失焦必须取消，而不是强行保留捕获。
                 if (EditorWindow.focusedWindow != h.Window)
                 {

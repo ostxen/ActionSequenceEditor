@@ -11,9 +11,9 @@ namespace NBC.ActionEditor.Tests.Presentation
     {
         [Test] public void DomainAndSerializationKeepOneWayRuntimeDependencies()
         {
-            var domain = typeof(NBC.ActionEditor.Domain.ActionDocument).Assembly;
-            var serialization = typeof(NBC.ActionEditor.Serialization.ActionDocumentJsonFormat).Assembly;
-            Assert.That(domain.GetName().Name, Is.EqualTo("NBC.ActionEditor.Domain"));
+            var domain = typeof(NBC.ActionEditor.Model.ActionSequence).Assembly;
+            var serialization = typeof(NBC.ActionEditor.Serialization.SequenceJsonFormat).Assembly;
+            Assert.That(domain.GetName().Name, Is.EqualTo("NBC.ActionEditor.Model"));
             Assert.That(serialization.GetName().Name, Is.EqualTo("NBC.ActionEditor.Serialization"));
             foreach (var assembly in new[] { domain, serialization })
                 Assert.That(assembly.GetReferencedAssemblies().Where(reference => reference.Name.StartsWith("UnityEditor", StringComparison.Ordinal)

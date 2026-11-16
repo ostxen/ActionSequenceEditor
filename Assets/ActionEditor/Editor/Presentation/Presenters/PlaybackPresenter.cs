@@ -9,7 +9,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
         private readonly IPlaybackControl control;
         public bool Playing => control.Playing;
         public bool Paused => control.Paused;
-        public bool Range => control.Range;
+        public bool RangePlaybackEnabled => control.RangePlaybackEnabled;
         public float Time => control.Time;
         public PlaybackPresenter(IPlaybackControl control) { this.control = control ?? throw new ArgumentNullException(nameof(control)); }
         public void Seek(float time)
@@ -24,10 +24,10 @@ namespace NBC.ActionEditor.Presentation.Presenters
                 case PlaybackIntent.First: Seek(0); break;
                 case PlaybackIntent.Previous: control.Step(false); break;
                 case PlaybackIntent.TogglePlay: if (control.Playing) control.Stop(); else control.Play(); break;
-                case PlaybackIntent.TogglePause: control.Pause(!control.Paused); break;
+                case PlaybackIntent.TogglePause: control.SetPaused(!control.Paused); break;
                 case PlaybackIntent.Next: control.Step(true); break;
                 case PlaybackIntent.Last: Seek(control.Length); break;
-                case PlaybackIntent.ToggleRange: control.Range = !control.Range; break;
+                case PlaybackIntent.ToggleRange: control.RangePlaybackEnabled = !control.RangePlaybackEnabled; break;
                 default: throw new ArgumentOutOfRangeException(nameof(intent));
             }
         }

@@ -1,5 +1,5 @@
 ﻿using NBC.ActionEditor.Presentation.Properties;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using NBC.ActionEditor;
 using UnityEditor;
 using UnityEngine;
@@ -7,8 +7,8 @@ using UnityEngine;
 namespace NBC.ActionEditor.Views.IMGUI.Properties.Standard
 {
     // 绘制轨道名称和公共字段，提交交由属性Presenter。
-    [CustomInspectors(typeof(TimelineTrack), true)]
-    public class TrackInspector : InspectorsBase
+    [CustomInspectors(typeof(ActionTrack), true)]
+    public class TrackInspector : PropertyInspectorBase
     {
         private NBC.ActionEditor.Presentation.Properties.PropertyTargetState action => target;
 

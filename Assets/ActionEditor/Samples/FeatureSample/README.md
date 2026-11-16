@@ -46,10 +46,12 @@
 
 ## 最小业务接入与边界
 
-Runtime 的 `ActionDocument.RootItems` 依次存放 `TimelineGroup` 或 `TimelineTrack`；组持有轨道，轨道持有 `TimelineClip`。沿样例使用 `Name`、`MenuName`、`Attachable` 等业务声明。Editor 的 IMGUI Header 继承 `HeaderBase` 并声明 `CustomHeader`，Toolkit Header 继承 `ToolkitHeaderView` 并声明 `ToolkitHeader`；属性控件扩展分别声明 `CustomInspectors` 和 `ToolkitProperties`。字段描述与提交由共享 `PropertyPresenter` 负责，原生视图只构建控件。参考 `Runtime/Samples/FeatureSample` 和 `Editor/Samples/FeatureSamplePreview.cs`。
+核心模型为`ActionSequence / ActionGroup / ActionTrack / ActionClip`，位于`Runtime/Model`，程序集与命名空间为`NBC.ActionEditor.Model`。当前改名不迁移旧JSON；包含旧类型身份的文件会被拒绝，请保留原文件并在隔离新文件中练习。
 
-Header及样例状态窗口使用 `EditorExtensionContext.Capture()` 的显示帧，不获取作者文档或全局Context。属性控件读取 `Presentation.Properties` 的输入快照，并用不透明字段身份提交；不要缓存作者对象、反射字段或编辑路径。设置窗口由所属窗口绑定显式创建Presenter，独立宿主不会写默认宿主的设置会话。声明与字段描述在 `Runtime/Metadata`，类型发现位于 `Editor/Infrastructure/Assets`。
+Runtime 的 `ActionSequence.RootItems` 依次存放 `ActionGroup` 或 `ActionTrack`；组持有轨道，轨道持有 `ActionClip`。沿样例使用 `Name`、`MenuName`、`Attachable` 等业务声明。Editor 的 IMGUI Header 继承 `SequenceHeaderExtension` 并声明 `CustomHeader`，Toolkit Header 继承 `ToolkitHeaderView` 并声明 `ToolkitHeader`；属性控件扩展分别声明 `CustomInspectors` 和 `ToolkitProperties`。IMGUI 属性基类为`PropertyInspectorBase`，Toolkit 字段视图为`PropertyFieldsView`。字段描述与提交由共享 `PropertyPresenter` 负责，原生视图只构建控件。参考 `Runtime/Samples/FeatureSample` 和 `Editor/Samples/FeatureSample/FeatureSamplePreviewWindow.cs`。
 
-样例状态窗口只按播放头求值绘制，不生成场景对象、不播放动画/音频/特效、不执行 Combat 或真实游戏逻辑。资源路径字段只是字符串，不是音频播放能力。受控 Unity Object 引用支持当前工程持久主/子资产的 GUID/localFileId；临时/场景/无有效身份引用不能保存，路径字符串不能冒充持久引用。
+Header及样例状态窗口使用 `EditorExtensionContext.Capture()` 的显示帧，不获取作者文档或全局Context。属性控件读取 `Presentation.Properties` 的输入快照，并用不透明字段身份提交；不要缓存作者对象、反射字段或编辑路径。设置窗口由所属窗口绑定显式创建Presenter，独立宿主不会写默认宿主的设置会话。声明与字段描述在 `Runtime/Metadata`，类型发现位于 `Editor/Infrastructure/Discovery`。
+
+样例状态窗口仍以IMGUI绘制，两个Header都可打开它；主流程原生Toolkit弹窗不代表此样例已原生化。样例状态窗口只按播放头求值绘制，不生成场景对象、不播放动画/音频/特效、不执行 Combat 或真实游戏逻辑。资源路径字段只是字符串，不是音频播放能力。受控 Unity Object 引用支持当前工程持久主/子资产的 GUID/localFileId；临时/场景/无有效身份引用不能保存，路径字符串不能冒充持久引用。
 
 两种绘制控件的字体、滑块皮肤和抗锯齿可能不同。实际工程验证与尚待人工体验的范围只记在[唯一任务清单](../../../../.codex/tasks/action-editor-refactor.md)。教程重放不代替用户完成 H01–H09。

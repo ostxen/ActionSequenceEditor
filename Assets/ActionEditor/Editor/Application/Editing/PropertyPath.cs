@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 
 namespace NBC.ActionEditor.Application.Editing
 {
@@ -77,7 +77,7 @@ namespace NBC.ActionEditor.Application.Editing
         }
         private void ValidateOwner(object current)
         {
-            if (current is IData data && !ReferenceEquals(current, editing.Document) && (editing.Document == null || !editing.Document.directables.Contains(data as IDirectable)))
+            if (current is IData data && !ReferenceEquals(current, editing.Sequence) && (editing.Sequence == null || !editing.Sequence.directables.Contains(data as IDirectable)))
                 throw new InvalidOperationException("属性所属对象已不在当前文档中。");
             if (current is IDirectable directable && directable.IsLocked) throw new InvalidOperationException("属性所属对象已锁定。");
         }

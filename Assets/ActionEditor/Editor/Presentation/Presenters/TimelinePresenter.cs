@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Editing;
 using NBC.ActionEditor.Application.Settings;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Timeline;
 
@@ -13,7 +13,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
     // 每窗协调输入、工作区与显示快照，共享作者会话不共享捕获。
     public sealed class TimelinePresenter : IDisposable
     {
-        private readonly DocumentSession session;
+        private readonly SequenceSession session;
         private readonly SelectionState selection;
         private readonly StructureEditing structure;
         private readonly NodeEditing nodes;
@@ -44,15 +44,15 @@ namespace NBC.ActionEditor.Presentation.Presenters
         public int KeyFor(NBC.ActionEditor.IDirectable item) => layout.KeyFor(item);
         public void ToggleLock(int key) => Run(() => nodes.ToggleLock(layout.Resolve(key)));
         public void ToggleActive(int key) => Run(() => nodes.ToggleActive(layout.Resolve(key)));
-        public void PlaybackState(bool isPlaying, bool isRange) { playing = isPlaying; rangeEnabled = isRange; Refresh(); }
+        public void SetPlaybackState(bool isPlaying, bool rangePlaybackEnabled) { playing = isPlaying; rangeEnabled = rangePlaybackEnabled; Refresh(); }
         public void Scroll(float value) => Run(() => Workspace.ScrollY = Math.Max(0, value));
         public void ViewRange(float minimum, float maximum) => Run(() => Workspace.SetRange(minimum, maximum));
-        public void Fit() => Run(() => Workspace.SetRange(0, Math.Max(.25f, session.Document?.Length ?? 7)));
+        public void Fit() => Run(() => Workspace.SetRange(0, Math.Max(.25f, session.Sequence?.Length ?? 7)));
         // 只滚动发起创建的窗口；展开父组后按当前行几何揭示完整对象。
         public void Reveal(IDirectable item) => Run(() =>
         {
-            var row = item is TimelineClip selectedClip ? selectedClip.Parent : item;
-            if (row?.Parent is TimelineGroup group) Workspace.SetCollapsed(group, false);
+            var row = item is ActionClip selectedClip ? selectedClip.Parent : item;
+            if (row?.Parent is ActionGroup group) Workspace.SetCollapsed(group, false);
             Refresh();
             var index = layout.Rows.ToList().IndexOf(row);
             if (index < 0) return;
@@ -61,7 +61,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
             else if (top + size.RowHeight > Workspace.ScrollY + size.Height)
                 Workspace.ScrollY = top + size.RowHeight - size.Height;
         });
-        public TimelinePresenter(DocumentSession session, SelectionState selection, StructureEditing structure, NodeEditing nodes, ClipboardEditing clipboard,
+        public TimelinePresenter(SequenceSession session, SelectionState selection, StructureEditing structure, NodeEditing nodes, ClipboardEditing clipboard,
             ClipEditing clips, TimelineWorkspace workspace, ITimelinePlayhead playhead, Func<EditorSettings> settings, ITimelineView view)
         {
             this.session = session ?? throw new ArgumentNullException(nameof(session));
@@ -79,11 +79,11 @@ namespace NBC.ActionEditor.Presentation.Presenters
             catch { Dispose(); throw; }
         }
         public void Resize(TimelineSize value) { RequireAlive(); size = value; Refresh(); }
-        public void Tick(double seconds)
+        public void Tick(double deltaSeconds)
         {
             RequireAlive();
-            if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds < 0) throw new ArgumentOutOfRangeException(nameof(seconds));
-            Run(() => interaction.Tick(seconds, size));
+            if (double.IsNaN(deltaSeconds) || double.IsInfinity(deltaSeconds) || deltaSeconds < 0) throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
+            Run(() => interaction.Tick(deltaSeconds, size));
         }
         public void Pointer(PointerInput input) => Run(() => interaction.Pointer(input, size));
         public void Wheel(WheelInput input) => Run(() =>
@@ -94,7 +94,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
         });
         public void ToggleFold(int rowKey) => Run(() =>
         {
-            if (layout.Resolve(rowKey) is NBC.ActionEditor.Domain.TimelineGroup group && group.Tracks.Count > 0)
+            if (layout.Resolve(rowKey) is NBC.ActionEditor.Model.ActionGroup group && group.Tracks.Count > 0)
                 Workspace.SetCollapsed(group, !Workspace.IsCollapsed(group));
         });
         public void Select(int key, bool add = false) => Run(() =>
@@ -119,7 +119,7 @@ namespace NBC.ActionEditor.Presentation.Presenters
                     case TimelineKey.Cut: clipboard.Copy(selection.First, true); break;
                     case TimelineKey.Duplicate: clipboard.Duplicate(selection.First); break;
                     case TimelineKey.Paste:
-                        var parent = selection.First is NBC.ActionEditor.Domain.TimelineClip clip ? clip.Parent : selection.First;
+                        var parent = selection.First is NBC.ActionEditor.Model.ActionClip clip ? clip.Parent : selection.First;
                         clipboard.Paste(parent, playhead.Time); break;
                     default: HostAction?.Invoke(input.Key); break;
                 }
@@ -130,11 +130,11 @@ namespace NBC.ActionEditor.Presentation.Presenters
         {
             if (disposed || refreshing) return;
             refreshing = true;
-            try { State = layout.Build(session.Document, selection, Workspace, size, playhead.Time, interaction.Marquee, interaction.Insertion,
+            try { State = layout.Build(session.Sequence, selection, Workspace, size, playhead.Time, interaction.Marquee, interaction.Insertion,
                 interaction.Guides, interaction.ResizeCursor, playing, rangeEnabled); view.Render(State); }
             finally { refreshing = false; }
         }
-        private void OnContentChanged() { interaction.Cancel(); Workspace.Bind(session.Document); }
+        private void OnContentChanged() { interaction.Cancel(); Workspace.Bind(session.Sequence); }
         private void Run(Action action)
         {
             RequireAlive();

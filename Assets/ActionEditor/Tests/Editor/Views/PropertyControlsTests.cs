@@ -2,10 +2,10 @@ using NBC.ActionEditor.Views.IMGUI;
 using NBC.ActionEditor.Views.IMGUI.Properties;
 using ImguiWindow = NBC.ActionEditor.Views.IMGUI.ActionEditorWindow;
 using ToolkitWindow = NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow;
-using ToolkitPreferences = NBC.ActionEditor.Views.UIToolkit.PreferencesWindow;
-using NBC.ActionEditor.Infrastructure.Documents;
+using ToolkitSettings = NBC.ActionEditor.Views.UIToolkit.SettingsWindow;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using NBC.ActionEditor.Presentation.Timeline;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using System;
 using System.Collections;
 using System.IO;
@@ -34,10 +34,10 @@ namespace NBC.ActionEditor.Tests
                 try
                 {
                     GUI.enabled = false;
-                    NBC.ActionEditor.Views.IMGUI.Controls.EditorTools.CleanPopup("Value", 1, new System.Collections.Generic.List<int> { 1, 2 });
+                    NBC.ActionEditor.Views.IMGUI.Controls.EditorGUIControls.CleanPopup("Value", 1, new System.Collections.Generic.List<int> { 1, 2 });
                     DisabledAfterPopup = !GUI.enabled;
                     GUI.color = OuterColor;
-                    NBC.ActionEditor.Views.IMGUI.Controls.EditorTools.BoldSeparator();
+                    NBC.ActionEditor.Views.IMGUI.Controls.EditorGUIControls.BoldSeparator();
                     ColorAfterSeparator = GUI.color;
                     Captured = true;
                 }
@@ -67,7 +67,7 @@ namespace NBC.ActionEditor.Tests
             public System.Collections.Generic.List<int> Missing;
         }
 
-        private sealed class CollectionInspector : InspectorsBase
+        private sealed class CollectionInspector : PropertyInspectorBase
         {
             public Rect RemoveRect, AddRect;
             protected override bool DrawAddButton()

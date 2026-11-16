@@ -1,6 +1,6 @@
 using System;
 using NBC.ActionEditor.Application.Settings;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Playback;
 using NBC.ActionEditor.Application.Ports;
 
@@ -9,14 +9,14 @@ namespace NBC.ActionEditor.Composition
     // 单一宿主时钟协调共享保存、播放和逐窗更新，不持有具体窗口。
     public sealed class EditorUpdateDriver
     {
-        private readonly DocumentAutoSave autoSave;
-        private readonly DocumentPlayback playback;
+        private readonly SequenceAutoSave autoSave;
+        private readonly SequencePlayback playback;
         private readonly IEditorClock clock;
-        private readonly ActionEditorViews views;
+        private readonly EditorViewRegistry views;
         private readonly SettingsSession settings;
         private readonly Action<Exception> failed;
-        public EditorUpdateDriver(DocumentAutoSave autoSave, DocumentPlayback playback, IEditorClock clock,
-            ActionEditorViews views, SettingsSession settings, Action<Exception> failed)
+        public EditorUpdateDriver(SequenceAutoSave autoSave, SequencePlayback playback, IEditorClock clock,
+            EditorViewRegistry views, SettingsSession settings, Action<Exception> failed)
         {
             this.autoSave = autoSave ?? throw new ArgumentNullException(nameof(autoSave));
             this.playback = playback ?? throw new ArgumentNullException(nameof(playback));
@@ -32,7 +32,7 @@ namespace NBC.ActionEditor.Composition
             if (views.Count == 0) return;
             try
             {
-                var result = autoSave.Tick(settings.Current.AutoSaveSeconds);
+                var result = autoSave.Tick(settings.Current.AutoSaveIntervalSeconds);
                 if (result.HasValue && !result.Value.Succeeded) failed(result.Value.Exception);
             }
             catch (Exception error) { failed(error); }

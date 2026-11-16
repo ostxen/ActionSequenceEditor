@@ -1,4 +1,4 @@
-using NBC.ActionEditor.Infrastructure.Documents;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -105,20 +105,20 @@ namespace NBC.ActionEditor.Tests
         {
             const string path = "Assets/ActionEditor/StorageFixture.json";
             var files = new Files(); var imports = 0;
-            var store = new JsonDocumentRepository(files, _ => { imports++; throw new InvalidOperationException("Injected import failure"); });
-            using var session = NBC.ActionEditor.Composition.DocumentComposition.Create(store);
-            var memory = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument()));
+            var store = new SequenceFileRepository(files, _ => { imports++; throw new InvalidOperationException("Injected import failure"); });
+            using var session = NBC.ActionEditor.Composition.SequenceComposition.Create(store);
+            var memory = new TextAsset(SequenceJsonCodec.Encode(new FeatureSampleSequence()));
             try
             {
-                session.Open(new JsonDocumentRepository().ReadSource(memory)); session.Edit("change", () => ((FeatureSampleDocument)session.Document).Version = 7);
-                var source = session.Document;
+                session.Open(new SequenceFileRepository().ReadSource(memory)); session.Edit("change", () => ((FeatureSampleSequence)session.Sequence).Version = 7);
+                var source = session.Sequence;
                 var failure = Assert.Throws<IOException>(() => session.Save(path));
                 Assert.That(failure.Message, Does.Contain("字节已提交")); Assert.That(imports, Is.EqualTo(1));
                 Assert.That(files.Writes, Is.EqualTo(1)); Assert.That(session.Path, Is.EqualTo(path));
-                Assert.That(session.Document, Is.SameAs(source)); Assert.That(session.IsDirty, Is.False);
+                Assert.That(session.Sequence, Is.SameAs(source)); Assert.That(session.IsDirty, Is.False);
                 var committed = files.Data[path].ToArray();
-                using var recovered = NBC.ActionEditor.Composition.DocumentComposition.Create(store); recovered.RestoreRecovery(session.CaptureRecovery());
-                recovered.Edit("change", () => ((FeatureSampleDocument)recovered.Document).Version = 8);
+                using var recovered = NBC.ActionEditor.Composition.SequenceComposition.Create(store); recovered.RestoreRecovery(session.CaptureRecovery());
+                recovered.Edit("change", () => ((FeatureSampleSequence)recovered.Sequence).Version = 8);
                 files.Data[path] = new byte[] { 42 };
                 Assert.Throws<IOException>(() => recovered.Save());
                 Assert.That(files.Data[path], Is.EqualTo(new byte[] { 42 })); Assert.That(files.Writes, Is.EqualTo(1));
@@ -130,19 +130,19 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void StoreRejectsMetaAndDirectoryTargetsAndSaveDoesNotEndActiveGesture()
         {
-            var files = new Files(); var store = new JsonDocumentRepository(files, _ => { });
+            var files = new Files(); var store = new SequenceFileRepository(files, _ => { });
             const string path = "Assets/ActionEditor/StorageFixture.json";
             files.Data[path + ".meta"] = new byte[] { 1 };
-            Assert.Throws<IOException>(() => store.Commit(path, new FeatureSampleDocument(), null));
+            Assert.Throws<IOException>(() => store.Commit(path, new FeatureSampleSequence(), null));
             Assert.That(files.Writes, Is.Zero);
-            using var session = NBC.ActionEditor.Composition.DocumentComposition.Create(store);
-            var memory = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument()));
+            using var session = NBC.ActionEditor.Composition.SequenceComposition.Create(store);
+            var memory = new TextAsset(SequenceJsonCodec.Encode(new FeatureSampleSequence()));
             try
             {
-                session.Open(new JsonDocumentRepository().ReadSource(memory)); var source = session.Document; using var token = session.BeginEdit(this);
-                ((FeatureSampleDocument)source).Version = 9;
+                session.Open(new SequenceFileRepository().ReadSource(memory)); var source = session.Sequence; using var token = session.BeginEdit(this);
+                ((FeatureSampleSequence)source).Version = 9;
                 Assert.Throws<InvalidOperationException>(() => session.Save(path));
-                Assert.That(token.IsActive, Is.True); Assert.That(session.Document, Is.SameAs(source)); Assert.That(files.Writes, Is.Zero);
+                Assert.That(token.IsActive, Is.True); Assert.That(session.Sequence, Is.SameAs(source)); Assert.That(files.Writes, Is.Zero);
             }
             finally { UnityEngine.Object.DestroyImmediate(memory); }
         }

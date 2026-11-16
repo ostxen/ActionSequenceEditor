@@ -86,15 +86,15 @@ namespace NBC.ActionEditor.Tests
         }
         private static IEnumerator Playback()
         {
-            using (var context = new EditorFixture(NBC.ActionEditor.Composition.DocumentComposition.Create()))
+            using (var context = new EditorFixture(NBC.ActionEditor.Composition.SequenceComposition.Create()))
             {
-                var fixture = new TextAsset(Infrastructure.Serialization.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
+                var fixture = new TextAsset(Infrastructure.Serialization.SequenceJsonCodec.Encode(new FeatureSampleSequence()));
                 try
                 {
                     context.Open(fixture); context.Playback.Play(0);
                     for (var frame = 1; frame <= 600; frame++) context.Playback.Update(frame / 60f, 1);
-                    Assert.That(context.Player.CurrentTime, Is.EqualTo(4).Within(.001f)); context.Playback.Stop();
-                    Assert.That(context.Player.IsInitialized, Is.False);
+                    Assert.That(context.Sampler.CurrentTime, Is.EqualTo(4).Within(.001f)); context.Playback.Stop();
+                    Assert.That(context.Sampler.IsInitialized, Is.False);
                 }
                 finally { UnityEngine.Object.DestroyImmediate(fixture); }
             }

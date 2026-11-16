@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 
 namespace NBC.ActionEditor.Presentation.Timeline
 {
     // 保存单个窗口的视域、滚动和折叠，不参与作者快照。
     public sealed class TimelineWorkspace
     {
-        private ActionDocument document;
-        private readonly HashSet<TimelineGroup> collapsed = new HashSet<TimelineGroup>();
+        private ActionSequence sequence;
+        private readonly HashSet<ActionGroup> collapsed = new HashSet<ActionGroup>();
         private float minimum;
         private float maximum = 7;
         private float scrollY, leftWidth = 240;
@@ -28,22 +28,22 @@ namespace NBC.ActionEditor.Presentation.Timeline
         public float ViewTime => maximum - minimum;
 
         // 图替换时释放旧引用，不把旧位置上的折叠误套给另一个分组。
-        public void Bind(ActionDocument next)
+        public void Bind(ActionSequence next)
         {
-            if (ReferenceEquals(document, next))
+            if (ReferenceEquals(sequence, next))
             {
-                collapsed.RemoveWhere(group => next == null || !next.RootItems.Contains(group));
+                collapsed.RemoveWhere(group => next == null || !next.RootContainers.Contains(group));
                 return;
             }
             collapsed.Clear();
-            document = next;
+            sequence = next;
             if (next == null) ScrollY = 0;
         }
 
-        public bool IsCollapsed(IDirectable item) => item is TimelineGroup group ? collapsed.Contains(group)
-            : item?.Parent is TimelineGroup parent && collapsed.Contains(parent);
+        public bool IsCollapsed(IDirectable item) => item is ActionGroup group ? collapsed.Contains(group)
+            : item?.Parent is ActionGroup parent && collapsed.Contains(parent);
 
-        public void SetCollapsed(TimelineGroup group, bool value)
+        public void SetCollapsed(ActionGroup group, bool value)
         {
             if (group == null) throw new ArgumentNullException(nameof(group));
             if (value) collapsed.Add(group); else collapsed.Remove(group);

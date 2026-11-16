@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Editing;
 using NBC.ActionEditor.Application.Ports;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using NUnit.Framework;
 
 namespace NBC.ActionEditor.Tests.Application
@@ -13,35 +13,35 @@ namespace NBC.ActionEditor.Tests.Application
     {
         [Test] public void UnityUndoInOtherSessionPreservesUnchangedGraphAndActiveTransaction()
         {
-            using var first = NBC.ActionEditor.Composition.DocumentComposition.Create();
-            using var second = NBC.ActionEditor.Composition.DocumentComposition.Create();
-            first.Open(new DocumentOpenData(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument()));
-            second.Open(new DocumentOpenData(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument()));
-            var original = first.Document;
+            using var first = NBC.ActionEditor.Composition.SequenceComposition.Create();
+            using var second = NBC.ActionEditor.Composition.SequenceComposition.Create();
+            first.Open(new SequenceOpenData(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleSequence()));
+            second.Open(new SequenceOpenData(new NBC.ActionEditor.Samples.FeatureSample.FeatureSampleSequence()));
+            var original = first.Sequence;
             var notifications = 0;
             first.Changed += () => notifications++;
             using var token = first.BeginEdit(this);
-            token.Update(() => ((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument)original).Version = 8);
-            second.Edit("Other document", () => ((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument)second.Document).Version = 4);
+            token.Update(() => ((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleSequence)original).Version = 8);
+            second.Edit("Other document", () => ((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleSequence)second.Sequence).Version = 4);
             UnityEditor.Undo.PerformUndo();
-            Assert.That(((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument)second.Document).Version, Is.EqualTo(1));
-            Assert.That(first.Document, Is.SameAs(original));
+            Assert.That(((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleSequence)second.Sequence).Version, Is.EqualTo(1));
+            Assert.That(first.Sequence, Is.SameAs(original));
             Assert.That(token.IsActive, Is.True);
             Assert.That(notifications, Is.Zero);
             UnityEditor.Undo.PerformRedo();
-            Assert.That(((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleDocument)second.Document).Version, Is.EqualTo(4));
+            Assert.That(((NBC.ActionEditor.Samples.FeatureSample.FeatureSampleSequence)second.Sequence).Version, Is.EqualTo(4));
             Assert.That(token.IsActive, Is.True);
-            Assert.That(first.Document, Is.SameAs(original));
+            Assert.That(first.Sequence, Is.SameAs(original));
         }
 
-        private sealed class Document : ActionDocument { public int Value; }
-        private sealed class Snapshots : IDocumentSnapshot
+        private sealed class Document : ActionSequence { public int Value; }
+        private sealed class Snapshots : ISequenceSnapshot
         {
             public bool FailValidation;
-            public string Capture(ActionDocument document) => ((Document)document).Value.ToString();
-            public ActionDocument Restore(string snapshot) => new Document { Value = int.Parse(snapshot) };
-            public string Content(ActionDocument document) => Capture(document);
-            public void ValidateAndInitialize(ActionDocument document)
+            public string Capture(ActionSequence document) => ((Document)document).Value.ToString();
+            public ActionSequence Restore(string snapshot) => new Document { Value = int.Parse(snapshot) };
+            public string GetContentKey(ActionSequence document) => Capture(document);
+            public void ValidateAndInitialize(ActionSequence document)
             { if (FailValidation) throw new InvalidDataException("validation"); document.Init(); }
         }
         private sealed class History : IUndoHistory
@@ -56,40 +56,40 @@ namespace NBC.ActionEditor.Tests.Application
             public void Restore(string value) => Restored?.Invoke(value);
             public void Dispose() { Disposals++; }
         }
-        private sealed class Repository : IDocumentRepository
+        private sealed class Repository : ISequenceRepository
         {
             public bool FailRead, FailCommit, FailImport;
             public int Commits, Imports;
             public byte[] Bytes = { 1 };
-            public DocumentOpenData Read(string path)
-            { if (FailRead) throw new IOException("read"); return new DocumentOpenData(new Document { Value = 1 }, path, Bytes); }
+            public SequenceOpenData Read(string path)
+            { if (FailRead) throw new IOException("read"); return new SequenceOpenData(new Document { Value = 1 }, path, Bytes); }
             public string ValidatePath(string path) => string.IsNullOrEmpty(path) ? throw new ArgumentException("path") : path;
-            public DocumentCommit Commit(string path, ActionDocument document, byte[] revision)
+            public SequenceCommit Commit(string path, ActionSequence document, byte[] revision)
             {
                 if (FailCommit) throw new IOException("commit");
                 if (revision != null && (revision.Length != 1 || revision[0] != Bytes[0])) throw new IOException("conflict");
                 Commits++; Bytes = new[] { (byte)(Bytes[0] + 1) };
                 var text = ((Document)document).Value.ToString();
-                return new DocumentCommit(text, text, Bytes);
+                return new SequenceCommit(text, text, Bytes);
             }
             public void Import(string path) { Imports++; if (FailImport) throw new IOException("import"); }
         }
         private sealed class Recovery : IRecoveryCodec
         {
-            private readonly Dictionary<string, DocumentRecovery> values = new Dictionary<string, DocumentRecovery>();
-            public string Encode(DocumentRecovery value) { var key = Guid.NewGuid().ToString(); values[key] = value; return key; }
-            public DocumentRecovery Decode(string text) => values[text];
+            private readonly Dictionary<string, SequenceRecovery> values = new Dictionary<string, SequenceRecovery>();
+            public string Encode(SequenceRecovery value) { var key = Guid.NewGuid().ToString(); values[key] = value; return key; }
+            public SequenceRecovery Decode(string text) => values[text];
         }
-        private sealed class Exporter : IDocumentExporter
+        private sealed class Exporter : ISequenceExporter
         {
             public int Calls;
             public bool Fail;
-            public void Export(ActionDocument document, string source, string target, string format)
+            public void Export(ActionSequence document, string source, string target, string format)
             { if (Fail) throw new IOException("export"); Calls++; }
         }
-        private sealed class Factory : IDocumentFactory
+        private sealed class Factory : ISequenceFactory
         {
-            public ActionDocument Create(Type type) => type == typeof(Document) ? new Document() : throw new ArgumentException("type");
+            public ActionSequence Create(Type type) => type == typeof(Document) ? new Document() : throw new ArgumentException("type");
         }
         private sealed class Harness : IDisposable
         {
@@ -98,13 +98,13 @@ namespace NBC.ActionEditor.Tests.Application
             public readonly History History = new History();
             public readonly Recovery Recovery = new Recovery();
             public readonly Exporter Exporter = new Exporter();
-            public readonly DocumentSession Session;
-            public readonly DocumentLifecycle Lifecycle;
-            public Document Current => (Document)Session.Document;
+            public readonly SequenceSession Session;
+            public readonly SequenceLifecycle Lifecycle;
+            public Document Current => (Document)Session.Sequence;
             public Harness()
             {
-                Session = new DocumentSession(Snapshots, Repository, History, Recovery);
-                Lifecycle = new DocumentLifecycle(Session, Repository, Exporter, new Factory());
+                Session = new SequenceSession(Snapshots, Repository, History, Recovery);
+                Lifecycle = new SequenceLifecycle(Session, Repository, Exporter, new Factory());
                 Session.Open(Repository.Read("A"));
             }
             public void Dispose() => Session.Dispose();
@@ -127,7 +127,7 @@ namespace NBC.ActionEditor.Tests.Application
         {
             using var h = new Harness();
             var clock = new Clock { Now = 10 };
-            var save = new DocumentAutoSave(h.Session, h.Lifecycle, clock);
+            var save = new SequenceAutoSave(h.Session, h.Lifecycle, clock);
             var baseline = save.LastSaved;
             h.Session.Edit("dirty", () => h.Current.Value = 4);
             clock.Now += elapsed;
@@ -143,7 +143,7 @@ namespace NBC.ActionEditor.Tests.Application
         {
             using var h = new Harness();
             var clock = new Clock();
-            var save = new DocumentAutoSave(h.Session, h.Lifecycle, clock);
+            var save = new SequenceAutoSave(h.Session, h.Lifecycle, clock);
             h.Session.Edit("dirty", () => h.Current.Value = 4);
             clock.Now = 9.999;
             Assert.That(save.Tick(10), Is.Null);
@@ -174,7 +174,7 @@ namespace NBC.ActionEditor.Tests.Application
             Assert.That(h.Repository.Commits, Is.EqualTo(2));
         }
 
-        private sealed class Interaction : NBC.ActionEditor.Presentation.Contracts.IDocumentInteraction, NBC.ActionEditor.Presentation.Contracts.IDocumentNavigation
+        private sealed class Interaction : NBC.ActionEditor.Presentation.Contracts.ISequenceInteraction, NBC.ActionEditor.Presentation.Contracts.ISequenceNavigation
         {
             public bool Confirm;
             public string Path;
@@ -189,8 +189,8 @@ namespace NBC.ActionEditor.Tests.Application
             public void Open(object source) => Opens++;
             public void OpenPath(string path) => Creates++;
             public void Close() => Closes++;
-            public NBC.ActionEditor.Presentation.Contracts.DocumentSwitchChoice ConfirmSwitch(bool dirty)
-                => Confirm ? NBC.ActionEditor.Presentation.Contracts.DocumentSwitchChoice.Discard : NBC.ActionEditor.Presentation.Contracts.DocumentSwitchChoice.Cancel;
+            public NBC.ActionEditor.Presentation.Contracts.SequenceSwitchChoice ConfirmSwitch(bool dirty)
+                => Confirm ? NBC.ActionEditor.Presentation.Contracts.SequenceSwitchChoice.Discard : NBC.ActionEditor.Presentation.Contracts.SequenceSwitchChoice.Cancel;
             public void ShowExport(Func<string, string, bool> export) => Exports++;
             public void Saved() => Saves++;
             public void Undo(bool redo) { if (redo) Redos++; else Undos++; }
@@ -200,19 +200,19 @@ namespace NBC.ActionEditor.Tests.Application
         {
             using var h = new Harness();
             var interaction = new Interaction();
-            var presenter = new NBC.ActionEditor.Presentation.Presenters.DocumentPresenter(h.Session, h.Lifecycle, interaction, interaction);
-            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Create);
-            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Open);
-            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Close);
+            var presenter = new NBC.ActionEditor.Presentation.Presenters.SequencePresenter(h.Session, h.Lifecycle, interaction, interaction);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Create);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Open);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Close);
             interaction.Selected(new object()); interaction.Create(typeof(Document), "B");
             Assert.That(interaction.Creates + interaction.Opens + interaction.Closes, Is.Zero);
-            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.SaveAs);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.SaveAs);
             Assert.That(interaction.PathRequests, Is.EqualTo(1));
             Assert.That(h.Repository.Commits, Is.Zero);
             using (var token = h.Session.BeginEdit(this))
             {
-                Assert.Throws<InvalidOperationException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.SaveAs));
-                Assert.Throws<InvalidOperationException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Export));
+                Assert.Throws<InvalidOperationException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.SaveAs));
+                Assert.Throws<InvalidOperationException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Export));
                 Assert.That(interaction.PathRequests, Is.EqualTo(1));
                 Assert.That(interaction.Exports, Is.Zero);
                 Assert.That(token.IsActive, Is.True);
@@ -220,22 +220,22 @@ namespace NBC.ActionEditor.Tests.Application
             }
             h.Session.Edit("change", () => h.Current.Value = 8);
             h.Repository.FailCommit = true;
-            Assert.Throws<IOException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Save));
+            Assert.Throws<IOException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Save));
             Assert.That(presenter.Dirty, Is.True); Assert.That(interaction.Saves, Is.Zero);
             h.Repository.FailCommit = false; h.Repository.FailImport = true;
-            Assert.Throws<IOException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Save));
+            Assert.Throws<IOException>(() => presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Save));
             Assert.That(presenter.Dirty, Is.False); Assert.That(h.Session.CommitVersion, Is.EqualTo(1));
             Assert.That(interaction.Saves, Is.Zero);
             h.Repository.FailImport = false;
-            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Save);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Save);
             Assert.That(interaction.Saves, Is.EqualTo(1));
             interaction.Confirm = true;
-            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Create);
-            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Open);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Create);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Open);
             interaction.Selected(new object()); interaction.Create(typeof(Document), "B");
-            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Close);
-            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Undo);
-            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.DocumentIntent.Redo);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Close);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Undo);
+            presenter.Invoke(NBC.ActionEditor.Presentation.Contracts.SequenceIntent.Redo);
             Assert.That(new[] { interaction.Creates, interaction.Opens, interaction.Closes, interaction.Undos, interaction.Redos }, Is.All.EqualTo(1));
         }
         [Test] public void OwnerAndStaleTokensCannotCompleteAnotherEdit()
@@ -279,7 +279,7 @@ namespace NBC.ActionEditor.Tests.Application
             h.Repository.FailRead = true; Assert.That(h.Lifecycle.Open("B").Succeeded, Is.False);
             h.Repository.FailRead = false; h.History.FailReset = true;
             Assert.That(h.Lifecycle.Open("B").Succeeded, Is.False);
-            Assert.That(h.Session.Document, Is.SameAs(graph)); Assert.That(token.IsActive, Is.True);
+            Assert.That(h.Session.Sequence, Is.SameAs(graph)); Assert.That(token.IsActive, Is.True);
             Assert.That(h.Session.Path, Is.EqualTo("A")); Assert.That(h.Current.Value, Is.EqualTo(4));
         }
         [Test] public void CommitFailureAndExternalConflictRetainDirtyGraphSourceAndRevision()
@@ -287,7 +287,7 @@ namespace NBC.ActionEditor.Tests.Application
             using var h = new Harness(); h.Session.Edit("edit", () => h.Current.Value = 5);
             var graph = h.Current; h.Repository.FailCommit = true;
             var failed = h.Lifecycle.SaveAs("B"); Assert.That(failed.Succeeded || failed.BytesCommitted, Is.False);
-            Assert.That(h.Session.Path, Is.EqualTo("A")); Assert.That(h.Session.Document, Is.SameAs(graph));
+            Assert.That(h.Session.Path, Is.EqualTo("A")); Assert.That(h.Session.Sequence, Is.SameAs(graph));
             h.Repository.FailCommit = false; h.Repository.Bytes[0] = 9;
             failed = h.Lifecycle.Save(); Assert.That(failed.Succeeded || failed.BytesCommitted, Is.False);
             Assert.That(h.Repository.Imports, Is.Zero); Assert.That(h.Session.IsDirty, Is.True);
@@ -309,7 +309,7 @@ namespace NBC.ActionEditor.Tests.Application
             using var h = new Harness(); var content = 0; h.Session.ContentChanged += () => content++;
             var graph = h.Current; Assert.That(h.Lifecycle.Save().Succeeded, Is.True);
             Assert.That(h.Lifecycle.Export("E", "format").Succeeded, Is.True);
-            Assert.That(content, Is.Zero); Assert.That(h.Session.Document, Is.SameAs(graph));
+            Assert.That(content, Is.Zero); Assert.That(h.Session.Sequence, Is.SameAs(graph));
             using var token = h.Session.BeginEdit(this);
             Assert.That(h.Lifecycle.Save().Succeeded, Is.False); Assert.That(h.Lifecycle.Export("F", "format").Succeeded, Is.False);
             Assert.That(token.IsActive, Is.True); Assert.That(h.Exporter.Calls, Is.EqualTo(1));
@@ -323,14 +323,14 @@ namespace NBC.ActionEditor.Tests.Application
             Assert.That(h.Lifecycle.Create(typeof(string), "B").Succeeded, Is.False);
             h.Repository.FailImport = true; var result = h.Lifecycle.Create(typeof(Document), "B");
             Assert.That(result.BytesCommitted, Is.True); Assert.That(result.Succeeded, Is.False);
-            Assert.That(h.Session.Document, Is.SameAs(graph)); Assert.That(h.Session.Path, Is.EqualTo("A"));
+            Assert.That(h.Session.Sequence, Is.SameAs(graph)); Assert.That(h.Session.Path, Is.EqualTo("A"));
         }
         [Test] public void UndoCancelsTokensAndDisposalUnsubscribesExactlyOnce()
         {
             var h = new Harness(); var token = h.Session.BeginEdit(this); token.Update(() => h.Current.Value = 4);
             h.History.Restore("2"); Assert.That(token.IsActive, Is.False); Assert.That(h.Current.Value, Is.EqualTo(2));
             h.Session.Dispose(); h.Session.Dispose(); h.History.Restore("3");
-            Assert.That(h.History.Disposals, Is.EqualTo(1)); Assert.That(h.Session.Document, Is.Null);
+            Assert.That(h.History.Disposals, Is.EqualTo(1)); Assert.That(h.Session.Sequence, Is.Null);
             Assert.Throws<ObjectDisposedException>(() => h.Session.BeginEdit(this));
         }
         [Test] public void BrokenViewNotificationCannotMisreportCommittedSaveOrBlockOtherViews()

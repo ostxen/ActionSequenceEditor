@@ -32,19 +32,19 @@ namespace NBC.ActionEditor.Presentation.Presenters
         }
 
         // 即时控件仍经过草稿与同一提交边界，校验或落盘失败只反馈给当前视图。
-        public SettingsResult Change(TimeStepMode? mode = null, float? snap = null, int? fps = null,
-            bool? magnet = null, bool? wheel = null, int? autoSave = null, string path = null)
+        public SettingsResult Change(TimeStepMode? timeStepMode = null, float? snapIntervalSeconds = null, int? frameRate = null,
+            bool? magnetSnapping = null, bool? scrollWheelZooms = null, int? autoSaveIntervalSeconds = null, string defaultSaveDirectory = null)
         {
             ThrowIfDisposed();
             try
             {
                 var current = draft ?? session.Current;
-                var nextMode = mode ?? current.TimeStepMode;
-                var changedMode = nextMode != current.TimeStepMode;
-                var rate = fps ?? (changedMode ? nextMode == TimeStepMode.Frames ? 30 : 10 : current.FrameRate);
-                var interval = snap ?? (fps.HasValue || changedMode ? 1f / rate : current.SnapInterval);
-                Preview(new EditorSettings(nextMode, interval, rate, magnet ?? current.MagnetSnapping,
-                    wheel ?? current.ScrollWheelZooms, autoSave ?? current.AutoSaveSeconds, path ?? current.SavePath));
+                var nextMode = timeStepMode ?? current.TimeStepMode;
+                var modeChanged = nextMode != current.TimeStepMode;
+                var frameRateValue = frameRate ?? (modeChanged ? nextMode == TimeStepMode.Frames ? 30 : 10 : current.FrameRate);
+                var snapIntervalSecondsValue = snapIntervalSeconds ?? (frameRate.HasValue || modeChanged ? 1f / frameRateValue : current.SnapInterval);
+                Preview(new EditorSettings(nextMode, snapIntervalSecondsValue, frameRateValue, magnetSnapping ?? current.MagnetSnapping,
+                    scrollWheelZooms ?? current.ScrollWheelZooms, autoSaveIntervalSeconds ?? current.AutoSaveIntervalSeconds, defaultSaveDirectory ?? current.DefaultSaveDirectory));
                 return Apply();
             }
             catch (Exception error) { view.ShowError(error.Message); return SettingsResult.Failure(error.Message); }

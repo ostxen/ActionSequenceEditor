@@ -1,11 +1,11 @@
 using NBC.ActionEditor.Infrastructure.Serialization;
 using System;
 using System.Linq;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Editing;
 using NBC.ActionEditor.Application.Settings;
-using NBC.ActionEditor.Domain;
-using NBC.ActionEditor.Infrastructure.Documents;
+using NBC.ActionEditor.Model;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
 using NBC.ActionEditor.Presentation.Timeline;
@@ -36,7 +36,7 @@ namespace NBC.ActionEditor.Tests.Presentation
         }
         private sealed class Harness : IDisposable
         {
-            public readonly DocumentSession Session = Composition.DocumentComposition.Create();
+            public readonly SequenceSession Session = Composition.SequenceComposition.Create();
             public readonly SelectionState Selection = new SelectionState();
             public readonly View View = new View();
             public readonly Playhead Playhead = new Playhead();
@@ -44,11 +44,11 @@ namespace NBC.ActionEditor.Tests.Presentation
             public readonly StructureEditing Structure;
             public readonly ClipboardEditing Clipboard;
             public EditorSettings Settings = new EditorSettings(TimeStepMode.Seconds, .1f, 30, false, true, 0, "Assets/");
-            public FeatureSampleDocument Document => (FeatureSampleDocument)Session.Document;
-            public TimelineClip Clip => Document.AllTracks.First().Clips.First();
+            public FeatureSampleSequence Sequence => (FeatureSampleSequence)Session.Sequence;
+            public ActionClip Clip => Sequence.AllTracks.First().Clips.First();
             public Harness()
             {
-                Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
+                Session.Open(new SequenceOpenData(new FeatureSampleSequence()));
                 Structure = new StructureEditing(Session, () => Selection.Items);
                 Clipboard = new ClipboardEditing(Session, Structure, new ClipboardState(), new FragmentCodec(), clip => Selection.Set(new[] { clip }, false));
                 Presenter = Create(View, new TimelineWorkspace());
@@ -68,8 +68,8 @@ namespace NBC.ActionEditor.Tests.Presentation
             using var other = h.Create(new View(), new TimelineWorkspace());
             other.Resize(new TimelineSize(800, 90));
             h.Presenter.Resize(new TimelineSize(800, 90));
-            var clip = h.Document.AllTracks.Skip(4).First().Clips.First();
-            var group = (TimelineGroup)clip.Parent.Parent;
+            var clip = h.Sequence.AllTracks.Skip(4).First().Clips.First();
+            var group = (ActionGroup)clip.Parent.Parent;
             h.Presenter.Workspace.SetCollapsed(group, true);
             other.Workspace.SetCollapsed(group, true);
             h.Presenter.Refresh(); other.Refresh();
@@ -118,13 +118,13 @@ namespace NBC.ActionEditor.Tests.Presentation
             Assert.That(h.Clip.Length, Is.LessThan(.1f));
             Assert.That(h.Clip.BlendIn, Is.InRange(0, h.Clip.Length));
             Assert.That(h.Clip.BlendOut, Is.InRange(0, h.Clip.Length - h.Clip.BlendIn));
-            var shortened = JsonDocumentCodec.Encode(h.Document);
+            var shortened = SequenceJsonCodec.Encode(h.Sequence);
             Undo.PerformUndo();
             Assert.That(h.Clip.Length, Is.EqualTo(1.5f));
             Assert.That(h.Clip.BlendIn, Is.EqualTo(.25f));
             Assert.That(h.Clip.BlendOut, Is.EqualTo(.25f));
             Undo.PerformRedo();
-            Assert.That(JsonDocumentCodec.Encode(h.Document), Is.EqualTo(shortened));
+            Assert.That(SequenceJsonCodec.Encode(h.Sequence), Is.EqualTo(shortened));
         }
         [Test] public void TwoWindowsShareAuthorsButNotRangeScrollCaptureOrDisposal()
         {
@@ -141,7 +141,7 @@ namespace NBC.ActionEditor.Tests.Presentation
         {
             using var h = new Harness(); var key = h.First.Key; var rect = h.First.Bounds;
             h.Pointer(PointerAction.Down, rect.X + rect.Width / 2, rect.Y + 4);
-            h.Session.Open(new DocumentOpenData(new FeatureSampleDocument()));
+            h.Session.Open(new SequenceOpenData(new FeatureSampleSequence()));
             Assert.That(h.View.Captured || h.Session.IsEditing, Is.False);
             Assert.That(h.Presenter.State.Clips.Any(clip => clip.Key == key), Is.False);
             var previous = h.Selection.Count; h.Presenter.Select(key);
@@ -172,9 +172,9 @@ namespace NBC.ActionEditor.Tests.Presentation
             h.Pointer(PointerAction.Move, rect.Right + 8, rect.Bottom + 1);
             h.Pointer(PointerAction.Up, rect.Right + 8, rect.Bottom + 1);
             Assert.That(h.Selection.Contains(h.Clip), Is.True);
-            var count = h.Document.AllTracks.Sum(track => track.Clips.Count);
+            var count = h.Sequence.AllTracks.Sum(track => track.Clips.Count);
             h.Presenter.Key(new KeyInput(TimelineKey.Delete, true));
-            Assert.That(h.Document.AllTracks.Sum(track => track.Clips.Count), Is.EqualTo(count));
+            Assert.That(h.Sequence.AllTracks.Sum(track => track.Clips.Count), Is.EqualTo(count));
         }
         [Test] public void SeekCancelAndFaultCleanCaptureWithoutTouchingAuthors()
         {
@@ -188,7 +188,7 @@ namespace NBC.ActionEditor.Tests.Presentation
         [Test] public void DisposedPresenterUnsubscribesAndCannotCancelAnotherOwner()
         {
             using var h = new Harness(); h.Presenter.Dispose(); var renders = h.View.Renders;
-            using var token = h.Session.BeginEdit(this); token.Update(() => h.Document.Version = 4);
+            using var token = h.Session.BeginEdit(this); token.Update(() => h.Sequence.Version = 4);
             h.Selection.Set(new[] { h.Clip }, false); h.Presenter.Dispose();
             Assert.That(token.IsActive, Is.True); Assert.That(h.View.Renders, Is.EqualTo(renders));
             Assert.Throws<ObjectDisposedException>(() => h.Presenter.Pointer(new PointerInput(PointerAction.Down, 500, 50)));
@@ -212,7 +212,7 @@ namespace NBC.ActionEditor.Tests.Presentation
         [Test] public void MultiselectMoveUsesOneDeltaAndCancelMarqueeRestoresSelection()
         {
             using var h = new Harness();
-            var first = h.Clip; var second = h.Document.AllTracks.First().Clips.Skip(1).First();
+            var first = h.Clip; var second = h.Sequence.AllTracks.First().Clips.Skip(1).First();
             var spacing = second.StartTime - first.StartTime;
             h.Selection.Set(new[] { first, second }, true);
             var rect = h.First.Bounds; var x = rect.X + rect.Width / 2; var y = rect.Y + 5;
@@ -228,11 +228,11 @@ namespace NBC.ActionEditor.Tests.Presentation
         [Test] public void EmptyFoldAndLockedSourceCannotStartAuthoringOrLeaveCapture()
         {
             using var h = new Harness();
-            h.Session.Edit("empty", () => h.Document.RootItems.OfType<TimelineGroup>().Last().Tracks.Clear());
+            h.Session.Edit("empty", () => h.Sequence.RootContainers.OfType<ActionGroup>().Last().Tracks.Clear());
             var empty = h.Presenter.State.Rows.Last(row => row.IsGroup);
             Assert.That(empty.CanFold, Is.False); h.Presenter.ToggleFold(empty.Key);
             Assert.That(h.Presenter.State.Rows.Last(row => row.IsGroup).Collapsed, Is.False);
-            h.Session.Edit("lock", () => h.Document.AllTracks.First().IsLocked = true);
+            h.Session.Edit("lock", () => h.Sequence.AllTracks.First().IsLocked = true);
             var rect = h.First.Bounds;
             h.Pointer(PointerAction.Down, rect.X + rect.Width / 2, rect.Y + 5);
             Assert.That(h.Session.IsEditing || h.View.Captured, Is.False);
@@ -248,7 +248,7 @@ namespace NBC.ActionEditor.Tests.Presentation
                 first.Pointer(action, a.X + a.Width / 2 + offset, a.Y + 5);
                 second.Pointer(action, b.X + b.Width / 2 + offset, b.Y + 5);
             }
-            Assert.That(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Content(first.Document), Is.EqualTo(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Content(second.Document)));
+            Assert.That(NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.GetContentKey(first.Sequence), Is.EqualTo(NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.GetContentKey(second.Sequence)));
             Assert.That(first.View.State.Clips.Select(clip => clip.Bounds.X), Is.EqualTo(second.View.State.Clips.Select(clip => clip.Bounds.X)));
         }
         [Test] public void MinimumResizeBeyondEndRemainsFiniteAndAtLeastOneCentisecond()

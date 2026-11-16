@@ -1,5 +1,5 @@
 using NBC.ActionEditor.Views.IMGUI;
-using ToolkitPreferences = NBC.ActionEditor.Views.UIToolkit.PreferencesWindow;
+using ToolkitSettings = NBC.ActionEditor.Views.UIToolkit.SettingsWindow;
 using System;
 using System.Collections.Generic;
 using NBC.ActionEditor.Application.Settings;
@@ -43,21 +43,21 @@ namespace NBC.ActionEditor.Tests.Presentation
         [UnityTest] public IEnumerator NativeSettingsControlsCommitOnlyToInjectedStoreAndShowFailures()
         {
             var store = new Store(); var session = new SettingsSession(store);
-            var window = ScriptableObject.CreateInstance<ToolkitPreferences>();
-            var imgui = new PreferencesWindow();
+            var window = ScriptableObject.CreateInstance<ToolkitSettings>();
+            var imgui = new SettingsWindow();
             try
             {
                 window.Bind(session); imgui.Bind(session); window.Show(); yield return null;
                 var toggles = window.rootVisualElement.Query<Toggle>().ToList();
-                toggles.Find(t => t.label == Lan.PreferencesMagnetSnapping).value = false;
+                toggles.Find(t => t.label == EditorText.SettingsMagnetSnapping).value = false;
                 Assert.That(session.Current.MagnetSnapping, Is.False); Assert.That(store.Writes, Is.EqualTo(1));
-                Assert.That(session.Current.AutoSaveSeconds, Is.Zero, "Opening controls must not enable autosave.");
+                Assert.That(session.Current.AutoSaveIntervalSeconds, Is.Zero, "Opening controls must not enable autosave.");
                 var field = window.rootVisualElement.Q<TextField>();
                 field.value = " ";
-                Assert.That(session.Current.SavePath, Is.EqualTo("Assets/"));
+                Assert.That(session.Current.DefaultSaveDirectory, Is.EqualTo("Assets/"));
                 Assert.That(window.rootVisualElement.Q<Label>("settings-error").text, Is.Not.Empty);
                 store.Fail = true;
-                window.rootVisualElement.Query<Toggle>().ToList().Find(t => t.label == Lan.PreferencesScrollWheelZooms).value = false;
+                window.rootVisualElement.Query<Toggle>().ToList().Find(t => t.label == EditorText.SettingsScrollWheelZooms).value = false;
                 Assert.That(session.Current.ScrollWheelZooms, Is.True);
                 Assert.That(window.rootVisualElement.Q<Label>("settings-error").text, Is.EqualTo("Storage unavailable"));
                 window.CreateGUI();
@@ -112,19 +112,19 @@ namespace NBC.ActionEditor.Tests.Presentation
         {
             var store = new Store(); var session = new SettingsSession(store); var view = new View();
             using var presenter = new SettingsPresenter(session, view);
-            Assert.That(presenter.Change(mode: TimeStepMode.Frames).Succeeded, Is.True);
+            Assert.That(presenter.Change(timeStepMode: TimeStepMode.Frames).Succeeded, Is.True);
             Assert.That(session.Current.FrameRate, Is.EqualTo(30));
             Assert.That(session.Current.SnapInterval, Is.EqualTo(1f / 30));
-            Assert.That(presenter.Change(fps: 60).Succeeded, Is.True);
+            Assert.That(presenter.Change(frameRate: 60).Succeeded, Is.True);
             Assert.That(session.Current.TimeStep, Is.EqualTo(1f / 60));
-            Assert.That(presenter.Change(mode: TimeStepMode.Seconds).Succeeded, Is.True);
+            Assert.That(presenter.Change(timeStepMode: TimeStepMode.Seconds).Succeeded, Is.True);
             Assert.That(session.Current.FrameRate, Is.EqualTo(10));
             Assert.That(session.Current.TimeStep, Is.EqualTo(.1f));
             var writes = store.Writes;
-            Assert.That(presenter.Change(path: " ").Succeeded, Is.False);
-            Assert.That(presenter.Change(fps: 0).Succeeded, Is.False);
+            Assert.That(presenter.Change(defaultSaveDirectory: " ").Succeeded, Is.False);
+            Assert.That(presenter.Change(frameRate: 0).Succeeded, Is.False);
             Assert.That(store.Writes, Is.EqualTo(writes));
-            Assert.That(session.Current.SavePath, Is.EqualTo("Assets/"));
+            Assert.That(session.Current.DefaultSaveDirectory, Is.EqualTo("Assets/"));
         }
 
         [Test] public void StaleDraftCannotOverwriteAnotherWindowsCommit()

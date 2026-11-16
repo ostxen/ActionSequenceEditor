@@ -1,9 +1,9 @@
-using NBC.ActionEditor.Infrastructure.Assets;
+using NBC.ActionEditor.Infrastructure.Discovery;
 using NBC.ActionEditor.Application.Playback;
 using NBC.ActionEditor.Infrastructure.Preview;
 using ImguiWindow = NBC.ActionEditor.Views.IMGUI.ActionEditorWindow;
 using ToolkitWindow = NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -18,8 +18,8 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class PreviewOwnershipTests
     {
-        private sealed class BoundaryTrack : TimelineTrack { }
-        private sealed class BoundaryInterval : TimelineClip { }
+        private sealed class BoundaryTrack : ActionTrack { }
+        private sealed class BoundaryInterval : ActionClip { }
         private sealed class BoundaryPoint : PointClip { }
         private sealed class BoundaryPreview : PreviewBase
         {
@@ -33,14 +33,14 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void ForwardPreviewCrossesZeroShortIntervalAndEndpointOnlyOnce()
         {
-            var document = new FeatureSampleDocument(); document.ClearRoots();
-            var track = new BoundaryTrack(); document.AddRoot(track);
+            var document = new FeatureSampleSequence(); document.ClearRootContainers();
+            var track = new BoundaryTrack(); document.AddRootContainer(track);
             track.Clips.Add(new BoundaryPoint { Name = "zero", StartTime = 0 });
             track.Clips.Add(new BoundaryInterval { Name = "short", StartTime = .25f, Length = .000001f });
             track.Clips.Add(new BoundaryPoint { Name = "endpoint", StartTime = 1 });
             document.Init();
             var calls = new List<string>();
-            using var preview = new DocumentPreviewSession(type => typeof(TimelineClip).IsAssignableFrom(type) ? new BoundaryPreview(calls) : null);
+            using var preview = new SequencePreviewSession(type => typeof(ActionClip).IsAssignableFrom(type) ? new BoundaryPreview(calls) : null);
             preview.Initialize(document);
             preview.Sample(1, 0, true);
             Assert.That(calls, Is.EqualTo(new[] { "zero:enter", "zero:update", "zero:update", "zero:exit",
@@ -56,8 +56,8 @@ namespace NBC.ActionEditor.Tests
         [TestCase(.75f, false)]
         public void PreviewContinuousUpdatesUseLeftClosedRightOpenInterval(float time, bool expected)
         {
-            var document = new FeatureSampleDocument(); document.ClearRoots();
-            var track = new BoundaryTrack(); document.AddRoot(track);
+            var document = new FeatureSampleSequence(); document.ClearRootContainers();
+            var track = new BoundaryTrack(); document.AddRootContainer(track);
             var clip = new BoundaryInterval { Name = "interval", StartTime = .25f, Length = .5f };
             track.Clips.Add(clip); document.Init();
             var calls = new List<string>(); var target = new BoundaryPreview(calls); target.SetTarget(clip);
@@ -68,15 +68,15 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void EqualTimePreviewBoundariesUseReverseTrackThenStableClipOrder()
         {
-            var document = new FeatureSampleDocument(); document.ClearRoots();
+            var document = new FeatureSampleSequence(); document.ClearRootContainers();
             var first = new BoundaryTrack(); var second = new BoundaryTrack();
             first.Clips.Add(new BoundaryInterval { Name = "old", StartTime = 0, Length = 1 });
             first.Clips.Add(new BoundaryPoint { Name = "point", StartTime = 1 });
             first.Clips.Add(new BoundaryInterval { Name = "next", StartTime = 1, Length = 1 });
             second.Clips.Add(new BoundaryPoint { Name = "other", StartTime = 1 });
-            document.AddRoot(first); document.AddRoot(second); document.Init();
+            document.AddRootContainer(first); document.AddRootContainer(second); document.Init();
             var calls = new List<string>();
-            using var preview = new DocumentPreviewSession(type => typeof(TimelineClip).IsAssignableFrom(type) ? new BoundaryPreview(calls) : null);
+            using var preview = new SequencePreviewSession(type => typeof(ActionClip).IsAssignableFrom(type) ? new BoundaryPreview(calls) : null);
             preview.Initialize(document); preview.Sample(.5f, 0, true); calls.Clear();
             preview.Sample(1, .5f, true);
             Assert.That(calls.Where(call => !call.EndsWith(":update")), Is.EqualTo(new[] {
@@ -87,9 +87,9 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void FeatureSampleProjectionUsesValuesAndKeepsCapturedFramesIndependent()
         {
-            var document = new FeatureSampleDocument();
+            var document = new FeatureSampleSequence();
             var time = .5f;
-            var presenter = new NBC.ActionEditor.Presentation.Presenters.FeatureSamplePresenter(new NBC.ActionEditor.Presentation.Presenters.ExtensionDocumentPresenter(() => document, () => time).Capture);
+            var presenter = new NBC.ActionEditor.Presentation.Presenters.FeatureSamplePresenter(new NBC.ActionEditor.Presentation.Presenters.ExtensionSequenceProjection(() => document, () => time).Capture);
             var state = presenter.Capture();
             Assert.That(state.Available, Is.True);
             Assert.That(state.Intervals.Count, Is.EqualTo(1));
@@ -115,14 +115,14 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void ExtensionContextsAndInspectorFactoriesUseOnlyTheirExplicitSession()
         {
-            using var first = new EditorFixture(Composition.DocumentComposition.Create());
-            using var second = new EditorFixture(Composition.DocumentComposition.Create());
-            first.Session.Open(new NBC.ActionEditor.Application.Documents.DocumentOpenData(new FeatureSampleDocument()));
-            second.Session.Open(new NBC.ActionEditor.Application.Documents.DocumentOpenData(new FeatureSampleDocument()));
-            ((FeatureSampleDocument)first.Document).Version = 17;
-            ((FeatureSampleDocument)second.Document).Version = 29;
-            var a = new EditorExtensionContext(new NBC.ActionEditor.Presentation.Presenters.ExtensionDocumentPresenter(() => first.Document, () => .5f).Capture);
-            var b = new EditorExtensionContext(new NBC.ActionEditor.Presentation.Presenters.ExtensionDocumentPresenter(() => second.Document, () => 2f).Capture);
+            using var first = new EditorFixture(Composition.SequenceComposition.Create());
+            using var second = new EditorFixture(Composition.SequenceComposition.Create());
+            first.Session.Open(new NBC.ActionEditor.Application.Sequences.SequenceOpenData(new FeatureSampleSequence()));
+            second.Session.Open(new NBC.ActionEditor.Application.Sequences.SequenceOpenData(new FeatureSampleSequence()));
+            ((FeatureSampleSequence)first.Sequence).Version = 17;
+            ((FeatureSampleSequence)second.Sequence).Version = 29;
+            var a = new EditorExtensionContext(new NBC.ActionEditor.Presentation.Presenters.ExtensionSequenceProjection(() => first.Sequence, () => .5f).Capture);
+            var b = new EditorExtensionContext(new NBC.ActionEditor.Presentation.Presenters.ExtensionSequenceProjection(() => second.Sequence, () => 2f).Capture);
             Assert.That(Composition.FeatureSampleComposition.Create(a).Capture().Time, Is.EqualTo(.5f));
             Assert.That(Composition.FeatureSampleComposition.Create(b).Capture().Time, Is.EqualTo(2f));
             var proxy = ScriptableObject.CreateInstance<InspectorSelectionTarget>();
@@ -146,19 +146,19 @@ namespace NBC.ActionEditor.Tests
                 proxy.Bind(() => second.CreateProperties(settings));
                 enable.Invoke(boundInspector, null);
                 var boundPresenter = (NBC.ActionEditor.Presentation.Presenters.PropertyPresenter)presenterField.GetValue(boundInspector);
-                Assert.That(boundPresenter.CaptureDocumentInputs().Single(f => f.Name == "Version").Value, Is.EqualTo(29));
+                Assert.That(boundPresenter.CaptureSequenceInputs().Single(f => f.Name == "Version").Value, Is.EqualTo(29));
                 disable.Invoke(boundInspector, null);
                 Assert.That(presenterField.GetValue(boundInspector), Is.Null);
                 enable.Invoke(boundInspector, null);
                 Assert.That(presenterField.GetValue(boundInspector), Is.Not.Null.And.Not.SameAs(boundPresenter));
                 var presenter = proxy.CreatePresenter();
-                Assert.That(presenter.CaptureDocumentInputs().Single(f => f.Name == "Version").Value, Is.EqualTo(29));
+                Assert.That(presenter.CaptureSequenceInputs().Single(f => f.Name == "Version").Value, Is.EqualTo(29));
                 Assert.That(proxy.CreatePresenter(), Is.Not.SameAs(presenter));
                 Assert.That(presenter.Settings, Is.SameAs(settings.Current));
                 Assert.That(presenter.Settings.SnapInterval, Is.EqualTo(.1f));
-                presenter.Write(presenter.CaptureDocumentInputs().Single(f => f.Name == "Version").Id, 31);
-                Assert.That(((FeatureSampleDocument)second.Document).Version, Is.EqualTo(31));
-                Assert.That(((FeatureSampleDocument)first.Document).Version, Is.EqualTo(17));
+                presenter.Write(presenter.CaptureSequenceInputs().Single(f => f.Name == "Version").Id, 31);
+                Assert.That(((FeatureSampleSequence)second.Sequence).Version, Is.EqualTo(31));
+                Assert.That(((FeatureSampleSequence)first.Sequence).Version, Is.EqualTo(17));
                 UnityEngine.Object.DestroyImmediate(proxy);
                 Assert.DoesNotThrow(() => enable.Invoke(boundInspector, null));
                 Assert.That(presenterField.GetValue(boundInspector), Is.Null);
@@ -190,7 +190,7 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void PreviewUpdateCanReleaseAndClearTargetBeforePointerReturns()
         {
-            var document = new FeatureSampleDocument();
+            var document = new FeatureSampleSequence();
             var clip = document.AllTracks.First().Clips.First();
             var probe = new ReentrantProbe();
             probe.SetTarget(clip);
@@ -205,10 +205,10 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void PreviewCallbackCanReleaseSessionWithoutEvaluatingDisposedPointers()
         {
-            var document = new FeatureSampleDocument();
+            var document = new FeatureSampleSequence();
             var probes = new List<ReentrantProbe>();
-            DocumentPreviewSession session = null;
-            session = new DocumentPreviewSession(type =>
+            SequencePreviewSession session = null;
+            session = new SequencePreviewSession(type =>
             {
                 var probe = new ReentrantProbe { OnEnter = () => session.Dispose(), OnDispose = () => session.Dispose() };
                 probes.Add(probe); return probe;
@@ -223,38 +223,38 @@ namespace NBC.ActionEditor.Tests
         [TestCase(false)] [TestCase(true)] public void PreviewFactoryCancellationReleasesReturnedButUnownedInstance(bool returnsNull)
         {
             var probe = new Probe();
-            DocumentPreviewSession session = null;
-            session = new DocumentPreviewSession(_ => { session.Dispose(); return returnsNull ? null : probe; });
-            Assert.Throws<OperationCanceledException>(() => session.Initialize(new FeatureSampleDocument()));
+            SequencePreviewSession session = null;
+            session = new SequencePreviewSession(_ => { session.Dispose(); return returnsNull ? null : probe; });
+            Assert.Throws<OperationCanceledException>(() => session.Initialize(new FeatureSampleSequence()));
             Assert.That(session.IsInitialized, Is.False);
             Assert.That(probe.Disposals, Is.EqualTo(returnsNull ? 0 : 1));
             session.Dispose();
             Assert.That(probe.Disposals, Is.EqualTo(returnsNull ? 0 : 1));
         }
-        private class Target : TimelineClip { }
+        private class Target : ActionClip { }
         [Test] public void PlaybackStoppedDuringLoopBoundaryCannotRecreatePreviewOrAdvancePreviousTime()
         {
-            var asset = new FeatureSampleDocument();
+            var asset = new FeatureSampleSequence();
             var probes = new List<ReentrantProbe>();
-            DocumentPlayback playback = null;
-            var player = new DocumentSampler(() => asset, _ =>
+            SequencePlayback playback = null;
+            var player = new SequenceSampler(() => asset, _ =>
             {
                 var probe = new ReentrantProbe { OnEnter = () => playback.Stop() };
                 probes.Add(probe); return probe;
             });
-            playback = new DocumentPlayback(player);
+            playback = new SequencePlayback(player);
             playback.Play(0);
             playback.Update(asset.Length + 1, 1);
             Assert.That(playback.IsPlaying || player.IsInitialized, Is.False);
             Assert.That(player.CurrentTime, Is.Zero);
-            Assert.That(player.previousTime, Is.Zero);
+            Assert.That(player.PreviousTime, Is.Zero);
             Assert.That(probes.Count, Is.GreaterThan(0));
             Assert.That(probes.All(p => p.Disposals == 1 && p.Updates == 0), Is.True);
         }
 
         [Test] public void PlayedCallbackCanStopWithoutPlayOverwritingItsDecision()
         {
-            var playback = new DocumentPlayback(new DocumentSampler(() => new FeatureSampleDocument()));
+            var playback = new SequencePlayback(new SequenceSampler(() => new FeatureSampleSequence()));
             playback.Played += () => playback.Stop();
             playback.Play(0);
             Assert.That(playback.IsPlaying || playback.IsPaused, Is.False);
@@ -273,8 +273,8 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void PreviewSessionReusesResourcesAndDisposesOnceOnResetAndFailure()
         {
-            var asset = new FeatureSampleDocument(); var probes = new List<Probe>();
-            var player = new DocumentSampler(() => asset, type =>
+            var asset = new FeatureSampleSequence(); var probes = new List<Probe>();
+            var player = new SequenceSampler(() => asset, type =>
             {
                 if (type != typeof(FeatureSampleInterval)) return null;
                 var probe = new Probe(); probes.Add(probe); return probe;
@@ -292,8 +292,8 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void PartialFactoryFailureReleasesAlreadyCreatedResources()
         {
-            var asset = new FeatureSampleDocument(); var probe = new Probe(); var count = 0;
-            var player = new DocumentSampler(() => asset, type =>
+            var asset = new FeatureSampleSequence(); var probe = new Probe(); var count = 0;
+            var player = new SequenceSampler(() => asset, type =>
             {
                 if (++count == 2) throw new InvalidOperationException("factory failure");
                 return probe;
@@ -305,12 +305,12 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void ReinitializingFromDisposeKeepsLatestPreviewWithoutMergingGraphs()
         {
-            var first = new FeatureSampleDocument();
-            var outer = new FeatureSampleDocument();
-            var latest = new FeatureSampleDocument();
+            var first = new FeatureSampleSequence();
+            var outer = new FeatureSampleSequence();
+            var latest = new FeatureSampleSequence();
             var probes = new List<ReentrantProbe>();
-            DocumentPreviewSession session = null;
-            session = new DocumentPreviewSession(_ => { var probe = new ReentrantProbe(); probes.Add(probe); return probe; });
+            SequencePreviewSession session = null;
+            session = new SequencePreviewSession(_ => { var probe = new ReentrantProbe(); probes.Add(probe); return probe; });
             try
             {
                 session.Initialize(first); var original = probes.ToArray();
@@ -327,15 +327,15 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void PlaybackPauseLoopStepAndFaultKeepResourceOwnershipExplicit()
         {
-            var asset = new FeatureSampleDocument(); var probes = new List<Probe>();
-            var player = new DocumentSampler(() => asset, type => { if (type != typeof(FeatureSampleInterval)) return null; var p = new Probe(); probes.Add(p); return p; });
-            var playback = new DocumentPlayback(player);
+            var asset = new FeatureSampleSequence(); var probes = new List<Probe>();
+            var player = new SequenceSampler(() => asset, type => { if (type != typeof(FeatureSampleInterval)) return null; var p = new Probe(); probes.Add(p); return p; });
+            var playback = new SequencePlayback(player);
             playback.Play(10); playback.Update(11, 1); Assert.That(player.CurrentTime, Is.EqualTo(1));
-            playback.Pause(true); playback.Update(12, 1); Assert.That(player.CurrentTime, Is.EqualTo(1));
-            playback.Pause(false); playback.Update(13, 1); Assert.That(player.CurrentTime, Is.EqualTo(2));
+            playback.SetPaused(true); playback.Update(12, 1); Assert.That(player.CurrentTime, Is.EqualTo(1));
+            playback.SetPaused(false); playback.Update(13, 1); Assert.That(player.CurrentTime, Is.EqualTo(2));
             playback.StepBackward(.25f); Assert.That(player.CurrentTime, Is.EqualTo(1.75f));
             playback.StepForward(.25f); Assert.That(player.CurrentTime, Is.EqualTo(2));
-            playback.IsRange = true; asset.RangeMin = 1; asset.RangeMax = 3;
+            playback.RangePlaybackEnabled = true; asset.RangeMin = 1; asset.RangeMax = 3;
             playback.Update(15, 1); Assert.That(player.CurrentTime, Is.EqualTo(2));
             Assert.That(probes.Any(p => p.Disposals == 1), Is.True, "Loop releases the old preview session.");
             foreach (var probe in probes.Where(p => p.Disposals == 0)) probe.ThrowUpdate = true;
@@ -346,9 +346,9 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void StopCallbackFailureStillReleasesPreviewAndClearsPlayback()
         {
-            var asset = new FeatureSampleDocument(); var probes = new List<Probe>();
-            var player = new DocumentSampler(() => asset, type => { var p = new Probe(); probes.Add(p); return p; });
-            var playback = new DocumentPlayback(player); playback.Play(0); player.Sample(1);
+            var asset = new FeatureSampleSequence(); var probes = new List<Probe>();
+            var player = new SequenceSampler(() => asset, type => { var p = new Probe(); probes.Add(p); return p; });
+            var playback = new SequencePlayback(player); playback.Play(0); player.Sample(1);
             playback.Stopped += () => throw new InvalidOperationException("stop callback failure");
             Assert.Throws<InvalidOperationException>(() => playback.Stop());
             Assert.That(player.IsInitialized || playback.IsPlaying || playback.IsPaused, Is.False);
@@ -358,7 +358,7 @@ namespace NBC.ActionEditor.Tests
         {
 
             var source = EditorFixture.Shared.Source; var recovery = EditorFixture.Shared.Session.CaptureRecovery();
-            var fixture = new TextAsset(Infrastructure.Serialization.JsonDocumentCodec.Encode(new FeatureSampleDocument())); EditorFixture.Shared.Open(fixture);
+            var fixture = new TextAsset(Infrastructure.Serialization.SequenceJsonCodec.Encode(new FeatureSampleSequence())); EditorFixture.Shared.Open(fixture);
             var original = ScriptableObject.CreateInstance<ImguiWindow>();
             var native = ScriptableObject.CreateInstance<ToolkitWindow>();
             try
@@ -367,7 +367,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(EditorApplication.update.GetInvocationList().Count(callback => callback.Method.DeclaringType == typeof(ActionEditorHost) && callback.Method.Name == "UpdateSharedEditor"), Is.EqualTo(1));
                 Assert.That(EditorApplication.update.GetInvocationList().Any(callback => callback.Target is ImguiWindow || callback.Target is ToolkitWindow), Is.False);
                 EditorFixture.Shared.Playback.Play((float)EditorApplication.timeSinceStartup);
-                EditorFixture.Shared.Playback.Pause(true);
+                EditorFixture.Shared.Playback.SetPaused(true);
                 native.Close();
                 Assert.That(EditorFixture.Shared.Playback.IsPlaying, Is.True, "Closing one view must not stop the shared playback.");
                 Assert.That(EditorFixture.Shared.Playback.IsPaused, Is.True);
@@ -383,7 +383,7 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void SharedDriverSkipsDetachedViewsAndIsolatesTickFailures()
         {
-            var views = new ActionEditorViews();
+            var views = new EditorViewRegistry();
             var first = new object(); var second = new object(); var third = new object();
             var calls = new List<string>(); var errors = new List<Exception>();
             foreach (var owner in new[] { first, second, third }) views.Attach(owner, () => { }, () => { });
@@ -400,8 +400,8 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void FailedWindowNotificationDoesNotBlockOtherBindingsOrHideWarning()
         {
-            using var context = new EditorFixture(Composition.DocumentComposition.Create());
-            var views = new ActionEditorViews();
+            using var context = new EditorFixture(Composition.SequenceComposition.Create());
+            var views = new EditorViewRegistry();
             var settings = new NBC.ActionEditor.Application.Settings.SettingsSession(new Preferences());
             var changed = 0; var paints = 0;
             using var first = context.Bind(new object(), () => paints++,
@@ -409,19 +409,19 @@ namespace NBC.ActionEditor.Tests
             using var second = context.Bind(new object(), () => { },
                 () => changed++, views, settings);
             var before = paints;
-            context.Session.Open(new NBC.ActionEditor.Application.Documents.DocumentOpenData(new FeatureSampleDocument()));
+            context.Session.Open(new NBC.ActionEditor.Application.Sequences.SequenceOpenData(new FeatureSampleSequence()));
             Assert.That(changed, Is.EqualTo(1));
             Assert.That(paints, Is.EqualTo(before + 1));
             Assert.That(context.Session.NotificationWarning, Does.Contain("first window unavailable"));
             first.Dispose();
-            context.Session.Open(new NBC.ActionEditor.Application.Documents.DocumentOpenData(new FeatureSampleDocument()));
+            context.Session.Open(new NBC.ActionEditor.Application.Sequences.SequenceOpenData(new FeatureSampleSequence()));
             Assert.That(changed, Is.EqualTo(2));
             Assert.That(context.Session.NotificationWarning, Is.Null);
         }
 
         [Test] public void RepaintFailureAndDetachDoNotBlockOtherRegisteredWindows()
         {
-            var views = new ActionEditorViews();
+            var views = new EditorViewRegistry();
             var first = new object(); var removed = new object(); var last = new object();
             var calls = new List<string>();
             views.Attach(first, () => { calls.Add("first"); views.Detach(removed); throw new InvalidOperationException("repaint"); }, () => { });
@@ -441,9 +441,9 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void SharedUpdateDriverStillTicksViewsWhenPlaybackAndStopCallbacksFail()
         {
-            using var context = new EditorFixture(Composition.DocumentComposition.Create());
-            context.Session.Open(new NBC.ActionEditor.Application.Documents.DocumentOpenData(new FeatureSampleDocument()));
-            var views = new ActionEditorViews(); var owner = new object(); var ticks = 0;
+            using var context = new EditorFixture(Composition.SequenceComposition.Create());
+            context.Session.Open(new NBC.ActionEditor.Application.Sequences.SequenceOpenData(new FeatureSampleSequence()));
+            var views = new EditorViewRegistry(); var owner = new object(); var ticks = 0;
             views.Attach(owner, () => throw new InvalidOperationException("repaint"), () => { });
             views.SetTick(owner, () => ticks++);
             var errors = new List<Exception>();
@@ -456,15 +456,15 @@ namespace NBC.ActionEditor.Tests
             Assert.That(errors.SelectMany(error => error is AggregateException aggregate
                 ? aggregate.Flatten().InnerExceptions.AsEnumerable() : new[] { error }).Select(error => error.Message),
                 Is.EquivalentTo(new[] { "repaint", "stop" }));
-            Assert.That(context.Playback.IsPlaying || context.Player.IsInitialized, Is.False);
+            Assert.That(context.Playback.IsPlaying || context.Sampler.IsInitialized, Is.False);
             views.Detach(owner); driver.Tick(); Assert.That(ticks, Is.EqualTo(1));
         }
 
         [Test] public void IsolatedBindingsReleaseLastPlaybackAndSubscriptionsExactlyOnce()
         {
-            using var context = new EditorFixture(Composition.DocumentComposition.Create());
-            var fixture = new TextAsset(Infrastructure.Serialization.JsonDocumentCodec.Encode(new FeatureSampleDocument()));
-            var views = new ActionEditorViews();
+            using var context = new EditorFixture(Composition.SequenceComposition.Create());
+            var fixture = new TextAsset(Infrastructure.Serialization.SequenceJsonCodec.Encode(new FeatureSampleSequence()));
+            var views = new EditorViewRegistry();
             var settings = new NBC.ActionEditor.Application.Settings.SettingsSession(new Preferences());
             var redraws = 0; var stopped = 0;
             var first = context.Bind(new object(), () => redraws++, () => { }, views, settings);
@@ -473,18 +473,18 @@ namespace NBC.ActionEditor.Tests
             {
                 context.Open(fixture);
                 first.Playback.Invoke(NBC.ActionEditor.Presentation.Contracts.PlaybackIntent.Next);
-                Assert.That(context.Player.CurrentTime, Is.EqualTo(.1f).Within(.00001f), "Step must use the settings supplied to this binding.");
+                Assert.That(context.Sampler.CurrentTime, Is.EqualTo(.1f).Within(.00001f), "Step must use the settings supplied to this binding.");
                 first.Playback.Invoke(NBC.ActionEditor.Presentation.Contracts.PlaybackIntent.Previous);
-                Assert.That(context.Player.CurrentTime, Is.Zero);
-                context.Open(fixture); context.Playback.Play(0); context.Player.Sample(1); context.Playback.Pause(true);
+                Assert.That(context.Sampler.CurrentTime, Is.Zero);
+                context.Open(fixture); context.Playback.Play(0); context.Sampler.Sample(1); context.Playback.SetPaused(true);
                 context.Playback.Stopped += () => stopped++;
                 first.Dispose(); first.Dispose();
                 Assert.That(views.Count, Is.EqualTo(1)); Assert.That(stopped, Is.Zero);
                 Assert.That(context.Playback.IsPlaying && context.Playback.IsPaused, Is.True);
                 second.Dispose(); second.Dispose();
                 Assert.That(views.Count, Is.Zero); Assert.That(stopped, Is.EqualTo(1));
-                Assert.That(context.Playback.IsPlaying || context.Playback.IsPaused || context.Player.IsInitialized, Is.False);
-                Assert.That(context.Player.CurrentTime, Is.Zero);
+                Assert.That(context.Playback.IsPlaying || context.Playback.IsPaused || context.Sampler.IsInitialized, Is.False);
+                Assert.That(context.Sampler.CurrentTime, Is.Zero);
                 var count = redraws; views.Repaint(); views.NotifyChanged();
                 Assert.That(redraws, Is.EqualTo(count));
                 var listeners = typeof(NBC.ActionEditor.Application.Settings.SettingsSession).GetField("Changed", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(settings) as Delegate;

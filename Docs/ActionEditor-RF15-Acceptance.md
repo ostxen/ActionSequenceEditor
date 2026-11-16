@@ -6,7 +6,7 @@
 
 两个正式菜单为 `NBC/Action Editor/IMGUI` 和 `NBC/Action Editor/UI Toolkit`，窗口分别位于 `NBC.ActionEditor.Views.IMGUI` 与 `.UIToolkit`，均名为 `ActionEditorWindow`。两窗共享单文档、选择、播放头及Undo，逐窗工作区与捕获独立。
 
-入门操作正文只维护在[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)。当前[存储合同](ActionEditor-Contracts.md)为严格 `actioneditor.json` version 2，根组和独立轨道按RootItems混排。保存、另存、自动保存和独立导出由共享用例与可靠提交实现，导出不改变来源或基线。
+入门操作正文只维护在[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)。当前[存储合同](ActionEditor-Contracts.md)为严格 `actioneditor.json` version 2，根组和独立轨道按RootContainers混排。保存、另存、自动保存和独立导出由共享用例与可靠提交实现，导出不改变来源或基线。
 
 最终工程状态与证据只见[唯一任务清单](../.codex/tasks/action-editor-refactor.md)。H01–H09仍为待用户体验的范围，不以自动化测试或截图代签。
 

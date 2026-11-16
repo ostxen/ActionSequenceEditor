@@ -9,25 +9,25 @@ namespace NBC.ActionEditor.Views.IMGUI.Controls
     internal class PreviewResizer
     {
         private static float s_DraggedPreviewSize;
-        private static float s_CachedPreviewSizeWhileDragging;
-        private static float s_MouseDownLocation;
-        private static float s_MouseDownValue;
+        private static float s_CurrentPreviewHeight;
+        private static float s_MouseDownY;
+        private static float s_ValueAtMouseDown;
         private static bool s_MouseDragged;
         [SerializeField] private float m_CachedPref;
         [SerializeField] private int m_ControlHash;
         [SerializeField] private string m_PrefName;
-        private int m_Id;
+        private int _controlId;
 
-        private int id
+        private int ControlId
         {
             get
             {
-                if (m_Id == 0)
+                if (_controlId == 0)
                 {
-                    m_Id = GUIUtility.GetControlID(m_ControlHash, FocusType.Passive, default(Rect));
+                    _controlId = GUIUtility.GetControlID(m_ControlHash, FocusType.Passive, default(Rect));
                 }
 
-                return m_Id;
+                return _controlId;
             }
         }
 
@@ -43,76 +43,76 @@ namespace NBC.ActionEditor.Views.IMGUI.Controls
             m_CachedPref = EditorPrefs.GetFloat(m_PrefName, 1f);
         }
 
-        public float ResizeHandle(Rect windowPosition, float minSize, float minRemainingSize, float resizerHeight)
+        public float ResizeHandle(Rect windowRect, float minimumPreviewHeight, float minimumContentHeight, float handleHeight)
         {
-            return ResizeHandle(windowPosition, minSize, minRemainingSize, resizerHeight, default(Rect));
+            return ResizeHandle(windowRect, minimumPreviewHeight, minimumContentHeight, handleHeight, default(Rect));
         }
 
-        public float ResizeHandle(Rect windowPosition, float minSize, float minRemainingSize, float resizerHeight,
-            Rect dragRect)
+        public float ResizeHandle(Rect windowRect, float minimumPreviewHeight, float minimumContentHeight, float handleHeight,
+            Rect horizontalDragBounds)
         {
-            if (Mathf.Abs(m_CachedPref) < minSize)
+            if (Mathf.Abs(m_CachedPref) < minimumPreviewHeight)
             {
-                m_CachedPref = minSize * Mathf.Sign(m_CachedPref);
+                m_CachedPref = minimumPreviewHeight * Mathf.Sign(m_CachedPref);
             }
 
-            float num = windowPosition.height - minRemainingSize;
-            bool flag = GUIUtility.hotControl == id;
-            float num2 = (!flag) ? Mathf.Max(0f, m_CachedPref) : s_DraggedPreviewSize;
-            bool flag2 = m_CachedPref > 0f;
-            float num3 = Mathf.Abs(m_CachedPref);
-            Rect position = new Rect(0f, windowPosition.height - num2 - resizerHeight, windowPosition.width,
-                resizerHeight);
-            if (dragRect.width != 0f)
+            float maximumPreviewHeight = windowRect.height - minimumContentHeight;
+            bool isDragging = GUIUtility.hotControl == ControlId;
+            float previewHeight = (!isDragging) ? Mathf.Max(0f, m_CachedPref) : s_DraggedPreviewSize;
+            bool expanded = m_CachedPref > 0f;
+            float rememberedExpandedHeight = Mathf.Abs(m_CachedPref);
+            Rect handleRect = new Rect(0f, windowRect.height - previewHeight - handleHeight, windowRect.width,
+                handleHeight);
+            if (horizontalDragBounds.width != 0f)
             {
-                position.x = dragRect.x;
-                position.width = dragRect.width;
+                handleRect.x = horizontalDragBounds.x;
+                handleRect.width = horizontalDragBounds.width;
             }
 
-            bool flag3 = flag2;
-            num2 = -PixelPreciseCollapsibleSlider(id, position, -num2, -num, 0f, ref flag2);
-            num2 = Mathf.Min(num2, num);
-            flag = (GUIUtility.hotControl == id);
-            if (flag)
+            bool wasExpanded = expanded;
+            previewHeight = -PixelPreciseCollapsibleSlider(ControlId, handleRect, -previewHeight, -maximumPreviewHeight, 0f, ref expanded);
+            previewHeight = Mathf.Min(previewHeight, maximumPreviewHeight);
+            isDragging = (GUIUtility.hotControl == ControlId);
+            if (isDragging)
             {
-                s_DraggedPreviewSize = num2;
+                s_DraggedPreviewSize = previewHeight;
             }
 
-            if (num2 < minSize)
+            if (previewHeight < minimumPreviewHeight)
             {
-                num2 = ((num2 >= minSize * 0.5f) ? minSize : 0f);
+                previewHeight = ((previewHeight >= minimumPreviewHeight * 0.5f) ? minimumPreviewHeight : 0f);
             }
 
-            if (flag2 != flag3)
+            if (expanded != wasExpanded)
             {
-                num2 = ((!flag2) ? 0f : num3);
+                previewHeight = ((!expanded) ? 0f : rememberedExpandedHeight);
             }
 
-            flag2 = (num2 >= minSize / 2f);
+            expanded = (previewHeight >= minimumPreviewHeight / 2f);
             if (GUIUtility.hotControl == 0)
             {
-                if (num2 > 0f)
+                if (previewHeight > 0f)
                 {
-                    num3 = num2;
+                    rememberedExpandedHeight = previewHeight;
                 }
 
-                float num4 = num3 * (float)((!flag2) ? -1 : 1);
-                if (num4 != m_CachedPref)
+                float signedPreviewHeight = rememberedExpandedHeight * (float)((!expanded) ? -1 : 1);
+                if (signedPreviewHeight != m_CachedPref)
                 {
-                    m_CachedPref = num4;
+                    m_CachedPref = signedPreviewHeight;
                     EditorPrefs.SetFloat(m_PrefName, m_CachedPref);
                 }
             }
 
-            s_CachedPreviewSizeWhileDragging = num2;
-            return num2;
+            s_CurrentPreviewHeight = previewHeight;
+            return previewHeight;
         }
 
         public bool GetExpanded()
         {
-            if (GUIUtility.hotControl == id)
+            if (GUIUtility.hotControl == ControlId)
             {
-                return s_CachedPreviewSizeWhileDragging > 0f;
+                return s_CurrentPreviewHeight > 0f;
             }
 
             return m_CachedPref > 0f;
@@ -120,9 +120,9 @@ namespace NBC.ActionEditor.Views.IMGUI.Controls
 
         public float GetPreviewSize()
         {
-            if (GUIUtility.hotControl == id)
+            if (GUIUtility.hotControl == ControlId)
             {
-                return Mathf.Max(0f, s_CachedPreviewSizeWhileDragging);
+                return Mathf.Max(0f, s_CurrentPreviewHeight);
             }
 
             return Mathf.Max(0f, m_CachedPref);
@@ -155,8 +155,8 @@ namespace NBC.ActionEditor.Views.IMGUI.Controls
                     if (GUIUtility.hotControl == 0 && current.button == 0 && position.Contains(current.mousePosition))
                     {
                         GUIUtility.hotControl = id;
-                        s_MouseDownLocation = current.mousePosition.y;
-                        s_MouseDownValue = value;
+                        s_MouseDownY = current.mousePosition.y;
+                        s_ValueAtMouseDown = value;
                         s_MouseDragged = false;
                         current.Use();
                     }
@@ -179,8 +179,8 @@ namespace NBC.ActionEditor.Views.IMGUI.Controls
                     if (GUIUtility.hotControl == id)
                     {
                         value = Mathf.Clamp(
-                            current.mousePosition.y - s_MouseDownLocation +
-                            s_MouseDownValue, min, max - 1f);
+                            current.mousePosition.y - s_MouseDownY +
+                            s_ValueAtMouseDown, min, max - 1f);
                         GUI.changed = true;
                         s_MouseDragged = true;
                         current.Use();

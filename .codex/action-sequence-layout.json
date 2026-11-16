@@ -1,0 +1,322 @@
+{
+  "types": {
+    "ActionDocument": "ActionSequence",
+    "TimelineGroup": "ActionGroup",
+    "TimelineTrack": "ActionTrack",
+    "TimelineClip": "ActionClip",
+    "TimelineRootItem": "ActionRootItem",
+    "FeatureSampleDocument": "FeatureSampleSequence",
+    "DocumentValue": "JsonValue",
+    "DocumentValueConverter": "JsonValueConverter",
+    "DocumentJson": "JsonText",
+    "DocumentFloatEncoding": "JsonFloatEncoding",
+    "DocumentReference": "AssetReference",
+    "IDocumentReferenceResolver": "IAssetReferenceResolver",
+    "IActionDocumentFormat": "ISequenceFormat",
+    "ActionDocumentJsonFormat": "SequenceJsonFormat",
+    "JsonDocumentCodec": "SequenceJsonCodec",
+    "JsonDocumentRepository": "SequenceFileRepository",
+    "DocumentFormatOptions": "SequenceFormatOptions",
+    "DocumentGraphValidation": "SequenceGraphValidation",
+    "DocumentFormatContext": "SequenceFormatContext",
+    "DocumentFormats": "SequenceFormats",
+    "DocumentSampler": "SequenceSampler",
+    "DocumentFormatRegistry": "SequenceFormatRegistry",
+    "DocumentPreviewSession": "SequencePreviewSession",
+    "DocumentCopy": "SequenceCopy",
+    "DocumentUndoState": "SequenceUndoState",
+    "DocumentNavigation": "SequenceNavigation",
+    "DocumentInteraction": "SequenceInteraction",
+    "DocumentCreationPrompt": "SequenceCreationPrompt",
+    "DocumentFactory": "SequenceFactory",
+    "DocumentCreationWindow": "SequenceCreationWindow",
+    "DocumentPickerWindow": "SequencePickerWindow",
+    "DocumentExportService": "SequenceExportService",
+    "DocumentExportWindow": "SequenceExportWindow",
+    "DocumentToolbar": "SequenceToolbar",
+    "DocumentInspector": "SequenceInspector",
+    "DocumentDialogCatalog": "SequenceDialogCatalog",
+    "ExtensionDocumentProjection": "ExtensionSequenceProjection",
+    "DocumentPresenter": "SequencePresenter",
+    "IDocumentDialogCatalog": "ISequenceDialogCatalog",
+    "IDocumentInteraction": "ISequenceInteraction",
+    "DocumentSwitchChoice": "SequenceSwitchChoice",
+    "IDocumentNavigation": "ISequenceNavigation",
+    "DocumentIntent": "SequenceIntent",
+    "ExtensionDocumentState": "ExtensionSequenceState",
+    "DocumentPresenterComposition": "SequencePresenterComposition",
+    "IDocumentFactory": "ISequenceFactory",
+    "DocumentPlayback": "SequencePlayback",
+    "IDocumentSampler": "ISequenceSampler",
+    "IDocumentSnapshot": "ISequenceSnapshot",
+    "IDocumentRepository": "ISequenceRepository",
+    "IDocumentExporter": "ISequenceExporter",
+    "DocumentCommit": "SequenceCommit",
+    "DocumentRecovery": "SequenceRecovery",
+    "DocumentComposition": "SequenceComposition",
+    "DocumentHeaderExtension": "SequenceHeaderExtension",
+    "DocumentSession": "SequenceSession",
+    "DocumentOpenData": "SequenceOpenData",
+    "DocumentOperationResult": "SequenceOperationResult",
+    "DocumentLifecycle": "SequenceLifecycle",
+    "DocumentEditTransaction": "SequenceEditTransaction",
+    "DocumentAutoSave": "SequenceAutoSave",
+    "DocumentPorts": "SequencePorts",
+    "DocumentContracts": "SequenceContracts"
+  },
+  "moves": [
+    {
+      "source": "Assets/ActionEditor/Editor/Views/UIToolkit/Dialogs/DocumentPickerWindow.cs",
+      "destination": "Assets/ActionEditor/Editor/Views/UIToolkit/Dialogs/SequencePickerWindow.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Views/UIToolkit/Dialogs/DocumentExportWindow.cs",
+      "destination": "Assets/ActionEditor/Editor/Views/UIToolkit/Dialogs/SequenceExportWindow.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Views/UIToolkit/Dialogs/DocumentCreationWindow.cs",
+      "destination": "Assets/ActionEditor/Editor/Views/UIToolkit/Dialogs/SequenceCreationWindow.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Views/Shared/Dialogs/DocumentInteraction.cs",
+      "destination": "Assets/ActionEditor/Editor/Views/Shared/Dialogs/SequenceInteraction.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Views/Shared/Dialogs/DocumentCreationPrompt.cs",
+      "destination": "Assets/ActionEditor/Editor/Views/Shared/Dialogs/SequenceCreationPrompt.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Serialization/DocumentGraphValidation.cs",
+      "destination": "Assets/ActionEditor/Runtime/Serialization/SequenceGraphValidation.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Serialization/DocumentFormatContext.cs",
+      "destination": "Assets/ActionEditor/Runtime/Serialization/SequenceFormatContext.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Serialization/DocumentFloatEncoding.cs",
+      "destination": "Assets/ActionEditor/Runtime/Serialization/JsonFloatEncoding.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Serialization/ActionDocumentJsonFormat.cs",
+      "destination": "Assets/ActionEditor/Runtime/Serialization/SequenceJsonFormat.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Serialization/IActionDocumentFormat.cs",
+      "destination": "Assets/ActionEditor/Runtime/Serialization/ISequenceFormat.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Serialization/DocumentValueConverter.cs",
+      "destination": "Assets/ActionEditor/Runtime/Serialization/JsonValueConverter.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Serialization/DocumentValue.cs",
+      "destination": "Assets/ActionEditor/Runtime/Serialization/JsonValue.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Serialization/DocumentJson.cs",
+      "destination": "Assets/ActionEditor/Runtime/Serialization/JsonText.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Views/IMGUI/DocumentToolbar.cs",
+      "destination": "Assets/ActionEditor/Editor/Views/IMGUI/SequenceToolbar.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Serialization/IDocumentReferenceResolver.cs",
+      "destination": "Assets/ActionEditor/Runtime/Serialization/IAssetReferenceResolver.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Views/IMGUI/Dialogs/DocumentExportWindow.cs",
+      "destination": "Assets/ActionEditor/Editor/Views/IMGUI/Dialogs/SequenceExportWindow.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Views/IMGUI/Dialogs/DocumentCreationWindow.cs",
+      "destination": "Assets/ActionEditor/Editor/Views/IMGUI/Dialogs/SequenceCreationWindow.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Samples/FeatureSample/FeatureSampleDocument.cs",
+      "destination": "Assets/ActionEditor/Runtime/Samples/FeatureSample/FeatureSampleSequence.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Documents/SessionStateRecoveryStore.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Sequences/SessionStateRecoveryStore.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Documents/PhysicalCommitFiles.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Sequences/PhysicalCommitFiles.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Documents/JsonRecoveryCodec.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Sequences/JsonRecoveryCodec.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Documents/JsonDocumentRepository.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Sequences/SequenceFileRepository.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Documents/DocumentNavigation.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Sequences/SequenceNavigation.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Documents/DocumentFactory.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Sequences/SequenceFactory.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Preview/DocumentSampler.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Preview/SequenceSampler.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Documents/UnityUndoHistory.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Sequences/UnityUndoHistory.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Documents/DocumentExportService.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Sequences/SequenceExportService.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Preview/DocumentPreviewSession.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Preview/SequencePreviewSession.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Documents/DocumentDialogCatalog.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Sequences/SequenceDialogCatalog.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Documents/AtomicFileCommit.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Sequences/AtomicFileCommit.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Serialization/DocumentFormatRegistry.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Serialization/SequenceFormatRegistry.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Serialization/DocumentCopy.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Serialization/SequenceCopy.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Serialization/JsonDocumentCodec.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Serialization/SequenceJsonCodec.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Infrastructure/Serialization/DocumentFormats.cs",
+      "destination": "Assets/ActionEditor/Editor/Infrastructure/Serialization/SequenceFormats.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Views/IMGUI/Properties/Standard/DocumentInspector.cs",
+      "destination": "Assets/ActionEditor/Editor/Views/IMGUI/Properties/Standard/SequenceInspector.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/NBC.ActionEditor.Domain.asmdef",
+      "destination": "Assets/ActionEditor/Runtime/NBC.ActionEditor.Model.asmdef"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Presentation/Presenters/DocumentPresenter.cs",
+      "destination": "Assets/ActionEditor/Editor/Presentation/Presenters/SequencePresenter.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Presentation/Presenters/ExtensionDocumentProjection.cs",
+      "destination": "Assets/ActionEditor/Editor/Presentation/Presenters/ExtensionSequenceProjection.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Extensions/DocumentHeaderExtension.cs",
+      "destination": "Assets/ActionEditor/Editor/Extensions/SequenceHeaderExtension.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Presentation/Contracts/ExtensionDocumentState.cs",
+      "destination": "Assets/ActionEditor/Editor/Presentation/Contracts/ExtensionSequenceState.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Presentation/Contracts/DocumentContracts.cs",
+      "destination": "Assets/ActionEditor/Editor/Presentation/Contracts/SequenceContracts.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Composition/DocumentComposition.cs",
+      "destination": "Assets/ActionEditor/Editor/Composition/SequenceComposition.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/WrapMode.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/WrapMode.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/TimelineTrack.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/ActionTrack.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Application/Ports/DocumentPorts.cs",
+      "destination": "Assets/ActionEditor/Editor/Application/Ports/SequencePorts.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/TimelineRootItem.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/ActionRootItem.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/TimelineGroup.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/ActionGroup.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/TimelineClip.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/ActionClip.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/StructureRules.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/StructureRules.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/ISubClipContainable.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/ISubClipContainable.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/IDirector.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/IDirector.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/IDirectableExtensions.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/IDirectableExtensions.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/IDirectable.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/IDirectable.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/IData.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/IData.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Application/Playback/DocumentPlayback.cs",
+      "destination": "Assets/ActionEditor/Editor/Application/Playback/SequencePlayback.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/ClipTimingRules.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/ClipTimingRules.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Runtime/Domain/ActionDocument.cs",
+      "destination": "Assets/ActionEditor/Runtime/Model/ActionSequence.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Composition/DocumentPresenterComposition.cs",
+      "destination": "Assets/ActionEditor/Editor/Composition/SequencePresenterComposition.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Application/Documents/DocumentEditTransaction.cs",
+      "destination": "Assets/ActionEditor/Editor/Application/Sequences/SequenceEditTransaction.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Application/Documents/DocumentAutoSave.cs",
+      "destination": "Assets/ActionEditor/Editor/Application/Sequences/SequenceAutoSave.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Application/Documents/DocumentLifecycle.cs",
+      "destination": "Assets/ActionEditor/Editor/Application/Sequences/SequenceLifecycle.cs"
+    },
+    {
+      "source": "Assets/ActionEditor/Editor/Application/Documents/DocumentSession.cs",
+      "destination": "Assets/ActionEditor/Editor/Application/Sequences/SequenceSession.cs"
+    }
+  ],
+  "directories": [
+    "Assets/ActionEditor/Runtime/Model",
+    "Assets/ActionEditor/Editor/Application/Sequences",
+    "Assets/ActionEditor/Editor/Infrastructure/Sequences"
+  ]
+}

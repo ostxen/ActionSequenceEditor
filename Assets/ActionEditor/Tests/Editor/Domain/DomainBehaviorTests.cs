@@ -1,6 +1,6 @@
 using System.Linq;
 using NBC.ActionEditor.Infrastructure.Preview;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using System;
 using NUnit.Framework;
 
@@ -9,13 +9,13 @@ namespace NBC.ActionEditor.Tests
     public class DomainBehaviorTests
     {
         [Serializable]
-        public sealed class FixtureDocument : ActionDocument { }
+        public sealed class FixtureDocument : ActionSequence { }
 
         [Serializable]
-        public sealed class FixtureTrack : TimelineTrack { }
+        public sealed class FixtureTrack : ActionTrack { }
 
         [Serializable]
-        public sealed class FixtureInterval : TimelineClip
+        public sealed class FixtureInterval : ActionClip
         {
             public string Message = "payload";
             public int Amount = 7;
@@ -38,12 +38,12 @@ namespace NBC.ActionEditor.Tests
         private static FixtureDocument CreateSample()
         {
             var asset = new FixtureDocument();
-            var group = new TimelineGroup { Name = "Reference" };
+            var group = new ActionGroup { Name = "Reference" };
             var track = new FixtureTrack { Name = "Events" };
             track.Clips.Add(new FixtureInterval { StartTime = 0.25f, Length = 0.5f });
             track.Clips.Add(new FixturePoint { StartTime = 1.25f });
             group.Tracks.Add(track);
-            asset.AddRoot(group);
+            asset.AddRootContainer(group);
             asset.Init();
             return asset;
         }
@@ -52,7 +52,7 @@ namespace NBC.ActionEditor.Tests
         public void ObjectGraph_RebuildsParentsAndDuration()
         {
             var asset = CreateSample();
-            var group = asset.RootItems.OfType<TimelineGroup>().ElementAt(0);
+            var group = asset.RootContainers.OfType<ActionGroup>().ElementAt(0);
             var track = group.Tracks[0];
             Assert.That(track.Parent, Is.SameAs(group));
             Assert.That(track.Clips[0].Parent, Is.SameAs(track));
@@ -66,20 +66,20 @@ namespace NBC.ActionEditor.Tests
         {
             var original = CreateSample();
             original.OnBeforeSerialize();
-            var context = Infrastructure.Serialization.DocumentFormats.CreateContext(typeof(FixtureDocument), typeof(FixtureTrack), typeof(FixtureInterval), typeof(FixturePoint));
-            var format = new Serialization.ActionDocumentJsonFormat();
+            var context = Infrastructure.Serialization.SequenceFormats.CreateContext(typeof(FixtureDocument), typeof(FixtureTrack), typeof(FixtureInterval), typeof(FixturePoint));
+            var format = new Serialization.SequenceJsonFormat();
             var json = format.Serialize(original, default, context);
             Assert.That(json, Is.Not.Empty);
             var loaded = format.Deserialize(json, context) as FixtureDocument;
             Assert.That(loaded, Is.Not.Null);
             loaded.Init();
-            var clip = loaded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0] as FixtureInterval;
+            var clip = loaded.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0] as FixtureInterval;
             Assert.That(clip, Is.Not.Null);
             Assert.That(clip.StartTime, Is.EqualTo(0.25f));
             Assert.That(clip.Length, Is.EqualTo(0.5f));
             Assert.That(clip.Message, Is.EqualTo("payload"));
             Assert.That(clip.Amount, Is.EqualTo(7));
-            Assert.That(loaded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1], Is.TypeOf<FixturePoint>());
+            Assert.That(loaded.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[1], Is.TypeOf<FixturePoint>());
         }
 
         [Test]
@@ -100,7 +100,7 @@ namespace NBC.ActionEditor.Tests
         [Test]
         public void PreviewPointers_ForwardEndAndRewindHaveObservableCallbacks()
         {
-            var clip = CreateSample().RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+            var clip = CreateSample().RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0];
             var preview = new RecordingPreview();
             preview.SetTarget(clip);
             IDirectableTimePointer start = new StartTimePointer(preview);

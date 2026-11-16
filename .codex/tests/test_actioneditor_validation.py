@@ -26,7 +26,7 @@ class ActionEditorValidationTests(unittest.TestCase):
         unity.raw.assert_not_called()
 
     def test_fixed_operations_reject_target_or_code_overrides(self):
-        for name in ("document_lifecycle_probe", "persistence_probe", "reference_probe", "sync_projects", "export_probe", "tutorial_probe"):
+        for name in ("document_lifecycle_probe", "persistence_probe", "reference_probe", "sync_projects", "export_probe", "tutorial_probe", "menu_layout_probe"):
             command = "actioneditor.verification " + name
             self.assertNotIn(command, READ_ONLY)
             self.assertEqual(MUTATIONS[command], {"dry_run": True, "confirm": True, "poll": None})
@@ -42,7 +42,7 @@ class ActionEditorValidationTests(unittest.TestCase):
             unity.ready.assert_not_called()
 
     def test_consumed_maintenance_commands_are_unavailable_before_editor_access(self):
-        for name in ("arrange_source_layout", "arrange_playback_sources", "rename_timeline_layout", "arrange_composition", "arrange_view_resources", "arrange_tests", "arrange_capabilities", "arrange_view_layout", "retire_unused_timeline", "retire_experiment_sources", "session_probe", "workbench_probe",
+        for name in ("arrange_action_sequence_layout", "arrange_semantic_layout", "arrange_naming_layout", "arrange_source_layout", "arrange_playback_sources", "rename_timeline_layout", "arrange_composition", "arrange_view_resources", "arrange_tests", "arrange_capabilities", "arrange_view_layout", "retire_unused_timeline", "retire_experiment_sources", "session_probe", "workbench_probe",
                      "retire_consumed_commands", "retire_view_protocols", "arrange_feature_layout",
                      "retire_imgui_timeline_sources", "retire_editing_sources", "arrange_application_layout",
                      "arrange_domain_layout", "rename_toolkit_ui", "rf17_move", "rf18_move"):

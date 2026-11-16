@@ -3,7 +3,7 @@ using System.Collections;
 using System.Linq;
 using System.Reflection;
 using NBC.ActionEditor.Application.Settings;
-using NBC.ActionEditor.Infrastructure.Documents;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -35,7 +35,7 @@ namespace NBC.ActionEditor.Tests
         {
             var baseline = Resources.FindObjectsOfTypeAll<StablePreviewEditor>().Length;
             var resources = new[] { ScriptableObject.CreateInstance<StablePreviewResource>(), ScriptableObject.CreateInstance<StablePreviewResource>() };
-            var type = typeof(ObjectSelectorWindow).Assembly.GetType("NBC.ActionEditor.Views.IMGUI.ObjectPreviewCache", true);
+            var type = typeof(AssetPickerWindow).Assembly.GetType("NBC.ActionEditor.Views.IMGUI.ObjectPreviewCache", true);
             var cache = (IDisposable)Activator.CreateInstance(type, true);
             var indexer = type.GetProperty("Item"); var cleanup = type.GetMethod("CleanupUntouchedEditors");
             try
@@ -65,7 +65,7 @@ namespace NBC.ActionEditor.Tests
         {
             var resource = ScriptableObject.CreateInstance<PreviewResource>();
             var baseline = Resources.FindObjectsOfTypeAll<FailingPreviewEditor>().Length;
-            var assembly = typeof(ObjectSelectorWindow).Assembly;
+            var assembly = typeof(AssetPickerWindow).Assembly;
             var wrapper = assembly.GetType("NBC.ActionEditor.Views.IMGUI.ObjectPreviewEditor", true);
             try
             {
@@ -97,7 +97,7 @@ namespace NBC.ActionEditor.Tests
                 var changed = Subscribers(session, session.GetType(), "Changed");
                 var content = Subscribers(session, session.GetType(), "ContentChanged");
                 var preferences = Subscribers(h.Settings, typeof(SettingsSession), "Changed");
-                var undoObjects = Resources.FindObjectsOfTypeAll<DocumentUndoState>().Length;
+                var undoObjects = Resources.FindObjectsOfTypeAll<SequenceUndoState>().Length;
                 for (var i = 0; i < 100; i++)
                 {
                     var end = new Vector2(90, h.Y(h.Group("B")));
@@ -123,7 +123,7 @@ namespace NBC.ActionEditor.Tests
                     Assert.That(Subscribers(session, session.GetType(), "Changed"), Is.EqualTo(changed), "cycle=" + i);
                     Assert.That(Subscribers(session, session.GetType(), "ContentChanged"), Is.EqualTo(content));
                     Assert.That(Subscribers(h.Settings, typeof(SettingsSession), "Changed"), Is.EqualTo(preferences));
-                    Assert.That(Resources.FindObjectsOfTypeAll<DocumentUndoState>().Length, Is.EqualTo(undoObjects));
+                    Assert.That(Resources.FindObjectsOfTypeAll<SequenceUndoState>().Length, Is.EqualTo(undoObjects));
                     Assert.That(h.Views.Count, Is.EqualTo(1));
                 }
                 // 只计本会话订阅和本次窗口，不清理其他用户窗口或历史测试对象。
@@ -153,14 +153,14 @@ namespace NBC.ActionEditor.Tests
                 {
                     other.Bind((owner, repaint, changed) => h.Context.Bind(owner, repaint, changed, h.Views, h.Settings)); other.Show();
                     other.position = new Rect(1100, 60, 550, 300); other.CreateGUI();
-                    h.Context.Player.Sample(.5f);
-                    Assert.That(h.Context.Player.IsInitialized, Is.True);
+                    h.Context.Sampler.Sample(.5f);
+                    Assert.That(h.Context.Sampler.IsInitialized, Is.True);
                     other.Canvas.Focus(); h.Window.Focus();
                 }
                 finally { other.Close(); }
                 Assert.That(h.Views.Count, Is.EqualTo(1));
-                Assert.That(h.Context.Player.IsInitialized, Is.True, "关闭非最后窗口不释放共享预览。");
-                h.Context.Player.Reset(); Assert.That(h.Context.Player.IsInitialized, Is.False);
+                Assert.That(h.Context.Sampler.IsInitialized, Is.True, "关闭非最后窗口不释放共享预览。");
+                h.Context.Sampler.Reset(); Assert.That(h.Context.Sampler.IsInitialized, Is.False);
                 Assert.That(Resources.FindObjectsOfTypeAll<ToolkitWindow>().Length, Is.EqualTo(windows));
                 Assert.That(Resources.FindObjectsOfTypeAll<NBC.ActionEditor.Views.UIToolkit.UIToolkitInspectorTarget>().Length, Is.EqualTo(proxies));
                 Assert.That(Subscribers(session, session.GetType(), "Changed"), Is.EqualTo(changed));

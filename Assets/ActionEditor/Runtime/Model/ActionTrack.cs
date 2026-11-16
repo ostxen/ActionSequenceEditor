@@ -1,0 +1,196 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+
+namespace NBC.ActionEditor.Model
+{
+    // 保存有序片段及作者状态，可直接归文档或归分组。
+    [Serializable]
+    [Attachable(typeof(ActionGroup))]
+    public abstract class ActionTrack : ActionContainer, IDirectable
+    {
+        [SerializeField] private List<ActionClip> actionClips = new();
+
+        [SerializeField] [HideInInspector] private string name;
+        [SerializeField] [HideInInspector] private bool active = true;
+        [SerializeField] [HideInInspector] private bool isLocked;
+        [SerializeField] private Color color = Color.white;
+
+        public Color Color => color.a > 0.1f ? color : Color.white;
+
+
+        public virtual string info => string.Empty;
+
+        public List<ActionClip> Clips
+        {
+            get => actionClips;
+            set => actionClips = value;
+        }
+
+
+        public virtual void OnBeforeSerialize()
+        {
+        }
+
+        public virtual void OnAfterDeserialize()
+        {
+        }
+
+        private IDirector root;
+        public IDirector Root => Parent?.Root ?? root;
+        public IDirectable Parent { get; private set; }
+
+        public ActionGroup Group => Parent as ActionGroup;
+        
+        public string Name
+        {
+            get => name;
+            set => name = value;
+        }
+
+        IEnumerable<IDirectable> IDirectable.Children => Clips;
+
+        public GameObject Actor => Parent?.Actor;
+
+        public virtual bool IsActive
+        {
+            get => (Parent == null || Parent.IsActive) && active;
+            set
+            {
+                if (active != value)
+                {
+                    active = value;
+                    if (Root != null) Root.Validate();
+                }
+            }
+        }
+
+        public virtual bool IsLocked
+        {
+            get => isLocked || Parent?.IsLocked == true;
+            set => isLocked = value;
+        }
+
+
+        public int StartTimeInt => 0;
+        public int EndTimeInt => 0;
+
+        public virtual float StartTime
+        {
+            get => Parent?.StartTime ?? 0;
+            set { }
+        }
+
+
+        public virtual float EndTime
+        {
+            get => Parent?.EndTime ?? Root?.Length ?? 0;
+            set { }
+        }
+
+        public virtual float BlendIn
+        {
+            get => 0f;
+            set { }
+        }
+
+
+        public virtual float BlendOut
+        {
+            get => 0f;
+            set { }
+        }
+
+        public bool CanCrossBlend => false;
+
+        public bool Initialize()
+        {
+            return true;
+        }
+
+        public void Validate(IDirector root, IDirectable parent)
+        {
+            this.root = root;
+            Parent = parent;
+            OnAfterValidate();
+        }
+
+        protected virtual void OnCreate()
+        {
+        }
+
+        protected virtual void OnAfterValidate()
+        {
+        }
+
+
+        public void PostCreate(IDirectable parent)
+        {
+            Parent = parent;
+            OnCreate();
+        }
+
+
+        public T AddClip<T>(float time) where T : ActionClip
+        {
+            return (T)AddClip(typeof(T), time);
+        }
+
+        public ActionClip AddClip(Type type, float time)
+        {
+            var error = StructureRules.AttachmentError(this, type);
+            if (error != null) throw new InvalidOperationException(error);
+            if (float.IsNaN(time) || float.IsInfinity(time) || time < 0) throw new ArgumentOutOfRangeException(nameof(time));
+            var categoryAttribute =
+                type.GetCustomAttributes(typeof(CategoryAttribute), true).FirstOrDefault() as CategoryAttribute;
+            if (categoryAttribute != null && Clips.Count == 0) Name = categoryAttribute.category + " Track";
+
+            var newClip = Activator.CreateInstance(type) as ActionClip;
+
+
+            if (newClip != null)
+            {
+
+                newClip.StartTime = time;
+                newClip.Name = type.Name;
+                Clips.Add(newClip);
+                newClip.PostCreate(this);
+
+                var nextClip = Clips.FirstOrDefault(a => a.StartTime > newClip.StartTime);
+                if (nextClip != null) newClip.EndTime = Mathf.Min(newClip.EndTime, nextClip.StartTime);
+
+                Root.Validate();
+            }
+
+            return newClip;
+        }
+
+        public ActionClip AddClip(ActionClip clip)
+        {
+            if (clip != null)
+            {
+                var error = StructureRules.AttachmentError(this, clip.GetType(), clip);
+                if (error != null) throw new InvalidOperationException(error);
+            }
+            if (clip != null && clip.FitsSiblingTiming(this, clip.StartTime, clip.EndTime))
+            {
+                if (clip.Parent != null && clip.Parent is ActionTrack track)
+                {
+                    track.DeleteClip(clip);
+                }
+
+                Clips.Add(clip);
+                Root.Validate();
+            }
+
+            return clip;
+        }
+
+        public void DeleteClip(ActionClip clip)
+        {
+            Clips.Remove(clip);
+            Root.Validate();
+        }
+    }
+}

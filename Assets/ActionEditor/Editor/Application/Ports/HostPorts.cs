@@ -19,10 +19,10 @@ namespace NBC.ActionEditor.Application.Ports
     }
 
     // 播放只消费采样能力与时间范围，不持有具体预览资源或作者图。
-    public interface IDocumentSampler
+    public interface ISequenceSampler
     {
         event Action Faulted;
-        bool HasDocument { get; }
+        bool HasSequence { get; }
         float CurrentTime { get; set; }
         float Length { get; }
         float RangeMin { get; }

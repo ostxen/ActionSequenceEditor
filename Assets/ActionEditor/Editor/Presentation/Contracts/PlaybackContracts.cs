@@ -5,12 +5,12 @@ namespace NBC.ActionEditor.Presentation.Contracts
     {
         bool Playing { get; }
         bool Paused { get; }
-        bool Range { get; set; }
+        bool RangePlaybackEnabled { get; set; }
         float Time { get; }
         float Length { get; }
         void Play();
         void Stop();
-        void Pause(bool paused);
+        void SetPaused(bool paused);
         void Seek(float time);
         void Step(bool forward);
     }

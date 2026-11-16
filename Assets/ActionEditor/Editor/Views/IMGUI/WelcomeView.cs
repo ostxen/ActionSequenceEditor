@@ -5,9 +5,9 @@ namespace NBC.ActionEditor.Views.IMGUI
     // 欢迎页只呈现文档意图，由所属窗口显式持有。
     public sealed class WelcomeView
     {
-        private readonly Presentation.Presenters.DocumentPresenter documents;
+        private readonly Presentation.Presenters.SequencePresenter documents;
         private readonly System.Action<Rect> showSettings;
-        public WelcomeView(Presentation.Presenters.DocumentPresenter documents, System.Action<Rect> showSettings)
+        public WelcomeView(Presentation.Presenters.SequencePresenter documents, System.Action<Rect> showSettings)
         { this.documents = documents; this.showSettings = showSettings; }
         public void OnGUI()
         {
@@ -34,7 +34,7 @@ namespace NBC.ActionEditor.Views.IMGUI
             GUIStyle titleStyle = new GUIStyle(GUI.skin.label);
             titleStyle.fontSize = 30;
             titleStyle.fontStyle = FontStyle.Bold;
-            GUILayout.Label(Lan.Title, titleStyle);
+            GUILayout.Label(EditorText.Title, titleStyle);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
@@ -42,32 +42,32 @@ namespace NBC.ActionEditor.Views.IMGUI
 
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            GUILayout.Label(Lan.WelcomeHint);
+            GUILayout.Label(EditorText.WelcomeHint);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
             GUI.backgroundColor = new Color(0.8f, 0.8f, 1, 1f);
 
-            if (DrawCenteredButton(Lan.CreateAsset))
+            if (DrawCenteredButton(EditorText.CreateSequence))
             {
-                documents.Invoke(Presentation.Contracts.DocumentIntent.Create);
+                documents.Invoke(Presentation.Contracts.SequenceIntent.Create);
             }
 
             GUI.backgroundColor = Color.white;
 
-            if (DrawCenteredButton(Lan.SelectAsset))
+            if (DrawCenteredButton(EditorText.OpenSequence))
             {
-                documents.Invoke(Presentation.Contracts.DocumentIntent.Open);
+                documents.Invoke(Presentation.Contracts.SequenceIntent.Open);
             }
 
             GUI.backgroundColor = Color.white;
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            GUILayout.Label(Lan.WelcomeHelp);
+            GUILayout.Label(EditorText.WelcomeHelp);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
-            if (DrawCenteredButton(Lan.Seeting))
+            if (DrawCenteredButton(EditorText.Settings))
             {
                 showSettings(new Rect(Styles.ScreenWidth - 5 - 400, 25, 400,
                     Styles.ScreenHeight - 70));

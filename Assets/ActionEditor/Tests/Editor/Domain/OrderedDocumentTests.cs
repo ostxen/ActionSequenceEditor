@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Serialization;
 using NBC.ActionEditor.Infrastructure.Serialization;
@@ -14,13 +14,13 @@ namespace NBC.ActionEditor.Tests
 {
     public sealed class OrderedDocumentTests
     {
-        [Serializable] public sealed class FixtureDocument : ActionDocument
+        [Serializable] public sealed class FixtureDocument : ActionSequence
         {
             public float[] Numbers;
             public Texture2D Reference;
         }
-        [Serializable] public sealed class FixtureTrack : TimelineTrack { }
-        [Serializable] public sealed class FixtureInterval : TimelineClip { public AnimationCurve Curve; }
+        [Serializable] public sealed class FixtureTrack : ActionTrack { }
+        [Serializable] public sealed class FixtureInterval : ActionClip { public AnimationCurve Curve; }
         [Serializable] public sealed class FixturePoint : PointClip { public string Payload; }
 
         // 独立手写字段和值，不从待测编码器生成预期。
@@ -32,27 +32,27 @@ namespace NBC.ActionEditor.Tests
             ""Reference"":{""$unity"":{""guid"":""0a565ffb56d0d444c85082f1c0e7cc5c"",""localFileId"":2800000}},
             ""length"":1.5,""rangeMin"":0,""rangeMax"":6,
             ""rootItems"":[
-              {""$type"":""NBC.ActionEditor.Domain.TimelineGroup, NBC.ActionEditor.Domain"",""ActorId"":0,""name"":""first"",""active"":true,""isLocked"":false,""tracks"":[]},
+              {""$type"":""NBC.ActionEditor.Model.ActionGroup, NBC.ActionEditor.Model"",""ActorId"":0,""name"":""first"",""active"":true,""isLocked"":false,""tracks"":[]},
               {""$type"":""NBC.ActionEditor.Tests.OrderedDocumentTests+FixtureTrack, NBC.ActionEditor.Editor.Tests"",""name"":""root"",""active"":true,""isLocked"":false,""color"":{""r"":1,""g"":1,""b"":1,""a"":1},""actionClips"":[
                 {""$type"":""NBC.ActionEditor.Tests.OrderedDocumentTests+FixtureInterval, NBC.ActionEditor.Editor.Tests"",""name"":""interval"",""startTime"":0.5,""length"":1,
                  ""Curve"":{""keys"":[{""time"":0,""value"":0.25,""inTangent"":0,""outTangent"":0,""inWeight"":0.125,""outWeight"":0.5,""weightedMode"":3}],""preWrapMode"":2,""postWrapMode"":4}},
                 {""$type"":""NBC.ActionEditor.Tests.OrderedDocumentTests+FixturePoint, NBC.ActionEditor.Editor.Tests"",""name"":""point"",""startTime"":1.5,""length"":1,""Payload"":null}
               ]},
-              {""$type"":""NBC.ActionEditor.Domain.TimelineGroup, NBC.ActionEditor.Domain"",""ActorId"":0,""name"":""last"",""active"":true,""isLocked"":false,""tracks"":[
+              {""$type"":""NBC.ActionEditor.Model.ActionGroup, NBC.ActionEditor.Model"",""ActorId"":0,""name"":""last"",""active"":true,""isLocked"":false,""tracks"":[
                 {""$type"":""NBC.ActionEditor.Tests.OrderedDocumentTests+FixtureTrack, NBC.ActionEditor.Editor.Tests"",""name"":""child"",""active"":true,""isLocked"":false,""color"":{""r"":1,""g"":1,""b"":1,""a"":1},""actionClips"":[]}
               ]}
             ]
           }
         }";
-        private static DocumentFormatContext Context => DocumentFormats.CreateContext(typeof(FixtureDocument), typeof(FixtureTrack), typeof(FixtureInterval), typeof(FixturePoint));
-        private static FixtureDocument Read(string json = Fixture) => (FixtureDocument)new ActionDocumentJsonFormat().Deserialize(Encoding.UTF8.GetBytes(json), Context);
+        private static SequenceFormatContext Context => SequenceFormats.CreateContext(typeof(FixtureDocument), typeof(FixtureTrack), typeof(FixtureInterval), typeof(FixturePoint));
+        private static FixtureDocument Read(string json = Fixture) => (FixtureDocument)new SequenceJsonFormat().Deserialize(Encoding.UTF8.GetBytes(json), Context);
         private static int Bits(float value) => BitConverter.ToInt32(BitConverter.GetBytes(value), 0);
 
         [Test] public void HandwrittenMixedRootsKeepOwnershipValuesCurveReferenceAndExactBits()
         {
             var document = Read();
-            Assert.That(document.RootItems.Select(item => item.GetType()), Is.EqualTo(new[] { typeof(TimelineGroup), typeof(FixtureTrack), typeof(TimelineGroup) }));
-            var root = (FixtureTrack)document.RootItems[1]; var group = (TimelineGroup)document.RootItems[2];
+            Assert.That(document.RootContainers.Select(item => item.GetType()), Is.EqualTo(new[] { typeof(ActionGroup), typeof(FixtureTrack), typeof(ActionGroup) }));
+            var root = (FixtureTrack)document.RootContainers[1]; var group = (ActionGroup)document.RootContainers[2];
             Assert.That(root.Parent, Is.Null); Assert.That(root.Root, Is.SameAs(document));
             Assert.That(group.Tracks[0].Parent, Is.SameAs(group));
             Assert.That(document.AllTracks, Is.EqualTo(new[] { root, group.Tracks[0] }));
@@ -66,9 +66,9 @@ namespace NBC.ActionEditor.Tests
             Assert.That(curve.keys[0].weightedMode, Is.EqualTo(WeightedMode.Both));
             foreach (var compressed in new[] { true, false })
             {
-                var format = new ActionDocumentJsonFormat();
-                var loaded = (FixtureDocument)format.Deserialize(format.Serialize(document, new DocumentFormatOptions(compressed), Context), Context);
-                Assert.That(DocumentValueConverter.Capture(loaded, typeof(ActionDocument), Context).ContentKey(), Is.EqualTo(DocumentValueConverter.Capture(document, typeof(ActionDocument), Context).ContentKey()));
+                var format = new SequenceJsonFormat();
+                var loaded = (FixtureDocument)format.Deserialize(format.Serialize(document, new SequenceFormatOptions(compressed), Context), Context);
+                Assert.That(JsonValueConverter.Capture(loaded, typeof(ActionSequence), Context).ContentKey(), Is.EqualTo(JsonValueConverter.Capture(document, typeof(ActionSequence), Context).ContentKey()));
             }
         }
 
@@ -79,7 +79,7 @@ namespace NBC.ActionEditor.Tests
                 Fixture.Replace("\"rootItems\":", "\"groups\":"),
                 Fixture.Replace("\"rangeMin\":0,", ""),
                 Fixture.Replace("\"rangeMin\":0,", "\"unknown\":0,\"rangeMin\":0,"),
-                Fixture.Replace("\"tracks\":[]", "\"tracks\":[{\"$type\":\"NBC.ActionEditor.Domain.TimelineGroup, NBC.ActionEditor.Domain\",\"ActorId\":0,\"name\":null,\"active\":true,\"isLocked\":false,\"tracks\":[]}]"),
+                Fixture.Replace("\"tracks\":[]", "\"tracks\":[{\"$type\":\"NBC.ActionEditor.Model.ActionGroup, NBC.ActionEditor.Model\",\"ActorId\":0,\"name\":null,\"active\":true,\"isLocked\":false,\"tracks\":[]}]"),
                 Fixture.Replace("FixtureInterval,", "MissingInterval,"),
                 Fixture.Replace("3.4028234663852886e38", "1e999"),
                 Fixture.Replace("2800000", "2800001") })
@@ -87,19 +87,19 @@ namespace NBC.ActionEditor.Tests
                 Assert.That(invalid, Is.Not.EqualTo(Fixture));
                 Assert.Throws<InvalidDataException>(() => Read(invalid));
             }
-            var document = Read(); document.AddRoot(document.RootItems[1]);
-            Assert.Throws<InvalidDataException>(() => new ActionDocumentJsonFormat().Serialize(document, default, Context));
+            var document = Read(); document.AddRootContainer(document.RootContainers[1]);
+            Assert.Throws<InvalidDataException>(() => new SequenceJsonFormat().Serialize(document, default, Context));
         }
 
         [Test] public void WindowWorkspacesDoNotEnterSnapshotsAndReleaseRemovedGraphReferences()
         {
-            var document = Read(); var group = (TimelineGroup)document.RootItems[0];
+            var document = Read(); var group = (ActionGroup)document.RootContainers[0];
             var first = new TimelineWorkspace(); var second = new TimelineWorkspace(); first.Bind(document); second.Bind(document);
-            var before = DocumentCopy.Content(document, Context);
+            var before = SequenceCopy.GetContentKey(document, Context);
             first.SetRange(-2, 9); first.ScrollY = 45; first.LeftWidth = 350; first.SetCollapsed(group, true);
             Assert.That(second.ViewTimeMin, Is.Zero); Assert.That(second.ScrollY, Is.Zero); Assert.That(second.LeftWidth, Is.EqualTo(240)); Assert.That(second.IsCollapsed(group), Is.False);
-            Assert.That(DocumentCopy.Content(document, Context), Is.EqualTo(before));
-            document.RemoveRoot(group); first.Bind(document); Assert.That(first.IsCollapsed(group), Is.False);
+            Assert.That(SequenceCopy.GetContentKey(document, Context), Is.EqualTo(before));
+            document.RemoveRootContainer(group); first.Bind(document); Assert.That(first.IsCollapsed(group), Is.False);
             first.Bind(Read()); Assert.That(first.ScrollY, Is.EqualTo(45)); Assert.That(first.IsCollapsed(group), Is.False);
             first.Bind(null); Assert.That(first.ScrollY, Is.Zero);
             Assert.Throws<ArgumentOutOfRangeException>(() => first.SetRange(-float.MaxValue, float.MaxValue));

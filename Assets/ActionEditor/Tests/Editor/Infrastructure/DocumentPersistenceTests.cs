@@ -1,10 +1,10 @@
 using NBC.ActionEditor.Views.IMGUI;
 using ImguiWindow = NBC.ActionEditor.Views.IMGUI.ActionEditorWindow;
 using ToolkitWindow = NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow;
-using ToolkitPreferences = NBC.ActionEditor.Views.UIToolkit.PreferencesWindow;
-using NBC.ActionEditor.Infrastructure.Documents;
+using ToolkitSettings = NBC.ActionEditor.Views.UIToolkit.SettingsWindow;
+using NBC.ActionEditor.Infrastructure.Sequences;
 using NBC.ActionEditor.Presentation.Timeline;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using System;
 using System.Collections;
 using System.IO;
@@ -24,53 +24,53 @@ namespace NBC.ActionEditor.Tests
     {
         [Test] public void SampleRoundtripContainsAllGroupsTracksClipsAndFields()
         {
-            var sample = (FeatureSampleDocument)EditorFixture.Shared.Document;
-            Assert.That(sample.RootItems.OfType<TimelineGroup>().Count(), Is.EqualTo(3));
-            Assert.That(sample.RootItems.OfType<TimelineGroup>().Sum(g => g.Tracks.Count), Is.EqualTo(7));
-            Assert.That(sample.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).Sum(t => t.Clips.Count), Is.EqualTo(13));
+            var sample = (FeatureSampleSequence)EditorFixture.Shared.Sequence;
+            Assert.That(sample.RootContainers.OfType<ActionGroup>().Count(), Is.EqualTo(3));
+            Assert.That(sample.RootContainers.OfType<ActionGroup>().Sum(g => g.Tracks.Count), Is.EqualTo(7));
+            Assert.That(sample.RootContainers.OfType<ActionGroup>().SelectMany(g => g.Tracks).Sum(t => t.Clips.Count), Is.EqualTo(13));
             Assert.That(sample.Length, Is.EqualTo(6));
-            var interval = (FeatureSampleInterval)sample.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[1];
+            var interval = (FeatureSampleInterval)sample.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[1];
             Assert.That(interval.Offset, Is.EqualTo(new Vector3(2, 1, 0)));
             Assert.That(interval.Parameters.Count, Is.EqualTo(2)); Assert.That(interval.CanScale(), Is.True);
-            Assert.That(sample.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[2].Clips[0].CanScale(), Is.False);
-            Assert.That(sample.RootItems.OfType<TimelineGroup>().ElementAt(2).Tracks[0].IsLocked, Is.True);
-            Assert.That(sample.RootItems.OfType<TimelineGroup>().ElementAt(2).Tracks[1].IsActive, Is.False);
+            Assert.That(sample.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[2].Clips[0].CanScale(), Is.False);
+            Assert.That(sample.RootContainers.OfType<ActionGroup>().ElementAt(2).Tracks[0].IsLocked, Is.True);
+            Assert.That(sample.RootContainers.OfType<ActionGroup>().ElementAt(2).Tracks[1].IsActive, Is.False);
         }
 
         [Test] public void SaveSnapshotRefreshesDerivedDurationWithoutDroppingEditedPayload()
         {
-            var clip = (FeatureSampleInterval)EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+            var clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0];
             clip.StartTime = 8; clip.Length = 3; clip.Count = 27;
-            Assert.That(EditorFixture.Shared.Document.Length, Is.EqualTo(6), "The public graph can contain a stale derived duration before commit.");
-            Assert.That(JsonDocumentCodec.InspectReadbackDifferences(EditorFixture.Shared.Document), Is.Empty, "Readback validates an isolated derived snapshot.");
-            var json = JsonDocumentCodec.CreateSaveSnapshot(EditorFixture.Shared.Document);
-            var loaded = NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Decode(json);
-            Assert.That(EditorFixture.Shared.Document.Length, Is.EqualTo(6), "Save snapshot must not mutate source duration.");
+            Assert.That(EditorFixture.Shared.Sequence.Length, Is.EqualTo(6), "The public graph can contain a stale derived duration before commit.");
+            Assert.That(SequenceJsonCodec.InspectReadbackDifferences(EditorFixture.Shared.Sequence), Is.Empty, "Readback validates an isolated derived snapshot.");
+            var json = SequenceJsonCodec.CreateSaveSnapshot(EditorFixture.Shared.Sequence);
+            var loaded = NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.Decode(json);
+            Assert.That(EditorFixture.Shared.Sequence.Length, Is.EqualTo(6), "Save snapshot must not mutate source duration.");
             Assert.That(loaded.Length, Is.EqualTo(11));
-            Assert.That(((FeatureSampleInterval)loaded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(27));
-            Assert.That(JsonDocumentCodec.InspectReadbackDifferences(EditorFixture.Shared.Document), Is.Empty);
+            Assert.That(((FeatureSampleInterval)loaded.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(27));
+            Assert.That(SequenceJsonCodec.InspectReadbackDifferences(EditorFixture.Shared.Sequence), Is.Empty);
         }
 
         [Test] public void JsonCodecPreservesFormatAndRejectsPayloadDifferences()
         {
-            var document = EditorFixture.Shared.Document;
-            var json = NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Encode(document);
-            Assert.That(JsonDocumentCodec.Encode(document), Is.EqualTo(json));
-            var decoded = JsonDocumentCodec.Decode(json);
-            Assert.That(JsonDocumentCodec.ReadbackDifferences(json, decoded), Is.Empty);
+            var document = EditorFixture.Shared.Sequence;
+            var json = NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.Encode(document);
+            Assert.That(SequenceJsonCodec.Encode(document), Is.EqualTo(json));
+            var decoded = SequenceJsonCodec.Decode(json);
+            Assert.That(SequenceJsonCodec.ReadbackDifferences(json, decoded), Is.Empty);
             Workspace.SetRange(1, 9);
-            Workspace.SetCollapsed(decoded.RootItems.OfType<TimelineGroup>().ElementAt(0), true);
-            Assert.That(JsonDocumentCodec.Content(decoded), Is.EqualTo(JsonDocumentCodec.Content(document)), "Workspace is excluded only from author content.");
-            Assert.That(JsonDocumentCodec.ReadbackDifferences(json, decoded), Is.Empty, "Workspace does not enter author snapshots.");
-            decoded = JsonDocumentCodec.Decode(json);
-            ((FeatureSampleInterval)decoded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count = 91;
-            var differences = JsonDocumentCodec.ReadbackDifferences(json, decoded);
+            Workspace.SetCollapsed(decoded.RootContainers.OfType<ActionGroup>().ElementAt(0), true);
+            Assert.That(SequenceJsonCodec.GetContentKey(decoded), Is.EqualTo(SequenceJsonCodec.GetContentKey(document)), "Workspace is excluded only from author content.");
+            Assert.That(SequenceJsonCodec.ReadbackDifferences(json, decoded), Is.Empty, "Workspace does not enter author snapshots.");
+            decoded = SequenceJsonCodec.Decode(json);
+            ((FeatureSampleInterval)decoded.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0]).Count = 91;
+            var differences = SequenceJsonCodec.ReadbackDifferences(json, decoded);
             Assert.That(differences, Has.Length.EqualTo(1));
             Assert.That(differences[0], Does.Contain("Count"));
             Assert.That(differences[0], Does.Not.Contain("91"), "Diagnostics must contain paths, not user values.");
-            decoded.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips.Add(null);
-            Assert.Throws<InvalidDataException>(() => JsonDocumentCodec.CreateSaveSnapshot(decoded));
-            Assert.That(EditorFixture.Shared.Document, Is.SameAs(document));
+            decoded.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips.Add(null);
+            Assert.Throws<InvalidDataException>(() => SequenceJsonCodec.CreateSaveSnapshot(decoded));
+            Assert.That(EditorFixture.Shared.Sequence, Is.SameAs(document));
             Assert.That(EditorFixture.Shared.Session.IsDirty, Is.False);
         }
 
@@ -81,16 +81,16 @@ namespace NBC.ActionEditor.Tests
             {
                 EditorFixture.Shared.Session.Edit("fractional edit", () =>
                 {
-                    foreach (var clip in EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().SelectMany(g => g.Tracks).SelectMany(t => t.Clips))
+                    foreach (var clip in EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().SelectMany(g => g.Tracks).SelectMany(t => t.Clips))
                     {
                         clip.StartTime = (float)(random.NextDouble() * 17);
                         if (clip.CanScale()) clip.Length = (float)(random.NextDouble() * 4 + .01);
                     }
                 });
-                var json = JsonDocumentCodec.CreateSaveSnapshot(EditorFixture.Shared.Document);
-                var differences = JsonDocumentCodec.InspectReadbackDifferences(EditorFixture.Shared.Document);
+                var json = SequenceJsonCodec.CreateSaveSnapshot(EditorFixture.Shared.Sequence);
+                var differences = SequenceJsonCodec.InspectReadbackDifferences(EditorFixture.Shared.Sequence);
                 Assert.That(differences, Is.Empty, "Iteration " + iteration + ": " + string.Join(", ", differences));
-                Assert.That(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Decode(json).Length, Is.EqualTo(EditorFixture.Shared.Document.Length));
+                Assert.That(NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.Decode(json).Length, Is.EqualTo(EditorFixture.Shared.Sequence.Length));
             }
         }
 
@@ -108,47 +108,47 @@ namespace NBC.ActionEditor.Tests
             {
                 foreach (var compressed in new[] { false, true })
                 {
-                    var context = new NBC.ActionEditor.Serialization.DocumentFormatContext(Array.Empty<Type>());
-                    var tree = NBC.ActionEditor.Serialization.DocumentValueConverter.Capture(value, typeof(float), context);
-                    var text = NBC.ActionEditor.Serialization.DocumentJson.Print(tree, compressed);
-                    var loaded = (float)NBC.ActionEditor.Serialization.DocumentValueConverter.Restore(NBC.ActionEditor.Serialization.DocumentJson.Parse(text), typeof(float), context);
+                    var context = new NBC.ActionEditor.Serialization.SequenceFormatContext(Array.Empty<Type>());
+                    var tree = NBC.ActionEditor.Serialization.JsonValueConverter.Capture(value, typeof(float), context);
+                    var text = NBC.ActionEditor.Serialization.JsonText.Print(tree, compressed);
+                    var loaded = (float)NBC.ActionEditor.Serialization.JsonValueConverter.Restore(NBC.ActionEditor.Serialization.JsonText.Parse(text), typeof(float), context);
                     Assert.That(BitConverter.GetBytes(loaded), Is.EqualTo(BitConverter.GetBytes(value)));
                 }
             }
-            Assert.That(NBC.ActionEditor.Serialization.DocumentValueConverter.Restore(NBC.ActionEditor.Serialization.DocumentJson.Parse("0.1"), typeof(float), new NBC.ActionEditor.Serialization.DocumentFormatContext(Array.Empty<Type>())), Is.EqualTo(.1f));
-            Assert.That(NBC.ActionEditor.Serialization.DocumentValueConverter.Restore(NBC.ActionEditor.Serialization.DocumentJson.Parse("3"), typeof(float), new NBC.ActionEditor.Serialization.DocumentFormatContext(Array.Empty<Type>())), Is.EqualTo(3f));
+            Assert.That(NBC.ActionEditor.Serialization.JsonValueConverter.Restore(NBC.ActionEditor.Serialization.JsonText.Parse("0.1"), typeof(float), new NBC.ActionEditor.Serialization.SequenceFormatContext(Array.Empty<Type>())), Is.EqualTo(.1f));
+            Assert.That(NBC.ActionEditor.Serialization.JsonValueConverter.Restore(NBC.ActionEditor.Serialization.JsonText.Parse("3"), typeof(float), new NBC.ActionEditor.Serialization.SequenceFormatContext(Array.Empty<Type>())), Is.EqualTo(3f));
         }
 
         [Test] public void RecoveryRejectsOldContractWithoutReplacingCurrentDocument()
         {
-            var before = EditorFixture.Shared.Session.Document; var recovery = EditorFixture.Shared.Session.CaptureRecovery();
+            var before = EditorFixture.Shared.Session.Sequence; var recovery = EditorFixture.Shared.Session.CaptureRecovery();
             Assert.That(recovery, Does.Contain("actioneditor.recovery.v2"));
             var old = recovery.Replace("\"Version\":2", "\"Version\":1").Replace("actioneditor.recovery.v2", "actioneditor.json");
             Assert.Throws<InvalidDataException>(() => EditorFixture.Shared.Session.RestoreRecovery(old));
-            Assert.That(EditorFixture.Shared.Session.Document, Is.SameAs(before));
+            Assert.That(EditorFixture.Shared.Session.Sequence, Is.SameAs(before));
             Assert.That(EditorFixture.Shared.Session.CaptureRecovery(), Is.EqualTo(recovery));
         }
 
         [Test] public void RecoveryPreservesUnsavedChangesAndBaseline()
         {
-            EditorFixture.Shared.Session.Edit("change", () => ((FeatureSampleDocument)EditorFixture.Shared.Document).Version = 9);
+            EditorFixture.Shared.Session.Edit("change", () => ((FeatureSampleSequence)EditorFixture.Shared.Sequence).Version = 9);
             var recovery = EditorFixture.Shared.Session.CaptureRecovery();
-            using var restored = NBC.ActionEditor.Composition.DocumentComposition.Create(); restored.RestoreRecovery(recovery);
-            Assert.That(((FeatureSampleDocument)restored.Document).Version, Is.EqualTo(9));
+            using var restored = NBC.ActionEditor.Composition.SequenceComposition.Create(); restored.RestoreRecovery(recovery);
+            Assert.That(((FeatureSampleSequence)restored.Sequence).Version, Is.EqualTo(9));
             Assert.That(restored.IsDirty, Is.True);
         }
 
         [Test] public void RecoveryKeepsDiscardBaselineIncludingViewStateAndRepeatedDiscard()
         {
             Workspace.ViewTimeMin = 1; Workspace.ViewTimeMax = 10;
-            EditorFixture.Shared.Session.Edit("change", () => ((FeatureSampleDocument)EditorFixture.Shared.Document).Version = 9);
-            using var restored = NBC.ActionEditor.Composition.DocumentComposition.Create();
+            EditorFixture.Shared.Session.Edit("change", () => ((FeatureSampleSequence)EditorFixture.Shared.Sequence).Version = 9);
+            using var restored = NBC.ActionEditor.Composition.SequenceComposition.Create();
             restored.RestoreRecovery(EditorFixture.Shared.Session.CaptureRecovery());
             restored.DiscardChanges();
-            Assert.That(((FeatureSampleDocument)restored.Document).Version, Is.EqualTo(1));
+            Assert.That(((FeatureSampleSequence)restored.Sequence).Version, Is.EqualTo(1));
             Assert.That(Workspace.ViewTimeMin, Is.EqualTo(1));
             Assert.That(Workspace.ViewTimeMax, Is.EqualTo(10));
-            Assert.That(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Encode(restored.Document), Does.Not.Contain("isCollapsed"));
+            Assert.That(NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.Encode(restored.Sequence), Does.Not.Contain("isCollapsed"));
             Assert.That(restored.IsDirty, Is.False);
             restored.DiscardChanges();
             Assert.That(restored.IsDirty || restored.IsEditing, Is.False);
@@ -160,9 +160,9 @@ namespace NBC.ActionEditor.Tests
             Directory.CreateDirectory(directory); var path = System.IO.Path.Combine(directory, "Document.json");
             try
             {
-                var original = System.Text.Encoding.UTF8.GetBytes(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Encode(EditorFixture.Shared.Document));
-                new AtomicFileCommit().Save(path, () => original, bytes => NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Decode(System.Text.Encoding.UTF8.GetString(bytes)));
-                Assert.That(NBC.ActionEditor.Infrastructure.Serialization.JsonDocumentCodec.Decode(File.ReadAllText(path)).RootItems.OfType<TimelineGroup>().Count(), Is.EqualTo(3));
+                var original = System.Text.Encoding.UTF8.GetBytes(NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence));
+                new AtomicFileCommit().Save(path, () => original, bytes => NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.Decode(System.Text.Encoding.UTF8.GetString(bytes)));
+                Assert.That(NBC.ActionEditor.Infrastructure.Serialization.SequenceJsonCodec.Decode(File.ReadAllText(path)).RootContainers.OfType<ActionGroup>().Count(), Is.EqualTo(3));
                 Assert.Throws<IOException>(() => new AtomicFileCommit().Save(path, () => original, _ => { }, new byte[] { 1 }));
                 Assert.That(File.ReadAllBytes(path), Is.EqualTo(original));
             }

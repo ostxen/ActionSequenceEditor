@@ -1,5 +1,5 @@
 using System;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 
 namespace NBC.ActionEditor.Application.Ports
 {
@@ -11,9 +11,9 @@ namespace NBC.ActionEditor.Application.Ports
     }
 
     // 创建目录由宿主控制，应用用例不发现或实例化未注册业务类型。
-    public interface IDocumentFactory
+    public interface ISequenceFactory
     {
-        ActionDocument Create(Type type);
+        ActionSequence Create(Type type);
     }
 
     // 属性默认值涉及宿主对象类型，由适配器决定可构造能力。

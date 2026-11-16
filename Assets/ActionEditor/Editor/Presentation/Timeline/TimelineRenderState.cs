@@ -26,17 +26,17 @@ namespace NBC.ActionEditor.Presentation.Timeline
         public float RangeEnd { get; }
         public bool Playing { get; }
         public bool RangeEnabled { get; }
-        public bool HasDocument { get; }
+        public bool HasSequence { get; }
         public TimelineRenderState(IEnumerable<TimelineRowState> rows, IEnumerable<TimelineClipState> clips,
             TimelineSize size, TimelineWorkspace workspace, float playhead, TimelineRect? marquee, InsertionIndicator insertion = default,
-            IEnumerable<ClipGuideState> guides = null, bool resizeCursor = false, NBC.ActionEditor.Domain.ActionDocument document = null,
+            IEnumerable<ClipGuideState> guides = null, bool resizeCursor = false, NBC.ActionEditor.Model.ActionSequence sequence = null,
             bool playing = false, bool rangeEnabled = false)
         {
             Rows = Array.AsReadOnly(rows.ToArray()); Clips = Array.AsReadOnly(clips.ToArray()); Size = size;
             LeftWidth = workspace.LeftWidth; Minimum = workspace.ViewTimeMin; Maximum = workspace.ViewTimeMax;
             ScrollY = workspace.ScrollY; Playhead = playhead; Marquee = marquee; Insertion = insertion;
             Guides = Array.AsReadOnly((guides ?? Enumerable.Empty<ClipGuideState>()).ToArray()); ResizeCursor = resizeCursor;
-            HasDocument = document != null; Duration = document?.Length ?? 0; RangeStart = document?.RangeMin ?? 0; RangeEnd = document?.RangeMax ?? 0;
+            HasSequence = sequence != null; Duration = sequence?.Length ?? 0; RangeStart = sequence?.RangeMin ?? 0; RangeEnd = sequence?.RangeMax ?? 0;
             Playing = playing; RangeEnabled = rangeEnabled;
         }
     }

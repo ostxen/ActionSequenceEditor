@@ -1,4 +1,4 @@
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -36,7 +36,7 @@ namespace NBC.ActionEditor
         private static bool WritableOverride(Type type, string name)
         {
             var property = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public);
-            return property != null && property.CanWrite && property.DeclaringType != typeof(TimelineClip);
+            return property != null && property.CanWrite && property.DeclaringType != typeof(ActionClip);
         }
         public static DirectableTypeInfo For(Type type)
         {

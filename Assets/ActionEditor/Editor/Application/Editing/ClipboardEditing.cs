@@ -1,30 +1,21 @@
-using NBC.ActionEditor.Domain;
-using NBC.ActionEditor.Application.Documents;
+using NBC.ActionEditor.Model;
+using NBC.ActionEditor.Application.Sequences;
 using NBC.ActionEditor.Application.Ports;
 using System;
 using System.Linq;
 
 namespace NBC.ActionEditor.Application.Editing
 {
-    // 剪贴板归共享会话，窗口只发送复制或粘贴意图。
-    public sealed class ClipboardState
-    {
-        public string Snapshot { get; internal set; }
-        public Type Type { get; internal set; }
-        public IDirectable CutSource { get; internal set; }
-        public IDirectable Item { get; set; }
-        public bool IsCut { get; set; }
-    }
 
     // 粘贴在单次事务中重验源和目标，异常不丢失剪切源。
     public sealed class ClipboardEditing
     {
-        private readonly DocumentSession session;
+        private readonly SequenceSession session;
         private readonly StructureEditing structure;
         private readonly ClipboardState state;
         private readonly IFragmentCodec codec;
         private readonly Action<IDirectable> select;
-        public ClipboardEditing(DocumentSession session, StructureEditing structure, ClipboardState state, IFragmentCodec codec, Action<IDirectable> select)
+        public ClipboardEditing(SequenceSession session, StructureEditing structure, ClipboardState state, IFragmentCodec codec, Action<IDirectable> select)
         { this.session = session; this.structure = structure; this.state = state; this.codec = codec; this.select = select; }
         public bool HasClipboard => state.Snapshot != null;
         public Type CopiedType => state.Type;
@@ -39,11 +30,11 @@ namespace NBC.ActionEditor.Application.Editing
         private string PasteError(IDirectable parent, float time)
         {
             if (state.Snapshot == null || state.Type == null) return "剪贴板为空。";
-            if (session.Document == null) return "没有打开的文档。";
+            if (session.Sequence == null) return "没有打开的文档。";
             if (float.IsNaN(time) || float.IsInfinity(time)) return "粘贴时间必须为有限值。";
             if (state.CutSource != null && structure.Contains(state.CutSource) && state.CutSource.IsLocked) return "剪切源已锁定。";
-            if (parent == null && typeof(TimelineTrack).IsAssignableFrom(state.Type))
-                return StructureRules.AttachmentError(session.Document, state.Type, state.CutSource);
+            if (parent == null && typeof(ActionTrack).IsAssignableFrom(state.Type))
+                return StructureRules.AttachmentError(session.Sequence, state.Type, state.CutSource);
             if (parent == null || !structure.Contains(parent) || parent.IsLocked) return "粘贴目标已失效或锁定。";
             if (state.CutSource == parent) return "不能把对象剪切到自身。";
             return StructureRules.AttachmentError(parent, state.Type, state.CutSource);
@@ -57,10 +48,10 @@ namespace NBC.ActionEditor.Application.Editing
                 clone = codec.Restore(state.Type, state.Snapshot);
                 if (clone == null) throw new InvalidOperationException("剪贴板反序列化失败。");
                 if (state.CutSource != null && structure.Contains(state.CutSource)) structure.Delete(state.CutSource);
-                if (parent is TimelineGroup group && clone is TimelineTrack track) group.Tracks.Add(track);
-                else if (parent == null && clone is TimelineTrack rootTrack) session.Document.AddRoot(rootTrack);
-                else if (parent is TimelineTrack target && clone is TimelineClip clip) { clip.StartTime = Math.Max(0, time); target.Clips.Add(clip); }
-                session.Document.Init();
+                if (parent is ActionGroup group && clone is ActionTrack track) group.Tracks.Add(track);
+                else if (parent == null && clone is ActionTrack rootTrack) session.Sequence.AddRootContainer(rootTrack);
+                else if (parent is ActionTrack target && clone is ActionClip clip) { clip.StartTime = Math.Max(0, time); target.Clips.Add(clip); }
+                session.Sequence.Init();
             }).Execute();
             state.CutSource = null; state.IsCut = false; select(clone); return clone;
         }
@@ -70,7 +61,7 @@ namespace NBC.ActionEditor.Application.Editing
             if (item == null || !structure.Contains(item) || item.IsLocked) throw new InvalidOperationException("锁定或失效对象不能复制副本。");
             var previousJson = state.Snapshot; var previousType = state.Type; var previousCut = state.CutSource;
             var previousItem = state.Item; var wasCut = state.IsCut;
-            try { Copy(item); Paste(item.Parent, item is TimelineClip clip ? clip.EndTime : 0); }
+            try { Copy(item); Paste(item.Parent, item is ActionClip clip ? clip.EndTime : 0); }
             catch
             {
                 state.Snapshot = previousJson; state.Type = previousType; state.CutSource = previousCut;

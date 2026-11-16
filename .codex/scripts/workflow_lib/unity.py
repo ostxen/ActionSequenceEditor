@@ -27,6 +27,7 @@ READ_ONLY = frozenset({
 
 # Explicit catalog, not a prefix heuristic. Only implemented return/poll contracts are admitted.
 MUTATIONS = {
+    "actioneditor.verification menu_layout_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.verification document_lifecycle_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.verification tutorial_probe": {"dry_run": True, "confirm": True, "poll": None},
     "actioneditor.verification export_probe": {"dry_run": True, "confirm": True, "poll": None},
@@ -330,7 +331,7 @@ class Unity:
 
     def preview(self, command, parameters, inputs=()):
         validate_parameters(parameters)
-        if command in {"actioneditor.verification document_lifecycle_probe", "actioneditor.verification persistence_probe"} and parameters:
+        if command in {"actioneditor.verification document_lifecycle_probe", "actioneditor.verification persistence_probe", "actioneditor.verification menu_layout_probe"} and parameters:
             blocked("Fixed operation accepts no parameters; targets cannot be overridden.")
         if command == "actioneditor.verification cancel_save_dialog":
             if parameters:
@@ -352,7 +353,7 @@ class Unity:
         if plan.get("kind") != "unity" or plan.get("command") not in MUTATIONS:
             blocked("Unsupported Unity mutation plan.")
         validate_parameters(plan["parameters"])
-        if plan["command"] in {"actioneditor.verification document_lifecycle_probe", "actioneditor.verification persistence_probe"} and plan["parameters"]:
+        if plan["command"] in {"actioneditor.verification document_lifecycle_probe", "actioneditor.verification persistence_probe", "actioneditor.verification menu_layout_probe"} and plan["parameters"]:
             blocked("Fixed operation accepts no parameters.")
         if plan["command"] == "actioneditor.verification cancel_save_dialog":
             if plan["parameters"]:

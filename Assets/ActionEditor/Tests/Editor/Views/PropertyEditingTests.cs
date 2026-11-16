@@ -1,9 +1,9 @@
 using NBC.ActionEditor.Presentation.Properties;
-using NBC.ActionEditor.Infrastructure.Assets;
+using NBC.ActionEditor.Infrastructure.Discovery;
 using NBC.ActionEditor.Views.IMGUI.Properties;
 using ToolkitWindow = NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow;
-using ToolkitProperties = NBC.ActionEditor.Views.UIToolkit.PropertyView;
-using NBC.ActionEditor.Domain;
+using ToolkitProperties = NBC.ActionEditor.Views.UIToolkit.PropertyFieldsView;
+using NBC.ActionEditor.Model;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -53,7 +53,7 @@ namespace NBC.ActionEditor.Tests
                 root.Add(control);
             }
         }
-        private sealed class StructInspector : InspectorsBase
+        private sealed class StructInspector : PropertyInspectorBase
         {
             public void Draw(Fields value)
             {
@@ -84,7 +84,7 @@ namespace NBC.ActionEditor.Tests
                 Inspector?.OnInspectorGUI();
             }
         }
-        private sealed class OptionsInspector : InspectorsBase
+        private sealed class OptionsInspector : PropertyInspectorBase
         {
             public bool ConditionalVisible;
             public bool FocusOptions;
@@ -112,7 +112,7 @@ namespace NBC.ActionEditor.Tests
                 }
             }
         }
-        private sealed class NullInspector : InspectorsBase
+        private sealed class NullInspector : PropertyInspectorBase
         {
             public Rect ButtonRect;
             private string buttonLabel;
@@ -152,7 +152,7 @@ namespace NBC.ActionEditor.Tests
         }
         private struct NestedCollection { public int[] Items; }
         private sealed class NestedCollectionOwner { public NestedCollection Value; }
-        private sealed class NestedCollectionInspector : InspectorsBase
+        private sealed class NestedCollectionInspector : PropertyInspectorBase
         {
             public Rect AddRect;
             public void Draw(NestedCollectionOwner value)
@@ -183,7 +183,7 @@ namespace NBC.ActionEditor.Tests
         [SetUp] public void SetUp()
         {
             previous = EditorFixture.Shared.Source; recovery = EditorFixture.Shared.Session.CaptureRecovery();
-            fixture = new TextAsset(JsonDocumentCodec.Encode(new FeatureSampleDocument())); EditorFixture.Shared.Open(fixture);
+            fixture = new TextAsset(SequenceJsonCodec.Encode(new FeatureSampleSequence())); EditorFixture.Shared.Open(fixture);
         }
         [TearDown] public void TearDown()
         {
@@ -192,8 +192,8 @@ namespace NBC.ActionEditor.Tests
         }
         [Test] public void DescriptionsCacheConditionsAndRealOptionValuesWithoutChangingOrder()
         {
-            var value = new Fields(); var fields = PropertyDescription.For(typeof(Fields));
-            Assert.That(PropertyDescription.For(typeof(Fields)), Is.SameAs(fields));
+            var value = new Fields(); var fields = PropertyFieldMetadata.For(typeof(Fields));
+            Assert.That(PropertyFieldMetadata.For(typeof(Fields)), Is.SameAs(fields));
             Assert.That(fields.Select(d => d.Field.Name), Is.EqualTo(typeof(Fields).GetFields().Select(f => f.Name)));
             var options = fields.Single(d => d.Field.Name == "Mode");
             Assert.That(options.Constants.Select(f => f.GetRawConstantValue()), Is.EqualTo(new object[] { 7, 20 }));
@@ -202,19 +202,19 @@ namespace NBC.ActionEditor.Tests
             var conditional = fields.Single(d => d.Field.Name == "Conditional");
             Assert.That(conditional.Visible(value), Is.False); value.Mode = 20; Assert.That(conditional.Visible(value), Is.True);
             Assert.That(fields.Single(d => d.Field.Name == "Hidden").Visible(value), Is.False);
-            Assert.That(typeof(PropertyDescription).GetProperties().Any(p => typeof(Attribute).IsAssignableFrom(p.PropertyType)), Is.False,
+            Assert.That(typeof(PropertyFieldMetadata).GetProperties().Any(p => typeof(Attribute).IsAssignableFrom(p.PropertyType)), Is.False,
                 "Cached descriptions must not expose mutable declaration attributes.");
         }
         [Test] public void ImguiFoldoutsUseReferenceIdentityAndResetWithTarget()
         {
-            var inspector = new InspectorsBase();
+            var inspector = new PropertyInspectorBase();
             var first = new SameHash(); var second = new SameHash();
             var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
             var firstPath = presenter.CaptureTarget(first).Id;
             var secondPath = presenter.CaptureTarget(second).Id;
             const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
-            var set = typeof(InspectorsBase).GetMethod("SetExpanded", flags);
-            var get = typeof(InspectorsBase).GetMethod("GetCollectionFoldout", flags);
+            var set = typeof(PropertyInspectorBase).GetMethod("SetExpanded", flags);
+            var get = typeof(PropertyInspectorBase).GetMethod("GetCollectionFoldout", flags);
             set.Invoke(inspector, new object[] { firstPath, true });
             Assert.That(get.Invoke(inspector, new object[] { firstPath }), Is.True);
             Assert.That(get.Invoke(inspector, new object[] { secondPath }), Is.False);
@@ -275,16 +275,16 @@ namespace NBC.ActionEditor.Tests
             numbers = presenter.CaptureInputs(value).Single(f => f.Name == "Numbers");
             presenter.Remove(numbers.Id, 0);
             Assert.That(value.Numbers, Is.Empty);
-            var clip = (FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0];
+            var clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
             var path = presenter.CaptureInputs(clip).Single(f => f.Name == "Count").Id;
             presenter.Write(path, 12); Undo.PerformUndo();
             Assert.Throws<InvalidOperationException>(() => presenter.Write(path, 15));
-            clip = (FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0]; clip.Parent.IsLocked = true;
+            clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0]; clip.Parent.IsLocked = true;
             Assert.Throws<InvalidOperationException>(() => presenter.Write(presenter.CaptureInputs(clip).Single(f => f.Name == "Count").Id, 20));
         }
         [Test] public void SelectedPropertyWritesAndCollectionEditsAreAtomicAndDoNotShareMutableValues()
         {
-            var clips = EditorFixture.Shared.Document.AllTracks.First().Clips.Take(2).Cast<FeatureSampleInterval>().ToArray();
+            var clips = EditorFixture.Shared.Sequence.AllTracks.First().Clips.Take(2).Cast<FeatureSampleInterval>().ToArray();
             EditorFixture.Shared.Selection.Set(clips.Cast<IDirectable>().ToArray(), false);
             var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
             var count = presenter.CaptureInputs(clips[0]).Single(f => f.Name == "Count").Id;
@@ -305,19 +305,19 @@ namespace NBC.ActionEditor.Tests
             Assert.That(clips[0].Parameters, Is.Not.SameAs(clips[1].Parameters));
             Assert.That(clips[0].Parameters[0], Is.Not.SameAs(clips[1].Parameters[0]));
             clips[1].Parameters.Clear();
-            var unchanged = JsonDocumentCodec.Encode(EditorFixture.Shared.Document);
+            var unchanged = SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence);
             var unequal = Parameters().Children[0].Children.Single(f => f.Name == "Value").Id;
             Assert.That(presenter.CanInput(unequal), Is.False);
             Assert.DoesNotThrow(() => presenter.CaptureInputs(clips[0]));
             Assert.Throws<ArgumentOutOfRangeException>(() => presenter.Write(unequal, 99f));
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(unchanged));
-            EditorFixture.Shared.Document.AllTracks.First().Clips.Remove(clips[1]);
-            EditorFixture.Shared.Document.AllTracks.Skip(1).First().Clips.Add(clips[1]); EditorFixture.Shared.Document.Init();
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(unchanged));
+            EditorFixture.Shared.Sequence.AllTracks.First().Clips.Remove(clips[1]);
+            EditorFixture.Shared.Sequence.AllTracks.Skip(1).First().Clips.Add(clips[1]); EditorFixture.Shared.Sequence.Init();
             Assert.That(clips[0].IsLocked, Is.False);
             clips[1].Parent.IsLocked = true;
-            var locked = JsonDocumentCodec.Encode(EditorFixture.Shared.Document);
+            var locked = SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence);
             Assert.Throws<InvalidOperationException>(() => presenter.Write(count, 99));
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(locked));
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(locked));
             Assert.That(EditorFixture.Shared.Session.IsEditing, Is.False);
         }
 
@@ -327,7 +327,7 @@ namespace NBC.ActionEditor.Tests
             try
             {
                 window.Show(); yield return null;
-                var clip = EditorFixture.Shared.Document.AllTracks.SelectMany(track => track.Clips).OfType<FeatureSampleLoop>().First();
+                var clip = EditorFixture.Shared.Sequence.AllTracks.SelectMany(track => track.Clips).OfType<FeatureSampleLoop>().First();
                 clip.Period = 0;
                 EditorFixture.Shared.Selection.Set(Array.Empty<IDirectable>(), false);
                 var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
@@ -360,10 +360,10 @@ namespace NBC.ActionEditor.Tests
             Editor inspector = null;
             try
             {
-                var clip = EditorFixture.Shared.Document.AllTracks.SelectMany(track => track.Clips).OfType<FeatureSampleLoop>().First();
+                var clip = EditorFixture.Shared.Sequence.AllTracks.SelectMany(track => track.Clips).OfType<FeatureSampleLoop>().First();
                 clip.Period = 0;
                 EditorFixture.Shared.Selection.Set(Array.Empty<IDirectable>(), false);
-                var before = JsonDocumentCodec.Encode(EditorFixture.Shared.Document);
+                var before = SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence);
                 proxy.Bind(() => EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings));
                 inspector = Editor.CreateEditor(proxy); window.Inspector = inspector;
                 window.position = new Rect(100, 100, 450, 400); window.Show(); window.Focus(); window.Repaint();
@@ -373,7 +373,7 @@ namespace NBC.ActionEditor.Tests
                 window.SendEvent(new Event { type = EventType.MouseUp, button = 0, mousePosition = point });
                 yield return null;
                 Assert.That(EditorFixture.Shared.Selection.First, Is.SameAs(clip));
-                Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before));
+                Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before));
                 Assert.That(EditorFixture.Shared.Session.IsEditing, Is.False);
                 LogAssert.NoUnexpectedReceived();
             }
@@ -388,7 +388,7 @@ namespace NBC.ActionEditor.Tests
         [Test] public void ValueTypePropertyCopiesKeepNestedMutableFieldsIndependent()
         {
             var factory = new NBC.ActionEditor.Infrastructure.Serialization.PropertyValueFactory(
-                DocumentFormats.CreateContext(typeof(ReferenceValue), typeof(OuterValue)));
+                SequenceFormats.CreateContext(typeof(ReferenceValue), typeof(OuterValue)));
             var source = new OuterValue { Inner = new ReferenceValue { Items = new List<FeatureSampleParameter>
                 { new FeatureSampleParameter { Key = "independent", Value = 7 } } } };
             var first = (OuterValue)factory.Copy(source);
@@ -404,13 +404,13 @@ namespace NBC.ActionEditor.Tests
 
         [Test] public void SelectionChangeRejectsDelayedBatchWritesAndOldFieldCallbacks()
         {
-            var clips = EditorFixture.Shared.Document.AllTracks.First().Clips.Take(2).Cast<FeatureSampleInterval>().ToArray();
+            var clips = EditorFixture.Shared.Sequence.AllTracks.First().Clips.Take(2).Cast<FeatureSampleInterval>().ToArray();
             EditorFixture.Shared.Selection.Set(clips.Cast<IDirectable>().ToArray(), false);
             var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
             var path = presenter.CaptureInputs(clips[0]).Single(f => f.Name == "Count").Id;
             var input = presenter.BeginDraft(path);
             EditorFixture.Shared.Selection.Set(new IDirectable[] { clips[1] }, false);
-            var before = JsonDocumentCodec.Encode(EditorFixture.Shared.Document);
+            var before = SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence);
             Assert.Throws<InvalidOperationException>(() => presenter.CommitDraft(input, 41));
             Assert.That(input.Active, Is.False);
             Assert.That(presenter.CanInput(path), Is.False);
@@ -418,7 +418,7 @@ namespace NBC.ActionEditor.Tests
             EditorFixture.Shared.Selection.Set(clips.Cast<IDirectable>().ToArray(), false);
             Assert.Throws<InvalidOperationException>(() => presenter.Write(path, 44), "Returning to the same selection must not revive old controls.");
             EditorFixture.Shared.Selection.Set(new IDirectable[] { clips[1] }, false);
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before));
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before));
             Assert.That(EditorFixture.Shared.Session.IsEditing, Is.False);
             var current = presenter.CaptureInputs(clips[1]).Single(f => f.Name == "Count").Id;
             presenter.Write(current, 43);
@@ -439,7 +439,7 @@ namespace NBC.ActionEditor.Tests
             try
             {
                 window.Show(); yield return null;
-                FeatureSampleInterval[] Clips() => EditorFixture.Shared.Document.AllTracks.First().Clips.Take(2).Cast<FeatureSampleInterval>().ToArray();
+                FeatureSampleInterval[] Clips() => EditorFixture.Shared.Sequence.AllTracks.First().Clips.Take(2).Cast<FeatureSampleInterval>().ToArray();
                 var selected = Clips(); selected[1].Count = 9;
                 EditorFixture.Shared.Selection.Set(selected.Cast<IDirectable>().ToArray(), false);
                 var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
@@ -479,7 +479,7 @@ namespace NBC.ActionEditor.Tests
             var window = ScriptableObject.CreateInstance<NullWindow>();
             try
             {
-                FeatureSampleInterval[] Clips() => EditorFixture.Shared.Document.AllTracks.First().Clips.Take(2).Cast<FeatureSampleInterval>().ToArray();
+                FeatureSampleInterval[] Clips() => EditorFixture.Shared.Sequence.AllTracks.First().Clips.Take(2).Cast<FeatureSampleInterval>().ToArray();
                 window.position = new Rect(100, 100, 450, 250); window.Show();
                 foreach (var field in new[] { "Caption", "Parameters" })
                 {
@@ -488,7 +488,7 @@ namespace NBC.ActionEditor.Tests
                     if (field == "Parameters")
                     {
                         var path = window.Inspector.Presenter.CaptureInputs(clips[0]).Single(f => f.Name == field).Id;
-                        var folds = (Dictionary<object, bool>)typeof(InspectorsBase)
+                        var folds = (Dictionary<object, bool>)typeof(PropertyInspectorBase)
                             .GetField("collectionFoldouts", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(window.Inspector);
                         folds[path.ViewKey] = true;
                     }
@@ -510,8 +510,8 @@ namespace NBC.ActionEditor.Tests
         [Test] public void ClipPropertyTimingCannotBorrowAnActiveGestureOrCrossItsNextBound()
         {
             var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
-            var clip = EditorFixture.Shared.Document.AllTracks.First().Clips[0];
-            var before = JsonDocumentCodec.Encode(EditorFixture.Shared.Document);
+            var clip = EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
+            var before = SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence);
             using (var token = EditorFixture.Shared.Session.BeginEdit(this))
             {
                 Assert.Throws<InvalidOperationException>(() => presenter.Timing(presenter.CaptureTarget(clip).Id, 10, 10));
@@ -524,7 +524,7 @@ namespace NBC.ActionEditor.Tests
                 Assert.Throws<InvalidOperationException>(() => presenter.Append(collection.Id));
                 Assert.Throws<InvalidOperationException>(() => presenter.Remove(collection.Id, 0));
                 Assert.That(token.IsActive, Is.True);
-                Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before));
+                Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before));
                 token.Commit();
             }
             var maximum = presenter.CaptureTarget(clip).Clip.Maximum;
@@ -533,50 +533,50 @@ namespace NBC.ActionEditor.Tests
             Assert.That(clip.EndTime, Is.LessThanOrEqualTo(maximum));
             Assert.That(EditorFixture.Shared.Session.IsEditing, Is.False);
             Undo.PerformUndo();
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before));
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before));
         }
 
         [Test] public void ClipPropertyRejectsNonFiniteAndInvalidStepWithoutLeavingEdit()
         {
-            var clip = EditorFixture.Shared.Document.AllTracks.First().Clips[0];
-            var before = JsonDocumentCodec.Encode(EditorFixture.Shared.Document);
+            var clip = EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
+            var before = SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence);
             Assert.Throws<ArgumentOutOfRangeException>(() => EditorFixture.Shared.Clips.SetTiming(clip, float.NaN, 1, .1f));
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before));
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before));
             Assert.That(EditorFixture.Shared.Session.IsEditing, Is.False);
-            clip = EditorFixture.Shared.Document.AllTracks.First().Clips[0];
+            clip = EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
             Assert.Throws<ArgumentOutOfRangeException>(() => EditorFixture.Shared.Clips.SetTiming(clip, 0, 1, 0));
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before));
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before));
             Assert.That(EditorFixture.Shared.Session.IsEditing, Is.False);
-            clip = EditorFixture.Shared.Document.AllTracks.First().Clips[0];
+            clip = EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
             var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
             presenter.Timing(presenter.CaptureTarget(clip).Id, .2f, .4f);
             Assert.That(clip.Length, Is.EqualTo(.2f).Within(.00001f));
             Assert.That(clip.BlendIn, Is.InRange(0, clip.Length));
             Assert.That(clip.BlendOut, Is.InRange(0, clip.Length - clip.BlendIn));
-            var shortened = JsonDocumentCodec.Encode(EditorFixture.Shared.Document);
+            var shortened = SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence);
             Undo.PerformUndo();
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before));
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before));
             Undo.PerformRedo();
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(shortened));
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(shortened));
             Undo.PerformUndo();
 
-            var loop = EditorFixture.Shared.Document.AllTracks.SelectMany(t => t.Clips).OfType<FeatureSampleLoop>().First();
-            EditorFixture.Shared.Clips.MatchLoop(loop, 1);
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before), "Next loop cannot cross the next start, even for cross-blend peers.");
-            EditorFixture.Shared.Clips.MatchLoop(loop, -1);
+            var loop = EditorFixture.Shared.Sequence.AllTracks.SelectMany(t => t.Clips).OfType<FeatureSampleLoop>().First();
+            EditorFixture.Shared.Clips.MatchLoopLength(loop, 1);
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before), "Next loop cannot cross the next start, even for cross-blend peers.");
+            EditorFixture.Shared.Clips.MatchLoopLength(loop, -1);
             Assert.That(loop.Length, Is.EqualTo(1.5f));
             Undo.PerformUndo();
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before));
-            loop = EditorFixture.Shared.Document.AllTracks.SelectMany(t => t.Clips).OfType<FeatureSampleLoop>().First();
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before));
+            loop = EditorFixture.Shared.Sequence.AllTracks.SelectMany(t => t.Clips).OfType<FeatureSampleLoop>().First();
             loop.Period = .625f;
-            EditorFixture.Shared.Clips.MatchLoop(loop, 1);
+            EditorFixture.Shared.Clips.MatchLoopLength(loop, 1);
             Assert.That(loop.EndTime, Is.EqualTo(loop.GetNextSibling().StartTime), "An exact next-start boundary remains allowed.");
         }
 
         [Test] public void PointPropertyMovePreservesStoredLengthAndUndo()
         {
-            var clip = EditorFixture.Shared.Document.AllTracks.SelectMany(t => t.Clips).OfType<FeatureSampleMarker>().First();
-            var length = typeof(TimelineClip).GetField("length", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var clip = EditorFixture.Shared.Sequence.AllTracks.SelectMany(t => t.Clips).OfType<FeatureSampleMarker>().First();
+            var length = typeof(ActionClip).GetField("length", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             var stored = length.GetValue(clip);
             var start = clip.StartTime;
             EditorFixture.Shared.Clips.SetTiming(clip, 1, 1, .1f);
@@ -584,7 +584,7 @@ namespace NBC.ActionEditor.Tests
             Assert.That(clip.Length, Is.Zero);
             Assert.That(length.GetValue(clip), Is.EqualTo(stored));
             Undo.PerformUndo();
-            clip = EditorFixture.Shared.Document.AllTracks.SelectMany(t => t.Clips).OfType<FeatureSampleMarker>().First();
+            clip = EditorFixture.Shared.Sequence.AllTracks.SelectMany(t => t.Clips).OfType<FeatureSampleMarker>().First();
             Assert.That(clip.StartTime, Is.EqualTo(start));
             Assert.That(length.GetValue(clip), Is.EqualTo(stored));
         }
@@ -592,7 +592,7 @@ namespace NBC.ActionEditor.Tests
         [Test] public void PresenterDraftCancelsRejectsConcurrentChangesAndCommitsOneUndo()
         {
             var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
-            var clip = (FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0];
+            var clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
             EditorFixture.Shared.Selection.Set(new IDirectable[] { clip }, false);
             NBC.ActionEditor.Presentation.Properties.PropertyFieldId Field() => presenter.CaptureSelectionInputs().Single(f => f.Name == "Count").Id;
             var field = Field();
@@ -611,13 +611,13 @@ namespace NBC.ActionEditor.Tests
             Assert.Throws<InvalidOperationException>(() => presenter.CommitDraft(draft, 20));
             Assert.That(clip.Count, Is.EqualTo(15));
             Undo.PerformUndo(); Undo.PerformUndo();
-            Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0]).Count, Is.EqualTo(3));
+            Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0]).Count, Is.EqualTo(3));
         }
 
         [Test] public void DraftInvalidatedByLockReleasesOnlyItsOwnInput()
         {
             var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
-            var clip = (FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0];
+            var clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
             EditorFixture.Shared.Selection.Set(new IDirectable[] { clip }, false);
             var field = presenter.CaptureSelectionInputs().Single(f => f.Name == "Count").Id;
             var input = presenter.BeginDraft(field);
@@ -652,24 +652,24 @@ namespace NBC.ActionEditor.Tests
         [Test] public void CurveDisplayAndSubmittedValueDoNotAliasAuthorData()
         {
             var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
-            var clip = (FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0];
-            var before = JsonDocumentCodec.Encode(EditorFixture.Shared.Document);
+            var clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
+            var before = SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence);
             var field = presenter.CaptureInputs(clip).Single(f => f.Name == "Curve");
             var displayed = (AnimationCurve)field.Value;
             Assert.That(displayed, Is.Not.SameAs(clip.Curve));
             displayed.AddKey(.5f, 2);
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before));
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before));
             presenter.Write(field.Id, displayed);
             Assert.That(clip.Curve.length, Is.EqualTo(3));
             displayed.AddKey(.75f, 3);
             Assert.That(clip.Curve.length, Is.EqualTo(3));
             Undo.PerformUndo();
-            Assert.That(JsonDocumentCodec.Encode(EditorFixture.Shared.Document), Is.EqualTo(before));
+            Assert.That(SequenceJsonCodec.Encode(EditorFixture.Shared.Sequence), Is.EqualTo(before));
         }
 
         [Test] public void AuthoredPathsUseOneUndoCancelAndRejectStaleOrLockedRoots()
         {
-            FeatureSampleInterval Clip() => (FeatureSampleInterval)EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+            FeatureSampleInterval Clip() => (FeatureSampleInterval)EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0];
             NBC.ActionEditor.Application.Editing.PropertyPath Path(FeatureSampleInterval clip) => new NBC.ActionEditor.Application.Editing.PropertyPath(EditorFixture.Shared.Properties, clip).Field(typeof(FeatureSampleInterval).GetField("Parameters")).Element(0).Field(typeof(FeatureSampleParameter).GetField("Value"));
             var path = Path(Clip()); var token = EditorFixture.Shared.Session.BeginEdit(this);
             path.Write(4f); path.Write(6f); token.Commit();
@@ -680,7 +680,7 @@ namespace NBC.ActionEditor.Tests
             Assert.That(Clip().Parameters[0].Value, Is.EqualTo(6));
             token = EditorFixture.Shared.Session.BeginEdit(this); Path(Clip()).Write(12f); token.Cancel();
             Assert.That(Clip().Parameters[0].Value, Is.EqualTo(6));
-            EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].IsLocked = true;
+            EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].IsLocked = true;
             Assert.Throws<InvalidOperationException>(() => Path(Clip()).Write(15f));
             Assert.That(Clip().Parameters[0].Value, Is.EqualTo(6));
         }
@@ -692,7 +692,7 @@ namespace NBC.ActionEditor.Tests
                 window.Show(); yield return null;
                 var root = new VisualElement(); window.rootVisualElement.Add(root);
                 var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
-                var clip = (FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0];
+                var clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
                 var refreshes = 0;
                 var properties = new ToolkitProperties(presenter, type =>
                 {
@@ -704,9 +704,9 @@ namespace NBC.ActionEditor.Tests
                 root.Q<IntegerField>("extension-count").value = 17;
                 Assert.That(clip.Count, Is.EqualTo(17)); Assert.That(refreshes, Is.EqualTo(1));
                 Undo.PerformUndo();
-                Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0]).Count, Is.EqualTo(3));
-                Assert.That(EditorExtensionFactory.GetToolkitProperties(typeof(FeatureSampleInterval)), Is.Null, "Injected test adapters must not enter the product registry.");
-                clip = (FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0];
+                Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0]).Count, Is.EqualTo(3));
+                Assert.That(EditorExtensionFactory.CreateToolkitPropertyExtension(typeof(FeatureSampleInterval)), Is.Null, "Injected test adapters must not enter the product registry.");
+                clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
                 clip.Parent.IsLocked = true;
                 root.Clear(); properties.Populate(root, presenter.CaptureTarget(clip), () => refreshes++);
                 Assert.That(root.Q<IntegerField>("extension-count").enabledInHierarchy, Is.False);
@@ -722,7 +722,7 @@ namespace NBC.ActionEditor.Tests
             try
             {
                 window.Show(); yield return null;
-                window.Select(EditorFixture.Shared.Document.AllTracks.First().Clips[0]);
+                window.Select(EditorFixture.Shared.Sequence.AllTracks.First().Clips[0]);
                 editor = Editor.CreateEditor(Selection.activeObject);
                 var view = editor.CreateInspectorGUI();
                 view.style.position = Position.Absolute; view.style.right = 0; view.style.width = 280;
@@ -732,7 +732,7 @@ namespace NBC.ActionEditor.Tests
                 foreach (var component in vector.Query<FloatField>().ToList())
                     Assert.That(component.Q(className: "unity-base-field__input").resolvedStyle.width, Is.GreaterThan(15));
                 vector.value = new Vector3(7, 8, 9);
-                Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0]).Offset, Is.EqualTo(new Vector3(7, 8, 9)));
+                Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0]).Offset, Is.EqualTo(new Vector3(7, 8, 9)));
                 view.RemoveFromHierarchy(); LogAssert.NoUnexpectedReceived();
             }
             finally { if (editor != null) UnityEngine.Object.DestroyImmediate(editor); window.DiscardChanges(); window.Close(); }
@@ -746,7 +746,7 @@ namespace NBC.ActionEditor.Tests
                 window.Show(); yield return null;
                 var root = new VisualElement(); window.rootVisualElement.Add(root);
                 var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
-                var clip = (FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0];
+                var clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0];
                 new ToolkitProperties(presenter).DrawFields(root, presenter.CaptureInputs(clip), () => { }, 0);
                 var field = root.Query<IntegerField>().ToList().Single(f => f.label == "次数");
                 clip.Parent.IsLocked = true;
@@ -757,7 +757,7 @@ namespace NBC.ActionEditor.Tests
                 presenter.Write(presenter.CaptureInputs(clip).Single(f => f.Name == "Count").Id, 12);
                 Undo.PerformUndo();
                 field.value = 19;
-                Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Document.AllTracks.First().Clips[0]).Count, Is.EqualTo(3));
+                Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Sequence.AllTracks.First().Clips[0]).Count, Is.EqualTo(3));
                 Assert.That(root.Q<HelpBox>(), Is.Not.Null);
                 root.RemoveFromHierarchy(); LogAssert.NoUnexpectedReceived();
             }
@@ -870,7 +870,7 @@ namespace NBC.ActionEditor.Tests
             {
                 window.Show(); window.Focus(); yield return null; yield return null;
                 var root = new VisualElement(); window.rootVisualElement.Add(root);
-                var clip = (FeatureSampleInterval)EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+                var clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0];
                 var presenter = EditorFixture.Shared.CreateProperties(EditorFixture.SharedSettings);
                 new ToolkitProperties(presenter).DrawFields(root, presenter.CaptureInputs(clip), () => { }, 0);
                 var field = root.Query<IntegerField>().ToList().Single(f => f.label == "次数");
@@ -892,8 +892,8 @@ namespace NBC.ActionEditor.Tests
                 window.Canvas.Focus(); yield return null;
                 Assert.That(clip.Count, Is.EqualTo(9), "Escape must restore committed input instead of committing the pending text on blur.");
                 Undo.PerformUndo(); yield return null;
-                Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(3));
-                root.Clear(); clip = (FeatureSampleInterval)EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0];
+                Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(3));
+                root.Clear(); clip = (FeatureSampleInterval)EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0];
                 new ToolkitProperties(presenter).DrawFields(root, presenter.CaptureInputs(clip), () => { }, 0);
                 field = root.Query<IntegerField>().ToList().Single(f => f.label == "次数");
                 yield return null; input = field.Q("unity-text-input").Q<TextElement>(); input.Focus(); yield return null;
@@ -902,7 +902,7 @@ namespace NBC.ActionEditor.Tests
                 window.Canvas.Focus(); yield return null;
                 Assert.That(clip.Count, Is.EqualTo(5), "Blur commits delayed text once.");
                 Undo.PerformUndo(); yield return null;
-                Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Document.RootItems.OfType<TimelineGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(3));
+                Assert.That(((FeatureSampleInterval)EditorFixture.Shared.Sequence.RootContainers.OfType<ActionGroup>().ElementAt(0).Tracks[0].Clips[0]).Count, Is.EqualTo(3));
                 LogAssert.NoUnexpectedReceived();
             }
             finally { window.DiscardChanges(); window.Close(); }

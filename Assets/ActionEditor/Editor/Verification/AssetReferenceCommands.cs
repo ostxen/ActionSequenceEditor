@@ -1,4 +1,4 @@
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using System;
 using System.IO;
 using NBC.ActionEditor.Serialization;
@@ -13,12 +13,12 @@ namespace NBC.ActionEditor.Verification
     public static class AssetReferenceCommands
     {
         private const string Root = "Assets/ActionEditorReferenceVerification";
-        [Serializable] private sealed class ReferenceAsset : ActionDocument { public Texture2D Main, Sub; }
+        [Serializable] private sealed class ReferenceAsset : ActionSequence { public Texture2D Main, Sub; }
         [CliGroupCommand("actioneditor.verification", "Isolated main/subasset reference persistence. Only creates a new fixed fixture folder; always cleans owned fixtures. No current-session changes.")]
         public static object ReferenceProbe([CliArg("confirm", "Apply fixed isolated fixture.")] bool confirm = false,
             [CliArg("dry-run", "Read-only preview.")] bool dryRun = false)
         {
-            VerificationGuard.Ready();
+            VerificationGuard.RequireReady();
             if (Directory.Exists(Root) || File.Exists(Root) || File.Exists(Root + ".meta")) throw new IOException("Fixture exists, refusing overwrite.");
             if (dryRun) return new { root = Root, targets = new[] { Root + "/References.asset", Root + "/Document.json" },
                 operations = new[] { "create main and subasset Texture2D", "write unique-format JSON", "unload and resolve GUID/localFileId", "reject missing/type-mismatched reference", "delete only owned new fixture folder" }, changesCurrentSession = false };
@@ -32,7 +32,7 @@ namespace NBC.ActionEditor.Verification
                 AssetDatabase.CreateAsset(main, Root + "/References.asset"); AssetDatabase.AddObjectToAsset(sub, main);
                 EditorUtility.SetDirty(main); EditorUtility.SetDirty(sub); AssetDatabase.SaveAssetIfDirty(main);
                 AssetDatabase.ImportAsset(Root + "/References.asset", ImportAssetOptions.ForceSynchronousImport);
-                var context = DocumentFormats.CreateContext(typeof(ReferenceAsset)); var format = new ActionDocumentJsonFormat();
+                var context = SequenceFormats.CreateContext(typeof(ReferenceAsset)); var format = new SequenceJsonFormat();
                 var bytes = format.Serialize(new ReferenceAsset { Main = main, Sub = sub }, default, context);
                 File.WriteAllBytes(Root + "/Document.json", bytes);
                 var resolver = new AssetReferenceResolver(); var mainId = resolver.Identify(main, typeof(Texture2D)); var subId = resolver.Identify(sub, typeof(Texture2D));

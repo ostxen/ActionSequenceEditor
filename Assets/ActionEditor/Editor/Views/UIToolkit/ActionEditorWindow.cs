@@ -1,5 +1,4 @@
-using NBC.ActionEditor.Views.IMGUI;
-using NBC.ActionEditor.Domain;
+using NBC.ActionEditor.Model;
 using NBC.ActionEditor.Presentation.Timeline;
 using NBC.ActionEditor.Presentation.Contracts;
 using NBC.ActionEditor.Presentation.Presenters;
@@ -14,23 +13,24 @@ using UnityEngine.UIElements;
 namespace NBC.ActionEditor.Views.UIToolkit
 {
     // 原生窗口装配逐窗控件与Presenter，只持有自身工作区和捕获。
-    public sealed class ActionEditorWindow : EditorWindow
+    public sealed class ActionEditorWindow : EditorWindow, IEditorDialogHost
     {
+        public IEditorDialogs Dialogs { get; } = new EditorDialogAdapter();
         public const float HeaderHeight = 40, RowHeight = 28, BottomHeight = 16;
         public float LeftWidth { get => Workspace.LeftWidth; set => Workspace.LeftWidth = value; }
         public float ScrollY { get => Workspace.ScrollY; set => Workspace.ScrollY = value; }
         public TimelineCanvas Canvas { get; private set; }
-        private TimelineHeader header;
+        private EditorToolbar header;
         private TimelineViewport viewport;
         private Label error;
         private UIToolkitInspectorTarget target;
-        private readonly TimelineProperties properties = new TimelineProperties();
+        private readonly SelectionPropertiesPanel properties = new SelectionPropertiesPanel();
         private IVisualElementScheduledItem refreshItem;
         private double lastTick;
         public string LastError { get; private set; }
         private Composition.WindowBinding binding;
         public PlaybackPresenter Playback => binding.Playback;
-        public DocumentPresenter Documents => binding.Documents;
+        public SequencePresenter Sequence => binding.Sequence;
         public TimelineWorkspace Workspace { get; } = new TimelineWorkspace();
 
         // 显式独立宿主与主入口共用控件和SaveChanges，不通过全局会话中转。
@@ -56,10 +56,10 @@ namespace NBC.ActionEditor.Views.UIToolkit
         // 创建Inspector代理失败时仍释放本窗口已经取得的绑定。
         private void InitializeWindow()
         {
-            Lan.Load();
+            EditorText.Load();
             Styles.Load();
             LeftWidth = Styles.TimelineLeftWidth;
-            titleContent = new GUIContent(Lan.Title + " · UI Toolkit"); minSize = new Vector2(500, 250);
+            titleContent = new GUIContent(EditorText.Title + " · UI Toolkit"); minSize = new Vector2(500, 250);
             if (target != null) DestroyImmediate(target);
             target = CreateInstance<UIToolkitInspectorTarget>(); target.hideFlags = HideFlags.HideAndDontSave; target.Owner = this;
             properties.Bind(binding.Properties, Refresh);
@@ -96,8 +96,8 @@ namespace NBC.ActionEditor.Views.UIToolkit
             var delta = EditorApplication.timeSinceStartup - lastTick;
             lastTick = EditorApplication.timeSinceStartup;
             Canvas?.Tick(delta);
-            Canvas?.Presenter.PlaybackState(Playback.Playing, Playback.Range);
-            if (Documents.HasDocument) SyncView();
+            Canvas?.Presenter.SetPlaybackState(Playback.Playing, Playback.RangePlaybackEnabled);
+            if (Sequence.HasSequence) SyncView();
         }
         public void CreateGUI()
         {
@@ -107,10 +107,10 @@ namespace NBC.ActionEditor.Views.UIToolkit
         }
         private void BuildGUI()
         {
-            titleContent = new GUIContent(Lan.Title + " · UI Toolkit");
+            titleContent = new GUIContent(EditorText.Title + " · UI Toolkit");
             ReleaseVisuals();
             rootVisualElement.style.backgroundColor = new Color(.2f, .2f, .2f);
-            header = new TimelineHeader(binding, Run, ShowTimelineError, ShowSettings);
+            header = new EditorToolbar(binding, Run, ShowTimelineError, ShowSettings);
             rootVisualElement.Add(header);
             Canvas = new TimelineCanvas(this);
             Canvas.Bind(binding.CreateTimeline(Workspace, Canvas));
@@ -120,9 +120,9 @@ namespace NBC.ActionEditor.Views.UIToolkit
             Canvas.AttachRuler(); Canvas.RegisterCallback<GeometryChangedEvent>(_ => SyncView()); Refresh();
         }
         public void Seek(float time) { Playback.Seek(time); Canvas?.MarkDirtyRepaint(); }
-        public void CreateDocument() => Documents.Invoke(DocumentIntent.Create);
-        public void OpenDocument() => Documents.Invoke(DocumentIntent.Open);
-        public void ShowSettings() => PreferencesWindow.ShowFor(this, binding.CreateSettings);
+        public void CreateDocument() => Sequence.Invoke(SequenceIntent.Create);
+        public void OpenDocument() => Sequence.Invoke(SequenceIntent.Open);
+        public void ShowSettings() => SettingsWindow.ShowFor(this, binding.CreateSettings);
         public void ShowTimelineError(string message)
         {
             LastError = message;
@@ -142,8 +142,8 @@ namespace NBC.ActionEditor.Views.UIToolkit
             refreshItem = rootVisualElement.schedule.Execute(() =>
             {
                 refreshItem = null; if (Canvas == null || binding == null) return;
-                hasUnsavedChanges = Documents.Dirty;
-                header.RefreshDocument();
+                hasUnsavedChanges = Sequence.Dirty;
+                header.RefreshSequence();
                 Canvas.RefreshVisualState(); SyncView();
                 properties.Refresh();
             });
@@ -151,7 +151,7 @@ namespace NBC.ActionEditor.Views.UIToolkit
         public void SyncView()
         {
             if (header == null || Canvas?.State == null || viewport == null) return;
-            header.style.display = Documents.HasDocument ? DisplayStyle.Flex : DisplayStyle.None;
+            header.style.display = Sequence.HasSequence ? DisplayStyle.Flex : DisplayStyle.None;
             header.Sync(LeftWidth);
             viewport.Sync();
         }
@@ -160,13 +160,13 @@ namespace NBC.ActionEditor.Views.UIToolkit
         public VisualElement CreatePropertyView() => properties.CreateView();
         private void Save()
         {
-            Documents.Invoke(DocumentIntent.Save);
+            Sequence.Invoke(SequenceIntent.Save);
         }
-        public override void SaveChanges() { Save(); if (!Documents.Dirty) base.SaveChanges(); }
+        public override void SaveChanges() { Save(); if (!Sequence.Dirty) base.SaveChanges(); }
         public override void DiscardChanges()
         {
             Canvas?.Cancel();
-            binding?.Documents.Discard();
+            binding?.Sequence.Discard();
             base.DiscardChanges();
         }
     }
