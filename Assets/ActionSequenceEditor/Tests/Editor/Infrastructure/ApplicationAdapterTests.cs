@@ -1,0 +1,297 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using ActionSequenceEditor.Application.Sequences;
+using ActionSequenceEditor.Infrastructure.Sequences;
+using ActionSequenceEditor.Presentation.Contracts;
+using ActionSequenceEditor.Samples.FeatureSample;
+using ActionSequenceEditor.Infrastructure.Serialization;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace ActionSequenceEditor.Tests
+{
+    public sealed class ApplicationAdapterTests
+    {
+        private sealed class RenameDialog : ITimelineDialogs
+        {
+            public string InitialName;
+            public Action<string> Submit;
+            public void Delete(string title, Action confirmed) { }
+            public void Rename(string initialName, Action<string> submit) { InitialName = initialName; Submit = submit; }
+        }
+        private sealed class EmptyCatalog : ITimelineTypeCatalog
+        {
+            public IReadOnlyList<TimelineTypeChoice> DerivedFrom(Type baseType) => Array.Empty<TimelineTypeChoice>();
+        }
+        [Test] public void RowUnlockChangesOnlyItsFlagAndUndoRestoresInheritedLocks()
+        {
+            using var context = new EditorFixture(Composition.SequenceComposition.Create());
+            var document = new FeatureSampleSequence();
+            var group = document.RootContainers.OfType<ActionSequenceEditor.Model.ActionGroup>().First();
+            var track = group.Tracks[0];
+            var groupName = group.Name; var trackName = track.Name;
+            track.IsLocked = true; group.IsLocked = true;
+            context.Session.Open(new SequenceOpenData(document));
+            var before = SequenceJsonCodec.Encode(context.Sequence);
+            Assert.Throws<InvalidOperationException>(() => context.Nodes.Rename(group, "must not change"));
+            Assert.Throws<InvalidOperationException>(() => context.Nodes.ToggleLock(track));
+            Assert.That(SequenceJsonCodec.Encode(context.Sequence), Is.EqualTo(before));
+            context.Nodes.ToggleLock(group);
+            Assert.That(group.IsLocked, Is.False);
+            Assert.That(track.IsLocked, Is.True);
+            context.Nodes.ToggleLock(track);
+            Assert.That(track.IsLocked, Is.False);
+            Assert.That(group.Name, Is.EqualTo(groupName));
+            Assert.That(track.Name, Is.EqualTo(trackName));
+            UnityEditor.Undo.PerformUndo();
+            group = context.Sequence.RootContainers.OfType<ActionSequenceEditor.Model.ActionGroup>().First();
+            Assert.That(group.IsLocked, Is.False);
+            Assert.That(group.Tracks[0].IsLocked, Is.True);
+            UnityEditor.Undo.PerformUndo();
+            Assert.That(SequenceJsonCodec.Encode(context.Sequence), Is.EqualTo(before));
+            UnityEditor.Undo.PerformRedo(); UnityEditor.Undo.PerformRedo();
+            group = context.Sequence.RootContainers.OfType<ActionSequenceEditor.Model.ActionGroup>().First();
+            Assert.That(group.IsLocked || group.Tracks[0].IsLocked, Is.False);
+            Assert.That(context.Session.IsEditing, Is.False);
+            var dialog = new RenameDialog();
+            var menus = new ActionSequenceEditor.Presentation.Presenters.TimelineMenuPresenter(context.Session, context.Structure, context.Nodes, context.Clips,
+                context.ClipboardEditing, context.Clipboard, context.Selection, new EmptyCatalog(), dialog, key => key, _ => { });
+            menus.Build(group, true, 0).Single(entry => entry.Text == "Rename").Invoke();
+            Assert.That(dialog.InitialName, Is.EqualTo(groupName));
+            dialog.Submit("renamed through menu");
+            Assert.That(group.Name, Is.EqualTo("renamed through menu"));
+            UnityEditor.Undo.PerformUndo();
+            var restored = SequenceJsonCodec.Encode(context.Sequence);
+            Assert.Throws<InvalidOperationException>(() => dialog.Submit("stale dialog"));
+            Assert.That(SequenceJsonCodec.Encode(context.Sequence), Is.EqualTo(restored));
+            Assert.That(context.Sequence.RootContainers.OfType<Model.ActionGroup>().First().Name, Is.EqualTo(groupName));
+        }
+
+        [Test] public void ResizeAndBatchRenameShareOneUndoAndDeletionRestoresBothClips()
+        {
+            using var context = new EditorFixture(Composition.SequenceComposition.Create());
+            context.Session.Open(new SequenceOpenData(new FeatureSampleSequence()));
+            var track = context.Sequence.AllTracks.First();
+            var first = track.Clips[0]; var second = track.Clips[1];
+            var before = SequenceJsonCodec.Encode(context.Sequence);
+            using (var token = context.Session.BeginEdit(this))
+            {
+                context.Clips.Resize(token, first, .5f, .75f);
+                context.Nodes.Rename(first, "changed"); context.Nodes.Rename(second, "changed");
+                token.Commit();
+            }
+            Assert.That(first.StartTime, Is.EqualTo(.5f)); Assert.That(first.Length, Is.EqualTo(.75f));
+            Assert.That(first.Name, Is.EqualTo("changed")); Assert.That(second.Name, Is.EqualTo("changed"));
+            var changed = SequenceJsonCodec.Encode(context.Sequence);
+            UnityEditor.Undo.PerformUndo();
+            Assert.That(SequenceJsonCodec.Encode(context.Sequence), Is.EqualTo(before));
+            UnityEditor.Undo.PerformRedo();
+            Assert.That(SequenceJsonCodec.Encode(context.Sequence), Is.EqualTo(changed));
+            track = context.Sequence.AllTracks.First(); first = track.Clips[0]; second = track.Clips[1];
+            using (var token = context.Session.BeginEdit(this))
+            {
+                Assert.That(context.Lifecycle.Save().Succeeded, Is.False);
+                Assert.Throws<InvalidOperationException>(() => context.CreateSequencePresenter().ConfirmSwitch());
+                context.Structure.DeleteOperation(first, second).Execute();
+                token.Commit();
+            }
+            Assert.That(track.Clips.Count, Is.EqualTo(1));
+            UnityEditor.Undo.PerformUndo();
+            Assert.That(SequenceJsonCodec.Encode(context.Sequence), Is.EqualTo(changed));
+            Assert.That(context.Session.IsEditing, Is.False);
+        }
+
+        [Test] public void DocumentDialogsKeepExplicitContextAndRejectInvalidCreationNames()
+        {
+            using var context = new EditorFixture(Composition.SequenceComposition.Create());
+            var fixture = new TextAsset(SequenceJsonCodec.Encode(new FeatureSampleSequence())) { name = "Isolated source" };
+            var existing = Resources.FindObjectsOfTypeAll<SequenceExportWindow>();
+            SequenceExportWindow window = null;
+            Views.UIToolkit.SequenceExportWindow nativeExport = null;
+            Views.UIToolkit.SequenceCreationWindow nativeCreate = null;
+            Views.UIToolkit.RenameWindow nativeRename = null;
+            var global = EditorFixture.Shared.Sequence;
+            try
+            {
+                context.Open(fixture);
+                var binding = new Infrastructure.Sequences.SequenceDialogCatalog();
+                Assert.That(context.Source.name, Is.EqualTo("Isolated source"));
+                Assert.That(binding.ValidateName("  Example  "), Is.EqualTo("Example"));
+                foreach (var name in new[] { "", "..", "a/b", "a\\b" })
+                    Assert.Throws<ArgumentException>(() => binding.ValidateName(name));
+                Assert.That(binding.CreationTypes(), Does.Contain(typeof(FeatureSampleSequence)));
+                context.CreateSequencePresenter().Invoke(ActionSequenceEditor.Presentation.Contracts.SequenceIntent.Export);
+                window = Resources.FindObjectsOfTypeAll<SequenceExportWindow>().Except(existing).Single();
+                var catalogField = typeof(SequenceExportWindow).GetField("catalog", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(catalogField.FieldType, Is.EqualTo(typeof(ISequenceDialogCatalog)));
+                Assert.That(catalogField.GetValue(window), Is.TypeOf<SequenceDialogCatalog>());
+                Assert.That(typeof(Views.IMGUI.RenameWindow).GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .Any(field => typeof(IDirectable).IsAssignableFrom(field.FieldType)), Is.False);
+                Assert.That(window.ExportTo("actioneditor.json", null), Is.False);
+                var toolkitHost = UnityEngine.ScriptableObject.CreateInstance<Views.UIToolkit.ActionSequenceEditorWindow>();
+                try
+                {
+                    var documents = context.Composition.CreateSequencePresenter(null, toolkitHost.Dialogs);
+                    var previous = Resources.FindObjectsOfTypeAll<Views.UIToolkit.SequenceExportWindow>();
+                    documents.Invoke(SequenceIntent.Export);
+                    nativeExport = Resources.FindObjectsOfTypeAll<Views.UIToolkit.SequenceExportWindow>().Except(previous).Single();
+                    nativeExport.CreateGUI();
+                    Assert.That(nativeExport.rootVisualElement.Q<UnityEngine.UIElements.DropdownField>("export-format"), Is.Not.Null);
+                    Assert.That(nativeExport.rootVisualElement.Query<UnityEngine.UIElements.IMGUIContainer>().ToList(), Is.Empty);
+                    Assert.That(nativeExport.ExportTo("actioneditor.json", null), Is.False);
+                    var creates = 0;
+                    var existingCreates = Resources.FindObjectsOfTypeAll<Views.UIToolkit.SequenceCreationWindow>();
+                    toolkitHost.Dialogs.Create(binding, (type, path) => { creates++; return false; });
+                    nativeCreate = Resources.FindObjectsOfTypeAll<Views.UIToolkit.SequenceCreationWindow>().Except(existingCreates).Single();
+                    nativeCreate.CreateGUI();
+                    var submit = nativeCreate.GetType().GetMethod("Submit", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    Func<string, string> cancelPath = _ => null;
+                    Func<string, string> newPath = _ => "Assets/ActionSequenceEditor/ToolkitCancelMustNotCreate.json";
+                    Func<Type, string, bool> reject = (_, __) => false;
+                    Assert.That(submit.Invoke(nativeCreate, new object[] { typeof(FeatureSampleSequence), "NewAction", cancelPath, reject }), Is.False);
+                    Assert.That(submit.Invoke(nativeCreate, new object[] { typeof(FeatureSampleSequence), "NewAction", newPath, reject }), Is.False);
+                    Assert.Throws<System.Reflection.TargetInvocationException>(() => submit.Invoke(nativeCreate, new object[] { typeof(FeatureSampleSequence), "a/b", newPath, reject }));
+                    Assert.That(creates, Is.Zero);
+                    var existingRenames = Resources.FindObjectsOfTypeAll<Views.UIToolkit.RenameWindow>();
+                    toolkitHost.Dialogs.Rename("original", _ => throw new InvalidOperationException("stale target"));
+                    nativeRename = Resources.FindObjectsOfTypeAll<Views.UIToolkit.RenameWindow>().Except(existingRenames).Single();
+                    nativeRename.CreateGUI();
+                    var button = nativeRename.rootVisualElement.Q<Button>("dialog-submit");
+                    using (var submitEvent = NavigationSubmitEvent.GetPooled()) { submitEvent.target = button; button.SendEvent(submitEvent); }
+                    Assert.That(nativeRename.rootVisualElement.Q<UnityEngine.UIElements.HelpBox>("dialog-error").text, Is.EqualTo("stale target"));
+                }
+                finally { UnityEngine.Object.DestroyImmediate(toolkitHost); }
+                using var token = context.Session.BeginEdit(this);
+                Assert.Throws<InvalidOperationException>(() => window.ExportTo("actioneditor.json", "Assets/ActionSequenceEditor/ActiveExportMustNotWrite.json"));
+                Assert.Throws<InvalidOperationException>(() => nativeExport.ExportTo("actioneditor.json", "Assets/ActionSequenceEditor/ActiveNativeExportMustNotWrite.json"));
+                Assert.That(token.IsActive, Is.True);
+                Assert.That(EditorFixture.Shared.Sequence, Is.SameAs(global));
+            }
+            finally
+            {
+                if (window != null) window.Close();
+                if (nativeExport != null) nativeExport.Close();
+                if (nativeCreate != null) nativeCreate.Close();
+                if (nativeRename != null) nativeRename.Close();
+                UnityEngine.Object.DestroyImmediate(fixture);
+            }
+        }
+
+        [Test] public void DocumentPresenterClosesOnlyItsInjectedContextAndProtectsActiveEdit()
+        {
+            var global = EditorFixture.Shared.Sequence;
+            var globalSource = EditorFixture.Shared.Source;
+            using var context = new EditorFixture(Composition.SequenceComposition.Create());
+            var fixture = new TextAsset(SequenceJsonCodec.Encode(new FeatureSampleSequence()));
+            try
+            {
+                context.Open(fixture);
+                var presenter = context.CreateSequencePresenter();
+                using (var token = context.Session.BeginEdit(this))
+                {
+                    Assert.Throws<InvalidOperationException>(() => presenter.Invoke(SequenceIntent.Close));
+                    Assert.Throws<InvalidOperationException>(() => presenter.Invoke(SequenceIntent.Open));
+                    Assert.Throws<InvalidOperationException>(() => presenter.Invoke(SequenceIntent.Create));
+                    Assert.Throws<InvalidOperationException>(() => context.CreateSequencePresenter().ConfirmSwitch());
+                    var creation = context.Lifecycle.Create(typeof(FeatureSampleSequence), "Assets/ActionSequenceEditor/ActiveEditMustNotCreate.json");
+                    Assert.That(creation.Succeeded, Is.False);
+                    Assert.That(creation.Exception, Is.TypeOf<InvalidOperationException>());
+                    Assert.That(creation.BytesCommitted, Is.False);
+                    Assert.That(token.IsActive, Is.True);
+                    token.Commit();
+                }
+                presenter.Invoke(SequenceIntent.Close);
+                Assert.That(context.Sequence, Is.Null);
+                Assert.That(context.Source, Is.Null);
+                Assert.That(EditorFixture.Shared.Sequence, Is.SameAs(global));
+                Assert.That(EditorFixture.Shared.Source, Is.SameAs(globalSource));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(fixture); }
+        }
+
+        [Test] public void PreferencesAdapterUsesOnlyItsExplicitPathAndFailedWriteKeepsSharedValue()
+        {
+            var directory = System.IO.Path.Combine("Temp", "Preferences-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            var path = System.IO.Path.Combine(directory, "preferences.json");
+            try
+            {
+                var store = new Infrastructure.Settings.SettingsFileStore(path);
+                var session = new ActionSequenceEditor.Application.Settings.SettingsSession(store);
+                var baseline = session.Current;
+                var candidate = new ActionSequenceEditor.Application.Settings.EditorSettings(ActionSequenceEditor.Application.Settings.TimeStepMode.Frames,
+                    .025f, 40, false, false, 15, "Assets/ActionSequenceEditor/");
+                Assert.That(session.Commit(candidate).Succeeded, Is.True);
+                Assert.That(new Infrastructure.Settings.SettingsFileStore(path).Read(), Is.EqualTo(candidate));
+                var failing = new ActionSequenceEditor.Application.Settings.SettingsSession(new Infrastructure.Settings.SettingsFileStore(System.IO.Path.Combine(directory, "missing", "preferences.json")));
+                Assert.That(failing.Commit(candidate).Succeeded, Is.False);
+                Assert.That(failing.Current, Is.EqualTo(baseline));
+            }
+            finally { if (File.Exists(path)) File.Delete(path); Directory.Delete(directory); }
+        }
+        private sealed class Files : ICommitFiles
+        {
+            public readonly Dictionary<string, byte[]> Data = new Dictionary<string, byte[]>();
+            public bool Exists(string path) => Data.ContainsKey(path);
+            public byte[] Read(string path) => Data[path].ToArray();
+            public void Write(string path, byte[] bytes) => Data.Add(path, bytes.ToArray());
+            public void Replace(string staged, string target) { Data[target] = Data[staged]; Data.Remove(staged); }
+            public void Move(string staged, string target) { Data.Add(target, Data[staged]); Data.Remove(staged); }
+            public void Delete(string path) => Data.Remove(path);
+        }
+        [Test] public void OpeningUsesOneByteRevisionAndNotStaleUnityResourceContents()
+        {
+            const string path = "Assets/ActionSequenceEditor/LifecycleFixture.json";
+            var files = new Files(); var source = new FeatureSampleSequence { Version = 7 };
+            files.Data[path] = System.Text.Encoding.UTF8.GetBytes(SequenceJsonCodec.Encode(source));
+            var repository = new SequenceFileRepository(files, _ => { });
+            var opened = repository.Read(path);
+            Assert.That(((FeatureSampleSequence)opened.Sequence).Version, Is.EqualTo(7));
+            var bytes = opened.Revision; bytes[0] ^= 1;
+            Assert.That(opened.Revision, Is.EqualTo(files.Data[path]));
+            files.Data[path] = System.Text.Encoding.UTF8.GetBytes(SequenceJsonCodec.Encode(new FeatureSampleSequence { Version = 9 }));
+            Assert.Throws<IOException>(() => repository.Commit(path, opened.Sequence, opened.Revision));
+            Assert.That(((FeatureSampleSequence)SequenceJsonCodec.Decode(System.Text.Encoding.UTF8.GetString(files.Data[path]))).Version, Is.EqualTo(9));
+        }
+        [Test] public void SaveExportAndFailedSavePreserveRealContextSelectionPlayheadAndPreview()
+        {
+            const string path = "Assets/ActionSequenceEditor/LifecycleFixture.json";
+            var files = new Files();
+            var repository = new SequenceFileRepository(files, _ => throw new IOException("import"));
+            using var context = new EditorFixture(Composition.SequenceComposition.Create(repository), repository);
+            var fixture = new TextAsset(SequenceJsonCodec.Encode(new FeatureSampleSequence()));
+            try
+            {
+                context.Open(fixture);
+                var clip = context.Sequence.AllTracks.First().Clips.First();
+                context.Selection.Set(new[] { clip }, false);
+                context.Sampler.Sample(.5f); context.Playback.SetPaused(true);
+                var graph = context.Sequence; var initialized = context.Sampler.IsInitialized;
+                var lifecycle = new SequenceLifecycle(context.Session, repository, new SequenceExportService(files), new SequenceFactory());
+                var result = lifecycle.Save(path);
+                Assert.That(result.Succeeded, Is.False); Assert.That(result.BytesCommitted, Is.True);
+                Check();
+                Assert.That(lifecycle.Export("Assets/ActionSequenceEditor/LifecycleExport.json", "actioneditor.json").Succeeded, Is.True);
+                Check();
+                context.Session.Edit("dirty", () => ((FeatureSampleSequence)context.Sequence).Version = 4);
+                context.Sampler.Sample(.5f); context.Playback.SetPaused(true);
+                files.Data[path] = new byte[] { 42 };
+                Assert.That(lifecycle.Save().BytesCommitted, Is.False);
+                Assert.That(context.Session.IsDirty, Is.True); Check();
+                using var token = context.Session.BeginEdit(this);
+                Assert.That(lifecycle.Save().Succeeded, Is.False); Assert.That(lifecycle.Export("Assets/ActionSequenceEditor/LifecycleOther.json", "actioneditor.json").Succeeded, Is.False);
+                Assert.That(token.IsActive, Is.True); Check();
+                void Check()
+                {
+                    Assert.That(context.Sequence, Is.SameAs(graph)); Assert.That(context.Selection.First, Is.SameAs(clip));
+                    Assert.That(context.Sampler.CurrentTime, Is.EqualTo(.5f)); Assert.That(context.Sampler.IsInitialized, Is.EqualTo(initialized));
+                    Assert.That(context.Playback.IsPaused, Is.True);
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(fixture); }
+        }
+    }
+}

@@ -37,5 +37,5 @@
 
 ## 编辑器改造任务恢复
 
-- ActionEditor 平台化与 Combat 接入的唯一执行清单是 [.codex/tasks/action-editor-refactor.md](.codex/tasks/action-editor-refactor.md)。涉及该改造时先读取其任务状态、依赖、验收和执行记录，再按用户指定编号执行，不自动批量推进。
-- 工程改名或重新打开后，以新根目录和工程内 `Assets/ActionEditor/`、`Assets/CombatEditor/` 为准，不使用旧绝对路径或外部 ActionEditor 副本；环境恢复步骤见该任务文档。
+- ActionSequenceEditor 平台化与 Combat 接入的唯一执行清单是 [.codex/tasks/action-editor-refactor.md](.codex/tasks/action-editor-refactor.md)。涉及该改造时先读取其任务状态、依赖、验收和执行记录，再按用户指定编号执行，不自动批量推进。
+- 工程改名或重新打开后，以新根目录和工程内 `Assets/ActionSequenceEditor/`、`Assets/CombatEditor/` 为准，不使用旧绝对路径或外部 ActionSequenceEditor 副本；环境恢复步骤见该任务文档。

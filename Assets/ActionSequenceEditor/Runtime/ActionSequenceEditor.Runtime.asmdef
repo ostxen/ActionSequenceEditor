@@ -1,0 +1,7 @@
+{
+    "name": "ActionSequenceEditor.Runtime",
+    "rootNamespace": "ActionSequenceEditor",
+    "overrideReferences": true,
+    "precompiledReferences": [],
+    "autoReferenced": true
+}

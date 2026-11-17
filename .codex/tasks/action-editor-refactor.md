@@ -1,13 +1,39 @@
-# ActionEditor 平台化与 Combat 接入执行任务
+# ActionSequenceEditor 平台化与 Combat 接入执行任务
 
 - ID：`action-editor-refactor`
 - 创建日期：2026-11-09
 - 总体状态：RF38–RF53本轮工程实施与约定的必要普通回归/交接完成；重复全基线余项按用户指示停止，不宣称301项完整通过。RF01–RF37历史证据保留，不等于结构质量或人工体验已获用户认可。统一产品验收（含H01–H09）待用户启动；Combat专属实施与验收暂缓。
 - 历史阶段摘要：RF24本地提交`0acd13d`、RF25本地提交`a5e1cad`（213/213）。RF26本地提交`3f2c03b`（219/219），RF27本地提交`38035e9`（233/233），RF28本地提交`b87cf42`（250/250），RF29本地提交`0f6ea31`（276/276），RF30本地提交`b12720a`（278/278），RF31本地提交`015d687`（280/280），RF32本地提交`04e76c9`（303/303），RF33本地提交`069b887`（312/312及双UI持久探针）。RF34本地提交`51c6016`（281/281与最终双UI持久闭环）。RF35本地提交`08ff4cf`（299/299与双UI隔离持久闭环）。RF36本地提交`96157c5`（311/311、末次选择器收敛后13/13，受控冷Editor未测）。RF37历史工程范围complete（最终311/311及双UI教程重放通过）。历史规格与证据见第4.3节；不代表本轮结构验收通过。
-- 下一步：已完成的命名整理、Toolkit原生交互和菜单字体适配按用户2026-11-16“提交一下”授权本地提交；不推送、不重跑测试、不自动开始统一产品验收。程序集仅Runtime/Editor的收敛尚未实施。
+- 下一步：ActionSequenceEditor全套定名、Runtime/Editor两程序集收敛及结构移动名称编号同步已完成；按用户2026-11-17“没问题了，可以提交”授权本地提交，不推送、不重跑测试、不自动开始统一产品验收。上一轮本地提交acd3f59。
 - 设计依据：[架构分析及改造建议](../../Docs/ActionEditor与CombatEditor架构分析及改造建议.md)。
 - 本文件是唯一执行清单与进度记录；架构文档保留背景、理由和阶段设计，不维护第二份任务状态。
-- 当前执行任务：RF38–RF53及后续修复已本地提交8669312fbc04ed57e8f03b9cbaa15a7680590893，未推送。三轮命名整理、ActionContainer与API内部命名、Toolkit主流程原生交互及菜单字体适配complete，纳入本次授权提交（哈希以Git历史为准）；第三轮52个独立现有测试身份通过，后续命名及字体轮未重跑测试，不把历史结果当本轮回归。程序集收敛尚未实施；统一产品验收、文档完整解析依赖及选择器历史许可风险保持原状态。
+- 当前执行任务：前三轮命名、ActionContainer/API内部命名与Toolkit原生交互/菜单适配已本地提交acd3f59955acfc4e610454d2e560733663fcea43。其后ActionSequenceEditor根命名空间去NBC、产品/目录/入口统一及两程序集收敛complete，尚未提交推送；本轮只做编译、静态与发现检查，未重跑测试。统一产品验收、文档完整解析依赖及选择器历史许可风险保持原状态。
+
+## RF53后续：本轮本地提交授权（2026-11-17）
+
+- 用户“没问题了，可以提交”授权将ActionSequenceEditor整体改名、去NBC、两程序集收敛及结构移动名称数字前缀同步创建本地提交，不推送。具体哈希以Git历史为准。
+- 仅纳入已批准移动清单对应的旧/新插件资源、源码和配套工作流/合同/任务记录/Agent路径说明。排除用户场景、Assets根下所有用户JSON及meta（包含新出现的NewAction111.json）、个人ProjectSettings及既有package和未参与本轮移动的旧目录meta删除；不恢复或覆盖工作区现场。
+- 提交阶段只做差异、暂存边界和格式检查，复用已记录的编译证据，不重跑Unity/Python测试；此前记录中的“不提交”是各阶段历史限制，不追改历史。
+
+## RF53后续：结构移动同步名称数字前缀（2026-11-17）
+
+- 状态：complete（实现与编译范围，未运行行为回归）。用户澄清所指为界面序号或名称，并明确选择“修改名称开头的数字前缀，让现有01、02等随位置重新编号”，不是修改播放顺序或新增独立显示编号。
+- 根因：样例组名01/02/03为作者Name内固定文字；结构移动只调整集合，不更新数字前缀。修正在共享StructureRules.Move内完成，现有两UI及MoveTrack调用同路，编号与移动属于同一会话事务/Undo。只更新受影响源/目标兄弟列表中既有ASCII数字加空白或常见分隔符的前缀，以当前1基位置编号，保留最小位宽、分隔符和正文；无前缀、纯数字或2D等业务名称保持。根组/根轨同一列表，组内轨道按组独立；整组子轨不因父组移动重写。原位/拒绝移动不重编，不改用户磁盘文件。
+- 现有StructureGestureTests补充组移动前缀断言，以及组间轨道移动/两侧编号/无编号及2D保留/原位/Undo/Redo检查源码；沿用用户不重跑测试要求，本轮不执行Unity或Python测试套件，不把未运行检查说成通过。
+- 编译证据：doctor20261117T124401Z-73e54f8e通过；初次124431Z-0cce66d2发现IDirectable.Name只读，改用已有ActionGroup/ActionTrack可写Name，不扩大接口。最终Editor编译124532Z-b9b2709b passed，completed/failed=false/errors=[]。真实生成方案dotnet build ActionEditor.sln --nologo -v:q -m:1 -nr:false退出0、0错误37警告、11.76秒，日志Temp/structure-numbering-build.log。git diff --check通过。未执行新补或旧测试、未现场拖动用户图、不保存或覆盖用户JSON，不提交推送；运行时/界面行为仍需后续获准回归或人工体验。
+
+## RF53后续：ActionSequenceEditor全套定名与两程序集收敛（2026-11-16）
+
+- 状态：complete（源码、资源身份、编译与发现范围，不代表行为回归或人工产品验收）。上一阶段本地提交acd3f59955acfc4e610454d2e560733663fcea43，未推送。用户要求整个编辑器改名并去掉NBC，随后确认标准拼写ActionSequenceEditor，全套统一界面、代码、程序集、Assets插件目录，并落实仅Runtime/Editor两程序集要求；不改磁盘工程根目录。
+- 计划：[x] 固定资源移动/五份冗余asmdef删除预览与真实批准；[x] 全源码/命名空间/两程序集/资源路径/现行合同及工作流同步；[x] GUID/meta与旧名残留静态核对、真实Editor编译和Unity生成方案构建，退役本次临时零参数命令。不重跑Unity/Python测试，不自动提交推送。
+- 两程序集：ActionSequenceEditor.Runtime（模型、元数据、序列化、Runtime样例）与ActionSequenceEditor.Editor（原Editor、Application、Presentation、Verification）。测试31份源码仍保留在Tests/Editor，移除测试asmdef后归Unity预定义Assembly-CSharp-Editor；该现有程序集已引用NUnit和TestRunner，保持产品程序集无测试依赖。不将Editor标记TestAssemblies，不删除/条件屏蔽测试。
+- 持久边界：新命名空间/程序集会使旧具体类型身份失效，沿用用户已接受的无兼容层方案；不读取、覆盖或迁移用户JSON/场景/个人配置，原actioneditor.json与recovery封套标识保持，不借产品改名更改格式。资源目录nbc同步保GUID移动；历史记录与旧批准清单不追改。
+- 资源证据：doctor 20261116T153053Z-b8d86f5e、发现153230Z-25ff96ce通过，本工程唯一ready PID5836。既有ProjectSyncCommands中临时固定零参数rename_sequence_editor，准备编译153552Z-a5b96ea9通过；预览153709Z-a3150c55展示8项保GUID移动及5份冗余asmdef/meta删除，用户问卷“批准并继续”后approval154059Z-e152b54d→apply154122Z-2afc4e12 passed。无目录或测试源码删除；原根e316733cce965d5459f670751f92ca13、Runtime定义7d31d11ba62f20b4d89380d87c02f0e4、Editor定义a65e97bc6b8576642bb25059ad62fcc5及其余移动GUID保持。临时方法/哈希助手及最小白名单已移除，不新增临时脚本资源。
+- 实施：226份C#、31份测试源码全部保留，产品前缀ActionSequenceEditorHost/ActionSequenceEditorTypeCatalog/双ActionSequenceEditorWindow及同名文件同步，SequenceSession语义名保持。中英文主标题ActionSequenceEditor、菜单ActionSequenceEditor/IMGUI和/UI Toolkit；Resources/nbc保GUID改名ActionSequenceEditor，USS与资源路径同步；CLI组actionsequenceeditor.verification及只读/写白名单、拒绝参数检查源码同步。上游真实仓库URL、历史证据/审批清单、任务ID及Docs既有文件名保留；修正改名造成的文档链接，不伪造新的上游地址。
+- 编译过程：移动后导入曾因合并验证源码缺Pipeline引用报错，Editor定义补Unity.Pipeline.Attributes；一次替换将参数类型Model误作Runtime导致160728Z-d5bf83cb失败，已纠正。160912Z-4f49439c流程先报编译错误，随后161005Z-bbf36bd4查询原终态completed/failed=false/errors=[]，不直接把该失败流程作成功。最终完整编译161450Z-e4ccff9a passed，completed/failed=false/errors=[]/compilationFailed=false、当前groundTruth consoleErrors=0；console内15:42及16:08旧条目不算最终错误，未清除历史日志。
+- 生成方案：固定sync_projects预览161101Z-c1ff08e1→引用本轮连续授权approval161222Z-c7ddacc4→apply161241Z-2d57bc74 passed；真实方案16项目742源码覆盖通过。dotnet build ActionEditor.sln --nologo -v:q -m:1 -nr:false退出0、0错误37警告，12.02秒，日志Temp/action-sequence-editor-build.log。两产品程序集真实Unity DLL反射引用不含NUnit/TestRunner，Editor单向引用Runtime；Rider生成csproj仍列额外测试引用，不能以IDE引用表误判产品DLL污染。31测试源均在默认Assembly-CSharp-Editor，Runtime29源、Editor166源。
+- 静态资源：对预览634文件完整清单映射新路径，预期仅10个asmdef/meta文件删除；384份非源码/非文档/非asmdef文件字节保持（含345份meta），issues=[]；两asmdef、226C#及31测试源计数符合。产品发现从按程序集排除补充为按类型命名空间及声明链排除Tests/Verification，避免合并后误纳验证模型；程序集边界断言改为真实两程序集及源码职责检查，手写JSON测试具体身份更新默认测试程序集，不改变业务预期。未删除或条件隐藏测试。
+- 现场只读证据：window_status161603Z-b2866b6f确认已开Toolkit窗口新完整类型、标题ActionSequenceEditor · UI Toolkit和两新菜单实际绑定，尺寸1000×600.3334/nativeTimeline=true，不打开或点击业务操作。test list161936Z-18cc365b发现311个现有EditMode用例归Assembly-CSharp-Editor；这是发现，不是311通过。未运行Unity/Python测试或持久探针、不用verify，不代签人工视觉验收、全资源引用、跨启动恢复或PlayerBuild。用户JSON/场景/ProjectSettings及既有删除现场不改写；个人偏好文件WhootActionSequencer.txt定位保留，不迁移或新建用户配置。
 
 ## RF53后续：本地提交授权（2026-11-16）
 

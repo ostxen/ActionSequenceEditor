@@ -1,15 +1,15 @@
-# ActionEditor 与 CombatEditor 架构分析及改造建议
+# ActionSequenceEditor 与 CombatEditor 架构分析及改造建议
 
 > 文档日期：2026-11-09  
 > 文档性质：基于本地源码阅读和讨论形成的分析与设计建议，不是已完成的实现规格。  
-> 最终方向：完善 ActionEditor，将 CombatEditor 整理为其第一套完整业务扩展。
+> 最终方向：完善 ActionSequenceEditor，将 CombatEditor 整理为其第一套完整业务扩展。
 > 执行入口：[逐项改造任务与恢复说明](../.codex/tasks/action-editor-refactor.md)。本文第 13 节保留阶段路线，实际任务状态和执行证据统一记录在该 task 文档。
 
 ---
 
 ## 当前架构与职责
 
-两个正式菜单是 `NBC/Action Editor/IMGUI` 和 `NBC/Action Editor/UI Toolkit`。入门操作仅见[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)，数据规则见[当前合同](ActionEditor-Contracts.md)。
+两个正式菜单是 `ActionSequenceEditor/IMGUI` 和 `ActionSequenceEditor/UI Toolkit`。入门操作仅见[功能体验样例教程](../Assets/ActionSequenceEditor/Samples/FeatureSample/README.md)，数据规则见[当前合同](ActionEditor-Contracts.md)。
 
 | 模块 | 当前职责与边界 |
 |---|---|
@@ -23,11 +23,11 @@
 | Editor/Extensions、Samples | 元数据绑定解析与双UI业务扩展、只读样例状态预览 |
 | Editor/Verification | 固定范围的引用、导出、持久化与双UI连续验收能力 |
 
-Domain与Serialization单向依赖。Application只依赖Domain及窄端口；Presentation依赖Application/Domain。Editor组合这些程序集并实现基础设施。验证程序集不进入产品类型目录。
+仅保留Runtime和Editor两个产品程序集，Editor单向引用Runtime。Application、Presentation、Infrastructure等是Editor程序集内的职责目录，不再各自定义程序集。固定验证类型不进入生产业务目录。
 
-MVP是总体组织方式，具体实现按内聚职责分开，不是只有Model、View、Presenter三个类。当前七个程序集为`NBC.ActionEditor.Model`、`NBC.ActionEditor.Serialization`、`NBC.ActionEditor.Application`、`NBC.ActionEditor.Presentation`、`NBC.ActionEditor.Editor`、`NBC.ActionEditor.Editor.Tests`和`NBC.ActionEditor.Verification.Editor`。Application和Presentation位于Editor目录，但仍通过程序集约束隔离UnityEditor、具体控件和文件系统；Presentation只使用必要的UnityEngine值类型。测试和固定验收命令不进入生产业务目录。
+MVP是总体组织方式，具体实现按内聚职责分开，不是只有Model、View、Presenter三个类。两个程序集为`ActionSequenceEditor.Runtime`与`ActionSequenceEditor.Editor`。Model、Metadata、Serialization与Runtime样例归Runtime，其余产品和固定验证源码归Editor。Application与Presentation继续以源码职责约束避免具体视图、文件和UnityEditor依赖，不再宣称有独立程序集硬隔离。测试保留在`Tests/Editor`，由Unity默认`Assembly-CSharp-Editor`编译；两份产品程序集不引用NUnit或TestRunner。
 
-共享状态只有一份作者文档、选择、剪贴板、播放头及Undo。每个窗口拥有独立工作区、Presenter、订阅和捕获所有者；依赖由WindowBinding传入，不通过服务定位器取得。ActionEditorHost只承担组合根和Editor生命周期，不承包业务用例。
+共享状态只有一份作者文档、选择、剪贴板、播放头及Undo。每个窗口拥有独立工作区、Presenter、订阅和捕获所有者；依赖由WindowBinding传入，不通过服务定位器取得。ActionSequenceEditorHost只承担组合根和Editor生命周期，不承包业务用例。
 
 四条调用链分别是：
 
@@ -43,7 +43,7 @@ MVP是总体组织方式，具体实现按内聚职责分开，不是只有Model
 - `TimelinePresenter`协调逐窗`TimelineInteraction`、`StructureGesture`和`VisibleTimelineLayout`，View只接收显示状态并适配原生输入。捕获带owner，取消不得结束另一窗口事务；文档版本变化使陈旧候选失效。
 - `SequenceFileRepository`使用隔离快照、严格读回与`AtomicFileCommit`，暂存后仍重验磁盘revision。成功字节提交先推进会话来源和基线，再导入；导入失败报告已提交，不能自动重放。独立导出不切换来源、不清脏、不改Undo和播放。
 - 生产类型目录只扫描已加载类型，不调用构造器进行发现，不从文件内容加载程序集。`SequenceFormatContext`的类型身份映射属于当前受信任上下文，字段元数据缓存不对外暴露可改数组。
-- `ActionEditorPreviewSession`独占本代预览与时间指针，回调之间重验代次，释放重入不能覆盖更新会话。对象选择器的`AssetPickerDiscovery`只发现资源，`ObjectPreviewCache`只拥有创建的Editor；借入资源不销毁，窗口关闭释放缓存及回调。
+- `SequencePreviewSession`独占本代预览与时间指针，回调之间重验代次，释放重入不能覆盖更新会话。对象选择器的`AssetPickerDiscovery`只发现资源，`ObjectPreviewCache`只拥有创建的Editor；借入资源不销毁，窗口关闭释放缓存及回调。
 
 ### 当前能力与使用边界
 

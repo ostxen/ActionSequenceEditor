@@ -1,24 +1,32 @@
-# ActionEditor 时间、身份与扩展契约
+# ActionSequenceEditor 时间、身份与扩展契约
 
-本文定义当前产品合同。实施状态、验证证据和待验范围仅记录在[唯一任务清单](../.codex/tasks/action-editor-refactor.md)；入门操作只维护在[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)。
+本文定义当前产品合同。实施状态、验证证据和待验范围仅记录在[唯一任务清单](../.codex/tasks/action-editor-refactor.md)；入门操作只维护在[功能体验样例教程](../Assets/ActionSequenceEditor/Samples/FeatureSample/README.md)。
+
+## 命名与程序集
+
+产品名与根命名空间统一为`ActionSequenceEditor`，不含NBC。插件位于`Assets/ActionSequenceEditor`，仅定义`ActionSequenceEditor.Runtime`及`ActionSequenceEditor.Editor`两个程序集，Editor单向引用Runtime。Application、Presentation、Infrastructure和Verification是Editor内部职责目录，不再拥有独立程序集。`Tests/Editor`测试源码由Unity默认`Assembly-CSharp-Editor`编译，产品程序集不引用NUnit/TestRunner；产品发现按类型命名空间及声明链排除Tests/Verification，不能靠程序集整包排除Editor产品扩展。
+
+命名空间与程序集变化使旧具体类型身份失效，不增加别名、迁移或旧格式回退，不改写用户JSON。格式ID`actioneditor.json`、version 2和`document`及业务字段仍保持；历史文件名、审批记录和唯一任务ID保持可追溯。
 
 ## 产品入口与状态归属
 
-菜单为 `NBC/Action Editor/IMGUI` 和 `NBC/Action Editor/UI Toolkit`，分别打开 `NBC.ActionEditor.Views.IMGUI.ActionEditorWindow` 与 `NBC.ActionEditor.Views.UIToolkit.ActionEditorWindow`。两窗绑定同一作者会话、选择、剪贴板、播放头及Undo；每窗独立持有Presenter、工作区、焦点和捕获所有权。最后一个编辑窗口关闭时停止共享播放。
+菜单为 `ActionSequenceEditor/IMGUI` 和 `ActionSequenceEditor/UI Toolkit`，分别打开 `ActionSequenceEditor.Views.IMGUI.ActionSequenceEditorWindow` 与 `ActionSequenceEditor.Views.UIToolkit.ActionSequenceEditorWindow`。两窗绑定同一作者会话、选择、剪贴板、播放头及Undo；每窗独立持有Presenter、工作区、焦点和捕获所有权。最后一个编辑窗口关闭时停止共享播放。
 
-被动视图只绘制显示状态并上报意图。Application负责会话、事务和用例；Presentation负责Presenter、交互与几何；Infrastructure实现文件、Undo、时钟、偏好和AssetDatabase端口；Composition显式建立依赖并拥有Editor生命周期。Model及Serialization不依赖UnityEditor，Application和Presentation不依赖具体视图。`ActionEditorHost`只作为组合根，不提供业务门面转发。
+被动视图只绘制显示状态并上报意图。Application负责会话、事务和用例；Presentation负责Presenter、交互与几何；Infrastructure实现文件、Undo、时钟、偏好和AssetDatabase端口；Composition显式建立依赖并拥有Editor生命周期。Model及Serialization不依赖UnityEditor，Application和Presentation不依赖具体视图。`ActionSequenceEditorHost`只作为组合根，不提供业务门面转发。
 
 Toolkit窗口通过`IEditorDialogHost`显式选择原生交互，组合根把同一适配注入文档与时间轴。创建、打开、导出、重命名使用各自`CreateGUI`窗口，目录与创建输入校验共用；选择器保留搜索、None、键盘选择、实时回调、可调整分栏、资源图标和只读文本预览。Toolkit菜单使用`GenericDropdownMenu`，分类逐级展开并可返回，保留勾选/禁用与活动手势保护。行水印由原生Label居中，拖动文字按自身字体测量；共享`Styles`仅持资源与布局，`GUIStyle/GUISkin`只在IMGUI专用样式中加载。Unity系统保存/确认/文件夹对话框及窗口标题API仍保留，不属于自有IMGUI绘制。
 
 `EditorCompositionRoot`私有拥有共享会话、选择、剪贴板、播放与采样，只通过显式工厂创建逐窗绑定和Presenter，不公开服务查询包。`EditorViewRegistry`注册逐窗更新、重绘及变更通知；`WindowBinding`拥有逐窗订阅和释放。两UI各有`EditorToolbar`，Toolkit的`TimelineViewport`、`SelectionPropertiesPanel`分别拥有原生视口和属性面板，`PropertyFieldsView`绘制字段。默认设置会话由宿主私有持有，隔离宿主显式注入自己的`SettingsSession`，`SettingsWindow`不自行获取全局业务状态。
 
-目录按职责对应：Runtime的`Model`、`Metadata`、`Serialization`分别放作者规则、声明及格式；Editor的`Infrastructure/Sequences`、`Serialization`、`Preview`、`Discovery`、`Settings`分别实现文档外部能力、格式适配、预览、类型发现及设置文件存储。`TypeMenuInfo`描述菜单元数据，`ProductTypeFilter`筛选产品类型，不执行候选构造器。属性输入状态与草稿位于`Presentation/Properties`，`EditorText`及语言声明位于`Views/Localization`。双UI的时间轴源码位于各自`Timeline`目录，属性源码位于`Properties`；IMGUI弹窗位于`IMGUI/Dialogs`，共享外观位于`Views/Shared`。路径归组不机械同步命名空间；本轮明确将模型程序集/命名空间由Domain改为Model，样例根改为FeatureSampleSequence；旧类型身份失效，不提供别名或迁移。USS路径、偏好键、业务字段和用户磁盘文件不改。旧`ActionEditorContext`、`Prefs`、`AssetPlayer`及`NBC.ActionEditor.Storage`不再作为业务入口。
+目录按职责对应：Runtime的`Model`、`Metadata`、`Serialization`分别放作者规则、声明及格式；Editor的`Infrastructure/Sequences`、`Serialization`、`Preview`、`Discovery`、`Settings`分别实现文档外部能力、格式适配、预览、类型发现及设置文件存储。`TypeMenuInfo`描述菜单元数据，`ProductTypeFilter`筛选产品类型，不执行候选构造器。属性输入状态与草稿位于`Presentation/Properties`，`EditorText`及语言声明位于`Views/Localization`。双UI的时间轴源码位于各自`Timeline`目录，属性源码位于`Properties`；IMGUI弹窗位于`IMGUI/Dialogs`，共享外观位于`Views/Shared`。目录按职责保留Model等子命名空间，根统一为ActionSequenceEditor；运行时类型身份使用ActionSequenceEditor.Runtime。USS与Resources路径跟随插件目录改名，业务字段和用户磁盘文件不改。语言与Recovery定位键使用新产品前缀，旧用户配置不改写或迁移。旧`ActionSequenceEditorContext`、`Prefs`、`AssetPlayer`及`ActionSequenceEditor.Storage`不再作为业务入口。
 
 `ActionContainer`是分组与轨道的共同基类，序列本身保持独立；公开根集合为`RootContainers`，磁盘字段`rootItems`保持不变。
 
 内存作者图统一使用`Sequence`；逐窗`WindowBinding.Sequence`指向序列Presenter，`CurrentSettings`为当前设置快照。`SourceName`表示来源资源名，不是作者图的名称。快照内容比较使用`GetContentKey`，提交结果使用`ContentKey`；它们不是保存JSON或文件revision。播放范围开关为`RangePlaybackEnabled`，暂停意图为`SetPaused(bool)`。`SequenceFormatOptions.Compact`只控制紧凑排版，不压缩字节；内存设置使用`AutoSaveIntervalSeconds`和`DefaultSaveDirectory`，持久偏好字段和恢复字段仍保留原键。
 
 组和独立轨道按 `ActionSequence.RootContainers` 任意交错排列，组不嵌套；组持有轨道，轨道持有片段。结构拖动超过3px显示覆盖主体全宽的蓝/红插入线，不显示拖动文本。最左20px是独立根区，组移动携带完整子树，空组无折叠按钮但保留对齐占位。边缘24px按0–300px/s自动滚动。提交重验锁定、Attachable、Unique及版本，一次有效释放对应一步Undo，同位与相邻边界不产生空Undo。
+
+有效结构移动同时更新受影响源/目标兄弟列表中名称开头的既有数字编号，编号为列表当前1基位置，保留原补零位宽、分隔符和名称正文。根组与独立根轨共享根级位置，组内轨道独立编号；无数字编号的名称不添加编号，`2D`等数字连文字名称及纯数字名称不变。编号变更与移动属于同一作者事务，Undo/Redo一并恢复；原位或失败移动不触发重编号，整组移动不重写子轨名称。
 
 两UI滚轮缩放以鼠标时间为锚点，最小跨度0.25秒、步进225；保持锚点时视域可为负，作者时间不得为负。中键平移保持跨度并在零点夹紧。片段最短可编辑区间0.01秒，点事件不可伸缩。Esc、失焦、捕获丢失及文档替换只取消本窗口拥有的操作。
 
@@ -45,7 +53,7 @@ Toolkit窗口通过`IEditorDialogHost`显式选择原生交互，组合根把同
 
 顶层仅为 `format`、`version`、`document`，分别固定为 `"actioneditor.json"`、整数 `2`、非空 ActionSequence 节点。版本不同或缺失即拒绝，不读旧的裸根对象，不双写。版本号仅描述本契约，不表示对象稳定 ID。
 
-`document` 及每个 Group/Track/Clip 使用 `$type` 加序列化字段。`$type` 为 **`Type.FullName + ", " + Assembly.GetName().Name`**，例如 `NBC.ActionEditor.Samples.FeatureSample.FeatureSampleSequence, NBC.ActionEditor.Model`，ordinal 精确匹配。它不是 Name/MenuName、短类名、路径或带版本的 AssemblyQualifiedName；程序集或命名空间改名是显式格式变更，不建设别名层。根节点仅允许 Group/Track，唯一 `rootItems` 保持任意交错顺序；Group 仅有 Track，Track 仅有 Clip，不允许组嵌套，也无第二份 groups/rootTracks 存储。集合保持顺序；不持久化父引用、`directables`、Actor 场景绑定、预览/选择/Undo/缓存、计算属性或委托。`ActorId` 是既有业务字段，不提升为持久 Unity 引用身份。
+`document` 及每个 Group/Track/Clip 使用 `$type` 加序列化字段。`$type` 为 **`Type.FullName + ", " + Assembly.GetName().Name`**，例如 `ActionSequenceEditor.Samples.FeatureSample.FeatureSampleSequence, ActionSequenceEditor.Runtime`，ordinal 精确匹配。它不是 Name/MenuName、短类名、路径或带版本的 AssemblyQualifiedName；程序集或命名空间改名是显式格式变更，不建设别名层。根节点仅允许 Group/Track，唯一 `rootItems` 保持任意交错顺序；Group 仅有 Track，Track 仅有 Clip，不允许组嵌套，也无第二份 groups/rootTracks 存储。集合保持顺序；不持久化父引用、`directables`、Actor 场景绑定、预览/选择/Undo/缓存、计算属性或委托。`ActorId` 是既有业务字段，不提升为持久 Unity 引用身份。
 
 序列化使用受控字段/类型策略，领域类型不依赖 FullSerializer：公共实例字段与 `[SerializeField]` 字段（含基类私有字段），排除 static、`[NonSerialized]`；不自动持久化属性。保留模型实际字段键，如 `rootItems`、`tracks`、`actionClips`、`startTime`、`length`、`blendIn`、`CrossBlendIn`。禁止框架元数据与业务字段重名、重复 JSON 键、未知字段静默丢弃、继承字段键冲突和 `$ref/$id` 对象图别名。序列化成员按 ordinal 名排序，数组/List 保持位置。所有契约成员必须存在，允许 null 的业务成员必须显式写 null；缺字段不使用样例构造器的预置数据补齐。
 
@@ -71,7 +79,7 @@ Toolkit窗口通过`IEditorDialogHost`显式选择原生交互，组合根把同
   "format": "actioneditor.json",
   "version": 2,
   "document": {
-    "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleSequence, NBC.ActionEditor.Model",
+    "$type": "ActionSequenceEditor.Samples.FeatureSample.FeatureSampleSequence, ActionSequenceEditor.Runtime",
     "Background": { "a": 1, "b": 0.25, "g": 0.125, "r": 0.5 },
     "Notes": null,
     "Version": 1,
@@ -99,20 +107,20 @@ Toolkit窗口通过`IEditorDialogHost`显式选择原生交互，组合根把同
   "format": "actioneditor.json",
   "version": 2,
   "document": {
-    "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleSequence, NBC.ActionEditor.Model",
+    "$type": "ActionSequenceEditor.Samples.FeatureSample.FeatureSampleSequence, ActionSequenceEditor.Runtime",
     "Background": { "a": 1, "b": 0.25, "g": 0.125, "r": 0.5 },
     "Notes": "Point contract fixture",
     "Version": 1,
     "rootItems": [{
-      "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleGroup, NBC.ActionEditor.Model",
+      "$type": "ActionSequenceEditor.Samples.FeatureSample.FeatureSampleGroup, ActionSequenceEditor.Runtime",
       "ActorId": 0,
       "active": true,
       "isLocked": false,
       "name": "Markers",
       "tracks": [{
-        "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleMarkerTrack, NBC.ActionEditor.Model",
+        "$type": "ActionSequenceEditor.Samples.FeatureSample.FeatureSampleMarkerTrack, ActionSequenceEditor.Runtime",
         "actionClips": [{
-          "$type": "NBC.ActionEditor.Samples.FeatureSample.FeatureSampleMarker, NBC.ActionEditor.Model",
+          "$type": "ActionSequenceEditor.Samples.FeatureSample.FeatureSampleMarker, ActionSequenceEditor.Runtime",
           "EventCode": 7,
           "Message": "Marker",
           "Notes": null,
@@ -141,7 +149,7 @@ Toolkit窗口通过`IEditorDialogHost`显式选择原生交互，组合根把同
 
 ## R01–R10 当前入口契约（覆盖下文的正式存储与窗口取舍）
 
-用户后续明确要求先完善原版，再以原生 UI Toolkit 重绘原有编辑体验，并共用 JSON。当前两个菜单分别进入 `ActionEditorWindow` 与 `JsonActionWorkbench`，均使用 `App.Session : JsonDocumentSession`、原有 `Asset → Group → Track → Clip` 和 FullSerializer JSON。只有一个当前文档/选择/播放头；不是下文实验平台的每窗口独立会话。旧 `.asset` 实验代码、验证和历史契约保留，但不作为两个主菜单的数据格式，不自动迁移任何资产。
+用户后续明确要求先完善原版，再以原生 UI Toolkit 重绘原有编辑体验，并共用 JSON。当前两个菜单分别进入 `ActionSequenceEditorWindow` 与 `JsonActionWorkbench`，均使用 `App.Session : JsonDocumentSession`、原有 `Asset → Group → Track → Clip` 和 FullSerializer JSON。只有一个当前文档/选择/播放头；不是下文实验平台的每窗口独立会话。旧 `.asset` 实验代码、验证和历史契约保留，但不作为两个主菜单的数据格式，不自动迁移任何资产。
 
 共用模型沿用 float 秒和原有类型扩展，不宣称获得下文的稳定 ID、double 时间或确定性运行时语义。JSON 编辑快照提供整图 Undo；嵌套命令归外层事务，失败回滚。缩放与折叠不计入作者数据脏状态。保存采用暂存读回、内容一致性校验、原子替换及磁盘版本比较；外部修改时拒绝覆盖。切换先成功读取候选，再释放旧会话。未知类型读取失败保持原会话，不自动删未知数据后保存。
 
@@ -155,7 +163,7 @@ JSON 的 Single 值通过工程局部 FullSerializer converter 直接提升为 d
 
 RF02明确的纠错边界：文档选择只列`.json`（扩展名不区分大小写），回调在解码前再次拒绝有路径的非JSON资源；通用资源选择器不默认限制扩展名，无路径内存TextAsset仍可用于创建及测试。原版多选移动从起拖快照应用同一位移，最早片段至零点后不压缩其他片段间距。每次拉伸重建非选中片段磁吸参考；折叠组内片段不参与单击、包含或框选查询。原版集合折叠状态按owner与字段保存，null不串状态且仅显式添加才创建内容。中键区域外释放、Esc和失焦取消平移，其他按钮不能续用中键状态。此轮不统一两UI最短长度、选择阈值、快捷键或缩放手感，相关人工差异及后续任务见唯一清单。
 
-RF03所有权：`App.Context`为产品内唯一`ActionEditorContext`，拥有JsonDocumentSession、源TextAsset、选择、剪贴板和播放状态/AssetPlayer。App原有入口与AssetPlayer.Inst均转发同一状态，不另存副本。上下文服务不持有具体窗口或GUI事件；Unity Selection、对话框和域重载恢复属于宿主适配。两窗口注册至`App.Views`，重复注册替换原回调，关闭解除注册且更新资格转交下一注册窗口；原版关闭仍停止共用播放。视图尺寸/焦点/原生捕获仍各UI持有，旧App.Window/Width和静态手势留待后续迁移，当前不声称跨窗口事务令牌或完整预览资源重构已完成。
+RF03所有权：`App.Context`为产品内唯一`ActionSequenceEditorContext`，拥有JsonDocumentSession、源TextAsset、选择、剪贴板和播放状态/AssetPlayer。App原有入口与AssetPlayer.Inst均转发同一状态，不另存副本。上下文服务不持有具体窗口或GUI事件；Unity Selection、对话框和域重载恢复属于宿主适配。两窗口注册至`App.Views`，重复注册替换原回调，关闭解除注册且更新资格转交下一注册窗口；原版关闭仍停止共用播放。视图尺寸/焦点/原生捕获仍各UI持有，旧App.Window/Width和静态手势留待后续迁移，当前不声称跨窗口事务令牌或完整预览资源重构已完成。
 
 RF04当前JSON编辑生命周期：BeginEdit(owner)返回发起者令牌，同owner复用、其他owner返回null。Update异常、Commit校验失败回滚整图，取消/重复提交/陈旧令牌不能结束新事务；无参legacy入口只结束自身legacy事务。两窗口、原版Inspector和拖动器持有自己的令牌，失焦/关闭只取消本方；全局放弃、打开、Undo/Redo使旧令牌失效。嵌套Session.Edit仍归活动外层，不是安全隔离。错误鼠标按钮释放不提交，活动Toolkit手势不弹上下文菜单。自身失焦仍按原习惯回滚；关闭另一窗口若导致owner自身失焦，也属于该规则。换图后清理旧选择引用，不承诺恢复对象身份。显式保存的活动事务策略与持久验证归RF05。
 
@@ -177,13 +185,13 @@ RF08几何：两UI消费JsonTimelineTransform的float时间变换及TimelineGeom
 
 ## 时间坐标和数据草案
 
-RF12播放：App只注册一个EditorApplication.update共享更新入口，有注册视图时驱动自动保存及播放；两窗口自己的update仅更新视图，不再调用共享播放。AssetPlayer只持有播放头/前帧与ActionEditorPreviewSession，后者独占预览实例和指针，重复释放幂等；初始化部分失败、求值回调异常都会释放已拥有资源并传播异常，播放故障停机，不再吞异常继续预览。类型目录缓存可选预览工厂，保持精确绑定及派生适配器覆盖，无关冲突报双方来源，无绑定无预览。停止回调异常也在finally释放；原版关闭仍停止全局播放，最后窗口退出同样释放。文档变化/Undo/放弃和重载钩子沿用Reset，不因缩放/重绘重建。没有引入Combat工厂或场景副作用；真实域重载和任意第三方预览资源仍非已验收范围。
+RF12播放：App只注册一个EditorApplication.update共享更新入口，有注册视图时驱动自动保存及播放；两窗口自己的update仅更新视图，不再调用共享播放。AssetPlayer只持有播放头/前帧与ActionSequenceEditorPreviewSession，后者独占预览实例和指针，重复释放幂等；初始化部分失败、求值回调异常都会释放已拥有资源并传播异常，播放故障停机，不再吞异常继续预览。类型目录缓存可选预览工厂，保持精确绑定及派生适配器覆盖，无关冲突报双方来源，无绑定无预览。停止回调异常也在finally释放；原版关闭仍停止全局播放，最后窗口退出同样释放。文档变化/Undo/放弃和重载钩子沿用Reset，不因缩放/重绘重建。没有引入Combat工厂或场景副作用；真实域重载和任意第三方预览资源仍非已验收范围。
 
 RF11属性：PropertyDescription缓存字段、名称、条件、选项真实常量及资源/范围说明；两UI保留既有字段顺序、无名称时的显示差异、横排时间和原生控件。JsonPropertyPath按字段/集合索引重新读取并回写嵌套值类型，当前文档对象的旧引用/锁定在写前拒绝；集合变更先验证所有者再修改。JsonPropertyEditing提供事务、元素创建和数组/列表增删重排操作，Toolkit不再调用InspectorsBase。原版选项原先把常量当索引，改为真实常量映射，非连续值不再被误写为索引；未知值在没有用户选择时保留。原版既有Inspector外层令牌继续归并本轮写入，Toolkit延迟字段仍由Unity控件处理回车/失焦/Esc。当前JSON入口仍只显示首个选择的属性，没有新增批量混合编辑或集合重排按钮；Mixed与Move为共享操作能力，其单测不代表UI已提供这些功能。缺自定义Toolkit适配仍提示，不代绘IMGUI。
 
-RF10导航：TimelineNavigation统一225×滚轮符号/窗口宽×视域跨度的缩放候选，左端固定，是用户明确选择的行为变化；240秒上限检查、最小视域仍沿用原模型。两UI平移共用候选计算，但保留原版过零时缩短视域、Toolkit过零保留跨度的既有差异。原版滚轮原本不受scrollWheelZooms控制，Toolkit仍受其控制，不借统一步进改变偏好作用域。ActionEditorSelection提供无副作用点击候选，UI保留原版替换/Toolkit Ctrl追加与已选集合保留策略。Toolkit文本控件的Delete/Ctrl快捷键和Esc不被时间轴父节点抢占；原版没有新增全窗口快捷键。原版Esc/失焦同步清理待提交框选矩形，取消后不会残留旧框选。标尺、分栏与底栏的输入适配、现有阈值及布局仍各UI持有，人工H02/H04/H05/H06待确认。
+RF10导航：TimelineNavigation统一225×滚轮符号/窗口宽×视域跨度的缩放候选，左端固定，是用户明确选择的行为变化；240秒上限检查、最小视域仍沿用原模型。两UI平移共用候选计算，但保留原版过零时缩短视域、Toolkit过零保留跨度的既有差异。原版滚轮原本不受scrollWheelZooms控制，Toolkit仍受其控制，不借统一步进改变偏好作用域。ActionSequenceEditorSelection提供无副作用点击候选，UI保留原版替换/Toolkit Ctrl追加与已选集合保留策略。Toolkit文本控件的Delete/Ctrl快捷键和Esc不被时间轴父节点抢占；原版没有新增全窗口快捷键。原版Esc/失焦同步清理待提交框选矩形，取消后不会残留旧框选。标尺、分栏与底栏的输入适配、现有阈值及布局仍各UI持有，人工H02/H04/H05/H06待确认。
 
-RF09手势：原版OriginalTimelineGesture由每个ActionEditorWindow独立持有快照、事务、磁吸参考及轨道落点，不再以ItemDragger静态状态跨窗口共享。Toolkit仍由每个canvas持有PointerCapture。TimelineCandidates共用快照位移零点约束、拉伸候选、非选中磁吸参考构造及吸附计算；调用者显式保留原策略。原版最短0.1秒、Toolkit0.01秒；原版阈值含边界且起点优先，Toolkit严格小于阈值且参考顺序优先。原版提交时用CanValidTime整体恢复不合法候选，Toolkit原有重叠容许及锁定集合过滤不在此次重构中暗改。原版网格始终量化，Toolkit网格跟随磁吸偏好；Shift只绕过磁吸，保留网格策略。上述差异需人工体验决策，不能把共用计算理解为已统一操作语义。
+RF09手势：原版OriginalTimelineGesture由每个ActionSequenceEditorWindow独立持有快照、事务、磁吸参考及轨道落点，不再以ItemDragger静态状态跨窗口共享。Toolkit仍由每个canvas持有PointerCapture。TimelineCandidates共用快照位移零点约束、拉伸候选、非选中磁吸参考构造及吸附计算；调用者显式保留原策略。原版最短0.1秒、Toolkit0.01秒；原版阈值含边界且起点优先，Toolkit严格小于阈值且参考顺序优先。原版提交时用CanValidTime整体恢复不合法候选，Toolkit原有重叠容许及锁定集合过滤不在此次重构中暗改。原版网格始终量化，Toolkit网格跟随磁吸偏好；Shift只绕过磁吸，保留网格策略。上述差异需人工体验决策，不能把共用计算理解为已统一操作语义。
 
 平台时间存储为有限、非负的 double 秒。文档长度必须大于 0；点事件 duration=0，区间 duration>0，start+duration 不得超出文档长度。所有非法数值在提交前拒绝，不在绘制时修正。界面帧吸附是显式编辑操作，不反向量化已有数据。
 
@@ -236,7 +244,7 @@ RF09手势：原版OriginalTimelineGesture由每个ActionEditorWindow独立持�
 
 ### B05 已固化接口
 
-Editor 的 `NBC.ActionEditor.Extensibility.IEventRegistration.Describe()` 返回 `EventDescriptor`；由 TypeCache 发现无参构造 provider。每个描述符指定 TypeId、DefinitionType、Owner、Factory、Summary、Properties、Validate 及可选 Preview/Exporter 工厂。注册先验证整个批次，包括类型/ID 唯一性、工厂类型和独立实例/ID，再发布；不允许覆盖已有 owner。
+Editor 的 `ActionSequenceEditor.Extensibility.IEventRegistration.Describe()` 返回 `EventDescriptor`；由 TypeCache 发现无参构造 provider。每个描述符指定 TypeId、DefinitionType、Owner、Factory、Summary、Properties、Validate 及可选 Preview/Exporter 工厂。注册先验证整个批次，包括类型/ID 唯一性、工厂类型和独立实例/ID，再发布；不允许覆盖已有 owner。
 
 `EventPropertyContext` 提供原生字段与事务修改入口，业务属性不直接绑定正式文档的 SerializedObject。文档会话、事务和正式存储调用同一注册校验。未知类型可保留诊断，禁止保存；未知 managed-reference 类型不加载为可保存的空事件。资源允许 null，非空资源必须为有效持久引用。预览/导出工厂为可选能力，当前没有默认业务预览或导出实现，不把接口存在当作业务已接入。
 

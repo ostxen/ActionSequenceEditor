@@ -1,12 +1,12 @@
 # RF15 双 UI 交付与人工验收
 
-本文件记录验收证据和待验操作，不维护第二份任务状态。唯一任务状态见 `.codex/tasks/action-editor-refactor.md`。本轮只覆盖 ActionEditor，未改 Combat、包/设置、用户 JSON，未执行 Player Build 或推送。
+本文件记录验收证据和待验操作，不维护第二份任务状态。唯一任务状态见 `.codex/tasks/action-editor-refactor.md`。本轮只覆盖 ActionSequenceEditor，未改 Combat、包/设置、用户 JSON，未执行 Player Build 或推送。
 
 ## 当前阅读入口
 
-两个正式菜单为 `NBC/Action Editor/IMGUI` 和 `NBC/Action Editor/UI Toolkit`，窗口分别位于 `NBC.ActionEditor.Views.IMGUI` 与 `.UIToolkit`，均名为 `ActionEditorWindow`。两窗共享单文档、选择、播放头及Undo，逐窗工作区与捕获独立。
+两个正式菜单为 `ActionSequenceEditor/IMGUI` 和 `ActionSequenceEditor/UI Toolkit`，窗口分别位于 `ActionSequenceEditor.Views.IMGUI` 与 `.UIToolkit`，均名为 `ActionSequenceEditorWindow`。两窗共享单文档、选择、播放头及Undo，逐窗工作区与捕获独立。
 
-入门操作正文只维护在[功能体验样例教程](../Assets/ActionEditor/Samples/FeatureSample/README.md)。当前[存储合同](ActionEditor-Contracts.md)为严格 `actioneditor.json` version 2，根组和独立轨道按RootContainers混排。保存、另存、自动保存和独立导出由共享用例与可靠提交实现，导出不改变来源或基线。
+入门操作正文只维护在[功能体验样例教程](../Assets/ActionSequenceEditor/Samples/FeatureSample/README.md)。当前[存储合同](ActionEditor-Contracts.md)为严格 `actioneditor.json` version 2，根组和独立轨道按RootContainers混排。保存、另存、自动保存和独立导出由共享用例与可靠提交实现，导出不改变来源或基线。
 
 最终工程状态与证据只见[唯一任务清单](../.codex/tasks/action-editor-refactor.md)。H01–H09仍为待用户体验的范围，不以自动化测试或截图代签。
 

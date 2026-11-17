@@ -1,0 +1,17 @@
+{
+    "name": "ActionSequenceEditor.Editor",
+    "rootNamespace": "ActionSequenceEditor",
+    "references": [
+        "GUID:7d31d11ba62f20b4d89380d87c02f0e4",
+        "Unity.Pipeline.Attributes"
+    ],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
