@@ -1,50 +1,33 @@
-﻿# ActionSequenceEditor
-行为时间轴编辑器
+# ActionSequenceEditor
 
-能用于项目技能、Buff、剧情等时间轴表现编辑
+可扩展的 Unity 行为时间轴编辑器，用于技能、Buff、剧情、战斗镜头与场景表现等内容的可视化编排。
 
-# 提示
+## 来源与改造
 
-> 由于工作和生活问题，目前已经没有太多精力维护。
->
-> 当前2.0版本还有不少UI上bug，但是核心功能基本上完成了！大家有动手能力可以自己修复和扩展，2.0相比1.0上限高很多，代码也更加精简，可读性高很多，功能也多了一些。
->
-> 1.0的话相对问题，bug较少，有上线项目的案例。如果您是要用于即将要发布的项目，建议使用1.0。如果时间上不急，那么建议2.0，不过可能需要自己修复一些bug。
+基于 [NoBugCn/ActionEditor](https://github.com/NoBugCn/ActionEditor) 2.0 改造，沿用原项目的时间轴模型与类型扩展机制。当前版本统一了产品命名与目录，整理为 Runtime、Editor 两个产品程序集，并加入原生 UI Toolkit 工作台、共享编辑会话、事务式撤销、JSON 存储与独立导出，以及更完整的结构拖动、属性编辑和业务状态预览。
 
+## 核心能力
 
-# 功能特点
-- 理论上适用于`所有类型项目`的技能Buff，战斗镜头，场景效果等等
-- 完全自定义扩展，项目只提供核心编辑器脚本，无具体业务逻辑，也就是说，拥有无限可能
-- 超高的扩展性，编辑器界面提供大量重写接口。很简单即可自行重写界面
-- 很简单的脚本既可完成扩展和开发，一两天即可集成进入自己项目实现技能，buff，场景等可视化编辑
-- 还有更多细节请看演示视频和演示项目
+- IMGUI 与 UI Toolkit 两套界面共享序列、选择、剪贴板、播放头和撤销历史。
+- 分组、独立轨道和片段编排，支持排序、跨组移动、锁定、激活和已有名称编号同步。
+- 片段拖动与伸缩、时间吸附、渐入渐出、交叉混合、点事件与内循环。
+- 常用字段、数组、列表、嵌套数据与条件属性编辑。
+- 编辑器内播放、时间定位、业务预览、保存、另存为、自动保存和 JSON 导出。
 
+## 扩展入口
 
-# 安装到Unity
-安装地址：https://github.com/NoBugCn/ActionEditor.git
+- **业务模型**：继承 `ActionSequence`、`ActionGroup`、`ActionTrack` 和 `ActionClip`。
+- **类型声明**：通过名称、分类、挂载关系、唯一性、颜色等特性组织业务类型。
+- **工具栏与属性**：为 IMGUI 和 UI Toolkit 分别绑定自定义工具栏与属性控件。
+- **预览**：通过 `PreviewBase<T>` 接入时间采样与生命周期，通过显示快照构建业务状态窗口。
+- **数据格式**：实现 `ISequenceFormat`，注册读取、写入或导出能力。
 
-不熟悉从url安装package的请看[install from giturl](https://docs.unity3d.com/Manual/upm-ui-giturl.html)
+## 开始使用
 
-# 功能预览视频
-功能预览：https://www.bilibili.com/video/BV1tM4y1q7xg/
+在 Unity 菜单中打开 `ActionSequenceEditor > UI Toolkit` 或 `ActionSequenceEditor > IMGUI`，新建“功能体验样例（预置轨道）”即可体验编辑、播放、保存与导出。
 
-# 快速上手
-本工程的唯一入门正文是[功能体验样例：从新建到独立导出](Samples/FeatureSample/README.md)。请先使用隔离样例练习，包含两套界面入口、属性与拖动、撤销、播放状态、保存重开及导出。上方版本建议和下方更新日志保留为上游历史，不代表当前工程验收结论。
+- [完整项目介绍与代码导航](../../README.md)
+- [功能体验样例教程](Samples/FeatureSample/README.md)
+- [数据与扩展接口约定](../../Docs/ActionEditor-Contracts.md)
 
-## 【必看】功能示例
-https://github.com/NoBugCn/ActionEditorExample
-
-# 文档
-操作手册文档：[点击查看](./docs/1.简介.md)
-
-# 交流Q群
-567604178
-
-# 更新日志
-## 2.0.0
- - 新增List和数组支持
- - 新增自定义类支持
- - 重写新的UI样式
- - 支持Asset自定义绑定Header
- - 新增自定义Group的支持
- - 新增Asset和Group自定义属性支持
+样例模型位于 `Runtime/Samples/FeatureSample`，工具栏和预览示例位于 `Editor/Samples/FeatureSample`。
