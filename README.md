@@ -2,27 +2,16 @@
 
 基于 Unity 的可扩展行为时间轴编辑器，用于技能、Buff、剧情、战斗镜头与场景表现等内容的可视化编排。通过序列、分组、轨道和片段组织数据，将时间轴编辑、业务数据与预览逻辑结合起来。
 
-## 项目来源
+## 功能
 
-本项目基于 [NoBugCn/ActionEditor](https://github.com/NoBugCn/ActionEditor) 2.0 改造，沿用其行为时间轴思路与类型扩展机制，并围绕编辑器架构、UI Toolkit 界面、数据存储和交互体验进行了整理与扩展。感谢原作者提供的基础实现。
-
-## 主要改造
-
-- **统一产品与代码结构**：产品名、命名空间和插件目录统一为 `ActionSequenceEditor`，整理序列、分组、轨道和片段的命名与职责。
-- **双界面工作台**：提供 IMGUI 和原生 UI Toolkit 两套编辑界面，共享当前序列、选择、剪贴板、撤销历史与播放头，各窗口独立保存视域、折叠、滚动和分栏状态。
-- **分层编辑架构**：将模型规则、编辑事务、界面呈现、文件存储与预览分别组织，产品程序集收敛为 `ActionSequenceEditor.Runtime` 和 `ActionSequenceEditor.Editor`。
-- **时间轴交互完善**：支持根级分组与独立轨道混排、跨组移动、插入位置提示、边缘自动滚动，以及移动后已有名称数字前缀的同步编号。
-- **原生 Toolkit 交互**：创建、打开、导出、重命名和资源选择使用 Toolkit 窗口，分类菜单、属性控件与菜单布局适配编辑器字号。
-- **统一数据读写**：以 JSON 保存序列，提供保存、另存为、自动保存和独立导出，配合快照、原子文件提交、读回校验与文件版本检查。
-- **完整功能样例**：提供区间、点事件、交叉混合、内循环、字段编辑与状态预览示例，覆盖从创建到保存、重开和导出的常用操作。
-
-## 编辑能力
+提供 **UI Toolkit** 和 **IMGUI** 两套界面，共享当前序列、选择、剪贴板、撤销历史与播放头。每个窗口分别管理视域、折叠、滚动和分栏状态。UI Toolkit 提供原生工具栏、属性控件、分类菜单及创建、打开、导出、重命名和资源选择窗口。
 
 ### 时间轴与内容组织
 
 - 通过 `ActionSequence → ActionGroup / ActionTrack → ActionClip` 组织内容。
 - 拖动片段、调整区间长度、时间步长与吸附、滚轮缩放、中键平移。
-- 分组和轨道排序、轨道归属调整、折叠、锁定与激活状态管理。
+- 根级分组与独立轨道混排、分组排序、轨道跨组移动、折叠、锁定与激活状态管理。
+- 结构拖动时显示插入位置，支持边缘自动滚动，移动后同步名称中已有的数字编号。
 - 区间片段、零长度点事件、渐入渐出、交叉混合与内循环编辑。
 - 复制粘贴、撤销与重做，以及按完整编辑事务恢复内容。
 
@@ -33,6 +22,10 @@
 - 编辑器内播放、暂停、停止、范围播放与播放头定位。
 - 通过业务预览扩展展示片段状态，并随时间轴位置更新。
 - 中文与英文界面，以及字体、时间显示和自动保存等偏好设置。
+
+### 数据存储
+
+序列以 JSON 文件保存，支持保存、另存为、自动保存和独立导出。读写过程使用隔离快照、原子文件提交、读回校验与文件版本检查；Unity 资源引用通过 GUID 与 localFileId 标识。
 
 ## 扩展能力
 
@@ -62,6 +55,8 @@
 
 插件源码位于 [`Assets/ActionSequenceEditor`](Assets/ActionSequenceEditor)。
 
+代码分为 `ActionSequenceEditor.Runtime` 和 `ActionSequenceEditor.Editor` 两个产品程序集。Runtime 提供模型、元数据与序列化；Editor 按编辑用例、界面呈现、外部能力适配和具体视图组织。
+
 | 目录 | 内容 |
 | --- | --- |
 | `Runtime/Model` | 序列、分组、轨道、片段及时间与结构规则。 |
@@ -75,9 +70,11 @@
 | `Editor/Extensions` | 工具栏、属性界面与预览扩展入口。 |
 | `Editor/Samples/FeatureSample` | 样例工具栏、状态展示与预览窗口。 |
 
-## 参考资料
+## 文档与示例
 
 - [功能体验样例教程](Assets/ActionSequenceEditor/Samples/FeatureSample/README.md)
 - [数据与扩展接口约定](Docs/ActionEditor-Contracts.md)
-- [原项目](https://github.com/NoBugCn/ActionEditor)
-- [原项目示例](https://github.com/NoBugCn/ActionEditorExample)
+
+## 项目来源
+
+基于 [NoBugCn/ActionEditor](https://github.com/NoBugCn/ActionEditor) 2.0 开发。
